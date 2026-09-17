@@ -12,6 +12,8 @@ Offline-first. Sin backend ni sincronización entre dispositivos (aún).
 
 El dominio congelado (entidades, matriz financiera, qué nunca se puede romper) está en [DOMAIN.md](DOMAIN.md). Un backend futuro debe implementar ese contrato, no inventar otro.
 
+Especificación del servidor (aún no implementada): [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [API_CONTRACT.md](API_CONTRACT.md) · [MIGRATION.md](MIGRATION.md).
+
 ## Arquitectura
 
 ```

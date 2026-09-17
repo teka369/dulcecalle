@@ -2,7 +2,7 @@
 
 Local-first PWA. IndexedDB/Dexie is the source of truth.
 This document is what a future NestJS + Prisma + PostgreSQL backend must implement.
-It does **not** authorize building that backend yet.
+It does **not** authorize building that backend yet. Fase 5 specs the server; implementation starts only when those docs say so.
 
 Money is integer COP. Never floats.
 
@@ -362,10 +362,11 @@ Critical methods: `createSale`, `createReturn`, `recordPayment`, `recordInitialD
 
 ## 19. Before backend (checklist)
 
-- Map Dexie int ids → UUID (or dual key).
-- Unique `(business_id, request_id)`.
-- `business_id` on every table + RLS/where-clause isolation.
-- Persist sale `method`.
-- Business timezone for `local_date`.
-- Import job: replay vs cached stock/debt.
-- No Nest/Prisma until this contract is the spec.
+Specified in Fase 5 (not implemented):
+
+- [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md)
+- [DATABASE.md](DATABASE.md)
+- [API_CONTRACT.md](API_CONTRACT.md)
+- [MIGRATION.md](MIGRATION.md)
+
+UUID PK + `legacy_dexie_id`. Unique `(business_id, request_id)`. `business_id` on every table. Sale `method` stored in Postgres (Dexie still reconstructs from cashMove). Business timezone `America/Bogota`. Import is hybrid insert + reconcile; initial debts stay `initial_debts`, never sales.
