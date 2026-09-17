@@ -172,7 +172,7 @@ describe("S4 Caja — distinct kinds & session rules", () => {
     const product = await productRepository.getById(productId);
     expect(product?.stock).toBe(10);
     const stockMoves = await inventoryRepository.listMoves(productId);
-    expect(stockMoves).toHaveLength(0);
+    expect(stockMoves.filter((m) => m.reason !== "inicial")).toHaveLength(0);
   });
 
   it("persists session + moves across reload (Dexie)", async () => {

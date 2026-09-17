@@ -357,6 +357,90 @@ describe("P0 fiados and abonos", () => {
   });
 });
 
+describe("P0.5 sale idempotency", () => {
+  beforeEach(async () => {
+    await __resetDbForTests();
+  });
+
+  it("same requestId creates a single sale (stock/cash once)", async () => {
+    const productId = await seedProduct({ price: 1000, stock: 10 });
+    const input = {
+      lines: [{ productId, qty: 2, unitPrice: 1000 }],
+      paymentKind: "paid" as const,
+      amountReceived: 2000,
+      method: "Efectivo" as const,
+      requestId: "sale-1",
+    };
+
+    const first = await saleRepository.createSale(input);
+    const second = await saleRepository.createSale(input);
+    expect(second).toBe(first);
+
+    const sales = await saleRepository.list();
+    expect(sales).toHaveLength(1);
+    expect((await productRepository.getById(productId))?.stock).toBe(8);
+    const cash = await getDb().cashMoves.toArray();
+    expect(cash.filter((m) => m.kind === "sale")).toHaveLength(1);
+    const moves = await getDb().stockMoves.toArray();
+    expect(moves.filter((m) => m.reason === "sale")).toHaveLength(1);
+  });
+
+  it("different requestIds create two valid sales", async () => {
+    const productId = await seedProduct({ price: 1000, stock: 10 });
+    const base = {
+      lines: [{ productId, qty: 1, unitPrice: 1000 }],
+      paymentKind: "paid" as const,
+      amountReceived: 1000,
+      method: "Efectivo" as const,
+    };
+
+    const a = await saleRepository.createSale({ ...base, requestId: "sale-a" });
+    const b = await saleRepository.createSale({ ...base, requestId: "sale-b" });
+    expect(a).not.toBe(b);
+
+    expect(await saleRepository.list()).toHaveLength(2);
+    expect((await productRepository.getById(productId))?.stock).toBe(8);
+    const cash = await getDb().cashMoves.toArray();
+    expect(cash.filter((m) => m.kind === "sale")).toHaveLength(2);
+  });
+
+  it("same requestId does not double debt on a fiada", async () => {
+    const productId = await seedProduct({ price: 1000, stock: 10 });
+    const customerId = await customerRepository.create({ name: "Rosa" });
+    const input = {
+      lines: [{ productId, qty: 3 }],
+      paymentKind: "credit" as const,
+      customerId,
+      amountReceived: 0,
+      requestId: "fiada-1",
+    };
+
+    const first = await saleRepository.createSale(input);
+    const second = await saleRepository.createSale(input);
+    expect(second).toBe(first);
+    expect((await customerRepository.getById(customerId))?.debt).toBe(3_000);
+    expect(await saleRepository.list()).toHaveLength(1);
+  });
+
+  it("parallel same requestId still yields one sale", async () => {
+    const productId = await seedProduct({ price: 1000, stock: 10 });
+    const input = {
+      lines: [{ productId, qty: 1 }],
+      paymentKind: "paid" as const,
+      amountReceived: 1000,
+      requestId: "sale-race",
+    };
+
+    const [a, b] = await Promise.all([
+      saleRepository.createSale(input),
+      saleRepository.createSale(input),
+    ]);
+    expect(a).toBe(b);
+    expect(await saleRepository.list()).toHaveLength(1);
+    expect((await productRepository.getById(productId))?.stock).toBe(9);
+  });
+});
+
 describe("P0 inventory integrity", () => {
   beforeEach(async () => {
     await __resetDbForTests();
@@ -391,6 +475,35 @@ describe("P0 inventory integrity", () => {
       productRepository.update(productId, { stock: 99 }),
     ).rejects.toThrow(INVENTORY_ERRORS.stockViaMoves);
     expect((await productRepository.getById(productId))?.stock).toBe(5);
+  });
+
+  it("create with stock writes inicial move, not a compra", async () => {
+    const productId = await seedProduct({ stock: 7, avgCost: 400 });
+    const p = await productRepository.getById(productId);
+    expect(p?.stock).toBe(7);
+    const moves = await inventoryRepository.listMoves(productId);
+    expect(moves).toHaveLength(1);
+    expect(moves[0]?.reason).toBe("inicial");
+    expect(moves[0]?.delta).toBe(7);
+    expect(moves[0]?.unitCost).toBe(400);
+    expect(await getDb().cashMoves.count()).toBe(0);
+  });
+
+  it("create with stock 0 writes no stockMove", async () => {
+    const productId = await seedProduct({ stock: 0 });
+    expect(await inventoryRepository.listMoves(productId)).toHaveLength(0);
+  });
+
+  it("applyMove cannot mint inicial stock", async () => {
+    const productId = await seedProduct({ stock: 3 });
+    await expect(
+      inventoryRepository.applyMove({
+        productId,
+        delta: 5,
+        reason: "inicial",
+      }),
+    ).rejects.toThrow(INVENTORY_ERRORS.inicialViaCreate);
+    expect((await productRepository.getById(productId))?.stock).toBe(3);
   });
 });
 

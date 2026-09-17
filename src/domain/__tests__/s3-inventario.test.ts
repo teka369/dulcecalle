@@ -78,7 +78,7 @@ describe("S3 inventario surtir + mermas", () => {
     expect(await metricStockByProduct(productId)).toBe(16);
     const moves = await inventoryRepository.listMoves(productId);
     const reasons = moves.map((m) => m.reason).sort();
-    expect(reasons).toEqual(["me_lo_comi", "perdido", "regalar"]);
+    expect(reasons).toEqual(["inicial", "me_lo_comi", "perdido", "regalar"]);
     // No cash / income on shrink
     const cash = await getDb().cashMoves.toArray();
     expect(cash).toHaveLength(0);
