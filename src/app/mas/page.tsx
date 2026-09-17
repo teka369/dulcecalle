@@ -31,6 +31,13 @@ export default function MasPage() {
           <span>{CASH_COPY.masCaja}</span>
           <span className="text-ink/40">→</span>
         </Link>
+        <Link
+          href="/mas/datos"
+          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 text-base font-semibold shadow-sm"
+        >
+          <span>Datos</span>
+          <span className="text-ink/40">→</span>
+        </Link>
       </nav>
     </div>
   );

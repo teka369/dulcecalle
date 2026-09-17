@@ -1,4 +1,4 @@
-import { getDb } from "./db";
+import { __resetDbForTests, getDb } from "./db";
 import { saleRepository } from "@/repositories/saleRepository";
 import { customerRepository } from "@/repositories/customerRepository";
 import { productRepository } from "@/repositories/productRepository";
@@ -181,6 +181,14 @@ export async function isDbEmpty(): Promise<boolean> {
   const products = await db.products.count();
   const sales = await db.sales.count();
   return products === 0 && sales === 0;
+}
+
+/**
+ * Wipe ALL local IndexedDB data (sales, stock, caja, customers, demo).
+ * Irreversible. Call only after a strong UI confirmation.
+ */
+export async function wipeLocalData(): Promise<void> {
+  await __resetDbForTests();
 }
 
 /** Helpers mirroring Inicio aggregations — used by demo regression tests. */

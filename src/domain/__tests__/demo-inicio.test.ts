@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { __resetDbForTests } from "@/storage/db";
 import {
   demoInicioSnapshot,
+  isDbEmpty,
   loadDemoData,
   startOfLocalDay,
+  wipeLocalData,
 } from "@/storage/seed";
 import { customerRepository, saleRepository } from "@/repositories";
 
@@ -39,5 +41,12 @@ describe("Cargar demo → Inicio metrics (today)", () => {
     await loadDemoData();
     const second = await demoInicioSnapshot();
     expect(second).toEqual(first);
+  });
+
+  it("wipeLocalData clears everything so demo can load again", async () => {
+    await loadDemoData();
+    expect(await isDbEmpty()).toBe(false);
+    await wipeLocalData();
+    expect(await isDbEmpty()).toBe(true);
   });
 });
