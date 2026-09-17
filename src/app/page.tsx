@@ -1,15 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { formatCop } from "@/domain/money";
+import { CASH_COPY } from "@/domain/cash";
 import {
-  metricCaja,
   metricFiadoOutstanding,
-  metricVentas,
   productRepository,
+  saleRepository,
 } from "@/repositories";
+import { cashRepository } from "@/repositories/cashRepository";
 import { isDbEmpty, loadDemoData } from "@/storage/seed";
-import { saleRepository } from "@/repositories";
 
 function startOfToday(): number {
   const d = new Date();
@@ -18,9 +19,13 @@ function startOfToday(): number {
 }
 
 export default function InicioPage() {
+  const pathname = usePathname();
   const [hoyVendido, setHoyVendido] = useState(0);
   const [porCobrar, setPorCobrar] = useState(0);
   const [stockBajo, setStockBajo] = useState(0);
+  const [cajaEsperado, setCajaEsperado] = useState<number | null>(null);
+  const [cajaCerrada, setCajaCerrada] = useState(true);
+  const [hasCajaSession, setHasCajaSession] = useState(false);
   const [emptyToday, setEmptyToday] = useState(true);
   const [showDemo, setShowDemo] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -37,14 +42,25 @@ export default function InicioPage() {
     const low = await productRepository.lowStock();
     setStockBajo(low.length);
     setShowDemo(await isDbEmpty());
-    // touch caja/ventas to keep imports honest for domain separation demos
-    void metricCaja;
-    void metricVentas;
+
+    const day = await cashRepository.daySummary();
+    setHasCajaSession(day.session != null);
+    setCajaCerrada(day.closed || day.session == null);
+    setCajaEsperado(day.expected.efectivo);
+
     setReady(true);
   }, []);
 
   useEffect(() => {
     void refresh();
+  }, [refresh, pathname]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, [refresh]);
 
   async function onLoadDemo() {
@@ -57,6 +73,8 @@ export default function InicioPage() {
   if (!ready) {
     return <p className="text-sm text-ink/60">Cargando…</p>;
   }
+
+  const cajaOpen = hasCajaSession && !cajaCerrada;
 
   return (
     <div className="flex flex-col gap-4">
@@ -73,6 +91,21 @@ export default function InicioPage() {
           value={String(stockBajo)}
           tone={stockBajo > 0 ? "danger" : "ok"}
         />
+        {/* S4: always visible on Inicio (mobile 390px) — open vs closed */}
+        {cajaOpen ? (
+          <SummaryCard
+            label={CASH_COPY.cajaEsperado}
+            value={formatCop(cajaEsperado ?? 0)}
+            tone="ok"
+          />
+        ) : (
+          <SummaryCard
+            label={CASH_COPY.estadoCerrada}
+            value={
+              hasCajaSession ? formatCop(cajaEsperado ?? 0) : CASH_COPY.estadoCerrada
+            }
+          />
+        )}
       </section>
 
       {emptyToday && (

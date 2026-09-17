@@ -109,12 +109,28 @@ export interface Expense {
   createdAt: number;
 }
 
+/**
+ * Cash move kinds — NEVER conflate:
+ * - expense (gasto operativo) ≠ retiro (owner_out) ≠ aporte (owner_in)
+ * - sale / debt_collect / compra are separate from the three S4 flows
+ * - Diferencia is close variance, not a move kind
+ */
+export type CashMoveKind =
+  | "expense"
+  | "retiro"
+  | "aporte"
+  | "sale"
+  | "debt_collect"
+  | "compra"
+  | string;
+
 export interface CashMove {
   id?: number;
   amount: number;
   direction: "in" | "out";
   method: PayMethod;
-  kind: string;
+  /** expense | retiro | aporte | sale | debt_collect | compra | … */
+  kind: CashMoveKind;
   refType?: string;
   refId?: number;
   sessionId?: number | null;
@@ -122,12 +138,26 @@ export interface CashMove {
   createdAt: number;
 }
 
+/**
+ * One cash session per local calendar day.
+ * Close count = physical Efectivo only (Nequi tracked separately, not in billetes).
+ */
 export interface CashSession {
   id?: number;
+  /** Local calendar day YYYY-MM-DD (1 session / day). */
+  localDate: string;
   openedAt: number;
   closedAt: number | null;
+  /** Opening float in Efectivo. */
   openingFloat: number;
+  /** Physical Efectivo counted at close (Nequi excluded). */
   closingCount: number | null;
+  /** Snapshot: expected Efectivo at close. */
+  expectedEfectivo?: number | null;
+  /** Snapshot: expected Nequi at close (tracked, not counted in billetes). */
+  expectedNequi?: number | null;
+  /** closingCount − expectedEfectivo */
+  difference?: number | null;
   note?: string;
 }
 

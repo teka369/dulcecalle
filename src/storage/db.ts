@@ -17,6 +17,7 @@ import type {
  * DulceCalle IndexedDB schema.
  * v1: foundation tables
  * v2: suppliers (light — NO CxP). StockMove.supplierId is optional payload (no new index).
+ * v3: cashSessions.localDate (1 session / calendar day).
  * Data lives in Dexie — NOT in the Cache API.
  */
 export class DulceCalleDB extends Dexie {
@@ -50,6 +51,10 @@ export class DulceCalleDB extends Dexie {
     this.version(2).stores({
       suppliers: "++id, name",
     });
+    // S4: 1 cash session per localDate; closingCount = Efectivo físico.
+    this.version(3).stores({
+      cashSessions: "++id, openedAt, closedAt, localDate",
+    });
   }
 }
 
@@ -73,6 +78,14 @@ export async function __resetDbForTests(): Promise<void> {
   }
   await Dexie.delete("dulcecalle");
   dbSingleton = null;
+}
+
+/** Test-only: close singleton without deleting IndexedDB (simulate reload). */
+export function __reopenDbForTests(): void {
+  if (dbSingleton) {
+    dbSingleton.close();
+    dbSingleton = null;
+  }
 }
 
 export type { DulceCalleDB as DulceCalleDatabase };
