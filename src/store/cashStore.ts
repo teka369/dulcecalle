@@ -75,6 +75,7 @@ export const cashStore = {
     categoryRaw: string;
     method: PayMethod | null;
     note?: string;
+    requestId?: string;
   }): Promise<void> {
     const err = validateGasto({
       amountRaw: input.amountRaw,
@@ -90,6 +91,7 @@ export const cashStore = {
       category: input.categoryRaw.trim(),
       method: input.method!,
       note: input.note?.trim() || undefined,
+      requestId: input.requestId,
     });
     setState({ lastToast: CASH_COPY.toastGasto });
     await this.refresh();
@@ -98,6 +100,7 @@ export const cashStore = {
     amountRaw: string;
     method: PayMethod | null;
     note?: string;
+    requestId?: string;
   }): Promise<void> {
     const err = validateCashAmount({
       amountRaw: input.amountRaw,
@@ -111,6 +114,7 @@ export const cashStore = {
       parseCopAmount(input.amountRaw)!,
       input.method!,
       input.note?.trim() || undefined,
+      input.requestId,
     );
     setState({ lastToast: CASH_COPY.toastRetiro });
     await this.refresh();
@@ -119,6 +123,7 @@ export const cashStore = {
     amountRaw: string;
     method: PayMethod | null;
     note?: string;
+    requestId?: string;
   }): Promise<void> {
     const err = validateCashAmount({
       amountRaw: input.amountRaw,
@@ -132,6 +137,7 @@ export const cashStore = {
       parseCopAmount(input.amountRaw)!,
       input.method!,
       input.note?.trim() || undefined,
+      input.requestId,
     );
     setState({ lastToast: CASH_COPY.toastAporte });
     await this.refresh();

@@ -91,6 +91,8 @@ export interface StockMove {
   refId?: number;
   note?: string;
   createdAt: number;
+  /** Same key → no second surtir/shrink. */
+  requestId?: string;
 }
 
 export interface CustomerPayment {
@@ -126,6 +128,8 @@ export interface Expense {
   note?: string;
   method: PayMethod;
   createdAt: number;
+  /** Same key → no second gasto. */
+  requestId?: string;
 }
 
 /**
@@ -155,6 +159,8 @@ export interface CashMove {
   sessionId?: number | null;
   note?: string;
   createdAt: number;
+  /** Same key → no second cash move (aporte/retiro/gasto). */
+  requestId?: string;
 }
 
 /**

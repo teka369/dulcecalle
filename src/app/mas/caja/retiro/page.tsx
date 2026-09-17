@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CASH_COPY, validateCashAmount } from "@/domain/cash";
+import { newRequestId } from "@/domain/requestId";
 import type { PayMethod } from "@/domain/types";
 import { cashStore } from "@/store/cashStore";
 
@@ -15,6 +16,7 @@ export default function RetiroPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const requestIdRef = useRef<string | null>(null);
 
   const valid = useMemo(
     () => validateCashAmount({ amountRaw, method }) === null,
@@ -31,7 +33,13 @@ export default function RetiroPage() {
     }
     setBusy(true);
     try {
-      await cashStore.recordRetiro({ amountRaw, method, note });
+      if (!requestIdRef.current) requestIdRef.current = newRequestId("retiro");
+      await cashStore.recordRetiro({
+        amountRaw,
+        method,
+        note,
+        requestId: requestIdRef.current,
+      });
       setToast(CASH_COPY.toastRetiro);
       setTimeout(() => router.push("/mas/caja"), 700);
     } catch (e) {

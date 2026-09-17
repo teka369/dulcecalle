@@ -154,6 +154,7 @@ export const inventoryStore = {
     supplierNameCreate?: string;
     note?: string;
     dateRaw?: string;
+    requestId?: string;
   }): Promise<number> {
     const parsed = validateSurtirForm({
       qtyRaw: input.qtyRaw,
@@ -182,6 +183,7 @@ export const inventoryStore = {
       supplierId,
       note: input.note?.trim() || undefined,
       createdAt: dateInputToMs(input.dateRaw ?? todayLocalDateInput()),
+      requestId: input.requestId,
     });
     await this.refreshAll();
     setState({ lastToast: INVENTORY_TOASTS.surtir });
@@ -194,6 +196,7 @@ export const inventoryStore = {
     note?: string;
     /** Required when reason === perdido */
     motivoRaw?: string;
+    requestId?: string;
   }): Promise<number> {
     const product = await productRepository.getById(input.productId);
     if (!product) throw new Error("product not found");
@@ -216,6 +219,7 @@ export const inventoryStore = {
       qty: parsed.qty,
       reason: input.reason,
       note,
+      requestId: input.requestId,
     });
     await this.refreshProducts();
     const toast =

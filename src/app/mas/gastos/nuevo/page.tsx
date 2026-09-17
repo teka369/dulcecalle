@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CASH_COPY } from "@/domain/cash";
 import { validateGasto } from "@/domain/cash";
+import { newRequestId } from "@/domain/requestId";
 import type { PayMethod } from "@/domain/types";
 import { cashStore } from "@/store/cashStore";
 
@@ -17,6 +18,7 @@ export default function NuevoGastoPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const requestIdRef = useRef<string | null>(null);
 
   const valid = useMemo(
     () =>
@@ -34,11 +36,13 @@ export default function NuevoGastoPage() {
     }
     setBusy(true);
     try {
+      if (!requestIdRef.current) requestIdRef.current = newRequestId("gasto");
       await cashStore.recordGasto({
         amountRaw,
         categoryRaw,
         method,
         note,
+        requestId: requestIdRef.current,
       });
       setToast(CASH_COPY.toastGasto);
       setTimeout(() => router.push("/mas/gastos"), 700);

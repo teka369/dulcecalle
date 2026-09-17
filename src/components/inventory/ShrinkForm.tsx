@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Product } from "@/domain/types";
 import {
   validateMotivo,
   validateShrinkQty,
   type ShrinkReason,
 } from "@/domain/inventory";
+import { newRequestId } from "@/domain/requestId";
 import { inventoryStore } from "@/store/inventoryStore";
 
 export function ShrinkForm({
@@ -36,6 +37,7 @@ export function ShrinkForm({
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(id) || id <= 0) {
@@ -76,12 +78,14 @@ export function ShrinkForm({
     }
     setBusy(true);
     try {
+      if (!requestIdRef.current) requestIdRef.current = newRequestId("shrink");
       await inventoryStore.applyShrink({
         productId: product.id!,
         qtyRaw,
         reason,
         note: showNote ? note : undefined,
         motivoRaw: requireMotivo ? note : undefined,
+        requestId: requestIdRef.current,
       });
       setToast(toastText);
       setTimeout(() => {

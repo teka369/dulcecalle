@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCop } from "@/domain/money";
+import { newRequestId } from "@/domain/requestId";
 import type { PayMethod, Product, Supplier } from "@/domain/types";
 import { validateSurtirForm } from "@/domain/inventory";
 import { inventoryStore } from "@/store/inventoryStore";
@@ -27,6 +28,7 @@ export default function SurtirPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [totalLocked, setTotalLocked] = useState(false);
+  const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(id) || id <= 0) {
@@ -114,6 +116,7 @@ export default function SurtirPage() {
     }
     setBusy(true);
     try {
+      if (!requestIdRef.current) requestIdRef.current = newRequestId("surtir");
       await inventoryStore.surtir({
         productId: product.id!,
         qtyRaw,
@@ -124,8 +127,13 @@ export default function SurtirPage() {
         supplierNameCreate: supplierCreate,
         note,
         dateRaw,
+        requestId: requestIdRef.current,
       });
-      setToast("Stock actualizado");
+      setToast(
+        r.totalCost > 0
+          ? `Stock actualizado · salieron ${formatCop(r.totalCost)} de ${method}`
+          : "Stock actualizado",
+      );
       setTimeout(() => {
         router.push(`/inventario/${product.id}`);
       }, 700);
@@ -273,6 +281,12 @@ export default function SurtirPage() {
               onClick={() => setMethod("Nequi")}
             />
           </div>
+          {previewTotal > 0 && (
+            <p className="mt-2 text-sm text-ink/70">
+              Sale {formatCop(previewTotal)} de {method}. No es un gasto ni un
+              retiro.
+            </p>
+          )}
         </div>
 
         <div>
@@ -298,7 +312,9 @@ export default function SurtirPage() {
             onClick={() => void confirm()}
             className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
           >
-            Confirmar surtir
+            {previewTotal > 0
+              ? `Confirmar surtir · ${formatCop(previewTotal)}`
+              : "Confirmar surtir"}
           </button>
         </div>
       </div>

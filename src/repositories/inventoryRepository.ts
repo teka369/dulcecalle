@@ -51,6 +51,7 @@ export class InventoryRepository {
     refId?: number;
     supplierId?: number | null;
     createdAt?: number;
+    requestId?: string;
   }): Promise<number> {
     if (!Number.isInteger(input.delta) || input.delta === 0) {
       throw new Error("delta must be a non-zero integer");
@@ -65,6 +66,13 @@ export class InventoryRepository {
     const db = getDb();
     return db.transaction("rw", db.products, db.stockMoves, db.cashSessions, async () => {
       await assertDayEditable(createdAt);
+      if (input.requestId) {
+        const existing = await db.stockMoves
+          .where("requestId")
+          .equals(input.requestId)
+          .first();
+        if (existing?.id != null) return existing.id;
+      }
       const product = await db.products.get(input.productId);
       if (!product) throw new Error("product not found");
 
@@ -102,6 +110,7 @@ export class InventoryRepository {
         refId: input.refId,
         note: input.note,
         createdAt,
+        ...(input.requestId ? { requestId: input.requestId } : {}),
       }) as Promise<number>;
     });
   }
@@ -124,6 +133,7 @@ export class InventoryRepository {
     note?: string;
     /** Default today; editable date from UI. */
     createdAt?: number;
+    requestId?: string;
   }): Promise<number> {
     if (!Number.isInteger(input.qty) || input.qty <= 0) {
       throw new Error(INVENTORY_ERRORS.notPositive);
@@ -155,6 +165,13 @@ export class InventoryRepository {
       db.cashSessions,
       async () => {
         await assertDayEditable(createdAt);
+        if (input.requestId) {
+          const existing = await db.stockMoves
+            .where("requestId")
+            .equals(input.requestId)
+            .first();
+          if (existing?.id != null) return existing.id;
+        }
         if (input.supplierId != null) {
           const supplier = await db.suppliers.get(input.supplierId);
           if (!supplier) throw new Error("supplier not found");
@@ -189,6 +206,7 @@ export class InventoryRepository {
           refType: "purchase",
           note: input.note,
           createdAt,
+          ...(input.requestId ? { requestId: input.requestId } : {}),
         })) as number;
 
         if (totalCost > 0) {
@@ -222,6 +240,7 @@ export class InventoryRepository {
     qty: number;
     reason: ShrinkReason;
     note?: string;
+    requestId?: string;
   }): Promise<number> {
     if (!Number.isInteger(input.qty) || input.qty <= 0) {
       throw new Error(INVENTORY_ERRORS.notPositive);
@@ -232,6 +251,7 @@ export class InventoryRepository {
       reason: input.reason,
       note: input.note,
       refType: "shrink",
+      requestId: input.requestId,
     });
   }
 }

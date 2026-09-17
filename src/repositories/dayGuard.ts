@@ -12,8 +12,7 @@ import { getDb } from "@/storage/db";
  */
 export async function assertDayEditable(atMs: number = Date.now()): Promise<void> {
   const date = localDateKey(atMs);
-  const sessions = await getDb().cashSessions.toArray();
-  const session = sessions.find((s) => s.localDate === date);
+  const session = await getDb().cashSessions.where("localDate").equals(date).first();
   if (session && session.closedAt != null) {
     throw new Error(CASH_ERRORS.dayClosed);
   }

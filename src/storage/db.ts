@@ -22,6 +22,7 @@ import type {
  * v4: customerPayments.requestId (abono idempotency).
  * v5: sales.requestId (sale idempotency).
  * v6: initialDebts (pre-system customer debt; not a sale).
+ * v7: requestId on expenses/cashMoves/stockMoves; unique cashSessions.localDate.
  * Data lives in Dexie — NOT in the Cache API.
  */
 export class DulceCalleDB extends Dexie {
@@ -71,6 +72,13 @@ export class DulceCalleDB extends Dexie {
     // Opening debts that existed before DulceCalle. Not a sale / not caja.
     this.version(6).stores({
       initialDebts: "++id, customerId, createdAt, requestId",
+    });
+    // F2: idempotent gasto/surtir/caja moves + 1 session per localDate.
+    this.version(7).stores({
+      expenses: "++id, createdAt, requestId",
+      cashMoves: "++id, createdAt, method, kind, sessionId, requestId",
+      stockMoves: "++id, productId, createdAt, reason, requestId",
+      cashSessions: "++id, openedAt, closedAt, &localDate",
     });
   }
 }

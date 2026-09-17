@@ -77,8 +77,7 @@ export class CashRepository {
   }
 
   async getSessionByLocalDate(localDate: string): Promise<CashSession | undefined> {
-    const all = await getDb().cashSessions.toArray();
-    return all.find((s) => s.localDate === localDate);
+    return getDb().cashSessions.where("localDate").equals(localDate).first();
   }
 
   async getTodaySession(): Promise<CashSession | undefined> {
@@ -166,6 +165,7 @@ export class CashRepository {
     note?: string;
     sessionId?: number | null;
     createdAt?: number;
+    requestId?: string;
   }): Promise<number> {
     const amount = asCop(input.amount);
     if (amount <= 0) throw new Error("cash move amount must be > 0");
@@ -176,23 +176,38 @@ export class CashRepository {
     const createdAt = input.createdAt ?? Date.now();
     await assertDayEditable(createdAt);
 
-    let sessionId = input.sessionId;
-    if (sessionId === undefined) {
-      const open = await this.getOpenSession();
-      sessionId = open?.id ?? null;
-    }
+    const db = getDb();
+    return db.transaction("rw", db.cashMoves, db.cashSessions, async () => {
+      await assertDayEditable(createdAt);
+      if (input.requestId) {
+        const existing = await db.cashMoves
+          .where("requestId")
+          .equals(input.requestId)
+          .first();
+        if (existing?.id != null) return existing.id;
+      }
 
-    return getDb().cashMoves.add({
-      amount,
-      direction: input.direction,
-      method: input.method,
-      kind: input.kind,
-      refType: input.refType,
-      refId: input.refId,
-      sessionId: sessionId ?? null,
-      note: input.note,
-      createdAt,
-    }) as Promise<number>;
+      let sessionId = input.sessionId;
+      if (sessionId === undefined) {
+        const open = await db.cashSessions
+          .filter((s) => s.closedAt == null)
+          .first();
+        sessionId = open?.id ?? null;
+      }
+
+      return db.cashMoves.add({
+        amount,
+        direction: input.direction,
+        method: input.method,
+        kind: input.kind,
+        refType: input.refType,
+        refId: input.refId,
+        sessionId: sessionId ?? null,
+        note: input.note,
+        createdAt,
+        ...(input.requestId ? { requestId: input.requestId } : {}),
+      }) as Promise<number>;
+    });
   }
 
   /** Owner aporte (cash in) — owner_in. NOT a sale. Does NOT touch stock. */
@@ -200,6 +215,7 @@ export class CashRepository {
     amount: number,
     method: PayMethod = "Efectivo",
     note?: string,
+    requestId?: string,
   ): Promise<number> {
     return this.recordMove({
       amount,
@@ -207,6 +223,7 @@ export class CashRepository {
       method,
       kind: "aporte",
       note,
+      requestId,
     });
   }
 
@@ -215,6 +232,7 @@ export class CashRepository {
     amount: number,
     method: PayMethod = "Efectivo",
     note?: string,
+    requestId?: string,
   ): Promise<number> {
     return this.recordMove({
       amount,
@@ -222,6 +240,7 @@ export class CashRepository {
       method,
       kind: "retiro",
       note,
+      requestId,
     });
   }
 
@@ -270,6 +289,7 @@ export class CashRepository {
     category: string;
     note?: string;
     method?: PayMethod;
+    requestId?: string;
   }): Promise<number> {
     const amount = asCop(input.amount);
     if (amount <= 0) throw new Error("expense amount must be > 0");
@@ -283,16 +303,28 @@ export class CashRepository {
     await assertDayEditable();
 
     const db = getDb();
-    const open = await this.getOpenSession();
 
     return db.transaction("rw", db.expenses, db.cashMoves, db.cashSessions, async () => {
       await assertDayEditable();
+      if (input.requestId) {
+        const existing = await db.expenses
+          .where("requestId")
+          .equals(input.requestId)
+          .first();
+        if (existing?.id != null) return existing.id;
+      }
+
+      const open = await db.cashSessions
+        .filter((s) => s.closedAt == null)
+        .first();
+
       const expenseId = (await db.expenses.add({
         amount,
         category,
         note: input.note,
         method,
         createdAt: Date.now(),
+        ...(input.requestId ? { requestId: input.requestId } : {}),
       })) as number;
 
       await db.cashMoves.add({
@@ -305,6 +337,7 @@ export class CashRepository {
         sessionId: open?.id ?? null,
         note: category,
         createdAt: Date.now(),
+        ...(input.requestId ? { requestId: `expense-${input.requestId}` } : {}),
       });
 
       return expenseId;
@@ -320,24 +353,32 @@ export class CashRepository {
     if (float < 0) throw new Error(CASH_ERRORS.openingNegative);
 
     const localDate = localDateKey();
-    const existing = await this.getSessionByLocalDate(localDate);
-    if (existing) {
-      if (existing.closedAt != null) {
-        throw new Error(CASH_ERRORS.dayClosedAlt);
-      }
-      throw new Error(CASH_ERRORS.sessionAlreadyOpen);
-    }
+    const db = getDb();
 
-    return getDb().cashSessions.add({
-      localDate,
-      openedAt: Date.now(),
-      closedAt: null,
-      openingFloat: float,
-      closingCount: null,
-      expectedEfectivo: null,
-      expectedNequi: null,
-      difference: null,
-    }) as Promise<number>;
+    return db.transaction("rw", db.cashSessions, async () => {
+      const existing = await db.cashSessions
+        .where("localDate")
+        .equals(localDate)
+        .first();
+      if (existing) {
+        if (existing.closedAt != null) {
+          throw new Error(CASH_ERRORS.dayClosedAlt);
+        }
+        if (existing.id != null) return existing.id;
+        throw new Error(CASH_ERRORS.sessionAlreadyOpen);
+      }
+
+      return db.cashSessions.add({
+        localDate,
+        openedAt: Date.now(),
+        closedAt: null,
+        openingFloat: float,
+        closingCount: null,
+        expectedEfectivo: null,
+        expectedNequi: null,
+        difference: null,
+      }) as Promise<number>;
+    });
   }
 
   /**
@@ -349,19 +390,21 @@ export class CashRepository {
     if (counted < 0) throw new Error(CASH_ERRORS.badCounted);
 
     const db = getDb();
-    const session = await db.cashSessions.get(sessionId);
-    if (!session) throw new Error("session not found");
-    if (session.closedAt != null) throw new Error(CASH_ERRORS.sessionAlreadyClosed);
+    await db.transaction("rw", db.cashSessions, db.cashMoves, async () => {
+      const session = await db.cashSessions.get(sessionId);
+      if (!session) throw new Error("session not found");
+      if (session.closedAt != null) throw new Error(CASH_ERRORS.sessionAlreadyClosed);
 
-    const expected = await this.expectedBuckets(session.localDate);
-    const difference = subCop(counted, expected.efectivo);
+      const expected = await this.expectedBuckets(session.localDate);
+      const difference = subCop(counted, expected.efectivo);
 
-    await db.cashSessions.update(sessionId, {
-      closedAt: Date.now(),
-      closingCount: counted,
-      expectedEfectivo: expected.efectivo,
-      expectedNequi: expected.nequi,
-      difference,
+      await db.cashSessions.update(sessionId, {
+        closedAt: Date.now(),
+        closingCount: counted,
+        expectedEfectivo: expected.efectivo,
+        expectedNequi: expected.nequi,
+        difference,
+      });
     });
   }
 

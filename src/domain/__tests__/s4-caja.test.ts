@@ -67,9 +67,10 @@ describe("S4 Caja — distinct kinds & session rules", () => {
     const id = await cashRepository.openSession(2_000);
     expect(id).toBeTruthy();
 
-    await expect(cashRepository.openSession(0)).rejects.toThrow(
-      CASH_ERRORS.sessionAlreadyOpen,
-    );
+    // Second open of an already-open day is a no-op (double tap).
+    const again = await cashRepository.openSession(0);
+    expect(again).toBe(id);
+    expect((await cashRepository.getTodaySession())?.openingFloat).toBe(2_000);
 
     await cashRepository.ownerAporte(10_000, "Efectivo");
     await cashRepository.ownerAporte(3_000, "Nequi");
