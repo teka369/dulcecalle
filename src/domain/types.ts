@@ -69,9 +69,9 @@ export interface SaleLine {
   productId: number;
   productName: string;
   qty: number;
-  /** Price SNAPSHOT at sale time. */
+  /** Price SNAPSHOT at sale time (the price actually charged). */
   unitPrice: number;
-  /** Cost SNAPSHOT at sale time. */
+  /** Cost SNAPSHOT at sale time (product.avgCost when sold). */
   unitCost: number;
   lineTotal: number;
 }
@@ -98,6 +98,8 @@ export interface CustomerPayment {
   saleId?: number | null;
   createdAt: number;
   note?: string;
+  /** Client-generated key; same key → no-op (no double abono). */
+  requestId?: string;
 }
 
 export interface Expense {
@@ -141,6 +143,9 @@ export interface CashMove {
 /**
  * One cash session per local calendar day.
  * Close count = physical Efectivo only (Nequi tracked separately, not in billetes).
+ *
+ * openingFloat lives on the session, NOT as a cashMove.
+ * See cashRepository.balance vs expectedBuckets.
  */
 export interface CashSession {
   id?: number;
@@ -169,10 +174,17 @@ export interface Setting {
 export interface CartItem {
   productId: number;
   qty: number;
+  /** Price charged on this sale; omit → catalog product.price at confirm. */
+  unitPrice?: number;
 }
 
 export interface CreateSaleInput {
-  lines: Array<{ productId: number; qty: number }>;
+  lines: Array<{
+    productId: number;
+    qty: number;
+    /** Optional override; omit → product.price at sale time. */
+    unitPrice?: number;
+  }>;
   paymentKind: PaymentKind;
   /** Required when paymentKind is partial or credit. */
   customerId?: number | null;

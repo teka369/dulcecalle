@@ -4,17 +4,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop, mulCop, addCop } from "@/domain/money";
+import { parseSaleUnitPrice } from "@/domain/sale/validate";
 import type { Product } from "@/domain/types";
 import { productRepository } from "@/repositories";
 import { useCart } from "@/store/cartStore";
 
 export default function NuevaVentaPage() {
   const router = useRouter();
-  const { items, setQty, totalQty } = useCart();
+  const { items, setQty, setUnitPrice, totalQty } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [stockError, setStockError] = useState<string | null>(null);
+  const [pendingPrices, setPendingPrices] = useState<Record<number, number>>({});
+
 
   useEffect(() => {
     void productRepository.list().then(setProducts);
@@ -36,11 +39,21 @@ export default function NuevaVentaPage() {
     });
   }, [products, query, category]);
 
+  function linePrice(product: Product): number {
+    const item = items.find((i) => i.productId === product.id);
+    if (item?.unitPrice != null) return item.unitPrice;
+    if (product.id != null && pendingPrices[product.id] != null) {
+      return pendingPrices[product.id]!;
+    }
+    return product.price;
+  }
+
   const total = useMemo(() => {
     return items.reduce((sum, item) => {
       const p = products.find((x) => x.id === item.productId);
       if (!p) return sum;
-      return addCop(sum, mulCop(p.price, item.qty));
+      const price = item.unitPrice ?? p.price;
+      return addCop(sum, mulCop(price, item.qty));
     }, 0);
   }, [items, products]);
 
@@ -58,7 +71,23 @@ export default function NuevaVentaPage() {
       return;
     }
     setStockError(null);
-    setQty(product.id!, next);
+    const existing = items.find((i) => i.productId === product.id);
+    const price =
+      existing?.unitPrice ??
+      (product.id != null ? pendingPrices[product.id] : undefined) ??
+      product.price;
+    setQty(product.id!, next, price);
+  }
+
+  function onPriceChange(product: Product, raw: string) {
+    const digits = raw.replace(/\D/g, "");
+    const parsed = parseSaleUnitPrice(digits, product.price);
+    if ("error" in parsed) return;
+    if (qtyOf(product.id!) > 0) {
+      setUnitPrice(product.id!, parsed.unitPrice);
+      return;
+    }
+    setPendingPrices((prev) => ({ ...prev, [product.id!]: parsed.unitPrice }));
   }
 
   return (
@@ -106,6 +135,8 @@ export default function NuevaVentaPage() {
         <div className="grid grid-cols-2 gap-3 pb-28">
           {filtered.map((p) => {
             const qty = qtyOf(p.id!);
+            const price = linePrice(p);
+            const custom = qty > 0 && price !== p.price;
             return (
               <article
                 key={p.id}
@@ -114,7 +145,21 @@ export default function NuevaVentaPage() {
                 <p className="line-clamp-2 min-h-10 text-sm font-medium">
                   {p.name}
                 </p>
-                <p className="mt-1 text-sm font-semibold">{formatCop(p.price)}</p>
+                <label className="mt-1 text-[11px] font-medium uppercase tracking-wide text-ink/45">
+                  Precio de esta venta
+                </label>
+                <input
+                  inputMode="numeric"
+                  aria-label={`Precio de ${p.name}`}
+                  value={String(price)}
+                  onChange={(e) => onPriceChange(p, e.target.value)}
+                  className="mt-1 min-h-11 w-full rounded-[14px] border border-ink/10 px-2 text-sm font-semibold outline-none focus:border-primary"
+                />
+                {custom && (
+                  <p className="mt-1 text-[11px] text-ink/50">
+                    Normal {formatCop(p.price)}
+                  </p>
+                )}
                 <div className="mt-auto flex items-center justify-between pt-3">
                   <button
                     type="button"

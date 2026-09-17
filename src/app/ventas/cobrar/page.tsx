@@ -19,9 +19,11 @@ export default function CobrarPage() {
     paymentKind,
     customerId,
     amountReceived,
+    method,
     setPaymentKind,
     setCustomerId,
     setAmountReceived,
+    setMethod,
     clear,
   } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
@@ -47,17 +49,22 @@ export default function CobrarPage() {
       .map((item) => {
         const p = products.find((x) => x.id === item.productId);
         if (!p) return null;
+        const unitPrice = item.unitPrice ?? p.price;
         return {
           productId: p.id!,
           name: p.name,
           qty: item.qty,
-          lineTotal: mulCop(p.price, item.qty),
+          unitPrice,
+          catalogPrice: p.price,
+          lineTotal: mulCop(unitPrice, item.qty),
         };
       })
       .filter(Boolean) as Array<{
       productId: number;
       name: string;
       qty: number;
+      unitPrice: number;
+      catalogPrice: number;
       lineTotal: number;
     }>;
   }, [items, products]);
@@ -106,12 +113,16 @@ export default function CobrarPage() {
             : 0;
 
       await saleRepository.createSale({
-        lines: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
+        lines: lines.map((l) => ({
+          productId: l.productId,
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+        })),
         paymentKind,
         customerId:
           paymentKind === "paid" ? null : (customerId as number),
         amountReceived: received,
-        method: "Efectivo",
+        method: paymentKind === "credit" ? "Efectivo" : method,
       });
 
       clear();
@@ -152,6 +163,11 @@ export default function CobrarPage() {
             <li key={l.productId} className="flex justify-between text-sm">
               <span>
                 {l.name} ×{l.qty}
+                {l.unitPrice !== l.catalogPrice && (
+                  <span className="ml-1 text-ink/45">
+                    ({formatCop(l.unitPrice)})
+                  </span>
+                )}
               </span>
               <span className="font-medium">{formatCop(l.lineTotal)}</span>
             </li>
@@ -186,6 +202,24 @@ export default function CobrarPage() {
           />
         </div>
       </section>
+
+      {paymentKind !== "credit" && (
+        <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+          <p className="text-sm font-semibold">¿Cómo recibes?</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <MethodButton
+              label="Efectivo"
+              active={method === "Efectivo"}
+              onClick={() => setMethod("Efectivo")}
+            />
+            <MethodButton
+              label="Nequi"
+              active={method === "Nequi"}
+              onClick={() => setMethod("Nequi")}
+            />
+          </div>
+        </section>
+      )}
 
       {paymentKind === "partial" && (
         <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
@@ -246,7 +280,6 @@ export default function CobrarPage() {
         </div>
       )}
 
-      {/* amountReceived kept in store for future payment-breakdown step */}
       <span className="hidden">{amountReceived}</span>
     </div>
   );
@@ -276,6 +309,30 @@ function ModeButton({
       onClick={onClick}
       className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
         active ? activeBg : "border-ink/10 bg-white text-ink/70"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function MethodButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
+        active
+          ? "border-primary bg-primary text-ink"
+          : "border-ink/10 bg-white text-ink/70"
       }`}
     >
       {label}

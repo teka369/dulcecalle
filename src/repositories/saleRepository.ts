@@ -7,6 +7,8 @@ import type {
   SaleLine,
 } from "@/domain/types";
 import { asCop, mulCop, addCop, subCop } from "@/domain/money";
+import { SALE_ERRORS } from "@/domain/sale/validate";
+import { assertDayEditable } from "./dayGuard";
 
 function assertPaymentMath(
   kind: PaymentKind,
@@ -38,6 +40,17 @@ function assertPaymentMath(
   return { credit: subCop(total, received) };
 }
 
+function resolveLineUnitPrice(
+  catalogPrice: number,
+  override: number | undefined,
+): number {
+  if (override === undefined) return asCop(catalogPrice);
+  if (!Number.isInteger(override) || override < 0) {
+    throw new Error(SALE_ERRORS.badPrice);
+  }
+  return asCop(override);
+}
+
 export class SaleRepository {
   async list(): Promise<Sale[]> {
     return getDb().sales.orderBy("createdAt").reverse().toArray();
@@ -59,10 +72,12 @@ export class SaleRepository {
 
   /**
    * Atomic sale: sale + saleLines + stockMoves + optional cashMoves + debt.
-   * Snapshots unitPrice/unitCost on each line. Stock never goes negative.
+   * Snapshots unitPrice (override or catalog) and unitCost on each line.
+   * Changing product.price / avgCost later does NOT rewrite history.
+   * Stock never goes negative. Closed day is rejected.
    */
   async createSale(input: CreateSaleInput): Promise<number> {
-    if (!input.lines.length) throw new Error("sale needs at least one line");
+    if (!input.lines.length) throw new Error(SALE_ERRORS.empty);
 
     const needsCustomer =
       input.paymentKind === "partial" || input.paymentKind === "credit";
@@ -71,7 +86,12 @@ export class SaleRepository {
     }
 
     const method: PayMethod = input.method ?? "Efectivo";
+    if (method !== "Efectivo" && method !== "Nequi") {
+      throw new Error("Elige Efectivo o Nequi.");
+    }
     const db = getDb();
+
+    await assertDayEditable();
 
     return db.transaction(
       "rw",
@@ -83,8 +103,11 @@ export class SaleRepository {
         db.cashMoves,
         db.customers,
         db.customerPayments,
+        db.cashSessions,
       ],
       async () => {
+        await assertDayEditable();
+
         let saleTotal = 0;
         const prepared: Array<{
           productId: number;
@@ -97,15 +120,16 @@ export class SaleRepository {
 
         for (const line of input.lines) {
           if (!Number.isInteger(line.qty) || line.qty <= 0) {
-            throw new Error("line qty must be a positive integer");
+            throw new Error(SALE_ERRORS.badQty);
           }
           const product = await db.products.get(line.productId);
           if (!product) throw new Error(`product ${line.productId} not found`);
           if (product.stock < line.qty) {
             throw new Error("stock insufficient (stock never negative)");
           }
-          const unitPrice = asCop(product.price);
+          const unitPrice = resolveLineUnitPrice(product.price, line.unitPrice);
           const unitCost = asCop(product.avgCost);
+          if (unitCost < 0) throw new Error("unitCost must be ≥ 0");
           const lineTotal = mulCop(unitPrice, line.qty);
           saleTotal = addCop(saleTotal, lineTotal);
           prepared.push({
@@ -172,6 +196,9 @@ export class SaleRepository {
         }
 
         if (amountReceived > 0) {
+          const open = await db.cashSessions
+            .filter((s) => s.closedAt == null)
+            .first();
           await db.cashMoves.add({
             amount: amountReceived,
             direction: "in",
@@ -179,7 +206,7 @@ export class SaleRepository {
             kind: "sale",
             refType: "sale",
             refId: saleId,
-            sessionId: null,
+            sessionId: open?.id ?? null,
             createdAt: Date.now(),
           });
         }

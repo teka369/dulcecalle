@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
-import type { CartItem, PaymentKind } from "@/domain/types";
+import type { CartItem, PayMethod, PaymentKind } from "@/domain/types";
 
 type CartState = {
   items: CartItem[];
   paymentKind: PaymentKind;
   customerId: number | null;
   amountReceived: number | null;
+  method: PayMethod;
 };
 
 const listeners = new Set<() => void>();
@@ -17,6 +18,7 @@ let state: CartState = {
   paymentKind: "paid",
   customerId: null,
   amountReceived: null,
+  method: "Efectivo",
 };
 
 function emit() {
@@ -46,14 +48,30 @@ export const cartStore = {
       paymentKind: "paid",
       customerId: null,
       amountReceived: null,
+      method: "Efectivo",
     });
   },
-  setQty(productId: number, qty: number) {
+  setQty(productId: number, qty: number, unitPrice?: number) {
     setState((s) => {
+      const existing = s.items.find((i) => i.productId === productId);
       const next = s.items.filter((i) => i.productId !== productId);
-      if (qty > 0) next.push({ productId, qty });
+      if (qty > 0) {
+        next.push({
+          productId,
+          qty,
+          unitPrice: unitPrice ?? existing?.unitPrice,
+        });
+      }
       return { ...s, items: next };
     });
+  },
+  setUnitPrice(productId: number, unitPrice: number) {
+    setState((s) => ({
+      ...s,
+      items: s.items.map((i) =>
+        i.productId === productId ? { ...i, unitPrice } : i,
+      ),
+    }));
   },
   setPaymentKind(paymentKind: PaymentKind) {
     setState((s) => ({
@@ -69,6 +87,9 @@ export const cartStore = {
   setAmountReceived(amountReceived: number | null) {
     setState({ amountReceived });
   },
+  setMethod(method: PayMethod) {
+    setState({ method });
+  },
 };
 
 export function useCart() {
@@ -83,17 +104,23 @@ export function useCart() {
     [snap.items],
   );
 
-  const setQty = useCallback((productId: number, qty: number) => {
-    cartStore.setQty(productId, qty);
+  const setQty = useCallback((productId: number, qty: number, unitPrice?: number) => {
+    cartStore.setQty(productId, qty, unitPrice);
+  }, []);
+
+  const setUnitPrice = useCallback((productId: number, unitPrice: number) => {
+    cartStore.setUnitPrice(productId, unitPrice);
   }, []);
 
   return {
     ...snap,
     totalQty,
     setQty,
+    setUnitPrice,
     clear: cartStore.clear,
     setPaymentKind: cartStore.setPaymentKind,
     setCustomerId: cartStore.setCustomerId,
     setAmountReceived: cartStore.setAmountReceived,
+    setMethod: cartStore.setMethod,
   };
 }
