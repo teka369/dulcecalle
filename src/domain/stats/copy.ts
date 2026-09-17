@@ -30,7 +30,7 @@ export const STATS_COPY = {
 
   captionVentas: "Lo que facturaste. No es plata en mano.",
   captionRecibido: "Plata que sí entró. No es ganancia.",
-  captionPorCobrar: "Lo que te deben.",
+  captionPorCobrar: "Deuda actual pendiente. No es el fiado generado en el período.",
   captionGaste: "Gastos del negocio. No incluye retiros personales.",
   captionInverti: "Compras / surtir (inversión en inventario).",
   captionInventario: "A costo, no a precio de venta.",
