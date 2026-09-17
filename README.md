@@ -62,6 +62,28 @@ Surtir con fecha de un día ya cerrado también se rechaza (aunque hoy esté abi
 
 La guarda central es `assertDayEditable()` (`src/repositories/dayGuard.ts`).
 
+### Idempotencia
+
+Abonos y ventas usan `requestId` (clave de intención, generada en la UI):
+
+- misma `requestId` → se devuelve el registro existente; no se vuelve a bajar stock, caja ni deuda
+- `requestId` distinta → dos operaciones válidas
+
+No basta con deshabilitar el botón. El repositorio es la guarda (doble tap, retry, operación lenta).
+
+### Stock inicial
+
+Alta de producto con `stock > 0` escribe un `stockMove` `reason=inicial` (delta = stock, `unitCost` = `avgCost`). **No** es compra: no hay `cashMove`, no entra en Invertí, no pasa por el cierre del día.
+
+`product.stock` sigue siendo la cantidad viva. Los movimientos son el historial de cambios:
+
+- crear producto → `inicial` (si stock > 0)
+- después → solo `surtir` / venta / merma
+
+No se puede parchar `product.stock`. `applyMove` rechaza `reason=inicial` (solo nace en el alta).
+
+Productos ya existentes (demo seed / datos pre-P0.5) pueden tener stock sin `inicial`. No se migran. No reconstruyas el stock actual como `sum(stockMoves)` — usa `product.stock`.
+
 ### Surtir / costos
 
 Fuente de cálculo:
@@ -111,11 +133,66 @@ Serwist precachea el *shell* (HTML/CSS/JS, `/offline`, icons, manifest). **Dexie
 
 ## Limitaciones conocidas (P1 / P2)
 
-- **Devoluciones (P1):** no hay flujo «el cliente devolvió». Habría que subir stock, ajustar dinero o deuda, y dejar la venta histórica trazable. No se implementó en esta auditoría.
+- **Devoluciones (P1):** no implementadas. Diseño mínimo abajo. No hay UI ni tablas todavía.
 - **Motivos de inventario (P1):** existe `adjust` en el tipo, pero la UI usa `me_lo_comi` / `regalar` / `perdido`. No se migró a damaged/expired/lost para no romper datos.
-- **Alta de producto con stock inicial (P1):** el stock de catálogo no genera `stockMove`. Los movimientos posteriores sí. No se puede parchar `product.stock` a mano.
 - **Backend / sync (P2):** un solo dispositivo. No hay PostgreSQL, cuentas ni sincronización.
-- **Idempotencia de ventas:** el abono sí tiene `requestId`; un doble tap en Confirmar venta aún puede crear dos ventas si se ignora el `busy` de la UI.
+
+### Devoluciones — diseño mínimo (P1, no construir aún)
+
+La venta original **no se edita ni se borra**. Siempre queda trazable.
+
+```
+Venta (inmutable)
+  → Devolución (nuevo registro, ref a la venta)
+    → stock vuelve (stockMove reason=devolucion, +qty)
+    → dinero o deuda se ajusta
+```
+
+**Alcance**
+
+| Caso | Qué pasa |
+|------|----------|
+| Total | se devuelven todas las líneas / qty pendientes |
+| Parcial | algunas líneas o qty; nunca más de lo vendido menos lo ya devuelto |
+| Pagada Efectivo | `cashMove` `kind=devolucion` `direction=out` método Efectivo |
+| Pagada Nequi | igual, método Nequi |
+| Fiada | baja `customer.debt` (nunca < 0). Sin caja |
+| Parcial (abono + fiado) | primero reduce la deuda de esa venta; si el valor devuelto supera lo que aún debía, el resto sale de caja por el método original |
+
+**Snapshots:** qty × `saleLine.unitPrice` y `saleLine.unitCost` de la venta original. Nunca el precio/costo actual del catálogo.
+
+**Tablas futuras (cuando se implemente)**
+
+- `saleReturns`: `saleId`, `createdAt`, `requestId` (idempotente), `refundAmount`, `debtReduced`, `method`
+- `saleReturnLines`: `returnId`, `saleLineId`, `qty`, `unitPrice`, `unitCost`
+
+**Impacto en números (cada métrica aparte)**
+
+- **Ventas brutas:** siguen siendo `sum(sale.saleTotal)` — la venta no se reescribe
+- **Ventas netas / stats:** `ventas − sum(return lines)` en el período de la devolución (o métrica Devoluciones aparte). Decisión de producto al implementar: restar vs. mostrar línea propia
+- **Ganancia:** restar `qty × (unitPrice − unitCost)` de los snapshots devueltos
+- **Caja:** solo si hubo plata recibida que se devuelve (`cashMove` out)
+- **Por cobrar:** baja si la venta tenía crédito vigente; clamp a 0
+- **Stock:** `product.stock += qty` vía `stockMove` (misma guarda de día cerrado y stock ≥ 0)
+- **Cierre del día:** una devolución en día cerrado se rechaza igual que una venta
+
+**Fuera de alcance P1:** nota crédito fiscal, factura electrónica, cambio por otro producto, devolución sin ticket.
+
+### Integridad de mutaciones
+
+Las páginas no escriben Dexie. Caminos de negocio:
+
+| Qué | Quién escribe | Guarda |
+|-----|----------------|--------|
+| stock | `saleRepository.createSale`, `inventoryRepository.surtir/applyShrink/applyMove`, alta `productRepository.create` (`inicial`) | día cerrado, stock ≥ 0, no parche directo |
+| deuda | `createSale` (suma crédito), `customerRepository.recordPayment` (resta) | día cerrado, deuda ≥ 0, abono ≤ deuda, `requestId` |
+| caja | `createSale`, `recordPayment`, `surtir` (compra), `recordExpense`, `ownerAporte/Retiro` | día cerrado, `assertDayEditable` |
+| ventas / líneas | solo `createSale` | `requestId`, pago coherente, stock |
+
+Excepciones conscientes:
+
+- **Demo seed:** `bulkAdd` de catálogo (puede no tener `inicial`) y reloj de `createdAt` para que Inicio muestre «hoy». No cambia montos de stock/deuda/caja.
+- **Alta de cliente** acepta `debt` en el API; la UI siempre crea en 0.
 
 ## Pendiente consciente
 
