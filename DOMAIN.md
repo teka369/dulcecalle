@@ -167,6 +167,20 @@ Stock never `< 0`. Direct `products.stock` patch is rejected. `inicial` and `dev
 
 Surtir is **today only**. Stock move and cash `compra` share the same `createdAt`.
 
+### Opening stock
+
+Two legal births, both `StockMove(reason=inicial)`. Neither is a compra, aporte, venta, gasto, or cash/Nequi move.
+
+**A. Known cost.** `stock > 0` and `avgCost > 0`. Default.
+
+**B. Gifted / unknown cost.** `stock > 0` and `avgCost = 0` only when the user **explicitly** sets `gifted: true` at create time (“Me lo regalaron / no sé el costo”). The flag is **not** stored on Product. The inicial move keeps `unitCost` 0 and note `Me lo regalaron / costo desconocido`.
+
+Without that declaration, `stock > 0` + `avgCost <= 0` is rejected (`needCost`). Accidental $0 cost must not inflate ganancia.
+
+Gifted means: **these opening units** entered at historical cost 0. It does **not** mean the product is forever free. Later `surtir` reweights `avgCost` with the existing weighted-average formula. Sales already done keep their `saleLine.unitCost` snapshot.
+
+Stock 0 may be created with cost 0 or cost > 0. No inicial move until there are units.
+
 ---
 
 ## 9. Cost model
@@ -175,7 +189,7 @@ Surtir is **today only**. Stock move and cash `compra` share the same `createdAt
 
 - Sale snapshots `product.avgCost` at that instant → `saleLine.unitCost`.
 - Return uses **that line’s** `unitCost` / `unitPrice`, not current catalog.
-- Product create with `stock > 0` requires `avgCost > 0`, unless `gifted: true` (opening units were a gift / unknown cost). Gifted stock is still `reason=inicial`, `unitCost` 0, note `Me lo regalaron`. Not a compra. Later surtir reweights avgCost.
+- Product create with `stock > 0` requires `avgCost > 0`, unless the user explicitly declares gifted/unknown cost (`gifted: true`). That declaration is create-time only; Product is not a special type. Gifted units are `reason=inicial`, `unitCost` 0, note `Me lo regalaron / costo desconocido`. Not a compra. Later surtir reweights avgCost. Past sale snapshots stay put.
 - Stock 0 may have cost 0 until first surtir.
 
 Do not replace this with FIFO unless the owner asks. It is coherent for a candy cart.
@@ -342,7 +356,7 @@ Critical methods: `createSale`, `createReturn`, `recordPayment`, `recordInitialD
 11. Opening float is starting bills, not post-sale pocket.
 12. Demo never loads on top of real books. Wipe is whole-device only.
 13. `product.stock` and `customer.debt` stay ≥ 0.
-14. Weighted-average cost on surtir; do not rewrite past `unitCost`.
+14. Weighted-average cost on surtir; do not rewrite past `unitCost`. Opening stock is either known-cost or explicitly gifted at 0 — never a silent 0.
 
 ---
 

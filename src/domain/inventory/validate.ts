@@ -27,7 +27,7 @@ export const INVENTORY_TOASTS = {
 } as const;
 
 /** Note on the `inicial` stockMove when the opening units were a gift. */
-export const GIFTED_STOCK_NOTE = "Me lo regalaron";
+export const GIFTED_STOCK_NOTE = "Me lo regalaron / costo desconocido";
 
 export type ShrinkReason = Extract<
   StockMoveReason,
