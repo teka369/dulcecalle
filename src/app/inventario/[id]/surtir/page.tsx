@@ -44,15 +44,45 @@ export default function SurtirPage() {
     void load();
   }, [load]);
 
-  // Derive total from unit×qty when user edits unit/qty (unless total was typed).
-  useEffect(() => {
-    if (totalLocked) return;
+  function onQtyChange(raw: string) {
+    const digits = raw.replace(/\D/g, "");
+    setQtyRaw(digits);
+    const qty = Number.parseInt(digits, 10);
+    if (!Number.isInteger(qty) || qty <= 0) return;
+    if (totalLocked) {
+      const total = Number.parseInt(totalCostRaw, 10);
+      if (Number.isInteger(total) && total >= 0) {
+        setUnitCostRaw(String(Math.round(total / qty)));
+      }
+    } else {
+      const unit = Number.parseInt(unitCostRaw, 10);
+      if (Number.isInteger(unit) && unit >= 0) {
+        setTotalCostRaw(String(unit * qty));
+      }
+    }
+  }
+
+  function onUnitChange(raw: string) {
+    const digits = raw.replace(/\D/g, "");
+    setTotalLocked(false);
+    setUnitCostRaw(digits);
     const qty = Number.parseInt(qtyRaw, 10);
-    const unit = Number.parseInt(unitCostRaw, 10);
+    const unit = Number.parseInt(digits, 10);
     if (Number.isInteger(qty) && qty > 0 && Number.isInteger(unit) && unit >= 0) {
       setTotalCostRaw(String(unit * qty));
     }
-  }, [qtyRaw, unitCostRaw, totalLocked]);
+  }
+
+  function onTotalChange(raw: string) {
+    const digits = raw.replace(/\D/g, "");
+    setTotalLocked(true);
+    setTotalCostRaw(digits);
+    const qty = Number.parseInt(qtyRaw, 10);
+    const total = Number.parseInt(digits, 10);
+    if (Number.isInteger(qty) && qty > 0 && Number.isInteger(total) && total >= 0) {
+      setUnitCostRaw(String(Math.round(total / qty)));
+    }
+  }
 
   const previewTotal = useMemo(() => {
     const n = Number.parseInt(totalCostRaw || "0", 10);
@@ -179,7 +209,7 @@ export default function SurtirPage() {
             id="cantidad"
             inputMode="numeric"
             value={qtyRaw}
-            onChange={(e) => setQtyRaw(e.target.value.replace(/\D/g, ""))}
+            onChange={(e) => onQtyChange(e.target.value)}
             className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
             placeholder="0"
           />
@@ -193,10 +223,7 @@ export default function SurtirPage() {
             id="unit-cost"
             inputMode="numeric"
             value={unitCostRaw}
-            onChange={(e) => {
-              setTotalLocked(false);
-              setUnitCostRaw(e.target.value.replace(/\D/g, ""));
-            }}
+            onChange={(e) => onUnitChange(e.target.value)}
             className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
             placeholder="0"
           />
@@ -210,10 +237,7 @@ export default function SurtirPage() {
             id="total-cost"
             inputMode="numeric"
             value={totalCostRaw}
-            onChange={(e) => {
-              setTotalLocked(true);
-              setTotalCostRaw(e.target.value.replace(/\D/g, ""));
-            }}
+            onChange={(e) => onTotalChange(e.target.value)}
             className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
             placeholder="0"
           />

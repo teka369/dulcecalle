@@ -43,6 +43,18 @@ describe("inventory validate (Tanda 3)", () => {
     });
   });
 
+  it("cost: both contradict → total wins, unit rounded", () => {
+    expect(
+      resolveSurtirCost({ qty: 10, unitCostRaw: "500", totalCostRaw: "7000" }),
+    ).toEqual({ unitCost: 700, totalCost: 7000 });
+  });
+
+  it("cost: both consistent stay as-is", () => {
+    expect(
+      resolveSurtirCost({ qty: 10, unitCostRaw: "500", totalCostRaw: "5000" }),
+    ).toEqual({ unitCost: 500, totalCost: 5000 });
+  });
+
   it("surtir form requires pay method", () => {
     const r = validateSurtirForm({
       qtyRaw: "2",

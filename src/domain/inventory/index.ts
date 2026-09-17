@@ -4,6 +4,7 @@ export {
   parseQtyRaw,
   validateShrinkQty,
   validateMotivo,
+  reconcileSurtirCost,
   resolveSurtirCost,
   validatePayMethod,
   validateSurtirForm,

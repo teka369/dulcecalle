@@ -10,6 +10,7 @@ export const INVENTORY_ERRORS = {
   emptyMotivo: "Cuéntanos qué pasó.",
   emptyProductName: "Ponle un nombre al producto.",
   emptySupplierName: "Ponle un nombre al proveedor.",
+  stockViaMoves: "El stock solo cambia con surtir, ventas o mermas.",
 } as const;
 
 export const INVENTORY_TOASTS = {
@@ -60,12 +61,35 @@ export function validateMotivo(motivoRaw: string): string | null {
 }
 
 /**
+ * Reconcile surtir costs so qty, unitCost and totalCost cannot contradict.
+ *
+ * Source of truth:
+ * - If unit × qty === total → keep both (already consistent).
+ * - If total > 0 and they differ → total is cash out; unitCost = round(total / qty).
+ * - If total === 0 → stock-only surtir; keep unitCost for weighted avg, no cash out.
+ */
+export function reconcileSurtirCost(
+  qty: number,
+  unitCost: number,
+  totalCost: number,
+): { unitCost: number; totalCost: number } {
+  const unit = Math.trunc(unitCost);
+  const total = Math.trunc(totalCost);
+  if (unit * qty === total) {
+    return { unitCost: unit, totalCost: total };
+  }
+  if (total > 0) {
+    return { unitCost: Math.round(total / qty), totalCost: total };
+  }
+  return { unitCost: unit, totalCost: 0 };
+}
+
+/**
  * Resolve unit + total cost (integer COP).
  * - Both empty → unit 0, total 0 (stock-only surtir; no cash out).
  * - Only unit → total = unit * qty (exact integer mul).
  * - Only total → unit = Math.round(total / qty)  // ROUND, not floor
- * - Both → prefer unit for avgCost; total used for cash out if consistent-ish;
- *   if total provided use it for cash; unit for weighted avg.
+ * - Both → reconcileSurtirCost (total wins if they contradict).
  * Invalid (negative / non-int) → badCost.
  */
 export function resolveSurtirCost(input: {
@@ -99,14 +123,12 @@ export function resolveSurtirCost(input: {
     return { unitCost: unit, totalCost: unit * input.qty };
   }
   if (unit == null && total != null) {
-    // Weighted avg uses ROUND (document choice vs floor).
     return {
       unitCost: Math.round(total / input.qty),
       totalCost: total,
     };
   }
-  // both provided
-  return { unitCost: unit!, totalCost: total! };
+  return reconcileSurtirCost(input.qty, unit!, total!);
 }
 
 export function validatePayMethod(

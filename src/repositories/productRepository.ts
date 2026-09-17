@@ -1,6 +1,7 @@
 import { getDb } from "@/storage/db";
 import type { Product } from "@/domain/types";
 import { asCop } from "@/domain/money";
+import { INVENTORY_ERRORS } from "@/domain/inventory";
 
 export class ProductRepository {
   async list(): Promise<Product[]> {
@@ -34,6 +35,9 @@ export class ProductRepository {
     const now = Date.now();
     asCop(input.price);
     asCop(input.avgCost);
+    if (input.price < 0 || input.avgCost < 0) {
+      throw new Error(INVENTORY_ERRORS.badCost);
+    }
     if (input.stock < 0) throw new Error("stock must be ≥ 0");
     const id = await getDb().products.add({
       ...input,
@@ -47,10 +51,16 @@ export class ProductRepository {
     id: number,
     patch: Partial<Omit<Product, "id" | "createdAt">>,
   ): Promise<void> {
-    if (patch.price !== undefined) asCop(patch.price);
-    if (patch.avgCost !== undefined) asCop(patch.avgCost);
-    if (patch.stock !== undefined && patch.stock < 0) {
-      throw new Error("stock must be ≥ 0");
+    if (patch.stock !== undefined) {
+      throw new Error(INVENTORY_ERRORS.stockViaMoves);
+    }
+    if (patch.price !== undefined) {
+      asCop(patch.price);
+      if (patch.price < 0) throw new Error(INVENTORY_ERRORS.badCost);
+    }
+    if (patch.avgCost !== undefined) {
+      asCop(patch.avgCost);
+      if (patch.avgCost < 0) throw new Error(INVENTORY_ERRORS.badCost);
     }
     await getDb().products.update(id, { ...patch, updatedAt: Date.now() });
   }
