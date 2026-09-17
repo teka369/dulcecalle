@@ -1,6 +1,16 @@
 import { getDb } from "@/storage/db";
 import type { Customer, CustomerPayment, PayMethod } from "@/domain/types";
 import { asCop, addCop, subCop } from "@/domain/money";
+import { ABONO_ERRORS } from "@/domain/abono";
+
+export type CustomerHistoryItem = {
+  id: string;
+  kind: "abono" | "fiada" | "parcial";
+  amount: number;
+  method?: PayMethod;
+  createdAt: number;
+  label: string;
+};
 
 export class CustomerRepository {
   async list(): Promise<Customer[]> {
@@ -26,12 +36,14 @@ export class CustomerRepository {
       debt?: number;
     },
   ): Promise<number> {
+    const name = input.name?.trim() ?? "";
+    if (!name) throw new Error("Ponle un nombre para guardarlo.");
     const debt = input.debt ?? 0;
     if (debt < 0) throw new Error("debt must be ≥ 0");
     asCop(debt);
     const now = Date.now();
     const id = await getDb().customers.add({
-      name: input.name,
+      name,
       phone: input.phone,
       debt,
       createdAt: now,
@@ -40,9 +52,62 @@ export class CustomerRepository {
     return id as number;
   }
 
+  async listPayments(customerId: number): Promise<CustomerPayment[]> {
+    const rows = await getDb()
+      .customerPayments.where("customerId")
+      .equals(customerId)
+      .toArray();
+    return rows.sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  /**
+   * Short history: abonos + credit/partial sales for this customer.
+   * Newest first; capped for ficha.
+   */
+  async listHistory(
+    customerId: number,
+    limit = 20,
+  ): Promise<CustomerHistoryItem[]> {
+    const db = getDb();
+    const payments = await db.customerPayments
+      .where("customerId")
+      .equals(customerId)
+      .toArray();
+    const sales = await db.sales.where("customerId").equals(customerId).toArray();
+
+    const items: CustomerHistoryItem[] = [];
+
+    for (const p of payments) {
+      items.push({
+        id: `pay-${p.id}`,
+        kind: "abono",
+        amount: p.amount,
+        method: p.method,
+        createdAt: p.createdAt,
+        label: `Abono · ${p.method}`,
+      });
+    }
+
+    for (const s of sales) {
+      if (s.credit <= 0) continue;
+      const kind = s.paymentKind === "partial" ? "parcial" : "fiada";
+      items.push({
+        id: `sale-${s.id}`,
+        kind,
+        amount: s.credit,
+        createdAt: s.createdAt,
+        label: kind === "parcial" ? "Parcial (fiado)" : "Fiada",
+      });
+    }
+
+    items.sort((a, b) => b.createdAt - a.createdAt);
+    return items.slice(0, limit);
+  }
+
   /**
    * Record an abono against customer debt.
-   * debt is never allowed to go negative.
+   * Decreases debt (≥ 0), creates customerPayments + cashMoves (debt_collect).
+   * Debt collection ≠ new sale.
    */
   async recordPayment(input: {
     customerId: number;
@@ -51,9 +116,17 @@ export class CustomerRepository {
     saleId?: number | null;
     note?: string;
   }): Promise<number> {
-    const amount = asCop(input.amount);
-    if (amount <= 0) throw new Error("payment amount must be > 0");
+    if (input.method !== "Efectivo" && input.method !== "Nequi") {
+      throw new Error(ABONO_ERRORS.noMethod);
+    }
+    if (!Number.isInteger(input.amount)) {
+      throw new Error(ABONO_ERRORS.empty);
+    }
+    if (input.amount <= 0) {
+      throw new Error(ABONO_ERRORS.notPositive);
+    }
 
+    const amount = asCop(input.amount);
     const db = getDb();
     return db.transaction(
       "rw",
@@ -64,7 +137,7 @@ export class CustomerRepository {
         const customer = await db.customers.get(input.customerId);
         if (!customer) throw new Error("customer not found");
         if (amount > customer.debt) {
-          throw new Error("payment exceeds debt");
+          throw new Error(ABONO_ERRORS.exceedsDebt);
         }
         const newDebt = subCop(customer.debt, amount);
         if (newDebt < 0) throw new Error("debt must be ≥ 0");
@@ -87,7 +160,7 @@ export class CustomerRepository {
           amount,
           direction: "in",
           method: input.method,
-          kind: "abono",
+          kind: "debt_collect",
           refType: "customerPayment",
           refId: paymentId as number,
           sessionId: null,
