@@ -7,7 +7,9 @@ Money = `BIGINT` COP integers. Quantities = `INTEGER`. Never `NUMERIC`/`FLOAT` f
 
 Default PK: `UUID`. App generates UUID (same idea as today’s `requestId`).
 
-Every business table: `business_id UUID NOT NULL REFERENCES businesses(id)`.
+Column names: see canonical table in [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md). Dexie `requestId` → `request_id`. Event day → `occurred_on`. Session day → `local_date`. Import tracer → `legacy_dexie_id` (never `legacy_id`).
+
+Every business table: `business_id UUID NOT NULL REFERENCES businesses(id)` — including child tables (`sale_lines`, `sale_return_lines`, etc.).
 
 ---
 
@@ -39,6 +41,18 @@ Every business table: `business_id UUID NOT NULL REFERENCES businesses(id)`.
 | created_at | timestamptz | |
 
 Unique: `(business_id, user_id)`.
+
+### import_id_map
+Used only by the Dexie import job. Not a business document.
+
+| Column | Type |
+|--------|------|
+| business_id | UUID |
+| table_name | TEXT |
+| dexie_id | INTEGER |
+| pg_id | UUID |
+
+Unique `(business_id, table_name, dexie_id)`. Also denormalized as `legacy_dexie_id` on the row.
 
 ---
 
@@ -87,11 +101,12 @@ name, phone, notes. **No accounts payable.**
 | sale_total | BIGINT NOT NULL CHECK >= 0 | |
 | amount_received | BIGINT NOT NULL CHECK >= 0 | |
 | credit | BIGINT NOT NULL CHECK >= 0 | sale_total − amount_received |
-| request_id | UUID NULL | unique per business |
+| request_id | UUID NULL | unique per business; copy from Dexie if UUID-shaped |
+| legacy_request_id | TEXT NULL | Dexie non-UUID requestId, if any |
 | note | TEXT | |
-| occurred_on | DATE NOT NULL | business local day |
+| occurred_on | DATE NOT NULL | business local day (`America/Bogota` unless business.timezone says otherwise) |
 | created_at | timestamptz | immutable |
-| legacy_dexie_id | INTEGER | |
+| legacy_dexie_id | INTEGER NULL | import only |
 
 Check: `amount_received + credit = sale_total`.  
 Check: `payment_kind = 'paid'` ⇒ credit = 0; `credit` ⇒ amount_received = 0.  
@@ -100,8 +115,8 @@ Unique: `(business_id, request_id)` WHERE request_id IS NOT NULL.
 **Immutable.** No UPDATE.
 
 ### sale_lines
-sale_id, product_id, product_name (snapshot), qty > 0, unit_price >= 0, unit_cost >= 0, line_total = unit_price * qty.  
-Snapshots never change when product price/cost/name change.
+`business_id`, sale_id, product_id, product_name (snapshot), qty > 0, unit_price >= 0, unit_cost >= 0, line_total = unit_price * qty.  
+Snapshots never change when product price/cost/name change. Immutable. `legacy_dexie_id` nullable.
 
 ### sale_returns
 sale_id, refund_amount >= 0, debt_reduced >= 0, method NULL if debt-only, request_id unique per business, occurred_on, created_at. Immutable.
@@ -125,9 +140,9 @@ App check: sum(returned qty per line) ≤ original qty.
 | ref_type / ref_id | TEXT / UUID | sale, product, return, … |
 | note | TEXT | gifted: `Me lo regalaron / costo desconocido` |
 | request_id | UUID NULL | unique per business |
-| occurred_on | DATE | |
+| occurred_on | DATE NOT NULL | commercial day; not `CURRENT_DATE` |
 | created_at | timestamptz | |
-| legacy_dexie_id | INTEGER | |
+| legacy_dexie_id | INTEGER NULL | import only |
 
 `adjust` exists in the enum, unused. Do not expose.
 
@@ -148,7 +163,7 @@ Unique `(business_id, request_id)` WHERE request_id IS NOT NULL.
 | expected_efectivo / expected_nequi | BIGINT NULL | snapshot at close |
 | difference | BIGINT NULL | closing_count − expected_efectivo |
 | note | TEXT | |
-| legacy_dexie_id | INTEGER | |
+| legacy_dexie_id | INTEGER NULL | |
 
 **UNIQUE (business_id, local_date).** Second open → return existing.
 
@@ -164,9 +179,9 @@ Opening float is bills at start, not post-sale pocket.
 | session_id | UUID NULL | null if caja never opened that day |
 | ref_type / ref_id | | |
 | request_id | UUID NULL | unique per business |
-| occurred_on | DATE | |
+| occurred_on | DATE NOT NULL | commercial day |
 | created_at | timestamptz | |
-| legacy_dexie_id | INTEGER | |
+| legacy_dexie_id | INTEGER NULL | import only |
 
 retiro ≠ expense. aporte ≠ sale. compra = paid surtir. Diferencia is **not** a kind.
 

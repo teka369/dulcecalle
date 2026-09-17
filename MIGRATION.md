@@ -20,17 +20,27 @@ Source of truth today: IndexedDB database `dulcecalle` (Dexie). **Not** the Cach
 Then **reconcile**:
 
 ```
-reconstructed_stock(product) = Σ stock_moves.delta   // if any moves exist
-compare to products.stock
+If the product has a stock_move reason=inicial:
+  reconstructed_stock = Σ stock_moves.delta
+  must equal products.stock
 
-reconstructed_debt(customer) =
-  Σ initial_debts + Σ sale.credit − Σ payments − Σ return.debtReduced
-compare to customers.debt
+If the product has **zero** moves (pre-P0.5 / demo):
+  trust products.stock; do **not** synthesize inicial
+
+If the product has later moves (sale/surtir/…) but **no inicial**:
+  do **not** require Σ delta == stock (DOMAIN forbids inventing inicial)
+  trust products.stock; log a warning; import still succeeds
 ```
 
-If a product has stock but **zero** moves (legacy/demo): keep `products.stock`; **do not** synthesize `inicial`. Same as DOMAIN.md.
+Debt:
 
-Mismatch → fail the import for that business. Do not auto-fix. Operator inspects.
+```
+reconstructed_debt =
+  Σ initial_debts + Σ sale.credit − Σ payments − Σ return.debtReduced
+must equal customers.debt
+```
+
+Mismatch on debt, or on stock when `inicial` exists → fail the import for that business. Do not auto-fix. Operator inspects.
 
 ---
 
@@ -38,11 +48,11 @@ Mismatch → fail the import for that business. Do not auto-fix. Operator inspec
 
 Dexie: autoincrement `number`. Postgres: UUID.
 
-1. Create empty UUID rows in FK order (catalog → events).
-2. Table `import_id_map(business_id, table_name, dexie_id INT, pg_id UUID)` unique `(business_id, table_name, dexie_id)`.
-3. Also store `legacy_dexie_id` on the row.
+1. Insert rows with **new UUID** PKs in FK order (catalog → events). Never reuse Dexie ints as PG PKs.
+2. Fill `import_id_map(business_id, table_name, dexie_id, pg_id)` unique `(business_id, table_name, dexie_id)`.
+3. Also store nullable `legacy_dexie_id` on the row (never a column named `legacy_id`).
 4. Rewrite FKs via the map (`sale.customerId` 3 → uuid).
-5. `request_id` strings that are UUIDs keep their value; non-UUID Dexie fallbacks (`prefix-Date.now-random`) are stored as TEXT in a `request_id_raw` if they are not UUID-shaped, **or** normalized into UUID v5 from that string. Prefer: if `crypto.randomUUID()` already, copy; else generate a new UUID and keep raw in `legacy_request_id TEXT`. Unique still on the UUID used for future calls.
+5. `requestId`: if it is a UUID, copy into `request_id`. If it is the Dexie fallback (`prefix-Date.now-random`), store it in `legacy_request_id` and set `request_id` to UUID v5 of that string so the unique index still works. Future API calls use UUID `Idempotency-Key` only.
 
 Do not change Dexie IDs on the phone.
 

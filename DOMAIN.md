@@ -206,7 +206,7 @@ Do not replace this with FIFO unless the owner asks. It is coherent for a candy 
 
 `localDateKey` uses `Date#getFullYear/Month/Date` (browser TZ).
 
-**Backend:** store UTC timestamptz + `business_local_date` computed in the **business** timezone (Colombia, `America/Bogota`). Never use the server’s TZ to close a day.
+**Backend:** `created_at` timestamptz UTC + `occurred_on` DATE in the **business** timezone (`America/Bogota` unless `businesses.timezone` says otherwise). Cash session day is `local_date` (same calendar value as that day’s `occurred_on`). Never `CURRENT_DATE` of the server. Dexie keeps `createdAt` / `localDate` until the HTTP adapter.
 
 ---
 
@@ -288,7 +288,7 @@ Weak spots (reconstructable, tighten in Postgres):
 ```
 users
 businesses
-business_users              -- membership
+business_memberships
 products                    -- business_id, uuid
 customers
 suppliers
@@ -303,11 +303,14 @@ customer_payments
 initial_debts
 expenses
 settings                    -- per business
+import_id_map               -- Dexie int → UUID, import job only
 ```
 
-Import from Dexie: keep `legacy_id` int. Rebuild `product.stock` / `customer.debt` from events and **compare** to cached values before go-live.
+Import from Dexie: `legacy_dexie_id` (nullable int), not a column named `legacy_id`. Reconcile debt and stock as in [MIGRATION.md](MIGRATION.md): compare cache to events; **do not** invent `inicial` for pre-P0.5 products; **do not** require `sum(stock_moves) = stock` unless an `inicial` move exists.
 
 Do **not** import Cache Storage. Only IndexedDB.
+
+Full column list: [DATABASE.md](DATABASE.md).
 
 ---
 
