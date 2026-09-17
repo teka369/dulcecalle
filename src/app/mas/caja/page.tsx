@@ -122,6 +122,9 @@ export default function CajaPage() {
             <p className="mt-1 text-2xl font-semibold">
               {formatCop(summary.expected.total)}
             </p>
+            <p className="mt-1 text-xs text-ink/50">
+              No es solo billetes. El cierre cuenta Efectivo.
+            </p>
             <div className="mt-2 flex gap-4 text-sm text-ink/60">
               <span>
                 {CASH_COPY.entradas}: {formatCop(summary.entradas)}
@@ -201,6 +204,7 @@ export default function CajaPage() {
           <label className="text-sm font-medium" htmlFor="opening">
             {CASH_COPY.conCuantoAbres}
           </label>
+          <p className="text-sm text-ink/60">{CASH_COPY.abrirCajaHint}</p>
           <input
             id="opening"
             inputMode="numeric"

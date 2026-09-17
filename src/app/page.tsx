@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { formatCop } from "@/domain/money";
@@ -84,8 +85,18 @@ export default function InicioPage() {
       </header>
 
       <section className="grid grid-cols-1 gap-3">
-        <SummaryCard label="Hoy vendido" value={formatCop(hoyVendido)} />
-        <SummaryCard label="Por cobrar" value={formatCop(porCobrar)} tone="accent" />
+        <SummaryCard
+          label="Hoy vendido"
+          value={formatCop(hoyVendido)}
+          caption="Lo facturado hoy. No es plata en mano."
+        />
+        <SummaryCard
+          label="Por cobrar"
+          value={formatCop(porCobrar)}
+          tone="accent"
+          caption="Deuda actual. Incluye deudas anteriores."
+          href="/clientes"
+        />
         <SummaryCard
           label="Stock bajo"
           value={String(stockBajo)}
@@ -94,16 +105,22 @@ export default function InicioPage() {
         {/* S4: always visible on Inicio (mobile 390px) — open vs closed */}
         {cajaOpen ? (
           <SummaryCard
-            label={CASH_COPY.cajaEsperado}
+            label={`${CASH_COPY.cajaEsperado} (Efectivo)`}
             value={formatCop(cajaEsperado ?? 0)}
             tone="ok"
+            href="/mas/caja"
+          />
+        ) : hasCajaSession ? (
+          <SummaryCard
+            label={CASH_COPY.estadoCerrada}
+            value={formatCop(cajaEsperado ?? 0)}
+            href="/mas/caja"
           />
         ) : (
           <SummaryCard
-            label={CASH_COPY.estadoCerrada}
-            value={
-              hasCajaSession ? formatCop(cajaEsperado ?? 0) : CASH_COPY.estadoCerrada
-            }
+            label={CASH_COPY.masCaja}
+            value={CASH_COPY.estadoSinAbrir}
+            href="/mas/caja"
           />
         )}
       </section>
@@ -139,11 +156,15 @@ export default function InicioPage() {
 function SummaryCard({
   label,
   value,
+  caption,
   tone = "default",
+  href,
 }: {
   label: string;
   value: string;
+  caption?: string;
   tone?: "default" | "accent" | "danger" | "ok";
+  href?: string;
 }) {
   const toneClass =
     tone === "accent"
@@ -154,12 +175,22 @@ function SummaryCard({
           ? "text-ok"
           : "text-ink";
 
-  return (
+  const body = (
     <article className="rounded-2xl border border-ink/[0.08] bg-white p-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
         {label}
       </p>
+      {caption && <p className="mt-1 text-xs text-ink/55">{caption}</p>}
       <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
     </article>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="block">
+        {body}
+      </Link>
+    );
+  }
+  return body;
 }

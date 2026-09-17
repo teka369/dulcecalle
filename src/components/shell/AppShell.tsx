@@ -11,12 +11,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname.startsWith("/ventas/cobrar") ||
     pathname === "/clientes/nuevo" ||
     /^\/clientes\/[^/]+\/abono$/.test(pathname) ||
+    /^\/clientes\/[^/]+\/deuda-inicial$/.test(pathname) ||
     pathname === "/inventario/nuevo" ||
     pathname === "/inventario/proveedores/nuevo" ||
-    /^\/inventario\/[^/]+\/(surtir|me-lo-comi|regalo|perdido)$/.test(pathname);
-  // Hide FAB on Cerrar caja so it does not cover Confirmar cierre
-  const hideFab =
-    pathname.startsWith("/mas/caja/cerrar") || pathname.startsWith("/mas/datos");
+    /^\/inventario\/[^/]+\/(surtir|me-lo-comi|regalo|perdido)$/.test(pathname) ||
+    pathname.startsWith("/mas/gastos/nuevo") ||
+    pathname.startsWith("/mas/caja/aporte") ||
+    pathname.startsWith("/mas/caja/retiro") ||
+    pathname.startsWith("/mas/caja/cerrar");
+  const hideFab = pathname.startsWith("/mas/datos");
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-bg text-ink">
