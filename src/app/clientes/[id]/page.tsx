@@ -103,7 +103,10 @@ export default function ClienteFichaPage() {
           <h2 className="mb-2 text-sm font-semibold text-ink/60">Historial</h2>
           <ul className="flex flex-col gap-2">
             {history.map((h) => {
-              const signed = h.kind === "abono" ? -h.amount : h.amount;
+              const signed =
+                h.kind === "abono" || h.kind === "devolucion"
+                  ? -h.amount
+                  : h.amount;
               return (
                 <li
                   key={h.id}

@@ -12,7 +12,8 @@ import { customerRepository } from "./customerRepository";
  * Period stats — each metric SEPARATE (never mix into one total).
  *
  * Formulas (Dexie-only, offline-safe):
- * - Ventas: sum(sale.saleTotal) in period
+ * - Ventas: sum(sale.saleTotal) in period (brutas; devoluciones aparte)
+ * - Devoluciones: sum(qty × unitPrice) of return lines in period
  * - Recibido: sum(sale.amountReceived) + sum(customerPayments) in period
  *   Efectivo|Nequi via cashMoves kind sale|debt_collect
  * - Por cobrar: sum(customer.debt) outstanding (point-in-time)
@@ -20,7 +21,7 @@ import { customerRepository } from "./customerRepository";
  * - Invertí: sum(cashMoves kind=compra) in period — surtir/purchase cash out
  * - Valor inventario: sum(stock × avgCost) current
  * - Stock bajo: count stock ≤ lowStockAt
- * - Ganancia aprox: sum(lineTotal − qty×unitCost) for sales in period
+ * - Ganancia aprox: sale margins in period − returned margins whose return is in period
  *
  * Caja Esperado/Contado/Diferencia: NOT here — Stats only links «Ir a Caja».
  */
@@ -30,6 +31,8 @@ export type StatsSnapshot = {
   range: PeriodRange;
   ventas: number;
   ventasCount: number;
+  devoluciones: number;
+  devolucionesCount: number;
   recibido: number;
   recibidoEfectivo: number;
   recibidoNequi: number;
@@ -49,18 +52,21 @@ export async function loadStats(
   const range = rangeForPeriod(period, nowMs);
   const db = getDb();
 
-  const [sales, payments, expenses, cashMoves, products] = await Promise.all([
-    db.sales.toArray(),
-    db.customerPayments.toArray(),
-    db.expenses.toArray(),
-    db.cashMoves.toArray(),
-    db.products.toArray(),
-  ]);
+  const [sales, payments, expenses, cashMoves, products, returns] =
+    await Promise.all([
+      db.sales.toArray(),
+      db.customerPayments.toArray(),
+      db.expenses.toArray(),
+      db.cashMoves.toArray(),
+      db.products.toArray(),
+      db.saleReturns.toArray(),
+    ]);
 
   const salesIn = sales.filter((s) => inRange(s.createdAt, range));
   const paymentsIn = payments.filter((p) => inRange(p.createdAt, range));
   const expensesIn = expenses.filter((e) => inRange(e.createdAt, range));
   const movesIn = cashMoves.filter((m) => inRange(m.createdAt, range));
+  const returnsIn = returns.filter((r) => inRange(r.createdAt, range));
 
   const ventas = salesIn.reduce((a, s) => addCop(a, s.saleTotal), 0);
   const ventasCount = salesIn.length;
@@ -94,6 +100,18 @@ export async function loadStats(
     ganancia = addCop(ganancia, subCop(line.lineTotal, cogs));
   }
 
+  const returnIds = new Set(
+    returnsIn.map((r) => r.id).filter((id): id is number => id != null),
+  );
+  const returnLines = await db.saleReturnLines.toArray();
+  let devoluciones = 0;
+  for (const rl of returnLines) {
+    if (!returnIds.has(rl.returnId)) continue;
+    devoluciones = addCop(devoluciones, mulCop(rl.unitPrice, rl.qty));
+    const margin = mulCop(subCop(rl.unitPrice, rl.unitCost), rl.qty);
+    ganancia = subCop(ganancia, margin);
+  }
+
   const gaste = expensesIn.reduce((a, e) => addCop(a, e.amount), 0);
   const inverti = movesIn
     .filter((m) => m.kind === "compra")
@@ -110,13 +128,16 @@ export async function loadStats(
     salesIn.length === 0 &&
     paymentsIn.length === 0 &&
     expensesIn.length === 0 &&
-    movesIn.length === 0;
+    movesIn.length === 0 &&
+    returnsIn.length === 0;
 
   return {
     period,
     range,
     ventas,
     ventasCount,
+    devoluciones,
+    devolucionesCount: returnsIn.length,
     recibido,
     recibidoEfectivo,
     recibidoNequi,

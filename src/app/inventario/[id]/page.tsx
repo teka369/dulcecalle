@@ -15,6 +15,7 @@ const REASON_LABEL: Record<string, string> = {
   sale: "Venta",
   adjust: "Ajuste",
   inicial: "Stock inicial",
+  devolucion: "Devolución",
 };
 
 export default function ProductoFichaPage() {

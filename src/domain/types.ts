@@ -11,7 +11,8 @@ export type StockMoveReason =
   | "regalar"
   | "perdido"
   | "adjust"
-  | "inicial";
+  | "inicial"
+  | "devolucion";
 
 export interface Product {
   id?: number;
@@ -145,6 +146,7 @@ export type CashMoveKind =
   | "sale"
   | "debt_collect"
   | "compra"
+  | "devolucion"
   | string;
 
 export interface CashMove {
@@ -217,4 +219,39 @@ export interface CreateSaleInput {
   method?: PayMethod;
   /** Client-generated key; same key → return existing sale, no double effects. */
   requestId?: string;
+}
+
+/**
+ * A return of one sale. The original sale is NEVER edited.
+ * refundAmount = cash/Nequi out. debtReduced = fiado that comes off the customer.
+ */
+export interface SaleReturn {
+  id?: number;
+  saleId: number;
+  createdAt: number;
+  requestId?: string;
+  refundAmount: number;
+  debtReduced: number;
+  /** Channel for the cash refund; null when the whole return is debt-only. */
+  method: PayMethod | null;
+  note?: string;
+}
+
+export interface SaleReturnLine {
+  id?: number;
+  returnId: number;
+  saleLineId: number;
+  productId: number;
+  qty: number;
+  /** SNAPSHOT from the original sale line. */
+  unitPrice: number;
+  /** SNAPSHOT from the original sale line. */
+  unitCost: number;
+}
+
+export interface CreateReturnInput {
+  saleId: number;
+  lines: Array<{ saleLineId: number; qty: number }>;
+  requestId?: string;
+  note?: string;
 }

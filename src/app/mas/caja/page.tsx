@@ -278,6 +278,8 @@ function kindLabel(kind: string): string {
       return "Abono";
     case "compra":
       return "Compra";
+    case "devolucion":
+      return "Devolución";
     default:
       return kind;
   }

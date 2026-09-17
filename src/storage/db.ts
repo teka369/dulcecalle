@@ -9,6 +9,8 @@ import type {
   Product,
   Sale,
   SaleLine,
+  SaleReturn,
+  SaleReturnLine,
   Setting,
   StockMove,
   Supplier,
@@ -23,6 +25,7 @@ import type {
  * v5: sales.requestId (sale idempotency).
  * v6: initialDebts (pre-system customer debt; not a sale).
  * v7: requestId on expenses/cashMoves/stockMoves; unique cashSessions.localDate.
+ * v8: saleReturns / saleReturnLines (original sale stays immutable).
  * Data lives in Dexie — NOT in the Cache API.
  */
 export class DulceCalleDB extends Dexie {
@@ -31,6 +34,8 @@ export class DulceCalleDB extends Dexie {
   suppliers!: EntityTable<Supplier, "id">;
   sales!: EntityTable<Sale, "id">;
   saleLines!: EntityTable<SaleLine, "id">;
+  saleReturns!: EntityTable<SaleReturn, "id">;
+  saleReturnLines!: EntityTable<SaleReturnLine, "id">;
   stockMoves!: EntityTable<StockMove, "id">;
   customerPayments!: EntityTable<CustomerPayment, "id">;
   initialDebts!: EntityTable<InitialDebt, "id">;
@@ -79,6 +84,10 @@ export class DulceCalleDB extends Dexie {
       cashMoves: "++id, createdAt, method, kind, sessionId, requestId",
       stockMoves: "++id, productId, createdAt, reason, requestId",
       cashSessions: "++id, openedAt, closedAt, &localDate",
+    });
+    this.version(8).stores({
+      saleReturns: "++id, saleId, createdAt, requestId",
+      saleReturnLines: "++id, returnId, saleLineId, productId",
     });
   }
 }

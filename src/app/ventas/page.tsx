@@ -36,18 +36,24 @@ export default function VentasPage() {
       ) : (
         <ul className="flex flex-col gap-2">
           {sales.map((s) => (
-            <li
-              key={s.id}
-              className="rounded-2xl border border-ink/[0.08] bg-white p-4"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{kindLabel[s.paymentKind]}</span>
-                <span className="text-sm font-semibold">{formatCop(s.saleTotal)}</span>
-              </div>
-              <p className="mt-1 text-xs text-ink/50">
-                Recibido {formatCop(s.amountReceived)} · Fiado{" "}
-                {formatCop(s.credit)}
-              </p>
+            <li key={s.id}>
+              <Link
+                href={`/ventas/${s.id}`}
+                className="block rounded-2xl border border-ink/[0.08] bg-white p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    {kindLabel[s.paymentKind]}
+                  </span>
+                  <span className="text-sm font-semibold">
+                    {formatCop(s.saleTotal)}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-ink/50">
+                  Recibido {formatCop(s.amountReceived)} · Fiado{" "}
+                  {formatCop(s.credit)}
+                </p>
+              </Link>
             </li>
           ))}
         </ul>

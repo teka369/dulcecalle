@@ -126,6 +126,13 @@ export default function EstadisticasPage() {
           />
 
           <MetricCard
+            title={STATS_COPY.devoluciones}
+            caption={STATS_COPY.captionDevoluciones}
+            value={formatCop(stats.devoluciones)}
+            tone="danger"
+          />
+
+          <MetricCard
             title={STATS_COPY.recibido}
             caption={STATS_COPY.captionRecibido}
             value={formatCop(stats.recibido)}

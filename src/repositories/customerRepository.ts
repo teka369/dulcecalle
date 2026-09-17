@@ -12,7 +12,7 @@ import { assertDayEditable } from "./dayGuard";
 
 export type CustomerHistoryItem = {
   id: string;
-  kind: "abono" | "fiada" | "parcial" | "inicial";
+  kind: "abono" | "fiada" | "parcial" | "inicial" | "devolucion";
   amount: number;
   method?: PayMethod;
   createdAt: number;
@@ -89,6 +89,7 @@ export class CustomerRepository {
       .where("customerId")
       .equals(customerId)
       .toArray();
+    const returns = await db.saleReturns.toArray();
 
     const items: CustomerHistoryItem[] = [];
 
@@ -122,6 +123,20 @@ export class CustomerRepository {
         amount: d.amount,
         createdAt: d.createdAt,
         label: "Deuda anterior",
+      });
+    }
+
+    const saleIds = new Set(
+      sales.map((s) => s.id).filter((id): id is number => id != null),
+    );
+    for (const r of returns) {
+      if (!saleIds.has(r.saleId) || r.debtReduced <= 0) continue;
+      items.push({
+        id: `dev-${r.id}`,
+        kind: "devolucion",
+        amount: r.debtReduced,
+        createdAt: r.createdAt,
+        label: "Devolución",
       });
     }
 
