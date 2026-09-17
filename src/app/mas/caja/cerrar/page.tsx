@@ -93,7 +93,7 @@ export default function CerrarCajaPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-28">
+    <div className="flex flex-col gap-4 pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))]">
       <header className="flex items-center gap-2">
         <Link
           href="/mas/caja"
@@ -154,7 +154,8 @@ export default function CerrarCajaPage() {
         {error && <p className="text-sm text-danger">{error}</p>}
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+      {/* Sticky CTA above AppShell bottom nav (~64–80px) + safe-area */}
+      <div className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
           <button
             type="button"

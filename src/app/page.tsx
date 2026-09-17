@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { formatCop } from "@/domain/money";
 import { CASH_COPY } from "@/domain/cash";
 import {
@@ -18,11 +19,12 @@ function startOfToday(): number {
 }
 
 export default function InicioPage() {
+  const pathname = usePathname();
   const [hoyVendido, setHoyVendido] = useState(0);
   const [porCobrar, setPorCobrar] = useState(0);
   const [stockBajo, setStockBajo] = useState(0);
   const [cajaEsperado, setCajaEsperado] = useState<number | null>(null);
-  const [cajaCerrada, setCajaCerrada] = useState(false);
+  const [cajaCerrada, setCajaCerrada] = useState(true);
   const [hasCajaSession, setHasCajaSession] = useState(false);
   const [emptyToday, setEmptyToday] = useState(true);
   const [showDemo, setShowDemo] = useState(false);
@@ -43,7 +45,7 @@ export default function InicioPage() {
 
     const day = await cashRepository.daySummary();
     setHasCajaSession(day.session != null);
-    setCajaCerrada(day.closed);
+    setCajaCerrada(day.closed || day.session == null);
     setCajaEsperado(day.expected.efectivo);
 
     setReady(true);
@@ -51,6 +53,14 @@ export default function InicioPage() {
 
   useEffect(() => {
     void refresh();
+  }, [refresh, pathname]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, [refresh]);
 
   async function onLoadDemo() {
@@ -63,6 +73,8 @@ export default function InicioPage() {
   if (!ready) {
     return <p className="text-sm text-ink/60">Cargando…</p>;
   }
+
+  const cajaOpen = hasCajaSession && !cajaCerrada;
 
   return (
     <div className="flex flex-col gap-4">
@@ -79,13 +91,19 @@ export default function InicioPage() {
           value={String(stockBajo)}
           tone={stockBajo > 0 ? "danger" : "ok"}
         />
-        {hasCajaSession && (
+        {/* S4: always visible on Inicio (mobile 390px) — open vs closed */}
+        {cajaOpen ? (
           <SummaryCard
-            label={
-              cajaCerrada ? CASH_COPY.estadoCerrada : CASH_COPY.cajaEsperado
-            }
+            label={CASH_COPY.cajaEsperado}
             value={formatCop(cajaEsperado ?? 0)}
-            tone={cajaCerrada ? "default" : "ok"}
+            tone="ok"
+          />
+        ) : (
+          <SummaryCard
+            label={CASH_COPY.estadoCerrada}
+            value={
+              hasCajaSession ? formatCop(cajaEsperado ?? 0) : CASH_COPY.estadoCerrada
+            }
           />
         )}
       </section>

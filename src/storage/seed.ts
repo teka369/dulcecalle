@@ -2,6 +2,7 @@ import { getDb } from "./db";
 import { saleRepository } from "@/repositories/saleRepository";
 import { customerRepository } from "@/repositories/customerRepository";
 import { productRepository } from "@/repositories/productRepository";
+import { cashRepository } from "@/repositories/cashRepository";
 
 /** Local calendar start-of-day (Inicio filters sales with createdAt >= this). */
 export function startOfLocalDay(ms: number = Date.now()): number {
@@ -129,6 +130,9 @@ export async function loadDemoData(): Promise<void> {
   if (!chicle?.id || !chocolate?.id || !rosa?.id || !carlos?.id) {
     throw new Error("demo seed missing catalog ids");
   }
+
+  // S4: open today's caja so Inicio shows «Caja esperado» after demo.
+  await cashRepository.openSession(0);
 
   // Paid sale today → Hoy vendido > 0
   const paidId = await saleRepository.createSale({
