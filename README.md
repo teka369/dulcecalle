@@ -10,6 +10,8 @@ PWA de ventas para dulcería de barrio (Next.js App Router + Dexie).
 
 Offline-first. Sin backend ni sincronización entre dispositivos (aún).
 
+El dominio congelado (entidades, matriz financiera, qué nunca se puede romper) está en [DOMAIN.md](DOMAIN.md). Un backend futuro debe implementar ese contrato, no inventar otro.
+
 ## Arquitectura
 
 ```
