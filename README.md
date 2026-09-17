@@ -56,6 +56,8 @@ Si la sesión del día está **cerrada**, se rechaza cualquier operación de ese
 
 venta, abono, surtir, merma, gasto, retiro, aporte, y cualquier `cashMove` / movimiento de stock.
 
+**No** aplica a cargas iniciales del sistema: alta de producto con stock y **deuda anterior** de un cliente. Esas no mueven caja.
+
 No hace falta tener la caja abierta para vender: sin sesión, el día se considera editable. El bloqueo aplica cuando ya se cerró.
 
 Surtir con fecha de un día ya cerrado también se rechaza (aunque hoy esté abierto).
@@ -64,7 +66,7 @@ La guarda central es `assertDayEditable()` (`src/repositories/dayGuard.ts`).
 
 ### Idempotencia
 
-Abonos y ventas usan `requestId` (clave de intención, generada en la UI):
+Abonos, ventas y **deudas anteriores** usan `requestId` (clave de intención, generada en la UI):
 
 - misma `requestId` → se devuelve el registro existente; no se vuelve a bajar stock, caja ni deuda
 - `requestId` distinta → dos operaciones válidas
@@ -83,6 +85,22 @@ Alta de producto con `stock > 0` escribe un `stockMove` `reason=inicial` (delta 
 No se puede parchar `product.stock`. `applyMove` rechaza `reason=inicial` (solo nace en el alta).
 
 Productos ya existentes (demo seed / datos pre-P0.5) pueden tener stock sin `inicial`. No se migran. No reconstruyas el stock actual como `sum(stockMoves)` — usa `product.stock`.
+
+### Deuda anterior (deuda inicial)
+
+Lo que un cliente **ya debía** antes de usar DulceCalle. No es una venta.
+
+Cliente → **Agregar deuda anterior**.
+
+- Sube `customer.debt` (saldo actual / Por cobrar)
+- Escribe un registro `initialDebts` (trazable, con `requestId`)
+- **No** crea venta, saleLines, inventario, caja, Nequi, Ventas ni Recibido
+- **No** cuenta como fiado generado en el período
+- Después se puede **Registrar abono** con normalidad (caja + cierre + idempotencia)
+
+Misma `requestId` → no vuelve a sumar. Otra clave → otra carga válida (varias deudas viejas, una por una).
+
+No se carga sola: hay que registrar cada cliente desde la ficha. El demo no mezcla deudas anteriores con ventas de muestra.
 
 ### Surtir / costos
 
@@ -185,14 +203,14 @@ Las páginas no escriben Dexie. Caminos de negocio:
 | Qué | Quién escribe | Guarda |
 |-----|----------------|--------|
 | stock | `saleRepository.createSale`, `inventoryRepository.surtir/applyShrink/applyMove`, alta `productRepository.create` (`inicial`) | día cerrado, stock ≥ 0, no parche directo |
-| deuda | `createSale` (suma crédito), `customerRepository.recordPayment` (resta) | día cerrado, deuda ≥ 0, abono ≤ deuda, `requestId` |
+| deuda | `createSale` (suma crédito), `recordInitialDebt` (deuda anterior), `recordPayment` (resta) | día cerrado en venta/abono; deuda ≥ 0; abono ≤ deuda; `requestId` |
 | caja | `createSale`, `recordPayment`, `surtir` (compra), `recordExpense`, `ownerAporte/Retiro` | día cerrado, `assertDayEditable` |
 | ventas / líneas | solo `createSale` | `requestId`, pago coherente, stock |
 
 Excepciones conscientes:
 
 - **Demo seed:** `bulkAdd` de catálogo (puede no tener `inicial`) y reloj de `createdAt` para que Inicio muestre «hoy». No cambia montos de stock/deuda/caja.
-- **Alta de cliente** acepta `debt` en el API; la UI siempre crea en 0.
+- **Alta de cliente** nace en deuda 0. La deuda anterior va por `recordInitialDebt`, no en el create.
 
 ## Pendiente consciente
 
