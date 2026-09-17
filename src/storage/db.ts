@@ -10,15 +10,19 @@ import type {
   SaleLine,
   Setting,
   StockMove,
+  Supplier,
 } from "@/domain/types";
 
 /**
- * DulceCalle IndexedDB schema v1 (Investigador names).
+ * DulceCalle IndexedDB schema.
+ * v1: foundation tables
+ * v2: suppliers (light — NO CxP). StockMove.supplierId is optional payload (no new index).
  * Data lives in Dexie — NOT in the Cache API.
  */
 export class DulceCalleDB extends Dexie {
   products!: EntityTable<Product, "id">;
   customers!: EntityTable<Customer, "id">;
+  suppliers!: EntityTable<Supplier, "id">;
   sales!: EntityTable<Sale, "id">;
   saleLines!: EntityTable<SaleLine, "id">;
   stockMoves!: EntityTable<StockMove, "id">;
@@ -41,6 +45,10 @@ export class DulceCalleDB extends Dexie {
       cashMoves: "++id, createdAt, method, kind, sessionId",
       cashSessions: "++id, openedAt, closedAt",
       settings: "key",
+    });
+    // S3: light suppliers (name/phone/notes + surtir history). NO CxP tables.
+    this.version(2).stores({
+      suppliers: "++id, name",
     });
   }
 }
