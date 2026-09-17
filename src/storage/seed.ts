@@ -17,15 +17,14 @@ export function startOfLocalDay(ms: number = Date.now()): number {
  * and leaves ≥1 customer with debt > 0 for Registrar abono.
  */
 export async function loadDemoData(): Promise<void> {
-  const db = getDb();
-  const count = await db.products.count();
-  if (count > 0) {
+  if (!(await isDbEmpty())) {
     return;
   }
 
   const now = Date.now();
   // Midday today — always ≥ startOfLocalDay for Inicio aggregations.
   const todayMs = startOfLocalDay(now) + 12 * 60 * 60 * 1000;
+  const db = getDb();
 
   await db.transaction(
     "rw",
@@ -180,11 +179,41 @@ export async function loadDemoData(): Promise<void> {
   void carlos;
 }
 
+/**
+ * True only when this device has no business data.
+ * Customers / deudas iniciales count — never offer demo on top of real books.
+ */
 export async function isDbEmpty(): Promise<boolean> {
   const db = getDb();
-  const products = await db.products.count();
-  const sales = await db.sales.count();
-  return products === 0 && sales === 0;
+  const [
+    products,
+    customers,
+    sales,
+    initialDebts,
+    cashMoves,
+    cashSessions,
+    stockMoves,
+    expenses,
+  ] = await Promise.all([
+    db.products.count(),
+    db.customers.count(),
+    db.sales.count(),
+    db.initialDebts.count(),
+    db.cashMoves.count(),
+    db.cashSessions.count(),
+    db.stockMoves.count(),
+    db.expenses.count(),
+  ]);
+  return (
+    products === 0 &&
+    customers === 0 &&
+    sales === 0 &&
+    initialDebts === 0 &&
+    cashMoves === 0 &&
+    cashSessions === 0 &&
+    stockMoves === 0 &&
+    expenses === 0
+  );
 }
 
 /**

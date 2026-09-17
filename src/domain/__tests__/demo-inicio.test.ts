@@ -49,4 +49,20 @@ describe("Cargar demo → Inicio metrics (today)", () => {
     await wipeLocalData();
     expect(await isDbEmpty()).toBe(true);
   });
+
+  it("does not load demo on top of real customers or deudas", async () => {
+    const customerId = await customerRepository.create({ name: "Pablo" });
+    await customerRepository.recordInitialDebt({
+      customerId,
+      amount: 45_000,
+      requestId: "real-deuda",
+    });
+    expect(await isDbEmpty()).toBe(false);
+    await loadDemoData();
+    const customers = await customerRepository.list();
+    expect(customers).toHaveLength(1);
+    expect(customers[0]?.name).toBe("Pablo");
+    expect(customers[0]?.debt).toBe(45_000);
+    expect(await saleRepository.list()).toHaveLength(0);
+  });
 });
