@@ -14,6 +14,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname === "/inventario/nuevo" ||
     pathname === "/inventario/proveedores/nuevo" ||
     /^\/inventario\/[^/]+\/(surtir|me-lo-comi|regalo|perdido)$/.test(pathname);
+  // Hide FAB on Cerrar caja so it does not cover Confirmar cierre
+  const hideFab = pathname.startsWith("/mas/caja/cerrar");
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-bg text-ink">
@@ -22,7 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
       {!hideChrome && (
         <>
-          <Fab />
+          {!hideFab && <Fab />}
           <BottomNav />
         </>
       )}
