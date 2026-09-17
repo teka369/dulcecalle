@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
+import { CASH_COPY } from "@/domain/cash";
 import {
-  metricCaja,
   metricFiadoOutstanding,
-  metricVentas,
   productRepository,
+  saleRepository,
 } from "@/repositories";
+import { cashRepository } from "@/repositories/cashRepository";
 import { isDbEmpty, loadDemoData } from "@/storage/seed";
-import { saleRepository } from "@/repositories";
 
 function startOfToday(): number {
   const d = new Date();
@@ -21,6 +21,9 @@ export default function InicioPage() {
   const [hoyVendido, setHoyVendido] = useState(0);
   const [porCobrar, setPorCobrar] = useState(0);
   const [stockBajo, setStockBajo] = useState(0);
+  const [cajaEsperado, setCajaEsperado] = useState<number | null>(null);
+  const [cajaCerrada, setCajaCerrada] = useState(false);
+  const [hasCajaSession, setHasCajaSession] = useState(false);
   const [emptyToday, setEmptyToday] = useState(true);
   const [showDemo, setShowDemo] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -37,9 +40,12 @@ export default function InicioPage() {
     const low = await productRepository.lowStock();
     setStockBajo(low.length);
     setShowDemo(await isDbEmpty());
-    // touch caja/ventas to keep imports honest for domain separation demos
-    void metricCaja;
-    void metricVentas;
+
+    const day = await cashRepository.daySummary();
+    setHasCajaSession(day.session != null);
+    setCajaCerrada(day.closed);
+    setCajaEsperado(day.expected.efectivo);
+
     setReady(true);
   }, []);
 
@@ -73,6 +79,15 @@ export default function InicioPage() {
           value={String(stockBajo)}
           tone={stockBajo > 0 ? "danger" : "ok"}
         />
+        {hasCajaSession && (
+          <SummaryCard
+            label={
+              cajaCerrada ? CASH_COPY.estadoCerrada : CASH_COPY.cajaEsperado
+            }
+            value={formatCop(cajaEsperado ?? 0)}
+            tone={cajaCerrada ? "default" : "ok"}
+          />
+        )}
       </section>
 
       {emptyToday && (
