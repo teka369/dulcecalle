@@ -8,6 +8,11 @@ import {
   validateAbono,
 } from "@/domain/abono";
 import {
+  INITIAL_DEBT_TOAST,
+  parseInitialDebtAmount,
+  validateInitialDebtAmount,
+} from "@/domain/initialDebt";
+import {
   customerRepository,
   type CustomerHistoryItem,
 } from "@/repositories/customerRepository";
@@ -96,6 +101,31 @@ export const customerStore = {
     setState({ lastToast: "Abono registrado" });
     return paymentId;
   },
+  /**
+   * UI → store → repository → Dexie deuda anterior.
+   * Not a sale. Idempotent via requestId.
+   */
+  async recordInitialDebt(input: {
+    customerId: number;
+    amountRaw: string;
+    requestId?: string;
+  }): Promise<number> {
+    const customer = await customerRepository.getById(input.customerId);
+    if (!customer) throw new Error("customer not found");
+
+    const error = validateInitialDebtAmount(input.amountRaw);
+    if (error) throw new Error(error);
+
+    const amount = parseInitialDebtAmount(input.amountRaw);
+    const id = await customerRepository.recordInitialDebt({
+      customerId: input.customerId,
+      amount,
+      requestId: input.requestId,
+    });
+    await this.refresh();
+    setState({ lastToast: INITIAL_DEBT_TOAST });
+    return id;
+  },
   clearToast() {
     setState({ lastToast: null });
   },
@@ -122,12 +152,21 @@ export function useCustomers() {
     }) => customerStore.recordAbono(input),
     [],
   );
+  const recordInitialDebt = useCallback(
+    (input: {
+      customerId: number;
+      amountRaw: string;
+      requestId?: string;
+    }) => customerStore.recordInitialDebt(input),
+    [],
+  );
 
   return {
     ...snap,
     refresh,
     createCustomer,
     recordAbono,
+    recordInitialDebt,
     getCustomer: customerStore.getCustomer,
     getHistory: customerStore.getHistory,
     clearToast: customerStore.clearToast,

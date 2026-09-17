@@ -91,19 +91,36 @@ export default function ClienteFichaPage() {
         </Link>
       )}
 
+      <Link
+        href={`/clientes/${customer.id}/deuda-inicial`}
+        className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white px-4 text-sm font-semibold"
+      >
+        Agregar deuda anterior
+      </Link>
+
       {history.length > 0 && (
         <section>
           <h2 className="mb-2 text-sm font-semibold text-ink/60">Historial</h2>
           <ul className="flex flex-col gap-2">
-            {history.map((h) => (
-              <li
-                key={h.id}
-                className="flex items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 py-3 text-sm"
-              >
-                <span>{h.label}</span>
-                <span className="font-semibold">{formatCop(h.amount)}</span>
-              </li>
-            ))}
+            {history.map((h) => {
+              const signed = h.kind === "abono" ? -h.amount : h.amount;
+              return (
+                <li
+                  key={h.id}
+                  className="flex items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 py-3 text-sm"
+                >
+                  <span>{h.label}</span>
+                  <span
+                    className={`font-semibold ${
+                      signed < 0 ? "text-ok" : "text-accent"
+                    }`}
+                  >
+                    {signed < 0 ? "−" : "+"}
+                    {formatCop(Math.abs(signed))}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

@@ -105,6 +105,20 @@ export interface CustomerPayment {
   requestId?: string;
 }
 
+/**
+ * Opening / pre-system debt. NOT a sale.
+ * Increases customer.debt. No saleLines, stock, cash, ventas, or recibido.
+ */
+export interface InitialDebt {
+  id?: number;
+  customerId: number;
+  amount: number;
+  createdAt: number;
+  note?: string;
+  /** Client-generated key; same key → no second debt increment. */
+  requestId?: string;
+}
+
 export interface Expense {
   id?: number;
   amount: number;

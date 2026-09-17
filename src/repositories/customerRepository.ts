@@ -1,12 +1,18 @@
 import { getDb } from "@/storage/db";
-import type { Customer, CustomerPayment, PayMethod } from "@/domain/types";
+import type {
+  Customer,
+  CustomerPayment,
+  InitialDebt,
+  PayMethod,
+} from "@/domain/types";
 import { asCop, addCop, subCop } from "@/domain/money";
 import { ABONO_ERRORS } from "@/domain/abono";
+import { INITIAL_DEBT_ERRORS } from "@/domain/initialDebt";
 import { assertDayEditable } from "./dayGuard";
 
 export type CustomerHistoryItem = {
   id: string;
-  kind: "abono" | "fiada" | "parcial";
+  kind: "abono" | "fiada" | "parcial" | "inicial";
   amount: number;
   method?: PayMethod;
   createdAt: number;
@@ -40,7 +46,11 @@ export class CustomerRepository {
     const name = input.name?.trim() ?? "";
     if (!name) throw new Error("Ponle un nombre para guardarlo.");
     const debt = input.debt ?? 0;
-    if (debt < 0) throw new Error("debt must be ≥ 0");
+    if (debt !== 0) {
+      throw new Error(
+        "La deuda anterior se registra aparte, no al crear el cliente.",
+      );
+    }
     asCop(debt);
     const now = Date.now();
     const id = await getDb().customers.add({
@@ -62,7 +72,7 @@ export class CustomerRepository {
   }
 
   /**
-   * Short history: abonos + credit/partial sales for this customer.
+   * Short history: deudas anteriores + abonos + credit/partial sales.
    * Newest first; capped for ficha.
    */
   async listHistory(
@@ -75,6 +85,10 @@ export class CustomerRepository {
       .equals(customerId)
       .toArray();
     const sales = await db.sales.where("customerId").equals(customerId).toArray();
+    const initials = await db.initialDebts
+      .where("customerId")
+      .equals(customerId)
+      .toArray();
 
     const items: CustomerHistoryItem[] = [];
 
@@ -101,8 +115,70 @@ export class CustomerRepository {
       });
     }
 
+    for (const d of initials) {
+      items.push({
+        id: `inicial-${d.id}`,
+        kind: "inicial",
+        amount: d.amount,
+        createdAt: d.createdAt,
+        label: "Deuda anterior",
+      });
+    }
+
     items.sort((a, b) => b.createdAt - a.createdAt);
     return items.slice(0, limit);
+  }
+
+  /**
+   * Load a pre-system debt. Increases customer.debt.
+   * NOT a sale: no saleLines, stock, cash, ventas, or recibido.
+   * Not a caja-day operation (same idea as product stock inicial).
+   * Same requestId → returns the existing row (no second increment).
+   */
+  async recordInitialDebt(input: {
+    customerId: number;
+    amount: number;
+    note?: string;
+    requestId?: string;
+  }): Promise<number> {
+    if (!Number.isInteger(input.amount) || !Number.isFinite(input.amount)) {
+      throw new Error(INITIAL_DEBT_ERRORS.empty);
+    }
+    if (input.amount <= 0) {
+      throw new Error(INITIAL_DEBT_ERRORS.notPositive);
+    }
+
+    const amount = asCop(input.amount);
+    const db = getDb();
+
+    return db.transaction("rw", db.customers, db.initialDebts, async () => {
+      if (input.requestId) {
+        const existing = await db.initialDebts
+          .where("requestId")
+          .equals(input.requestId)
+          .first();
+        if (existing?.id != null) return existing.id;
+      }
+
+      const customer = await db.customers.get(input.customerId);
+      if (!customer) throw new Error("customer not found");
+
+      const newDebt = addCop(customer.debt, amount);
+      await db.customers.update(customer.id!, {
+        debt: newDebt,
+        updatedAt: Date.now(),
+      });
+
+      const id = await db.initialDebts.add({
+        customerId: input.customerId,
+        amount,
+        createdAt: Date.now(),
+        note: input.note,
+        requestId: input.requestId,
+      } satisfies InitialDebt);
+
+      return id as number;
+    });
   }
 
   /**
