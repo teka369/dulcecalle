@@ -5,7 +5,7 @@ PWA de ventas para dulcería de barrio (Next.js App Router + Dexie).
 ## Stack
 
 - Next.js (App Router) + TypeScript + Tailwind
-- Dexie (IndexedDB) — datos **no** van al Cache API
+- Dexie (IndexedDB) — **fuente de verdad**; datos **no** van al Cache API / Cache Storage
 - Capas: UI → store → repository → storage
 
 ## Domain rules (separación dura)
@@ -31,3 +31,7 @@ npm run build
 ## Onboarding
 
 Inicio vacío + botón **Cargar demo**.
+
+## Offline / PWA
+
+Serwist precachea el *shell* (HTML/CSS/JS, `/offline`, icons, manifest). **Dexie (IndexedDB) es la fuente de verdad** de ventas, clientes, stock y caja: esos datos **nunca** van a Cache Storage. El seed demo también vive en Dexie, no en el service worker.
