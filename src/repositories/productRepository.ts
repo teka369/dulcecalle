@@ -39,6 +39,9 @@ export class ProductRepository {
       throw new Error(INVENTORY_ERRORS.badCost);
     }
     if (input.stock < 0) throw new Error("stock must be ≥ 0");
+    if (input.stock > 0 && input.avgCost <= 0) {
+      throw new Error(INVENTORY_ERRORS.needCost);
+    }
     const db = getDb();
     return db.transaction("rw", db.products, db.stockMoves, async () => {
       const id = (await db.products.add({

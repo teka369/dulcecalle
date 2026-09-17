@@ -20,7 +20,6 @@ export default function SurtirPage() {
   const [qtyRaw, setQtyRaw] = useState("");
   const [unitCostRaw, setUnitCostRaw] = useState("");
   const [totalCostRaw, setTotalCostRaw] = useState("");
-  const [dateRaw, setDateRaw] = useState(inventoryStore.todayLocalDateInput());
   const [method, setMethod] = useState<PayMethod>("Efectivo");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +125,6 @@ export default function SurtirPage() {
         supplierId: supplierId === "" ? null : Number(supplierId),
         supplierNameCreate: supplierCreate,
         note,
-        dateRaw,
         requestId: requestIdRef.current,
       });
       setToast(
@@ -252,19 +250,6 @@ export default function SurtirPage() {
           {previewTotal > 0 && (
             <p className="mt-1 text-sm text-ink/60">{formatCop(previewTotal)}</p>
           )}
-        </div>
-
-        <div>
-          <label className="text-sm font-medium" htmlFor="fecha">
-            Fecha
-          </label>
-          <input
-            id="fecha"
-            type="date"
-            value={dateRaw}
-            onChange={(e) => setDateRaw(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
-          />
         </div>
 
         <div>

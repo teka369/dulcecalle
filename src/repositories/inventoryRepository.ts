@@ -6,6 +6,7 @@ import {
   reconcileSurtirCost,
   type ShrinkReason,
 } from "@/domain/inventory";
+import { localDateKey } from "@/domain/cash";
 import { assertDayEditable } from "./dayGuard";
 
 /**
@@ -58,6 +59,9 @@ export class InventoryRepository {
     }
     if (input.reason === "inicial") {
       throw new Error(INVENTORY_ERRORS.inicialViaCreate);
+    }
+    if (input.reason === "devolucion") {
+      throw new Error("Las devoluciones se registran desde la venta.");
     }
 
     const createdAt = input.createdAt ?? Date.now();
@@ -131,7 +135,7 @@ export class InventoryRepository {
     method: PayMethod;
     supplierId?: number | null;
     note?: string;
-    /** Default today; editable date from UI. */
+    /** Ignored unless it falls on today; other days are rejected. */
     createdAt?: number;
     requestId?: string;
   }): Promise<number> {
@@ -152,8 +156,15 @@ export class InventoryRepository {
       rawTotal,
     );
 
+    if (input.createdAt != null) {
+      await assertDayEditable(input.createdAt);
+      if (localDateKey(input.createdAt) !== localDateKey(Date.now())) {
+        throw new Error(INVENTORY_ERRORS.surtirTodayOnly);
+      }
+    }
+
     const db = getDb();
-    const createdAt = input.createdAt ?? Date.now();
+    const createdAt = Date.now();
     await assertDayEditable(createdAt);
 
     return db.transaction(

@@ -50,13 +50,6 @@ function todayLocalDateInput(): string {
   return `${y}-${m}-${day}`;
 }
 
-function dateInputToMs(dateStr: string): number {
-  const raw = dateStr.trim() || todayLocalDateInput();
-  const [y, m, d] = raw.split("-").map((x) => Number(x));
-  if (!y || !m || !d) return Date.now();
-  return new Date(y, m - 1, d, 12, 0, 0, 0).getTime();
-}
-
 export const inventoryStore = {
   subscribe(listener: () => void) {
     listeners.add(listener);
@@ -118,6 +111,9 @@ export const inventoryStore = {
       throw new Error(INVENTORY_ERRORS.notPositive);
     }
     const avgCost = Number.parseInt(input.avgCostRaw?.trim() || "0", 10) || 0;
+    if (stock > 0 && avgCost <= 0) {
+      throw new Error(INVENTORY_ERRORS.needCost);
+    }
     const id = await productRepository.create({
       name,
       category: "General",
@@ -153,7 +149,6 @@ export const inventoryStore = {
     supplierId?: number | null;
     supplierNameCreate?: string;
     note?: string;
-    dateRaw?: string;
     requestId?: string;
   }): Promise<number> {
     const parsed = validateSurtirForm({
@@ -182,7 +177,6 @@ export const inventoryStore = {
       method: parsed.method,
       supplierId,
       note: input.note?.trim() || undefined,
-      createdAt: dateInputToMs(input.dateRaw ?? todayLocalDateInput()),
       requestId: input.requestId,
     });
     await this.refreshAll();

@@ -12,6 +12,7 @@ export default function AgregarProductoPage() {
   const [name, setName] = useState("");
   const [priceRaw, setPriceRaw] = useState("");
   const [stockRaw, setStockRaw] = useState("");
+  const [costRaw, setCostRaw] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -25,6 +26,7 @@ export default function AgregarProductoPage() {
         name,
         priceRaw: priceRaw || "0",
         stockRaw: stockRaw || "0",
+        avgCostRaw: costRaw || "0",
       });
       setToast("Producto guardado");
       setTimeout(() => {
@@ -86,6 +88,22 @@ export default function AgregarProductoPage() {
           className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
           placeholder="0"
         />
+
+        <label className="mt-4 block text-sm font-medium" htmlFor="costo">
+          Costo
+        </label>
+        <input
+          id="costo"
+          inputMode="numeric"
+          value={costRaw}
+          onChange={(e) => setCostRaw(e.target.value.replace(/\D/g, ""))}
+          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          placeholder="0"
+        />
+        <p className="mt-2 text-sm text-ink/60">
+          Si ya tienes unidades, pon lo que te costó cada una. Sin stock puede
+          ir en 0 y se llena al surtir.
+        </p>
 
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </section>

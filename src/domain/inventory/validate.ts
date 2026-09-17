@@ -11,8 +11,10 @@ export const INVENTORY_ERRORS = {
   emptyProductName: "Ponle un nombre al producto.",
   emptySupplierName: "Ponle un nombre al proveedor.",
   stockViaMoves:
-    "El stock solo cambia con surtir, ventas, mermas o el alta inicial.",
+    "El stock solo cambia con surtir, ventas, mermas, devoluciones o el alta inicial.",
   inicialViaCreate: "El stock inicial solo se registra al crear el producto.",
+  needCost: "Si hay stock, ponle lo que te costó.",
+  surtirTodayOnly: "El surtido queda en el día de hoy.",
 } as const;
 
 export const INVENTORY_TOASTS = {
