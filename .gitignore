@@ -43,3 +43,18 @@ next-env.d.ts
 # Serwist
 public/sw*
 public/swe-worker*
+
+# Grok App Builder sandbox (local-only; not part of DulceCalle)
+.grok/
+.node_modules.lock
+AGENTS.sandbox.md
+attachments/
+artifacts/
+migrations/
+screenshots/
+scripts/
+server/
+vite.config.ts
+startup.sh
+public/__grok/
+

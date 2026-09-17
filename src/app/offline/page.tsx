@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function OfflinePage() {
   return (
     <div className="flex flex-col gap-3 py-8">
@@ -6,12 +8,12 @@ export default function OfflinePage() {
         No hay red. Tus datos locales siguen en el dispositivo; vuelve a intentar
         cuando tengas internet.
       </p>
-      <a
+      <Link
         href="/"
         className="mt-2 inline-flex w-fit rounded-xl bg-cta px-4 py-2 text-sm font-medium text-white"
       >
         Reintentar
-      </a>
+      </Link>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { AppShell } from "@/components/shell/AppShell";
+import { PreviewHostBridge } from "@/components/shell/PreviewHostBridge";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -42,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full bg-bg text-ink">
+        <PreviewHostBridge />
         <AppShell>{children}</AppShell>
       </body>
     </html>
