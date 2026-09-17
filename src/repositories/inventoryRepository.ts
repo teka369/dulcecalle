@@ -3,8 +3,10 @@ import type { PayMethod, StockMove, StockMoveReason } from "@/domain/types";
 import { asCop } from "@/domain/money";
 import {
   INVENTORY_ERRORS,
+  reconcileSurtirCost,
   type ShrinkReason,
 } from "@/domain/inventory";
+import { assertDayEditable } from "./dayGuard";
 
 /**
  * Integer weighted average cost.
@@ -54,8 +56,12 @@ export class InventoryRepository {
       throw new Error("delta must be a non-zero integer");
     }
 
+    const createdAt = input.createdAt ?? Date.now();
+    await assertDayEditable(createdAt);
+
     const db = getDb();
-    return db.transaction("rw", db.products, db.stockMoves, async () => {
+    return db.transaction("rw", db.products, db.stockMoves, db.cashSessions, async () => {
+      await assertDayEditable(createdAt);
       const product = await db.products.get(input.productId);
       if (!product) throw new Error("product not found");
 
@@ -92,7 +98,7 @@ export class InventoryRepository {
         refType: input.refType,
         refId: input.refId,
         note: input.note,
-        createdAt: input.createdAt ?? Date.now(),
+        createdAt,
       }) as Promise<number>;
     });
   }
@@ -101,6 +107,9 @@ export class InventoryRepository {
    * Surtir / restock (stock path ≠ sale).
    * Increases stock + updates weighted avgCost (Math.round).
    * Records stockMoves reason=surtir + cashMoves kind=compra direction=out when totalCost > 0.
+   *
+   * Cost source of truth: reconcileSurtirCost — if unit×qty ≠ total, total wins
+   * (cash out) and unitCost = round(total / qty).
    */
   async surtir(input: {
     productId: number;
@@ -119,14 +128,20 @@ export class InventoryRepository {
     if (input.method !== "Efectivo" && input.method !== "Nequi") {
       throw new Error(INVENTORY_ERRORS.noMethod);
     }
-    const unitCost = asCop(input.unitCost);
-    const totalCost = asCop(input.totalCost);
-    if (unitCost < 0 || totalCost < 0) {
+    const rawUnit = asCop(input.unitCost);
+    const rawTotal = asCop(input.totalCost);
+    if (rawUnit < 0 || rawTotal < 0) {
       throw new Error(INVENTORY_ERRORS.badCost);
     }
+    const { unitCost, totalCost } = reconcileSurtirCost(
+      input.qty,
+      rawUnit,
+      rawTotal,
+    );
 
     const db = getDb();
     const createdAt = input.createdAt ?? Date.now();
+    await assertDayEditable(createdAt);
 
     return db.transaction(
       "rw",
@@ -134,7 +149,9 @@ export class InventoryRepository {
       db.stockMoves,
       db.cashMoves,
       db.suppliers,
+      db.cashSessions,
       async () => {
+        await assertDayEditable(createdAt);
         if (input.supplierId != null) {
           const supplier = await db.suppliers.get(input.supplierId);
           if (!supplier) throw new Error("supplier not found");
@@ -150,7 +167,6 @@ export class InventoryRepository {
           unitCost,
         );
         const nextStock = product.stock + input.qty;
-        // Integrity: stock ≥ 0 always (inbound cannot go negative).
         if (nextStock < 0) {
           throw new Error(INVENTORY_ERRORS.insufficientStock);
         }
@@ -172,8 +188,10 @@ export class InventoryRepository {
           createdAt,
         })) as number;
 
-        // Cash out only when there is a positive compra amount (STOCK ≠ sale income).
         if (totalCost > 0) {
+          const open = await db.cashSessions
+            .filter((s) => s.closedAt == null)
+            .first();
           await db.cashMoves.add({
             amount: totalCost,
             direction: "out",
@@ -181,7 +199,7 @@ export class InventoryRepository {
             kind: "compra",
             refType: "stockMove",
             refId: moveId,
-            sessionId: null,
+            sessionId: open?.id ?? null,
             note: input.note,
             createdAt,
           });

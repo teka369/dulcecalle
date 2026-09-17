@@ -5,6 +5,7 @@ export type { SupplierSurtirHistoryItem } from "./supplierRepository";
 export { inventoryRepository, InventoryRepository, weightedAvgCost } from "./inventoryRepository";
 export { saleRepository, SaleRepository } from "./saleRepository";
 export { cashRepository, CashRepository } from "./cashRepository";
+export { assertDayEditable } from "./dayGuard";
 export {
   metricVentas,
   metricRecibido,

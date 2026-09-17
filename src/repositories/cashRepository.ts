@@ -4,11 +4,11 @@ import { asCop, addCop, subCop } from "@/domain/money";
 import {
   CASH_ERRORS,
   endOfLocalDay,
-  isTimestampOnLocalDate,
   localDateKey,
   startOfLocalDay,
 } from "@/domain/cash";
 import { inventoryRepository } from "./inventoryRepository";
+import { assertDayEditable } from "./dayGuard";
 
 export type ExpectedBuckets = {
   efectivo: number;
@@ -32,6 +32,16 @@ export type DayCashSummary = {
 /**
  * Caja / gasto / retiro / aporte — NEVER conflate with VENTAS, FIADO, STOCK.
  * Close physical count = Efectivo only; Nequi tracked separately.
+ *
+ * Two different numbers (do not mix):
+ *
+ * 1. balance()
+ *    Σ cashMoves (all time, all methods). in adds, out subtracts.
+ *    Does NOT include CashSession.openingFloat — that is not a cashMove.
+ *
+ * 2. expectedBuckets(day).efectivo  ("Caja esperado")
+ *    session.openingFloat + Σ that day's Efectivo cashMoves.
+ *    Nequi starts at 0 (opening float is physical cash).
  */
 export class CashRepository {
   async listMoves(): Promise<CashMove[]> {
@@ -43,8 +53,8 @@ export class CashRepository {
   }
 
   /**
-   * Caja balance from cashMoves only (CAJA ≠ VENTAS ≠ FIADO).
-   * in adds, out subtracts.
+   * Ledger of cashMoves only. openingFloat is NOT included.
+   * For "what should be in the till today" use expectedBuckets().
    */
   async balance(): Promise<number> {
     const moves = await this.listMoves();
@@ -82,12 +92,10 @@ export class CashRepository {
     return all[0];
   }
 
-  /** Reject mutations when today's session is closed. */
+  /** Reject mutations when the target day's session is closed. */
   async assertTodayEditable(): Promise<CashSession | null> {
+    await assertDayEditable();
     const session = await this.getTodaySession();
-    if (session && session.closedAt != null) {
-      throw new Error(CASH_ERRORS.dayClosed);
-    }
     return session ?? null;
   }
 
@@ -167,8 +175,9 @@ export class CashRepository {
       throw new Error(CASH_ERRORS.noMethod);
     }
 
+    const createdAt = input.createdAt ?? Date.now();
     if (!input._skipClosedCheck) {
-      await this.assertTodayEditable();
+      await assertDayEditable(createdAt);
     }
 
     let sessionId = input.sessionId;
@@ -186,7 +195,7 @@ export class CashRepository {
       refId: input.refId,
       sessionId: sessionId ?? null,
       note: input.note,
-      createdAt: input.createdAt ?? Date.now(),
+      createdAt,
     }) as Promise<number>;
   }
 
@@ -275,12 +284,13 @@ export class CashRepository {
     const category = input.category.trim();
     if (!category) throw new Error(CASH_ERRORS.emptyCategory);
 
-    await this.assertTodayEditable();
+    await assertDayEditable();
 
     const db = getDb();
     const open = await this.getOpenSession();
 
-    return db.transaction("rw", db.expenses, db.cashMoves, async () => {
+    return db.transaction("rw", db.expenses, db.cashMoves, db.cashSessions, async () => {
+      await assertDayEditable();
       const expenseId = (await db.expenses.add({
         amount,
         category,

@@ -18,6 +18,7 @@ import type {
  * v1: foundation tables
  * v2: suppliers (light — NO CxP). StockMove.supplierId is optional payload (no new index).
  * v3: cashSessions.localDate (1 session / calendar day).
+ * v4: customerPayments.requestId (abono idempotency).
  * Data lives in Dexie — NOT in the Cache API.
  */
 export class DulceCalleDB extends Dexie {
@@ -54,6 +55,10 @@ export class DulceCalleDB extends Dexie {
     // S4: 1 cash session per localDate; closingCount = Efectivo físico.
     this.version(3).stores({
       cashSessions: "++id, openedAt, closedAt, localDate",
+    });
+    // P0: idempotent abonos (same requestId → no second debt decrement).
+    this.version(4).stores({
+      customerPayments: "++id, customerId, createdAt, saleId, requestId",
     });
   }
 }

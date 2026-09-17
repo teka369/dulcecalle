@@ -73,6 +73,7 @@ export const customerStore = {
     customerId: number;
     amountRaw: string;
     method: PayMethod | null;
+    requestId?: string;
   }): Promise<number> {
     const customer = await customerRepository.getById(input.customerId);
     if (!customer) throw new Error("customer not found");
@@ -89,6 +90,7 @@ export const customerStore = {
       customerId: input.customerId,
       amount,
       method: input.method as PayMethod,
+      requestId: input.requestId,
     });
     await this.refresh();
     setState({ lastToast: "Abono registrado" });
@@ -116,6 +118,7 @@ export function useCustomers() {
       customerId: number;
       amountRaw: string;
       method: PayMethod | null;
+      requestId?: string;
     }) => customerStore.recordAbono(input),
     [],
   );

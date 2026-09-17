@@ -2,6 +2,7 @@ import { getDb } from "@/storage/db";
 import type { Customer, CustomerPayment, PayMethod } from "@/domain/types";
 import { asCop, addCop, subCop } from "@/domain/money";
 import { ABONO_ERRORS } from "@/domain/abono";
+import { assertDayEditable } from "./dayGuard";
 
 export type CustomerHistoryItem = {
   id: string;
@@ -107,7 +108,8 @@ export class CustomerRepository {
   /**
    * Record an abono against customer debt.
    * Decreases debt (≥ 0), creates customerPayments + cashMoves (debt_collect).
-   * Debt collection ≠ new sale.
+   * Debt collection ≠ new sale. Closed day is rejected.
+   * Same requestId → returns the existing payment (no double decrement).
    */
   async recordPayment(input: {
     customerId: number;
@@ -115,6 +117,7 @@ export class CustomerRepository {
     method: PayMethod;
     saleId?: number | null;
     note?: string;
+    requestId?: string;
   }): Promise<number> {
     if (input.method !== "Efectivo" && input.method !== "Nequi") {
       throw new Error(ABONO_ERRORS.noMethod);
@@ -128,12 +131,25 @@ export class CustomerRepository {
 
     const amount = asCop(input.amount);
     const db = getDb();
+    await assertDayEditable();
+
     return db.transaction(
       "rw",
       db.customers,
       db.customerPayments,
       db.cashMoves,
+      db.cashSessions,
       async () => {
+        await assertDayEditable();
+
+        if (input.requestId) {
+          const existing = await db.customerPayments
+            .where("requestId")
+            .equals(input.requestId)
+            .first();
+          if (existing?.id != null) return existing.id;
+        }
+
         const customer = await db.customers.get(input.customerId);
         if (!customer) throw new Error("customer not found");
         if (amount > customer.debt) {
@@ -154,8 +170,12 @@ export class CustomerRepository {
           saleId: input.saleId ?? null,
           createdAt: Date.now(),
           note: input.note,
+          requestId: input.requestId,
         } satisfies CustomerPayment);
 
+        const open = await db.cashSessions
+          .filter((s) => s.closedAt == null)
+          .first();
         await db.cashMoves.add({
           amount,
           direction: "in",
@@ -163,7 +183,7 @@ export class CustomerRepository {
           kind: "debt_collect",
           refType: "customerPayment",
           refId: paymentId as number,
-          sessionId: null,
+          sessionId: open?.id ?? null,
           createdAt: Date.now(),
         });
 

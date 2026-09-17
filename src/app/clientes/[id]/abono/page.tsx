@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   abonoRemainingHelper,
   parseAbonoAmount,
@@ -23,6 +23,7 @@ export default function RegistrarAbonoPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(id) || id <= 0) {
@@ -74,10 +75,17 @@ export default function RegistrarAbonoPage() {
     }
     setBusy(true);
     try {
+      if (!requestIdRef.current) {
+        requestIdRef.current =
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `abono-${customer.id}-${amountRaw}-${Date.now()}`;
+      }
       await customerStore.recordAbono({
         customerId: customer.id!,
         amountRaw,
         method,
+        requestId: requestIdRef.current,
       });
       setToast("Abono registrado");
       setTimeout(() => {
