@@ -19,8 +19,8 @@ Error envelope:
 |------|------|------|
 | 400 | `VALIDATION` | DTO |
 | 401 | `UNAUTHORIZED` | no/invalid token |
-| 403 | `FORBIDDEN` | no membership / wrong role |
-| 404 | `NOT_FOUND` | missing in **this** business |
+| 403 | `FORBIDDEN` | no membership for this business, or role cannot do this action |
+| 404 | `NOT_FOUND` | member of this business, but this id is not here (also used for ids that belong to another tenant — do not leak) |
 | 409 | `CLOSED_DAY` | `dayClosed` |
 | 409 | `SESSION_ALREADY_CLOSED` | re-close |
 | 409 | `INSUFFICIENT_STOCK` | |
@@ -49,6 +49,12 @@ Duplicate request_id is **not** 409: it is 200 with the first result.
 | GET | `/v1/health` | no | |
 
 Selector: header `X-Business-Id` must be a membership of the user.
+
+**403 vs 404**
+
+- **A.** Caller is not a member of the selected business → `403 FORBIDDEN`.
+- **B.** Caller is a member, id does not exist **in that business** (unknown id, or id of another business) → `404 NOT_FOUND`.
+- Staff calling an owner-only route → `403 FORBIDDEN`.
 
 ---
 
@@ -111,7 +117,7 @@ No PATCH/DELETE.
 
 ### Payments
 `POST /v1/customers/:id/payments`  
-Dto: amount, method, requestId. Server: clamp to debt, cash_move kind=debt_collect.
+Dto: amount, method, requestId. Server: **reject** if amount > current debt (`ABONO_EXCEEDS_DEBT`). Do not clamp. cash_move kind=`debt_collect`.
 
 ### Cash sessions
 `POST /v1/cash/sessions` Dto: `{ openingFloat }` → unique day, second call returns existing.  
@@ -142,7 +148,7 @@ No `adjust` endpoint. No client `createdAt` in the past (Dexie tests only).
 
 `POST /v1/sales/:id/returns`  
 Dto: `{ lines: [{ saleLineId, qty }], requestId, note? }`  
-Server: remaining qty, snapshots from sale line, split debt vs refund (DOMAIN return rules), stock_move devolucion (does **not** reweight avg_cost), cash_move if refund>0. Original sale untouched.
+Server: remaining qty, snapshots from the **sale line** (not current catalog), `splitReturnSettlement` from DOMAIN (fiada of **this** sale first, never below `customer.debt`, remainder is cash refund on the original sale method). stock_move `devolucion` does **not** reweight avg_cost. cash_move if refund>0. Original sale untouched. Hits **today’s** `occurred_on`, not the sale’s day.
 
 ---
 
@@ -187,11 +193,16 @@ No extra BI.
 
 | Client | Server |
 |--------|--------|
-| qty, unitPrice override, paymentKind, method, amountReceived, gifted flag, countedEfectivo, openingFloat | unitCost, stock, debt, avgCost after surtir, occurred_on, businessId, expected buckets, difference, return split |
+| qty, unitPrice override, paymentKind, method, amountReceived, gifted flag, countedEfectivo, openingFloat, **stock + avgCost only on product create** | unitCost on sale/return, live stock, debt, avgCost after surtir, occurred_on, businessId, expected buckets, difference, return split |
 
 ---
 
 ## 12. Idempotency header
 
-All economic POST: `Idempotency-Key: <uuid>`.  
-Stored on the **owning** row (`sales.request_id`, etc.). Unique per business. Forever (needed for sync later).
+All economic POST (and `POST /v1/products`): header `Idempotency-Key: <uuid>` required.
+
+If the body also has `requestId`, it **must equal** the header or the call is `400 VALIDATION`.
+
+Stored on the owning row (`sales.request_id`, `customer_payments.request_id`, `initial_debts.request_id`, `expenses.request_id`, `stock_moves.request_id`, `sale_returns.request_id`, `cash_moves.request_id` for aporte/retiro). Unique per business. Kept forever.
+
+Dexie `product.create` has **no** requestId today. The API still requires the header. Do not change Dexie in this phase.
