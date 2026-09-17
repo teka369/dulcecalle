@@ -33,7 +33,7 @@ La lógica de negocio vive en repositories + `src/domain`. Los componentes no es
 | **Recibido** | `sum(sale.amountReceived) + sum(customerPayments)` |
 | **Fiado / Por cobrar** | `sum(customer.debt)` outstanding **ahora** (no el fiado generado en el período) |
 | **Caja (ledger)** | `balance()` = Σ `cashMoves` (no incluye `openingFloat`) |
-| **Caja esperado** | `openingFloat` + Σ movimientos del día por método |
+| **Caja esperado (Efectivo)** | `openingFloat` + Σ cashMoves **Efectivo** del día. Nequi no entra. |
 | **Stock** | unidades en `products.stock` |
 
 Nunca mezclar estas cifras en un solo número.
@@ -58,9 +58,9 @@ Al **abrir**, el fondo es lo que traías al empezar — **no** lo que hay ahora 
 
 ### Cierre del día
 
-Si la sesión del día está **cerrada**, se rechaza cualquier operación de ese día:
+Si la sesión del día está **cerrada**, se rechaza cualquier operación económica o de stock de ese día:
 
-venta, abono, surtir, merma, gasto, retiro, aporte, y cualquier `cashMove` / movimiento de stock.
+venta, abono, surtir, merma, gasto, retiro, aporte, **devolución**, y cualquier `cashMove` / movimiento de stock.
 
 **No** aplica a cargas iniciales del sistema: alta de producto con stock y **deuda anterior** de un cliente. Esas no mueven caja.
 
@@ -72,7 +72,7 @@ La guarda central es `assertDayEditable()` (`src/repositories/dayGuard.ts`).
 
 ### Idempotencia
 
-Abonos, ventas, deudas anteriores, **gastos, retiros, aportes y surtir** usan `requestId`.
+Abonos, ventas, deudas anteriores, gastos, retiros, aportes, surtir, **merma y devolución** usan `requestId`.
 
 - misma `requestId` → se devuelve el registro existente; no se vuelve a bajar stock, caja ni deuda
 - `requestId` distinta → dos operaciones válidas

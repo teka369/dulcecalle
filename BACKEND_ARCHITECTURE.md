@@ -81,6 +81,22 @@ HTTP
 
 `businessId` in a JSON body is ignored. The server uses the membership of the authenticated user (header `X-Business-Id` only as a **selector among memberships**, then verified).
 
+### Canonical names
+
+| Idea | Dexie / domain today | Postgres | HTTP |
+|------|----------------------|----------|------|
+| Row id | `id` int | `id` UUID | `id` |
+| Dexie int after import | — | `legacy_dexie_id` (nullable) | not exposed as a write |
+| Idempotency key | `requestId` | `request_id` UUID | header `Idempotency-Key` (body `requestId` must match if sent) |
+| Instant | `createdAt` ms | `created_at` timestamptz UTC | ISO-8601 |
+| Commercial day of an event | derived from `createdAt` in device TZ | `occurred_on` DATE in **business** TZ | query `from`/`to` on `occurred_on` |
+| Cash session day | `localDate` | `cash_sessions.local_date` | — |
+| Gifted opening | create flag only | `stock_moves.note` + `unit_cost=0` | DTO `gifted` on create only |
+
+`cash_sessions.local_date` **equals** that day’s `occurred_on`. Never use SQL `CURRENT_DATE` for the commercial day.
+
+Never write `legacy_id`. The column is always `legacy_dexie_id`.
+
 ---
 
 ## 5. Domain vs storage
@@ -130,9 +146,13 @@ Cash session `local_date` **is** `occurred_on` for that day.
 
 Stats, close-day, “surtir today only” use `occurred_on`, never `CURRENT_DATE` of the server.
 
-Closed day: a session exists for `(business_id, local_date)` with `closed_at IS NOT NULL` → reject economic writes whose `occurred_on` equals that date.
+Closed day: a session exists for `(business_id, local_date)` with `closed_at IS NOT NULL` → reject **economic and stock writes** whose `occurred_on` equals that date:
 
-Exempt (same as today): product birth `inicial`, `initial_debts`.
+Blocked: sale, payment/abono, surtir, shrink (merma), expense, retiro, aporte, return/devolución, cash_move, stock_move.
+
+**Exempt** (carga inicial, same as Dexie): product birth (`inicial`), `initial_debts`.
+
+Not “any POST”: catalog name/price PATCH and reads are allowed.
 
 ---
 
@@ -184,7 +204,13 @@ Enforced in **three** places:
 2. Every Prisma `where: { businessId }`
 3. Optional RLS: `business_id = current_setting('app.business_id')::uuid` after `SET LOCAL` in the txn
 
-Cross-tenant GET/POST is `403 FORBIDDEN`. IDs from another business look like `404` (do not leak existence).
+Cross-tenant and missing rows (one rule, same as [API_CONTRACT.md](API_CONTRACT.md)):
+
+| Case | HTTP |
+|------|------|
+| User has **no** membership for `X-Business-Id` | `403 FORBIDDEN` |
+| Member, but the role cannot perform the action (e.g. staff + import) | `403 FORBIDDEN` |
+| Member of this business, resource id not in **this** business — including ids that exist in another tenant | `404 NOT_FOUND` (do not leak that the other tenant has it) |
 
 ---
 
@@ -192,7 +218,7 @@ Cross-tenant GET/POST is `403 FORBIDDEN`. IDs from another business look like `4
 
 - TLS only in production
 - Auth required except `GET /health`
-- Role: `owner` (all writes) / `staff` (sales, payments, inventory; no wipe, no membership admin)
+- Role: `owner` | `staff`. Exact matrix in [API_CONTRACT.md](API_CONTRACT.md) §10. Staff: sales, payments, inventory, returns, expenses, caja, initial debt. Owner-only: archive product/customer, memberships, wipe, import.
 - Rate limit economic POSTs per user
 - CORS: PWA origin only
 - Secrets in env (`DATABASE_URL`, `JWT_SECRET`, …)
@@ -223,7 +249,7 @@ That is enough. Do not invent a sync engine in the first BC.
 
 Why this BC first: it is where money, stock, debt, snapshots, closed-day, and idempotency meet. If that txn is wrong, the rest of the backend is decoration.
 
-Out of scope for that first slice: surtir/shrink UI on the API, returns, expenses, stats, Dexie import, PWA adapter swap.
+The Nest `sales` module folder may later hold returns; **the first slice does not implement returns**. Out of scope for that slice: surtir/shrink API, returns, expenses, stats, Dexie import, PWA adapter swap.
 
 ---
 
