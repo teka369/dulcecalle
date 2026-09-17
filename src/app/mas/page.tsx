@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { CASH_COPY } from "@/domain/cash";
+import { STATS_COPY } from "@/domain/stats";
 
 export default function MasPage() {
   return (
@@ -9,6 +10,13 @@ export default function MasPage() {
       <h1 className="text-[22px] font-semibold">Más</h1>
 
       <nav className="flex flex-col gap-2">
+        <Link
+          href="/mas/estadisticas"
+          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 text-base font-semibold shadow-sm"
+        >
+          <span>{STATS_COPY.masItem}</span>
+          <span className="text-ink/40">→</span>
+        </Link>
         <Link
           href="/mas/gastos"
           className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 text-base font-semibold shadow-sm"

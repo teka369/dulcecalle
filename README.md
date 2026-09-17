@@ -20,6 +20,23 @@ PWA de ventas para dulcería de barrio (Next.js App Router + Dexie).
 
 Nunca mezclar estas cifras en un solo número.
 
+
+## Estadísticas (S5)
+
+Pantalla **Más → Estadísticas**. Períodos: Hoy · Semana (últimos 7 días) · Mes (calendario local).
+
+| Métrica | Fórmula | ≠ |
+|---------|---------|---|
+| **Ventas** | `sum(sale.saleTotal)` del período | Recibido, caja, ganancia |
+| **Recibido** | `sum(sale.amountReceived) + sum(abonos)` del período (Efectivo/Nequi) | Ventas fiadas, ganancia |
+| **Por cobrar** | `sum(customer.debt)` outstanding | Diferencia de caja |
+| **Gasté** | `sum(expenses)` del período | Retiro personal |
+| **Invertí** | `sum(cashMoves kind=compra)` surtir/compra del período | Gasto, aporte, retiro |
+| **Inventario** | `sum(stock × avgCost)` + stock bajo (punto actual) | Efectivo en caja |
+| **Ganancia aprox** | `sum(lineTotal − qty×unitCost)` del período (snapshots) | Cierre de caja |
+
+**No** se muestran Esperado/Contado/Diferencia en Stats — solo enlace **Ir a Caja**. Lecturas 100% Dexie (offline).
+
 ## Scripts
 
 ```bash

@@ -13,3 +13,5 @@ export {
   metricStockTotal,
   metricStockByProduct,
 } from "./metrics";
+export { loadStats, statsRepository } from "./statsRepository";
+export type { StatsSnapshot } from "./statsRepository";
