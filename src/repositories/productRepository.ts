@@ -1,7 +1,7 @@
 import { getDb } from "@/storage/db";
 import type { Product } from "@/domain/types";
 import { asCop } from "@/domain/money";
-import { INVENTORY_ERRORS } from "@/domain/inventory";
+import { GIFTED_STOCK_NOTE, INVENTORY_ERRORS } from "@/domain/inventory";
 
 export class ProductRepository {
   async list(): Promise<Product[]> {
@@ -30,36 +30,43 @@ export class ProductRepository {
   }
 
   async create(
-    input: Omit<Product, "id" | "createdAt" | "updatedAt">,
+    input: Omit<Product, "id" | "createdAt" | "updatedAt"> & {
+      /** Opening units were a gift / unknown cost. Allows avgCost 0 with stock. */
+      gifted?: boolean;
+    },
   ): Promise<number> {
+    const { gifted, ...rest } = input;
     const now = Date.now();
-    asCop(input.price);
-    asCop(input.avgCost);
-    if (input.price < 0 || input.avgCost < 0) {
+    asCop(rest.price);
+    asCop(rest.avgCost);
+    if (rest.price < 0 || rest.avgCost < 0) {
       throw new Error(INVENTORY_ERRORS.badCost);
     }
-    if (input.stock < 0) throw new Error("stock must be ≥ 0");
-    if (input.stock > 0 && input.avgCost <= 0) {
+    if (rest.stock < 0) throw new Error("stock must be ≥ 0");
+    const avgCost = gifted ? 0 : rest.avgCost;
+    if (rest.stock > 0 && avgCost <= 0 && !gifted) {
       throw new Error(INVENTORY_ERRORS.needCost);
     }
     const db = getDb();
     return db.transaction("rw", db.products, db.stockMoves, async () => {
       const id = (await db.products.add({
-        ...input,
+        ...rest,
+        avgCost,
         createdAt: now,
         updatedAt: now,
       })) as number;
 
       // Birth snapshot: not a compra, not a day's cash event.
       // Existing products created before v5 keep stock without this move.
-      if (input.stock > 0) {
+      if (rest.stock > 0) {
         await db.stockMoves.add({
           productId: id,
-          delta: input.stock,
+          delta: rest.stock,
           reason: "inicial",
-          unitCost: asCop(input.avgCost),
+          unitCost: asCop(avgCost),
           refType: "product",
           refId: id,
+          note: gifted ? GIFTED_STOCK_NOTE : undefined,
           createdAt: now,
         });
       }

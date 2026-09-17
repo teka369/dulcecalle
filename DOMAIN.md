@@ -175,7 +175,7 @@ Surtir is **today only**. Stock move and cash `compra` share the same `createdAt
 
 - Sale snapshots `product.avgCost` at that instant → `saleLine.unitCost`.
 - Return uses **that line’s** `unitCost` / `unitPrice`, not current catalog.
-- Product create with `stock > 0` requires `avgCost > 0`.
+- Product create with `stock > 0` requires `avgCost > 0`, unless `gifted: true` (opening units were a gift / unknown cost). Gifted stock is still `reason=inicial`, `unitCost` 0, note `Me lo regalaron`. Not a compra. Later surtir reweights avgCost.
 - Stock 0 may have cost 0 until first surtir.
 
 Do not replace this with FIFO unless the owner asks. It is coherent for a candy cart.

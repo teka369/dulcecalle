@@ -26,6 +26,9 @@ export const INVENTORY_TOASTS = {
   productSaved: "Producto guardado",
 } as const;
 
+/** Note on the `inicial` stockMove when the opening units were a gift. */
+export const GIFTED_STOCK_NOTE = "Me lo regalaron";
+
 export type ShrinkReason = Extract<
   StockMoveReason,
   "me_lo_comi" | "regalar" | "perdido"

@@ -99,6 +99,7 @@ export const inventoryStore = {
     priceRaw: string;
     stockRaw?: string;
     avgCostRaw?: string;
+    gifted?: boolean;
   }): Promise<number> {
     const name = input.name.trim();
     if (!name) throw new Error(INVENTORY_ERRORS.emptyProductName);
@@ -110,8 +111,11 @@ export const inventoryStore = {
     if (!Number.isFinite(stock) || stock < 0 || !Number.isInteger(stock)) {
       throw new Error(INVENTORY_ERRORS.notPositive);
     }
-    const avgCost = Number.parseInt(input.avgCostRaw?.trim() || "0", 10) || 0;
-    if (stock > 0 && avgCost <= 0) {
+    const gifted = Boolean(input.gifted);
+    const avgCost = gifted
+      ? 0
+      : Number.parseInt(input.avgCostRaw?.trim() || "0", 10) || 0;
+    if (stock > 0 && avgCost <= 0 && !gifted) {
       throw new Error(INVENTORY_ERRORS.needCost);
     }
     const id = await productRepository.create({
@@ -121,6 +125,7 @@ export const inventoryStore = {
       avgCost,
       stock,
       lowStockAt: 5,
+      gifted,
     });
     await this.refreshProducts();
     setState({ lastToast: INVENTORY_TOASTS.productSaved });

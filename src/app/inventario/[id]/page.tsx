@@ -81,11 +81,15 @@ export default function ProductoFichaPage() {
           Precio venta
         </p>
         <p className="mt-1 text-lg font-semibold">{formatCop(product.price)}</p>
-        {product.avgCost > 0 && (
+        {product.avgCost > 0 ? (
           <p className="mt-2 text-sm text-ink/50">
             Costo prom. {formatCop(product.avgCost)}
           </p>
-        )}
+        ) : product.stock > 0 ? (
+          <p className="mt-2 text-sm text-ink/50">
+            Costo $0 (regalo o no se sabe). Se actualiza al surtir.
+          </p>
+        ) : null}
       </section>
 
       <Link
@@ -124,7 +128,14 @@ export default function ProductoFichaPage() {
                 key={m.id}
                 className="flex items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 py-3 text-sm"
               >
-                <span>{REASON_LABEL[m.reason] ?? m.reason}</span>
+                <span>
+                  {REASON_LABEL[m.reason] ?? m.reason}
+                  {m.note ? (
+                    <span className="mt-0.5 block text-xs text-ink/50">
+                      {m.note}
+                    </span>
+                  ) : null}
+                </span>
                 <span className="font-semibold">
                   {m.delta > 0 ? `+${m.delta}` : m.delta}
                 </span>

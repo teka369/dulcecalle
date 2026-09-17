@@ -81,6 +81,8 @@ No basta con deshabilitar el botón. El repositorio es la guarda (doble tap, ret
 
 Alta de producto con `stock > 0` escribe un `stockMove` `reason=inicial` (delta = stock, `unitCost` = `avgCost`). **No** es compra: no hay `cashMove`, no entra en Invertí, no pasa por el cierre del día.
 
+Si las unidades te las regalaron o no sabes el costo, marca **Me lo regalaron / no sé el costo**. Entonces `avgCost` queda en 0 (la ganancia de esa tanda será casi todo el precio). Sin esa marca, stock > 0 sigue exigiendo costo > 0.
+
 `product.stock` sigue siendo la cantidad viva. Los movimientos son el historial de cambios:
 
 - crear producto → `inicial` (si stock > 0)
@@ -192,7 +194,7 @@ Una sola fecha efectiva: **hoy**. Inventario y caja salen juntos. Un día distin
 
 ### Alta de producto
 
-Stock inicial > 0 exige costo > 0. Sin stock el costo puede ir en 0 y se llena al surtir.
+Stock inicial > 0 exige costo > 0, salvo que marques que te lo regalaron (costo 0 a propósito). Sin stock el costo puede ir en 0 y se llena al surtir.
 
 ### Integridad de mutaciones
 

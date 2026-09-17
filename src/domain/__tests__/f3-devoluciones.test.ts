@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { __resetDbForTests, __reopenDbForTests, getDb } from "@/storage/db";
 import { CASH_ERRORS, localDateKey } from "@/domain/cash";
-import { INVENTORY_ERRORS } from "@/domain/inventory";
+import { INVENTORY_ERRORS, GIFTED_STOCK_NOTE } from "@/domain/inventory";
 import { RETURN_ERRORS } from "@/domain/sale/returns";
 import { loadStats } from "@/repositories/statsRepository";
 import {
@@ -271,5 +271,35 @@ describe("F3 surtir date + product cost", () => {
       lowStockAt: 1,
     });
     expect(id).toBeTruthy();
+  });
+
+  it("gifted opening stock may cost 0; later surtir sets avgCost", async () => {
+    const id = await productRepository.create({
+      name: "Galleta regalada",
+      category: "T",
+      price: 2000,
+      avgCost: 0,
+      stock: 15,
+      lowStockAt: 1,
+      gifted: true,
+    });
+    const p = await productRepository.getById(id);
+    expect(p?.stock).toBe(15);
+    expect(p?.avgCost).toBe(0);
+    const moves = await inventoryRepository.listMoves(id);
+    expect(moves[0]?.reason).toBe("inicial");
+    expect(moves[0]?.unitCost).toBe(0);
+    expect(moves[0]?.note).toBe(GIFTED_STOCK_NOTE);
+
+    await inventoryRepository.surtir({
+      productId: id,
+      qty: 10,
+      unitCost: 1200,
+      totalCost: 12_000,
+      method: "Efectivo",
+    });
+    const after = await productRepository.getById(id);
+    expect(after?.stock).toBe(25);
+    expect(after?.avgCost).toBe(480);
   });
 });
