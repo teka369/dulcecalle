@@ -10,7 +10,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname.startsWith("/ventas/nueva") ||
     pathname.startsWith("/ventas/cobrar") ||
     pathname === "/clientes/nuevo" ||
-    /^\/clientes\/[^/]+\/abono$/.test(pathname);
+    /^\/clientes\/[^/]+\/abono$/.test(pathname) ||
+    pathname === "/inventario/nuevo" ||
+    pathname === "/inventario/proveedores/nuevo" ||
+    /^\/inventario\/[^/]+\/(surtir|me-lo-comi|regalo|perdido)$/.test(pathname);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-bg text-ink">
