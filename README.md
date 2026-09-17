@@ -50,6 +50,8 @@ Al vender se puede cambiar el precio. La línea guarda **el precio cobrado** (`u
 
 Cerrar caja cuenta solo Efectivo físico. Nequi se rastrea aparte.
 
+Al **abrir**, el fondo es lo que traías al empezar — **no** lo que hay ahora en el bolsillo después de vender. Si ya vendiste hoy y abres después, no cuentes lo vendido otra vez.
+
 ### Cierre del día
 
 Si la sesión del día está **cerrada**, se rechaza cualquier operación de ese día:
@@ -66,7 +68,7 @@ La guarda central es `assertDayEditable()` (`src/repositories/dayGuard.ts`).
 
 ### Idempotencia
 
-Abonos, ventas y **deudas anteriores** usan `requestId` (clave de intención, generada en la UI):
+Abonos, ventas, deudas anteriores, **gastos, retiros, aportes y surtir** usan `requestId`.
 
 - misma `requestId` → se devuelve el registro existente; no se vuelve a bajar stock, caja ni deuda
 - `requestId` distinta → dos operaciones válidas
