@@ -1,7 +1,7 @@
 import { getDb } from "@/storage/db";
 import type { CashMove, CashSession, PayMethod } from "@/domain/types";
 import { asCop, addCop, subCop } from "@/domain/money";
-import { weightedAvgCost } from "./inventoryRepository";
+import { inventoryRepository } from "./inventoryRepository";
 
 export class CashRepository {
   async listMoves(): Promise<CashMove[]> {
@@ -66,66 +66,39 @@ export class CashRepository {
 
   /**
    * Purchase / surtir stock + cash out for compra.
-   * Updates weighted avgCost; stock never negative path (delta positive).
+   * Delegates to inventoryRepository.surtir (stock path; NOT sale).
+   * Updates weighted avgCost via Math.round; stock never negative.
    */
   async purchaseStock(input: {
     productId: number;
     qty: number;
     totalCost: number;
     method?: PayMethod;
+    unitCost?: number;
+    supplierId?: number | null;
+    note?: string;
+    createdAt?: number;
   }): Promise<void> {
     if (!Number.isInteger(input.qty) || input.qty <= 0) {
       throw new Error("qty must be a positive integer");
     }
     const totalCost = asCop(input.totalCost);
-    const unitCost = asCop(Math.round(totalCost / input.qty));
+    const unitCost =
+      input.unitCost !== undefined
+        ? asCop(input.unitCost)
+        : asCop(Math.round(totalCost / input.qty));
     const method = input.method ?? "Efectivo";
-    const db = getDb();
 
-    await db.transaction(
-      "rw",
-      db.products,
-      db.stockMoves,
-      db.cashMoves,
-      async () => {
-        const product = await db.products.get(input.productId);
-        if (!product) throw new Error("product not found");
-
-        const nextAvg = weightedAvgCost(
-          product.stock,
-          product.avgCost,
-          input.qty,
-          unitCost,
-        );
-        const nextStock = product.stock + input.qty;
-
-        await db.products.update(product.id!, {
-          stock: nextStock,
-          avgCost: nextAvg,
-          updatedAt: Date.now(),
-        });
-
-        const moveId = (await db.stockMoves.add({
-          productId: product.id!,
-          delta: input.qty,
-          reason: "surtir",
-          unitCost,
-          refType: "purchase",
-          createdAt: Date.now(),
-        })) as number;
-
-        await db.cashMoves.add({
-          amount: totalCost,
-          direction: "out",
-          method,
-          kind: "compra",
-          refType: "stockMove",
-          refId: moveId,
-          sessionId: null,
-          createdAt: Date.now(),
-        });
-      },
-    );
+    await inventoryRepository.surtir({
+      productId: input.productId,
+      qty: input.qty,
+      unitCost,
+      totalCost,
+      method,
+      supplierId: input.supplierId ?? null,
+      note: input.note,
+      createdAt: input.createdAt,
+    });
   }
 
   async recordExpense(input: {

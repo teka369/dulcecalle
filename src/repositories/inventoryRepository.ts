@@ -1,8 +1,16 @@
 import { getDb } from "@/storage/db";
-import type { StockMove, StockMoveReason } from "@/domain/types";
+import type { PayMethod, StockMove, StockMoveReason } from "@/domain/types";
 import { asCop } from "@/domain/money";
+import {
+  INVENTORY_ERRORS,
+  type ShrinkReason,
+} from "@/domain/inventory";
 
-/** Integer weighted average cost. */
+/**
+ * Integer weighted average cost.
+ * Choice: Math.round (not floor) so COP stays integer and balances evenly.
+ * Example: total 1000 / qty 3 → unit 333.
+ */
 export function weightedAvgCost(
   oldStock: number,
   oldAvg: number,
@@ -27,7 +35,9 @@ export class InventoryRepository {
 
   /**
    * Apply a stock delta. Rejects if resulting stock would be < 0.
-   * On positive surtir, updates weighted avgCost.
+   * On positive surtir, updates weighted avgCost (round).
+   * Prefer surtir() / applyShrink() for S3 flows — this stays the low-level path
+   * (Day-1 + sales must not duplicate shrink logic).
    */
   async applyMove(input: {
     productId: number;
@@ -37,6 +47,8 @@ export class InventoryRepository {
     note?: string;
     refType?: string;
     refId?: number;
+    supplierId?: number | null;
+    createdAt?: number;
   }): Promise<number> {
     if (!Number.isInteger(input.delta) || input.delta === 0) {
       throw new Error("delta must be a non-zero integer");
@@ -49,7 +61,7 @@ export class InventoryRepository {
 
       const nextStock = product.stock + input.delta;
       if (nextStock < 0) {
-        throw new Error("stock insufficient (stock never negative)");
+        throw new Error(INVENTORY_ERRORS.insufficientStock);
       }
 
       let nextAvg = product.avgCost;
@@ -76,11 +88,129 @@ export class InventoryRepository {
         delta: input.delta,
         reason: input.reason,
         unitCost,
+        supplierId: input.supplierId ?? null,
         refType: input.refType,
         refId: input.refId,
         note: input.note,
-        createdAt: Date.now(),
+        createdAt: input.createdAt ?? Date.now(),
       }) as Promise<number>;
+    });
+  }
+
+  /**
+   * Surtir / restock (stock path ≠ sale).
+   * Increases stock + updates weighted avgCost (Math.round).
+   * Records stockMoves reason=surtir + cashMoves kind=compra direction=out when totalCost > 0.
+   */
+  async surtir(input: {
+    productId: number;
+    qty: number;
+    unitCost: number;
+    totalCost: number;
+    method: PayMethod;
+    supplierId?: number | null;
+    note?: string;
+    /** Default today; editable date from UI. */
+    createdAt?: number;
+  }): Promise<number> {
+    if (!Number.isInteger(input.qty) || input.qty <= 0) {
+      throw new Error(INVENTORY_ERRORS.notPositive);
+    }
+    if (input.method !== "Efectivo" && input.method !== "Nequi") {
+      throw new Error(INVENTORY_ERRORS.noMethod);
+    }
+    const unitCost = asCop(input.unitCost);
+    const totalCost = asCop(input.totalCost);
+    if (unitCost < 0 || totalCost < 0) {
+      throw new Error(INVENTORY_ERRORS.badCost);
+    }
+
+    const db = getDb();
+    const createdAt = input.createdAt ?? Date.now();
+
+    return db.transaction(
+      "rw",
+      db.products,
+      db.stockMoves,
+      db.cashMoves,
+      db.suppliers,
+      async () => {
+        if (input.supplierId != null) {
+          const supplier = await db.suppliers.get(input.supplierId);
+          if (!supplier) throw new Error("supplier not found");
+        }
+
+        const product = await db.products.get(input.productId);
+        if (!product) throw new Error("product not found");
+
+        const nextAvg = weightedAvgCost(
+          product.stock,
+          product.avgCost,
+          input.qty,
+          unitCost,
+        );
+        const nextStock = product.stock + input.qty;
+        // Integrity: stock ≥ 0 always (inbound cannot go negative).
+        if (nextStock < 0) {
+          throw new Error(INVENTORY_ERRORS.insufficientStock);
+        }
+
+        await db.products.update(product.id!, {
+          stock: nextStock,
+          avgCost: nextAvg,
+          updatedAt: Date.now(),
+        });
+
+        const moveId = (await db.stockMoves.add({
+          productId: product.id!,
+          delta: input.qty,
+          reason: "surtir",
+          unitCost,
+          supplierId: input.supplierId ?? null,
+          refType: "purchase",
+          note: input.note,
+          createdAt,
+        })) as number;
+
+        // Cash out only when there is a positive compra amount (STOCK ≠ sale income).
+        if (totalCost > 0) {
+          await db.cashMoves.add({
+            amount: totalCost,
+            direction: "out",
+            method: input.method,
+            kind: "compra",
+            refType: "stockMove",
+            refId: moveId,
+            sessionId: null,
+            note: input.note,
+            createdAt,
+          });
+        }
+
+        return moveId;
+      },
+    );
+  }
+
+  /**
+   * Shrink / merma — decrease stock with NO sale and NO income / pay method.
+   * Distinct reasons: me_lo_comi | regalar | perdido.
+   */
+  async applyShrink(input: {
+    productId: number;
+    qty: number;
+    reason: ShrinkReason;
+    note?: string;
+  }): Promise<number> {
+    if (!Number.isInteger(input.qty) || input.qty <= 0) {
+      throw new Error(INVENTORY_ERRORS.notPositive);
+    }
+    return this.applyMove({
+      productId: input.productId,
+      delta: -input.qty,
+      reason: input.reason,
+      note: input.note,
+      refType: "shrink",
     });
   }
 }

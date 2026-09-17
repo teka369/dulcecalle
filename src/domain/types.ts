@@ -26,6 +26,19 @@ export interface Product {
   updatedAt: number;
 }
 
+/**
+ * Light supplier (S3) — name/phone/notes + surtir history.
+ * NO accounts payable / CxP.
+ */
+export interface Supplier {
+  id?: number;
+  name: string;
+  phone?: string;
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Customer {
   id?: number;
   name: string;
@@ -69,6 +82,8 @@ export interface StockMove {
   delta: number;
   reason: StockMoveReason;
   unitCost: number;
+  /** Optional light supplier on surtir (NO CxP). */
+  supplierId?: number | null;
   refType?: string;
   refId?: number;
   note?: string;
