@@ -153,50 +153,44 @@ Serwist precachea el *shell* (HTML/CSS/JS, `/offline`, icons, manifest). **Dexie
 
 ## Limitaciones conocidas (P1 / P2)
 
-- **Devoluciones (P1):** no implementadas. Diseño mínimo abajo. No hay UI ni tablas todavía.
-- **Motivos de inventario (P1):** existe `adjust` en el tipo, pero la UI usa `me_lo_comi` / `regalar` / `perdido`. No se migró a damaged/expired/lost para no romper datos.
+- **Motivos de inventario (P1):** existe `adjust` en el tipo, pero la UI usa `me_lo_comi` / `regalar` / `perdido`.
 - **Backend / sync (P2):** un solo dispositivo. No hay PostgreSQL, cuentas ni sincronización.
 
-### Devoluciones — diseño mínimo (P1, no construir aún)
+### Devoluciones
 
-La venta original **no se edita ni se borra**. Siempre queda trazable.
+La venta original **no se edita ni se borra**.
 
 ```
 Venta (inmutable)
-  → Devolución (nuevo registro, ref a la venta)
+  → Devolución (saleReturns + saleReturnLines)
     → stock vuelve (stockMove reason=devolucion, +qty)
-    → dinero o deuda se ajusta
+    → caja out kind=devolucion  y/o  baja customer.debt
 ```
 
-**Alcance**
+Ventas → ficha de la venta → **Devolver**.
 
-| Caso | Qué pasa |
-|------|----------|
-| Total | se devuelven todas las líneas / qty pendientes |
-| Parcial | algunas líneas o qty; nunca más de lo vendido menos lo ya devuelto |
-| Pagada Efectivo | `cashMove` `kind=devolucion` `direction=out` método Efectivo |
-| Pagada Nequi | igual, método Nequi |
-| Fiada | baja `customer.debt` (nunca < 0). Sin caja |
-| Parcial (abono + fiado) | primero reduce la deuda de esa venta; si el valor devuelto supera lo que aún debía, el resto sale de caja por el método original |
+- Parcial o total, nunca más de lo que queda.
+- Snapshots de la línea original (`unitPrice` / `unitCost`).
+- Pagada Efectivo/Nequi → reembolso por el mismo medio.
+- Fiada → baja la deuda (si ya se cobró, el resto sale de caja).
+- Parcial (abono + fiado): primero el crédito que queda de ESA venta; el resto es reembolso.
+- `requestId` en el repositorio. Día cerrado (hoy) se rechaza. La devolución queda en **hoy**, no reescribe el día de la venta.
 
-**Snapshots:** qty × `saleLine.unitPrice` y `saleLine.unitCost` de la venta original. Nunca el precio/costo actual del catálogo.
+**Números**
 
-**Tablas futuras (cuando se implemente)**
+- **Ventas** = brutas (`sum(sale.saleTotal)`). No se reescriben.
+- **Devoluciones** = valor devuelto en el período (a precio histórico).
+- **Ganancia aprox** = margen de ventas del período − margen de lo devuelto en el período.
+- **Recibido** = entradas (ventas + abonos). El reembolso sale por Caja, no resta Recibido.
+- **Por cobrar** = deuda actual (baja si la devolución quita fiado).
 
-- `saleReturns`: `saleId`, `createdAt`, `requestId` (idempotente), `refundAmount`, `debtReduced`, `method`
-- `saleReturnLines`: `returnId`, `saleLineId`, `qty`, `unitPrice`, `unitCost`
+### Surtir
 
-**Impacto en números (cada métrica aparte)**
+Una sola fecha efectiva: **hoy**. Inventario y caja salen juntos. Un día distinto (aunque esté abierto) se rechaza. Un día cerrado también.
 
-- **Ventas brutas:** siguen siendo `sum(sale.saleTotal)` — la venta no se reescribe
-- **Ventas netas / stats:** `ventas − sum(return lines)` en el período de la devolución (o métrica Devoluciones aparte). Decisión de producto al implementar: restar vs. mostrar línea propia
-- **Ganancia:** restar `qty × (unitPrice − unitCost)` de los snapshots devueltos
-- **Caja:** solo si hubo plata recibida que se devuelve (`cashMove` out)
-- **Por cobrar:** baja si la venta tenía crédito vigente; clamp a 0
-- **Stock:** `product.stock += qty` vía `stockMove` (misma guarda de día cerrado y stock ≥ 0)
-- **Cierre del día:** una devolución en día cerrado se rechaza igual que una venta
+### Alta de producto
 
-**Fuera de alcance P1:** nota crédito fiscal, factura electrónica, cambio por otro producto, devolución sin ticket.
+Stock inicial > 0 exige costo > 0. Sin stock el costo puede ir en 0 y se llena al surtir.
 
 ### Integridad de mutaciones
 
@@ -204,10 +198,11 @@ Las páginas no escriben Dexie. Caminos de negocio:
 
 | Qué | Quién escribe | Guarda |
 |-----|----------------|--------|
-| stock | `saleRepository.createSale`, `inventoryRepository.surtir/applyShrink/applyMove`, alta `productRepository.create` (`inicial`) | día cerrado, stock ≥ 0, no parche directo |
-| deuda | `createSale` (suma crédito), `recordInitialDebt` (deuda anterior), `recordPayment` (resta) | día cerrado en venta/abono; deuda ≥ 0; abono ≤ deuda; `requestId` |
-| caja | `createSale`, `recordPayment`, `surtir` (compra), `recordExpense`, `ownerAporte/Retiro` | día cerrado, `assertDayEditable` |
+| stock | `createSale`, `surtir`/`applyShrink`/`applyMove`, alta `create` (`inicial`), `createReturn` (`devolucion`) | día cerrado, stock ≥ 0, no parche directo |
+| deuda | `createSale` (suma crédito), `recordInitialDebt`, `recordPayment` (resta), `createReturn` (resta) | día cerrado en venta/abono/devolución; deuda ≥ 0 |
+| caja | `createSale`, `recordPayment`, `surtir` (compra), `recordExpense`, `ownerAporte/Retiro`, `createReturn` | día cerrado, `assertDayEditable` |
 | ventas / líneas | solo `createSale` | `requestId`, pago coherente, stock |
+| devoluciones | solo `createReturn` | `requestId`, qty ≤ restante, snapshots |
 
 Excepciones conscientes:
 
