@@ -8,7 +8,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const hideChrome =
     pathname.startsWith("/ventas/nueva") ||
-    pathname.startsWith("/ventas/cobrar");
+    pathname.startsWith("/ventas/cobrar") ||
+    pathname === "/clientes/nuevo" ||
+    /^\/clientes\/[^/]+\/abono$/.test(pathname);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-bg text-ink">
