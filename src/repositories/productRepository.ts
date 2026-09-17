@@ -39,12 +39,30 @@ export class ProductRepository {
       throw new Error(INVENTORY_ERRORS.badCost);
     }
     if (input.stock < 0) throw new Error("stock must be ≥ 0");
-    const id = await getDb().products.add({
-      ...input,
-      createdAt: now,
-      updatedAt: now,
+    const db = getDb();
+    return db.transaction("rw", db.products, db.stockMoves, async () => {
+      const id = (await db.products.add({
+        ...input,
+        createdAt: now,
+        updatedAt: now,
+      })) as number;
+
+      // Birth snapshot: not a compra, not a day's cash event.
+      // Existing products created before v5 keep stock without this move.
+      if (input.stock > 0) {
+        await db.stockMoves.add({
+          productId: id,
+          delta: input.stock,
+          reason: "inicial",
+          unitCost: asCop(input.avgCost),
+          refType: "product",
+          refId: id,
+          createdAt: now,
+        });
+      }
+
+      return id;
     });
-    return id as number;
   }
 
   async update(

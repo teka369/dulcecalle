@@ -75,6 +75,7 @@ export class SaleRepository {
    * Snapshots unitPrice (override or catalog) and unitCost on each line.
    * Changing product.price / avgCost later does NOT rewrite history.
    * Stock never goes negative. Closed day is rejected.
+   * Same requestId → returns the existing sale id (no second stock/cash/debt).
    */
   async createSale(input: CreateSaleInput): Promise<number> {
     if (!input.lines.length) throw new Error(SALE_ERRORS.empty);
@@ -107,6 +108,14 @@ export class SaleRepository {
       ],
       async () => {
         await assertDayEditable();
+
+        if (input.requestId) {
+          const existing = await db.sales
+            .where("requestId")
+            .equals(input.requestId)
+            .first();
+          if (existing?.id != null) return existing.id;
+        }
 
         let saleTotal = 0;
         const prepared: Array<{
@@ -161,6 +170,7 @@ export class SaleRepository {
           saleTotal,
           amountReceived,
           credit,
+          ...(input.requestId ? { requestId: input.requestId } : {}),
         })) as number;
 
         for (const line of prepared) {

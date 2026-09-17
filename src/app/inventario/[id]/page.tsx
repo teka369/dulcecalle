@@ -14,6 +14,7 @@ const REASON_LABEL: Record<string, string> = {
   perdido: "Perdido / dañado",
   sale: "Venta",
   adjust: "Ajuste",
+  inicial: "Stock inicial",
 };
 
 export default function ProductoFichaPage() {

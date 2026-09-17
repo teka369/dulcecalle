@@ -166,8 +166,6 @@ export class CashRepository {
     note?: string;
     sessionId?: number | null;
     createdAt?: number;
-    /** When true, skip closed-day check (internal/tests only). */
-    _skipClosedCheck?: boolean;
   }): Promise<number> {
     const amount = asCop(input.amount);
     if (amount <= 0) throw new Error("cash move amount must be > 0");
@@ -176,9 +174,7 @@ export class CashRepository {
     }
 
     const createdAt = input.createdAt ?? Date.now();
-    if (!input._skipClosedCheck) {
-      await assertDayEditable(createdAt);
-    }
+    await assertDayEditable(createdAt);
 
     let sessionId = input.sessionId;
     if (sessionId === undefined) {

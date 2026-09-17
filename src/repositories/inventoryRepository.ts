@@ -55,6 +55,9 @@ export class InventoryRepository {
     if (!Number.isInteger(input.delta) || input.delta === 0) {
       throw new Error("delta must be a non-zero integer");
     }
+    if (input.reason === "inicial") {
+      throw new Error(INVENTORY_ERRORS.inicialViaCreate);
+    }
 
     const createdAt = input.createdAt ?? Date.now();
     await assertDayEditable(createdAt);

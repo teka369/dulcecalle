@@ -19,6 +19,7 @@ import type {
  * v2: suppliers (light — NO CxP). StockMove.supplierId is optional payload (no new index).
  * v3: cashSessions.localDate (1 session / calendar day).
  * v4: customerPayments.requestId (abono idempotency).
+ * v5: sales.requestId (sale idempotency).
  * Data lives in Dexie — NOT in the Cache API.
  */
 export class DulceCalleDB extends Dexie {
@@ -59,6 +60,10 @@ export class DulceCalleDB extends Dexie {
     // P0: idempotent abonos (same requestId → no second debt decrement).
     this.version(4).stores({
       customerPayments: "++id, customerId, createdAt, saleId, requestId",
+    });
+    // P0.5: idempotent sales (same requestId → no second stock/cash/debt).
+    this.version(5).stores({
+      sales: "++id, createdAt, customerId, paymentKind, requestId",
     });
   }
 }

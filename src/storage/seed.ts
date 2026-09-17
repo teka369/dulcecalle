@@ -34,6 +34,8 @@ export async function loadDemoData(): Promise<void> {
     db.suppliers,
     db.settings,
     async () => {
+      // Bootstrap catalog (not productRepository.create). Demo stock may
+      // exist without an `inicial` stockMove — same as pre-P0.5 products.
       await db.products.bulkAdd([
         {
           name: "Chicle menta",
@@ -141,6 +143,8 @@ export async function loadDemoData(): Promise<void> {
     amountReceived: 2000,
     method: "Efectivo",
   });
+  // Seed-only: stamp "today" so Inicio metrics light up. Does not change
+  // stock, debt, or cash amounts — not a business mutation path.
   await db.sales.update(paidId, { createdAt: todayMs });
   const paidCash = await db.cashMoves
     .filter((m) => m.refType === "sale" && m.refId === paidId)

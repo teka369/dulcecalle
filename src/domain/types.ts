@@ -10,7 +10,8 @@ export type StockMoveReason =
   | "me_lo_comi"
   | "regalar"
   | "perdido"
-  | "adjust";
+  | "adjust"
+  | "inicial";
 
 export interface Product {
   id?: number;
@@ -60,6 +61,8 @@ export interface Sale {
   amountReceived: number;
   /** saleTotal − amountReceived (FIADO from this sale). */
   credit: number;
+  /** Client-generated key; same key → no second sale (stock/cash/debt). */
+  requestId?: string;
   note?: string;
 }
 
@@ -192,4 +195,6 @@ export interface CreateSaleInput {
   amountReceived: number;
   /** Optional channel for received cash (default Efectivo). */
   method?: PayMethod;
+  /** Client-generated key; same key → return existing sale, no double effects. */
+  requestId?: string;
 }

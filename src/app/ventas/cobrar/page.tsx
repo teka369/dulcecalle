@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCop, mulCop, addCop, subCop } from "@/domain/money";
 import type { Customer, PaymentKind, Product } from "@/domain/types";
 import {
@@ -32,6 +32,7 @@ export default function CobrarPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     void productRepository.list().then(setProducts);
@@ -112,6 +113,13 @@ export default function CobrarPage() {
             ? abono
             : 0;
 
+      if (!requestIdRef.current) {
+        requestIdRef.current =
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `sale-${Date.now()}`;
+      }
+
       await saleRepository.createSale({
         lines: lines.map((l) => ({
           productId: l.productId,
@@ -123,6 +131,7 @@ export default function CobrarPage() {
           paymentKind === "paid" ? null : (customerId as number),
         amountReceived: received,
         method: paymentKind === "credit" ? "Efectivo" : method,
+        requestId: requestIdRef.current,
       });
 
       clear();
