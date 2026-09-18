@@ -2,7 +2,15 @@
  * Read-only Dexie snapshot (Fase 6.9).
  * Never writes, deletes, or replays operations.
  */
+import { checksumCanonical } from "./canonical";
 import { getDb } from "./db";
+
+export {
+  canonicalize,
+  checksumCanonical,
+  hashUtf8,
+  stableStringify,
+} from "./canonical";
 
 export const DEXIE_SCHEMA_VERSION = 8 as const;
 export const SNAPSHOT_TABLES = [
@@ -43,31 +51,10 @@ function newId(): string {
   return `snap-${Date.now()}`;
 }
 
-export function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) {
-    return `[${value.map((v) => stableStringify(v)).join(",")}]`;
-  }
-  const obj = value as Record<string, unknown>;
-  const keys = Object.keys(obj).sort();
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
-}
-
-export async function hashUtf8(text: string): Promise<string> {
-  const subtle = globalThis.crypto?.subtle;
-  if (!subtle) {
-    throw new Error("SHA-256 is not available in this environment");
-  }
-  const buf = await subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 export async function checksumTables(
   tables: Record<SnapshotTable, unknown[]>,
 ): Promise<string> {
-  return hashUtf8(stableStringify(tables));
+  return checksumCanonical(tables);
 }
 
 /** Read-only copy of every Dexie table. Does not mutate IndexedDB. */
@@ -119,4 +106,10 @@ export async function verifySnapshotUnchanged(
     }
   }
   return { ok: true };
+}
+
+export async function verifyStoredChecksum(
+  snap: Pick<DexieSnapshot, "tables" | "checksum">,
+): Promise<boolean> {
+  return (await checksumTables(snap.tables)) === snap.checksum;
 }

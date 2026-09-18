@@ -66,7 +66,8 @@ describe("read-only Dexie snapshot", () => {
     const check = await verifySnapshotUnchanged(a, b);
     expect(check.ok).toBe(true);
     expect(a.checksum).toBe(b.checksum);
-    expect(a.checksum).toBe(await checksumTables(a.tables));
+    const roundTrip = JSON.parse(JSON.stringify(a)) as typeof a;
+    expect(await checksumTables(roundTrip.tables)).toBe(a.checksum);
     expect(a.tables.products.map((p) => (p as { id: number }).id)).toEqual(
       b.tables.products.map((p) => (p as { id: number }).id),
     );
