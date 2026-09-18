@@ -15,6 +15,7 @@ export {
   metricStockByProduct,
 } from "./metrics";
 export { loadStats, statsRepository } from "./statsRepository";
+export { loadDashboard } from "./dashboardRepository";
 export type { StatsSnapshot } from "./statsRepository";
 export type {
   DexieEntityId,
