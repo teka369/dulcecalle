@@ -126,7 +126,7 @@ export default function InicioPage() {
       </section>
 
       {emptyToday && (
-        <div className="rounded-2xl border border-ink/10 bg-white p-4">
+        <div className="rounded-2xl border border-ink/10 bg-surface p-4">
           <p className="text-base font-medium">Aún no hay ventas hoy.</p>
           <p className="mt-1 text-sm text-ink/60">
             Toca + Nueva venta para empezar.
@@ -176,7 +176,7 @@ function SummaryCard({
           : "text-ink";
 
   const body = (
-    <article className="rounded-2xl border border-ink/[0.08] bg-white p-4 shadow-sm">
+    <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
         {label}
       </p>

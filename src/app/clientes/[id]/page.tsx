@@ -3,18 +3,16 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { formatCop } from "@/domain/money";
+import { DebtStatementView } from "@/components/customers/DebtStatementView";
+import type { DebtStatement } from "@/domain/debt/statement";
 import type { Customer } from "@/domain/types";
-import {
-  customerStore,
-} from "@/store/customerStore";
-import type { CustomerHistoryItem } from "@/repositories/customerRepository";
+import { customerStore } from "@/store/customerStore";
 
 export default function ClienteFichaPage() {
   const params = useParams();
   const id = Number(params.id);
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [history, setHistory] = useState<CustomerHistoryItem[]>([]);
+  const [statement, setStatement] = useState<DebtStatement | null>(null);
   const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
@@ -24,8 +22,8 @@ export default function ClienteFichaPage() {
     }
     const c = await customerStore.getCustomer(id);
     setCustomer(c ?? null);
-    if (c) {
-      setHistory(await customerStore.getHistory(id));
+    if (c?.id != null) {
+      setStatement(await customerStore.getStatement(c.id));
     }
     setReady(true);
   }, [id]);
@@ -56,31 +54,21 @@ export default function ClienteFichaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/clientes"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
         </Link>
-        <h1 className="text-[22px] font-semibold tracking-tight">
+        <h1 className="min-w-0 truncate text-[22px] font-semibold tracking-tight">
           {customer.name}
         </h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
-          Saldo
-        </p>
-        <p
-          className={`mt-1 text-2xl font-semibold ${
-            hasDebt ? "text-accent" : "text-ink"
-          }`}
-        >
-          {formatCop(customer.debt)}
-        </p>
-        {!hasDebt && (
-          <p className="mt-1 text-sm text-ink/60">No debe nada</p>
-        )}
-      </section>
+      {statement ? (
+        <DebtStatementView statement={statement} />
+      ) : (
+        <p className="text-sm text-ink/60">No se pudo armar el detalle.</p>
+      )}
 
       {hasDebt && (
         <Link
@@ -93,40 +81,10 @@ export default function ClienteFichaPage() {
 
       <Link
         href={`/clientes/${customer.id}/deuda-inicial`}
-        className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white px-4 text-sm font-semibold"
+        className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface px-4 text-sm font-semibold"
       >
         Agregar deuda anterior
       </Link>
-
-      {history.length > 0 && (
-        <section>
-          <h2 className="mb-2 text-sm font-semibold text-ink/60">Historial</h2>
-          <ul className="flex flex-col gap-2">
-            {history.map((h) => {
-              const signed =
-                h.kind === "abono" || h.kind === "devolucion"
-                  ? -h.amount
-                  : h.amount;
-              return (
-                <li
-                  key={h.id}
-                  className="flex items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 py-3 text-sm"
-                >
-                  <span>{h.label}</span>
-                  <span
-                    className={`font-semibold ${
-                      signed < 0 ? "text-ok" : "text-accent"
-                    }`}
-                  >
-                    {signed < 0 ? "−" : "+"}
-                    {formatCop(Math.abs(signed))}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }

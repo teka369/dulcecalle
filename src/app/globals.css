@@ -1,17 +1,75 @@
 @import "tailwindcss";
 
-:root {
+:root,
+[data-theme="amber"] {
   --bg: #fff9f2;
+  --surface: #ffffff;
   --ink: #3b241c;
   --primary: #ffc857;
   --cta: #ff8c42;
   --accent: #ff6b8a;
-  --ok: #22c55e;
-  --danger: #ef4444;
+  --ok: #15803d;
+  --danger: #dc2626;
+}
+
+[data-theme="ocean"] {
+  --bg: #f3f8fc;
+  --surface: #ffffff;
+  --ink: #1c2e3b;
+  --primary: #8fbfd4;
+  --cta: #2b6f8a;
+  --accent: #c45c4a;
+  --ok: #15803d;
+  --danger: #dc2626;
+}
+
+[data-theme="emerald"] {
+  --bg: #f3f8f4;
+  --surface: #ffffff;
+  --ink: #1e3328;
+  --primary: #9dcca8;
+  --cta: #2f6f4e;
+  --accent: #c45c4a;
+  --ok: #15803d;
+  --danger: #dc2626;
+}
+
+[data-theme="violet"] {
+  --bg: #f7f4fb;
+  --surface: #ffffff;
+  --ink: #2c2438;
+  --primary: #c4b0dc;
+  --cta: #6b4c9a;
+  --accent: #c45c4a;
+  --ok: #15803d;
+  --danger: #dc2626;
+}
+
+[data-theme="rose"] {
+  --bg: #fdf6f6;
+  --surface: #ffffff;
+  --ink: #3a2428;
+  --primary: #e8b4ba;
+  --cta: #9f3d4a;
+  --accent: #c45c4a;
+  --ok: #15803d;
+  --danger: #dc2626;
+}
+
+[data-theme="slate"] {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --ink: #1f2933;
+  --primary: #c5ced8;
+  --cta: #334155;
+  --accent: #c45c4a;
+  --ok: #15803d;
+  --danger: #dc2626;
 }
 
 @theme inline {
   --color-bg: var(--bg);
+  --color-surface: var(--surface);
   --color-ink: var(--ink);
   --color-primary: var(--primary);
   --color-cta: var(--cta);

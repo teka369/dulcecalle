@@ -157,7 +157,7 @@ export default function CobrarPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/ventas/nueva"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -165,7 +165,7 @@ export default function CobrarPage() {
         <h1 className="text-[22px] font-semibold">Cobrar</h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
         <h2 className="text-sm font-semibold text-ink/60">Resumen</h2>
         <ul className="mt-2 flex flex-col gap-1">
           {lines.map((l) => (
@@ -213,7 +213,7 @@ export default function CobrarPage() {
       </section>
 
       {paymentKind !== "credit" && (
-        <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
           <p className="text-sm font-semibold">¿Cómo recibes?</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <MethodButton
@@ -231,7 +231,7 @@ export default function CobrarPage() {
       )}
 
       {paymentKind === "partial" && (
-        <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
           <label className="text-sm font-medium" htmlFor="abono">
             Abono
           </label>
@@ -259,7 +259,7 @@ export default function CobrarPage() {
       )}
 
       {paymentKind === "credit" && (
-        <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
           <CustomerPicker
             customers={customers}
             customerId={customerId}
@@ -317,7 +317,7 @@ function ModeButton({
       type="button"
       onClick={onClick}
       className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
-        active ? activeBg : "border-ink/10 bg-white text-ink/70"
+        active ? activeBg : "border-ink/10 bg-surface text-ink/70"
       }`}
     >
       {label}
@@ -341,7 +341,7 @@ function MethodButton({
       className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
         active
           ? "border-primary bg-primary text-ink"
-          : "border-ink/10 bg-white text-ink/70"
+          : "border-ink/10 bg-surface text-ink/70"
       }`}
     >
       {label}
@@ -365,7 +365,7 @@ function CustomerPicker({
       </label>
       <select
         id="cliente"
-        className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 bg-white px-3 text-base"
+        className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base"
         value={customerId ?? ""}
         onChange={(e) =>
           onChange(e.target.value ? Number(e.target.value) : null)

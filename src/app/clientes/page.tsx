@@ -43,13 +43,13 @@ export default function ClientesPage() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Buscar cliente..."
-        className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-white px-3 text-base outline-none focus:border-primary"
+        className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base outline-none focus:border-primary"
       />
 
       {loading && customers.length === 0 ? (
         <p className="text-sm text-ink/60">Cargando…</p>
       ) : customers.length === 0 ? (
-        <div className="rounded-2xl border border-ink/10 bg-white p-6 text-center">
+        <div className="rounded-2xl border border-ink/10 bg-surface p-6 text-center">
           <p className="text-base font-medium">Sin clientes aún.</p>
           <Link
             href="/clientes/nuevo"
@@ -66,15 +66,24 @@ export default function ClientesPage() {
             <li key={c.id}>
               <Link
                 href={`/clientes/${c.id}`}
-                className="flex min-h-11 items-center justify-between gap-2 rounded-2xl border border-ink/[0.08] bg-white p-4"
+                className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
-                <span className="font-medium">{c.name}</span>
-                <span
-                  className={`text-sm font-semibold ${
-                    c.debt > 0 ? "text-accent" : "text-ink/50"
-                  }`}
-                >
-                  {formatCop(c.debt)}
+                <span className="min-w-0 truncate font-medium">{c.name}</span>
+                <span className="flex shrink-0 flex-col items-end">
+                  <span
+                    className={`text-sm font-semibold tabular-nums ${
+                      c.debt > 0 ? "text-accent" : "text-ink/50"
+                    }`}
+                  >
+                    {formatCop(c.debt)}
+                  </span>
+                  <span
+                    className={`text-[11px] font-medium ${
+                      c.debt > 0 ? "text-accent/80" : "text-ok"
+                    }`}
+                  >
+                    {c.debt > 0 ? "Pendiente" : "Al día"}
+                  </span>
                 </span>
               </Link>
             </li>

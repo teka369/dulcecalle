@@ -62,7 +62,7 @@ export default function ProductoFichaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/inventario"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -72,7 +72,7 @@ export default function ProductoFichaPage() {
         </h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
           Stock
         </p>
@@ -126,7 +126,7 @@ export default function ProductoFichaPage() {
             {moves.slice(0, 20).map((m) => (
               <li
                 key={m.id}
-                className="flex items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 py-3 text-sm"
+                className="flex items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
               >
                 <span>
                   {REASON_LABEL[m.reason] ?? m.reason}
@@ -152,7 +152,7 @@ function ActionLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white px-4 text-sm font-semibold"
+      className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface px-4 text-sm font-semibold"
     >
       {label}
     </Link>

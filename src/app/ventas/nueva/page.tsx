@@ -95,7 +95,7 @@ export default function NuevaVentaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -108,7 +108,7 @@ export default function NuevaVentaPage() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Buscar dulce..."
-        className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-white px-3 text-base outline-none focus:border-primary"
+        className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base outline-none focus:border-primary"
       />
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
@@ -140,7 +140,7 @@ export default function NuevaVentaPage() {
             return (
               <article
                 key={p.id}
-                className="flex flex-col rounded-2xl border border-ink/[0.08] bg-white p-3"
+                className="flex flex-col rounded-2xl border border-ink/[0.08] bg-surface p-3"
               >
                 <p className="line-clamp-2 min-h-10 text-sm font-medium">
                   {p.name}
@@ -224,7 +224,7 @@ function Chip({
       type="button"
       onClick={onClick}
       className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-medium ${
-        active ? "bg-primary text-ink" : "bg-white text-ink/70 border border-ink/10"
+        active ? "bg-primary text-ink" : "bg-surface text-ink/70 border border-ink/10"
       }`}
     >
       {label}

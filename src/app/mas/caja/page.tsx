@@ -68,7 +68,7 @@ export default function CajaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -88,7 +88,7 @@ export default function CajaPage() {
       </p>
 
       {closed && (
-        <p className="rounded-2xl border border-ink/10 bg-white p-3 text-sm text-ink/70">
+        <p className="rounded-2xl border border-ink/10 bg-surface p-3 text-sm text-ink/70">
           {CASH_COPY.elDiaEstaCerrado}
         </p>
       )}
@@ -96,7 +96,7 @@ export default function CajaPage() {
       {/* Buckets */}
       {(open || closed) && (
         <section className="grid grid-cols-1 gap-3">
-          <article className="rounded-2xl border border-ink/[0.08] bg-white p-4 shadow-sm">
+          <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
               {CASH_COPY.esperado} Efectivo
             </p>
@@ -104,7 +104,7 @@ export default function CajaPage() {
               {formatCop(summary.expected.efectivo)}
             </p>
           </article>
-          <article className="rounded-2xl border border-ink/[0.08] bg-white p-4 shadow-sm">
+          <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
               {CASH_COPY.esperado} Nequi
             </p>
@@ -115,7 +115,7 @@ export default function CajaPage() {
               Nequi no cuenta en billetes de cierre
             </p>
           </article>
-          <article className="rounded-2xl border border-ink/[0.08] bg-white p-4 shadow-sm">
+          <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
               {CASH_COPY.enCaja}
             </p>
@@ -136,7 +136,7 @@ export default function CajaPage() {
           </article>
           {(closed || summary.counted != null) && (
             <>
-              <article className="rounded-2xl border border-ink/[0.08] bg-white p-4 shadow-sm">
+              <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm">
                 <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
                   {CASH_COPY.contado}
                 </p>
@@ -145,7 +145,7 @@ export default function CajaPage() {
                 </p>
               </article>
               {diff != null && (
-                <article className="rounded-2xl border border-ink/[0.08] bg-white p-4 shadow-sm">
+                <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm">
                   <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
                     {CASH_COPY.diferencia}
                   </p>
@@ -176,7 +176,7 @@ export default function CajaPage() {
               .map((m) => (
                 <div
                   key={m.id}
-                  className="rounded-2xl border border-ink/[0.08] bg-white px-4 py-3 text-sm"
+                  className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
                 >
                   <div className="flex justify-between gap-2">
                     <span className="font-medium">
@@ -199,7 +199,7 @@ export default function CajaPage() {
 
       {/* Open form */}
       {noSession && (
-        <section className="flex flex-col gap-3 rounded-2xl border border-ink/[0.08] bg-white p-4">
+        <section className="flex flex-col gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4">
           <p className="text-sm text-ink/60">{CASH_COPY.emptyCerrada}</p>
           <label className="text-sm font-medium" htmlFor="opening">
             {CASH_COPY.conCuantoAbres}
@@ -230,19 +230,19 @@ export default function CajaPage() {
         <section className="flex flex-col gap-2">
           <Link
             href="/mas/caja/aporte"
-            className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-sm font-semibold"
+            className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
           >
             {CASH_COPY.aporteCapital}
           </Link>
           <Link
             href="/mas/caja/retiro"
-            className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-sm font-semibold"
+            className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
           >
             {CASH_COPY.retiroPersonal}
           </Link>
           <Link
             href="/mas/gastos/nuevo"
-            className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-sm font-semibold"
+            className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
           >
             {CASH_COPY.registrarGasto}
           </Link>

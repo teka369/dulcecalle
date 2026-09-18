@@ -8,6 +8,10 @@ import type {
 import { asCop, addCop, subCop } from "@/domain/money";
 import { ABONO_ERRORS } from "@/domain/abono";
 import { INITIAL_DEBT_ERRORS } from "@/domain/initialDebt";
+import {
+  buildDebtStatement,
+  type DebtStatement,
+} from "@/domain/debt/statement";
 import { assertDayEditable } from "./dayGuard";
 
 export type CustomerHistoryItem = {
@@ -142,6 +146,34 @@ export class CustomerRepository {
 
     items.sort((a, b) => b.createdAt - a.createdAt);
     return items.slice(0, limit);
+  }
+
+  /** Full fiado ledger. Does not mutate Dexie. */
+  async getStatement(customerId: number): Promise<DebtStatement | null> {
+    const customer = await this.getById(customerId);
+    if (!customer) return null;
+    const db = getDb();
+    const [payments, sales, initials] = await Promise.all([
+      db.customerPayments.where("customerId").equals(customerId).toArray(),
+      db.sales.where("customerId").equals(customerId).toArray(),
+      db.initialDebts.where("customerId").equals(customerId).toArray(),
+    ]);
+    const saleIds = sales
+      .map((s) => s.id)
+      .filter((id): id is number => id != null);
+    const lines =
+      saleIds.length > 0
+        ? await db.saleLines.where("saleId").anyOf(saleIds).toArray()
+        : [];
+    const returns = await db.saleReturns.toArray();
+    return buildDebtStatement({
+      customer,
+      initials,
+      sales,
+      lines,
+      payments,
+      returns,
+    });
   }
 
   /**

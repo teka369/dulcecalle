@@ -123,7 +123,7 @@ export default function DevolverVentaPage() {
       <header className="flex items-center gap-2">
         <Link
           href={`/ventas/${data.sale.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -145,7 +145,7 @@ export default function DevolverVentaPage() {
             {remainingLines.map((l) => (
               <div
                 key={l.id}
-                className="rounded-2xl border border-ink/[0.08] bg-white p-4"
+                className="rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
                 <p className="font-medium">{l.productName}</p>
                 <p className="text-sm text-ink/60">
@@ -177,7 +177,7 @@ export default function DevolverVentaPage() {
           <button
             type="button"
             onClick={fillAll}
-            className="min-h-11 rounded-[14px] border border-ink/10 bg-white text-sm font-semibold"
+            className="min-h-11 rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
           >
             Devolver todo
           </button>

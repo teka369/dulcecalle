@@ -161,7 +161,7 @@ export default function SurtirPage() {
       <header className="flex items-center gap-2">
         <Link
           href={`/inventario/${product.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -169,7 +169,7 @@ export default function SurtirPage() {
         <h1 className="text-[22px] font-semibold">Surtir</h1>
       </header>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-ink/[0.08] bg-white p-4">
+      <section className="flex flex-col gap-4 rounded-2xl border border-ink/[0.08] bg-surface p-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
             Producto
@@ -188,7 +188,7 @@ export default function SurtirPage() {
               setSupplierId(e.target.value ? Number(e.target.value) : "");
               setSupplierCreate("");
             }}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 bg-white px-3 text-base outline-none focus:border-primary"
+            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base outline-none focus:border-primary"
           >
             <option value="">Elegir o crear…</option>
             {suppliers.map((s) => (
@@ -329,7 +329,7 @@ function MethodButton({
       className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
         active
           ? "border-primary bg-primary text-ink"
-          : "border-ink/10 bg-white text-ink/70"
+          : "border-ink/10 bg-surface text-ink/70"
       }`}
     >
       {label}

@@ -40,7 +40,7 @@ export default function EstadisticasPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -52,7 +52,7 @@ export default function EstadisticasPage() {
       </header>
 
       <div
-        className="flex gap-2 rounded-2xl border border-ink/[0.08] bg-white p-1"
+        className="flex gap-2 rounded-2xl border border-ink/[0.08] bg-surface p-1"
         role="tablist"
         aria-label="Período"
       >
@@ -98,7 +98,7 @@ export default function EstadisticasPage() {
       )}
 
       {!loading && error && (
-        <div className="rounded-2xl border border-ink/10 bg-white p-4">
+        <div className="rounded-2xl border border-ink/10 bg-surface p-4">
           <p className="font-medium">{STATS_COPY.errorLoad}</p>
           <button
             type="button"
@@ -113,7 +113,7 @@ export default function EstadisticasPage() {
       {!loading && !error && stats && (
         <>
           {stats.emptyPeriod && (
-            <div className="rounded-2xl border border-ink/10 bg-white p-4">
+            <div className="rounded-2xl border border-ink/10 bg-surface p-4">
               <p className="text-sm text-ink/70">{STATS_COPY.emptyPeriodo}</p>
             </div>
           )}
@@ -161,7 +161,7 @@ export default function EstadisticasPage() {
             value={formatCop(stats.inverti)}
           />
 
-          <article className="rounded-2xl border border-ink/[0.08] bg-white p-4 shadow-sm">
+          <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
               {STATS_COPY.inventario}
             </p>
@@ -190,7 +190,7 @@ export default function EstadisticasPage() {
 
           <Link
             href="/mas/caja"
-            className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-sm font-semibold shadow-sm"
+            className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold shadow-sm"
           >
             {STATS_COPY.irACaja}
           </Link>
@@ -227,7 +227,7 @@ function MetricCard({
           : "text-ink";
 
   return (
-    <article className="rounded-2xl border border-ink/[0.08] bg-white p-4 shadow-sm">
+    <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
         {title}
       </p>

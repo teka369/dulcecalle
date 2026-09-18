@@ -62,7 +62,7 @@ export default function VentaDetallePage() {
       <header className="flex items-center gap-2">
         <Link
           href="/ventas"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -73,7 +73,7 @@ export default function VentaDetallePage() {
         </div>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
           Total
         </p>
@@ -89,7 +89,7 @@ export default function VentaDetallePage() {
           {lines.map((l) => (
             <li
               key={l.id}
-              className="rounded-2xl border border-ink/[0.08] bg-white px-4 py-3 text-sm"
+              className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
             >
               <div className="flex justify-between gap-2">
                 <span className="font-medium">{l.productName}</span>
@@ -126,7 +126,7 @@ export default function VentaDetallePage() {
             {returns.map((r) => (
               <li
                 key={r.id}
-                className="rounded-2xl border border-ink/[0.08] bg-white px-4 py-3 text-sm"
+                className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
               >
                 <div className="flex justify-between gap-2">
                   <span>Devolución</span>

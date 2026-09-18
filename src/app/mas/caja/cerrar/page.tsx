@@ -97,7 +97,7 @@ export default function CerrarCajaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas/caja"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -105,7 +105,7 @@ export default function CerrarCajaPage() {
         <h1 className="text-[22px] font-semibold">{CASH_COPY.cerrarCaja}</h1>
       </header>
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-ink/[0.08] bg-white p-4">
+      <section className="flex flex-col gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
             {CASH_COPY.deberiaHaber} (Efectivo)

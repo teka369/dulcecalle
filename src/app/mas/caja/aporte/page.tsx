@@ -53,7 +53,7 @@ export default function AportePage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas/caja"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -64,7 +64,7 @@ export default function AportePage() {
       <p className="text-sm text-ink/70">{CASH_COPY.aporteHelper}</p>
       <p className="text-sm font-medium text-ink/80">{CASH_COPY.aporteCaption}</p>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-ink/[0.08] bg-white p-4">
+      <section className="flex flex-col gap-4 rounded-2xl border border-ink/[0.08] bg-surface p-4">
         <div>
           <label className="text-sm font-medium" htmlFor="monto">
             {CASH_COPY.monto}
@@ -148,7 +148,7 @@ function MethodButton({
       className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
         active
           ? "border-primary bg-primary text-ink"
-          : "border-ink/10 bg-white text-ink/70"
+          : "border-ink/10 bg-surface text-ink/70"
       }`}
     >
       {label}

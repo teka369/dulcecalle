@@ -52,7 +52,7 @@ export default function ProveedorFichaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/inventario"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -62,7 +62,7 @@ export default function ProveedorFichaPage() {
         </h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
         {supplier.phone && (
           <>
             <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
@@ -97,7 +97,7 @@ export default function ProveedorFichaPage() {
             {historial.map((h) => (
               <li
                 key={h.id}
-                className="rounded-2xl border border-ink/[0.08] bg-white px-4 py-3 text-sm"
+                className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{h.productName}</span>

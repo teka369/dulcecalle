@@ -39,7 +39,7 @@ export default function VentasPage() {
             <li key={s.id}>
               <Link
                 href={`/ventas/${s.id}`}
-                className="block rounded-2xl border border-ink/[0.08] bg-white p-4"
+                className="block rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">

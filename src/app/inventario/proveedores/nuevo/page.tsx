@@ -39,7 +39,7 @@ export default function AgregarProveedorPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/inventario"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -47,7 +47,7 @@ export default function AgregarProveedorPage() {
         <h1 className="text-[22px] font-semibold">Agregar proveedor</h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
         <label className="text-sm font-medium" htmlFor="nombre">
           Nombre
         </label>

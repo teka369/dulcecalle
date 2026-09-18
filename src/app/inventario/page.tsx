@@ -58,7 +58,7 @@ export default function InventarioPage() {
         </Link>
       </header>
 
-      <div className="grid grid-cols-2 gap-2 rounded-[14px] border border-ink/10 bg-white p-1">
+      <div className="grid grid-cols-2 gap-2 rounded-[14px] border border-ink/10 bg-surface p-1">
         <SegmentButton
           label="Productos"
           active={segment === "productos"}
@@ -90,7 +90,7 @@ export default function InventarioPage() {
             ? "Buscar producto..."
             : "Buscar proveedor..."
         }
-        className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-white px-3 text-base outline-none focus:border-primary"
+        className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base outline-none focus:border-primary"
       />
 
       {loading && products.length === 0 && suppliers.length === 0 ? (
@@ -113,7 +113,7 @@ export default function InventarioPage() {
                 <li key={p.id}>
                   <Link
                     href={`/inventario/${p.id}`}
-                    className="flex min-h-11 items-start justify-between gap-2 rounded-2xl border border-ink/[0.08] bg-white p-4"
+                    className="flex min-h-11 items-start justify-between gap-2 rounded-2xl border border-ink/[0.08] bg-surface p-4"
                   >
                     <div>
                       <p className="font-medium">{p.name}</p>
@@ -163,7 +163,7 @@ export default function InventarioPage() {
             <li key={s.id}>
               <Link
                 href={`/inventario/proveedores/${s.id}`}
-                className="flex min-h-11 flex-col justify-center rounded-2xl border border-ink/[0.08] bg-white p-4"
+                className="flex min-h-11 flex-col justify-center rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
                 <span className="font-medium">{s.name}</span>
                 {s.phone && (
@@ -210,7 +210,7 @@ function EmptyBlock({
   href: string;
 }) {
   return (
-    <div className="rounded-2xl border border-ink/10 bg-white p-6 text-center">
+    <div className="rounded-2xl border border-ink/10 bg-surface p-6 text-center">
       <p className="text-base font-medium">{message}</p>
       <Link
         href={href}

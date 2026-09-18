@@ -12,28 +12,35 @@ export default function MasPage() {
       <nav className="flex flex-col gap-2">
         <Link
           href="/mas/estadisticas"
-          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 text-base font-semibold shadow-sm"
+          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 text-base font-semibold shadow-sm"
         >
           <span>{STATS_COPY.masItem}</span>
           <span className="text-ink/40">→</span>
         </Link>
         <Link
           href="/mas/gastos"
-          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 text-base font-semibold shadow-sm"
+          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 text-base font-semibold shadow-sm"
         >
           <span>{CASH_COPY.masGastos}</span>
           <span className="text-ink/40">→</span>
         </Link>
         <Link
           href="/mas/caja"
-          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 text-base font-semibold shadow-sm"
+          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 text-base font-semibold shadow-sm"
         >
           <span>{CASH_COPY.masCaja}</span>
           <span className="text-ink/40">→</span>
         </Link>
         <Link
+          href="/mas/apariencia"
+          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 text-base font-semibold shadow-sm"
+        >
+          <span>Apariencia</span>
+          <span className="text-ink/40">→</span>
+        </Link>
+        <Link
           href="/mas/datos"
-          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-white px-4 text-base font-semibold shadow-sm"
+          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 text-base font-semibold shadow-sm"
         >
           <span>Datos</span>
           <span className="text-ink/40">→</span>

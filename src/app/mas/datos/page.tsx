@@ -69,7 +69,7 @@ export default function DatosPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -78,7 +78,7 @@ export default function DatosPage() {
       </header>
 
       {done ? (
-        <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
           <p className="font-semibold">Datos locales eliminados</p>
           <p className="mt-2 text-sm text-ink/70">
             Este dispositivo quedó vacío. Puedes cargar la demo otra vez desde
@@ -93,7 +93,7 @@ export default function DatosPage() {
         </section>
       ) : (
         <>
-          <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+          <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
             <p className="font-semibold">Descargar copia</p>
             <p className="mt-2 text-sm text-ink/70">
               Genera un snapshot de solo lectura. No borra ni cambia ventas,
@@ -112,7 +112,7 @@ export default function DatosPage() {
             )}
           </section>
 
-          <section className="rounded-2xl border border-danger/30 bg-white p-4">
+          <section className="rounded-2xl border border-danger/30 bg-surface p-4">
             <p className="font-semibold text-danger">Zona peligrosa</p>
             <p className="mt-1 font-semibold">Limpiar datos / Reiniciar</p>
             <p className="mt-2 text-sm text-ink/70">

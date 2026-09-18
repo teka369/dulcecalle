@@ -34,7 +34,7 @@ export default function GastosPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -43,13 +43,13 @@ export default function GastosPage() {
       </header>
 
       {closed && (
-        <p className="rounded-2xl border border-ink/10 bg-white p-3 text-sm text-ink/70">
+        <p className="rounded-2xl border border-ink/10 bg-surface p-3 text-sm text-ink/70">
           {CASH_COPY.elDiaEstaCerrado}
         </p>
       )}
 
       {expenses.length === 0 ? (
-        <div className="rounded-2xl border border-ink/10 bg-white p-4">
+        <div className="rounded-2xl border border-ink/10 bg-surface p-4">
           <p className="text-sm text-ink/60">Aún no hay gastos.</p>
         </div>
       ) : (
@@ -57,7 +57,7 @@ export default function GastosPage() {
           {expenses.map((e) => (
             <li
               key={e.id}
-              className="rounded-2xl border border-ink/[0.08] bg-white p-4 shadow-sm"
+              className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>

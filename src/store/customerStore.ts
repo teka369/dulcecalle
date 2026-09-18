@@ -16,6 +16,7 @@ import {
   customerRepository,
   type CustomerHistoryItem,
 } from "@/repositories/customerRepository";
+import type { DebtStatement } from "@/domain/debt/statement";
 
 type CustomerState = {
   customers: Customer[];
@@ -69,6 +70,9 @@ export const customerStore = {
   },
   async getHistory(id: number): Promise<CustomerHistoryItem[]> {
     return customerRepository.listHistory(id);
+  },
+  async getStatement(id: number): Promise<DebtStatement | null> {
+    return customerRepository.getStatement(id);
   },
   /**
    * UI → store → repository → Dexie abono.
@@ -169,6 +173,7 @@ export function useCustomers() {
     recordInitialDebt,
     getCustomer: customerStore.getCustomer,
     getHistory: customerStore.getHistory,
+    getStatement: customerStore.getStatement,
     clearToast: customerStore.clearToast,
   };
 }

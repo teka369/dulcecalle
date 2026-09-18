@@ -117,7 +117,7 @@ export default function RegistrarAbonoPage() {
       <header className="flex items-center gap-2">
         <Link
           href={`/clientes/${customer.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-white text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -125,7 +125,7 @@ export default function RegistrarAbonoPage() {
         <h1 className="text-[22px] font-semibold">Registrar abono</h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-white p-4">
+      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
           Cliente
         </p>
@@ -209,7 +209,7 @@ function MethodButton({
       className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
         active
           ? "border-primary bg-primary text-ink"
-          : "border-ink/10 bg-white text-ink/70"
+          : "border-ink/10 bg-surface text-ink/70"
       }`}
     >
       {label}
