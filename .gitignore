@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!backend/.env.example
 
 # vercel
 .vercel
@@ -50,11 +52,22 @@ public/swe-worker*
 AGENTS.sandbox.md
 attachments/
 artifacts/
-migrations/
+/migrations/
 screenshots/
 scripts/
-server/
+/server/
 vite.config.ts
 startup.sh
 public/__grok/
+
+# Nest backend
+backend/node_modules/
+backend/dist/
+backend/coverage/
+backend/pgdata/
+backend/test/*.so
+
+# Phone Dexie dumps (PII / live books). Never commit.
+**/dulcecalle-snapshot-*.json
+
 

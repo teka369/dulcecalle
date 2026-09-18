@@ -157,7 +157,7 @@ Server: remaining qty, snapshots from the **sale line** (not current catalog), `
 `POST /v1/customers/:id/initial-debts` `{ amount, note?, requestId }`  
 No cash, no stock, no sale. Increases debt. Skips closed-day lock (carga inicial).
 
-The $45.000 live debts are rows here after import — never POST them as sales.
+The $45.200 live debts (dump `544b330b-…`, owner-confirmed) are rows here after import — never POST them as sales. Do not round to 45000.
 
 ---
 

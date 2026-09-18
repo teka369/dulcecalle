@@ -199,7 +199,7 @@ customer_id, amount > 0, method, sale_id **usually NULL** (debt is on the custom
 customer_id, amount > 0, note, request_id unique, created_at, occurred_on.
 
 **Not a sale. Not caja. Not Nequi. Not inventory.**  
-The owner’s live books include **$45.000 COP** in this table. Import must keep that meaning (see [MIGRATION.md](MIGRATION.md)).
+Official live total from dump `544b330b-…` (owner-confirmed): **$45.200 COP**. Import must keep that sum (see [MIGRATION.md](MIGRATION.md)). Do not round to 45000.
 
 ---
 

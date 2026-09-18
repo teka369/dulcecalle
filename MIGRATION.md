@@ -73,9 +73,15 @@ CashSession.localDate is already `YYYY-MM-DD` — copy as `local_date`. If it di
 
 ---
 
-## 4. $45.000 initial debts
+## 4. Initial debts (official live total: $45.200)
 
 These rows live in Dexie `initialDebts`. They are **not** sales.
+
+Official DEVICE_COPY dump `544b330b-e499-40b4-8909-cdcf6745fc64` (2026-09-18):
+
+`SUM(initialDebts.amount) = 45_200 COP`
+
+The owner confirmed **45200 is correct**. Do **not** round to the older freeze figure of 45000.
 
 Import:
 
@@ -83,7 +89,8 @@ Import:
 - `customers.debt` already includes them — after import, reconciliation must still match
 - **zero** sales, cash_moves, stock_moves, Nequi, Invertí, Ventas from this step
 
-If the dump’s `SUM(initialDebts.amount)` is not 45000, **do not invent the difference**. Report the actual sum. The 45000 figure is the owner’s known live total at freeze time; the dump is the authority.
+If a later dump’s sum is not 45200, **do not invent the difference**. The dump is the authority.
+
 
 ---
 

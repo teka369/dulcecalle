@@ -16,3 +16,11 @@ export {
 } from "./metrics";
 export { loadStats, statsRepository } from "./statsRepository";
 export type { StatsSnapshot } from "./statsRepository";
+export type {
+  DexieEntityId,
+  Fase6AuthOps,
+  Fase6CashOps,
+  Fase6CatalogOps,
+  Fase6SalesOps,
+  RemoteEntityId,
+} from "./ports";

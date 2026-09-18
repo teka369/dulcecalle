@@ -1,0 +1,423 @@
+// DulceCalle PostgreSQL model. Matches DATABASE.md.
+// Money is BIGINT integer COP. Never float.
+// Do not add columns “just in case”.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  owner
+  staff
+}
+
+enum PaymentKind {
+  paid
+  partial
+  credit
+}
+
+enum PayMethod {
+  Efectivo
+  Nequi
+}
+
+enum StockMoveReason {
+  inicial
+  surtir
+  sale
+  me_lo_comi
+  regalar
+  perdido
+  devolucion
+  adjust
+}
+
+enum CashDirection {
+  in
+  out
+}
+
+enum CashMoveKind {
+  sale
+  debt_collect
+  expense
+  retiro
+  aporte
+  compra
+  devolucion
+}
+
+model User {
+  id           String   @id @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  memberships BusinessMembership[]
+
+  @@map("users")
+}
+
+model Business {
+  id        String   @id @db.Uuid
+  name      String
+  timezone  String   @default("America/Bogota")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  memberships        BusinessMembership[]
+  products           Product[]
+  customers          Customer[]
+  suppliers          Supplier[]
+  settings           Setting[]
+  sales              Sale[]
+  saleLines          SaleLine[]
+  saleReturns        SaleReturn[]
+  saleReturnLines    SaleReturnLine[]
+  stockMoves         StockMove[]
+  cashSessions       CashSession[]
+  cashMoves          CashMove[]
+  expenses           Expense[]
+  customerPayments   CustomerPayment[]
+  initialDebts       InitialDebt[]
+  importIdMap        ImportIdMap[]
+
+  @@map("businesses")
+}
+
+model BusinessMembership {
+  id         String         @id @db.Uuid
+  businessId String         @map("business_id") @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  role       MembershipRole
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  business Business @relation(fields: [businessId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([businessId, userId])
+  @@map("business_memberships")
+}
+
+model Product {
+  id            String    @id @db.Uuid
+  businessId    String    @map("business_id") @db.Uuid
+  name          String
+  category      String    @default("General")
+  price         BigInt
+  avgCost       BigInt    @map("avg_cost")
+  stock         Int
+  lowStockAt    Int       @map("low_stock_at")
+  archivedAt    DateTime? @map("archived_at") @db.Timestamptz(3)
+  legacyDexieId Int?      @map("legacy_dexie_id")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  requestId     String?   @map("request_id") @db.Uuid
+
+  business   Business    @relation(fields: [businessId], references: [id])
+  saleLines  SaleLine[]
+  stockMoves StockMove[]
+  returnLines SaleReturnLine[]
+
+  @@unique([businessId, requestId])
+  @@unique([businessId, legacyDexieId])
+  @@index([businessId])
+  @@map("products")
+}
+
+model Customer {
+  id            String    @id @db.Uuid
+  businessId    String    @map("business_id") @db.Uuid
+  name          String
+  phone         String?
+  debt          BigInt    @default(0)
+  archivedAt    DateTime? @map("archived_at") @db.Timestamptz(3)
+  legacyDexieId Int?      @map("legacy_dexie_id")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  business Business           @relation(fields: [businessId], references: [id])
+  sales    Sale[]
+  payments CustomerPayment[]
+  initials InitialDebt[]
+
+  @@unique([businessId, legacyDexieId])
+  @@index([businessId, debt])
+  @@map("customers")
+}
+
+model Supplier {
+  id            String   @id @db.Uuid
+  businessId    String   @map("business_id") @db.Uuid
+  name          String
+  phone         String?
+  notes         String?
+  legacyDexieId Int?     @map("legacy_dexie_id")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  business   Business    @relation(fields: [businessId], references: [id])
+  stockMoves StockMove[]
+
+  @@unique([businessId, legacyDexieId])
+  @@map("suppliers")
+}
+
+model Setting {
+  businessId String @map("business_id") @db.Uuid
+  key        String
+  value      String
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@id([businessId, key])
+  @@map("settings")
+}
+
+model Sale {
+  id              String       @id @db.Uuid
+  businessId      String       @map("business_id") @db.Uuid
+  customerId      String?      @map("customer_id") @db.Uuid
+  paymentKind     PaymentKind  @map("payment_kind")
+  method          PayMethod?
+  saleTotal       BigInt       @map("sale_total")
+  amountReceived  BigInt       @map("amount_received")
+  credit          BigInt
+  requestId       String?      @map("request_id") @db.Uuid
+  legacyRequestId String?      @map("legacy_request_id")
+  note            String?
+  occurredOn      DateTime     @map("occurred_on") @db.Date
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  legacyDexieId   Int?         @map("legacy_dexie_id")
+
+  business Business   @relation(fields: [businessId], references: [id])
+  customer Customer?  @relation(fields: [customerId], references: [id])
+  lines    SaleLine[]
+  returns  SaleReturn[]
+
+  @@unique([businessId, requestId])
+  @@unique([businessId, legacyDexieId])
+  @@index([businessId, occurredOn])
+  @@index([businessId, customerId])
+  @@map("sales")
+}
+
+model SaleLine {
+  id            String @id @db.Uuid
+  businessId    String @map("business_id") @db.Uuid
+  saleId        String @map("sale_id") @db.Uuid
+  productId     String @map("product_id") @db.Uuid
+  productName   String @map("product_name")
+  qty           Int
+  unitPrice     BigInt @map("unit_price")
+  unitCost      BigInt @map("unit_cost")
+  lineTotal     BigInt @map("line_total")
+  legacyDexieId Int?   @map("legacy_dexie_id")
+
+  business    Business         @relation(fields: [businessId], references: [id])
+  sale        Sale             @relation(fields: [saleId], references: [id])
+  product     Product          @relation(fields: [productId], references: [id])
+  returnLines SaleReturnLine[]
+
+  @@unique([businessId, legacyDexieId])
+  @@index([businessId, saleId])
+  @@map("sale_lines")
+}
+
+model SaleReturn {
+  id            String     @id @db.Uuid
+  businessId    String     @map("business_id") @db.Uuid
+  saleId        String     @map("sale_id") @db.Uuid
+  refundAmount  BigInt     @map("refund_amount")
+  debtReduced   BigInt     @map("debt_reduced")
+  method        PayMethod?
+  requestId     String?    @map("request_id") @db.Uuid
+  note          String?
+  occurredOn    DateTime   @map("occurred_on") @db.Date
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  legacyDexieId Int?       @map("legacy_dexie_id")
+
+  business Business         @relation(fields: [businessId], references: [id])
+  sale     Sale             @relation(fields: [saleId], references: [id])
+  lines    SaleReturnLine[]
+
+  @@unique([businessId, requestId])
+  @@unique([businessId, legacyDexieId])
+  @@index([businessId, occurredOn])
+  @@index([businessId, saleId])
+  @@map("sale_returns")
+}
+
+model SaleReturnLine {
+  id            String @id @db.Uuid
+  businessId    String @map("business_id") @db.Uuid
+  returnId      String @map("return_id") @db.Uuid
+  saleLineId    String @map("sale_line_id") @db.Uuid
+  productId     String @map("product_id") @db.Uuid
+  qty           Int
+  unitPrice     BigInt @map("unit_price")
+  unitCost      BigInt @map("unit_cost")
+  legacyDexieId Int?   @map("legacy_dexie_id")
+
+  business Business  @relation(fields: [businessId], references: [id])
+  ret      SaleReturn @relation(fields: [returnId], references: [id])
+  saleLine SaleLine   @relation(fields: [saleLineId], references: [id])
+  product  Product    @relation(fields: [productId], references: [id])
+
+  @@unique([businessId, legacyDexieId])
+  @@map("sale_return_lines")
+}
+
+model StockMove {
+  id            String           @id @db.Uuid
+  businessId    String           @map("business_id") @db.Uuid
+  productId     String           @map("product_id") @db.Uuid
+  delta         Int
+  reason        StockMoveReason
+  unitCost      BigInt           @map("unit_cost")
+  supplierId    String?          @map("supplier_id") @db.Uuid
+  refType       String?          @map("ref_type")
+  refId         String?          @map("ref_id") @db.Uuid
+  note          String?
+  requestId     String?          @map("request_id") @db.Uuid
+  occurredOn    DateTime         @map("occurred_on") @db.Date
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  legacyDexieId Int?             @map("legacy_dexie_id")
+
+  business Business @relation(fields: [businessId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@unique([businessId, requestId])
+  @@unique([businessId, legacyDexieId])
+  @@index([businessId, occurredOn])
+  @@index([businessId, productId, createdAt])
+  @@map("stock_moves")
+}
+
+model CashSession {
+  id               String    @id @db.Uuid
+  businessId       String    @map("business_id") @db.Uuid
+  localDate        DateTime  @map("local_date") @db.Date
+  openedAt         DateTime  @map("opened_at") @db.Timestamptz(3)
+  closedAt         DateTime? @map("closed_at") @db.Timestamptz(3)
+  openingFloat     BigInt    @map("opening_float")
+  closingCount     BigInt?   @map("closing_count")
+  expectedEfectivo BigInt?   @map("expected_efectivo")
+  expectedNequi    BigInt?   @map("expected_nequi")
+  difference       BigInt?
+  note             String?
+  legacyDexieId    Int?      @map("legacy_dexie_id")
+
+  business Business   @relation(fields: [businessId], references: [id])
+  moves    CashMove[]
+
+  @@unique([businessId, localDate])
+  @@unique([businessId, legacyDexieId])
+  @@map("cash_sessions")
+}
+
+model CashMove {
+  id            String        @id @db.Uuid
+  businessId    String        @map("business_id") @db.Uuid
+  amount        BigInt
+  direction     CashDirection
+  method        PayMethod
+  kind          CashMoveKind
+  sessionId     String?       @map("session_id") @db.Uuid
+  refType       String?       @map("ref_type")
+  refId         String?       @map("ref_id") @db.Uuid
+  requestId     String?       @map("request_id") @db.Uuid
+  note          String?
+  occurredOn    DateTime      @map("occurred_on") @db.Date
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  legacyDexieId Int?          @map("legacy_dexie_id")
+
+  business Business     @relation(fields: [businessId], references: [id])
+  session  CashSession? @relation(fields: [sessionId], references: [id])
+
+  @@unique([businessId, requestId])
+  @@unique([businessId, legacyDexieId])
+  @@index([businessId, occurredOn])
+  @@map("cash_moves")
+}
+
+model Expense {
+  id            String    @id @db.Uuid
+  businessId    String    @map("business_id") @db.Uuid
+  amount        BigInt
+  category      String
+  note          String?
+  method        PayMethod
+  requestId     String?   @map("request_id") @db.Uuid
+  occurredOn    DateTime  @map("occurred_on") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  legacyDexieId Int?      @map("legacy_dexie_id")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@unique([businessId, requestId])
+  @@unique([businessId, legacyDexieId])
+  @@index([businessId, occurredOn])
+  @@map("expenses")
+}
+
+model CustomerPayment {
+  id            String    @id @db.Uuid
+  businessId    String    @map("business_id") @db.Uuid
+  customerId    String    @map("customer_id") @db.Uuid
+  amount        BigInt
+  method        PayMethod
+  saleId        String?   @map("sale_id") @db.Uuid
+  requestId     String?   @map("request_id") @db.Uuid
+  note          String?
+  occurredOn    DateTime  @map("occurred_on") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  legacyDexieId Int?      @map("legacy_dexie_id")
+
+  business Business @relation(fields: [businessId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@unique([businessId, requestId])
+  @@unique([businessId, legacyDexieId])
+  @@index([businessId, occurredOn])
+  @@index([businessId, customerId])
+  @@map("customer_payments")
+}
+
+model InitialDebt {
+  id            String   @id @db.Uuid
+  businessId    String   @map("business_id") @db.Uuid
+  customerId    String   @map("customer_id") @db.Uuid
+  amount        BigInt
+  note          String?
+  requestId     String?  @map("request_id") @db.Uuid
+  occurredOn    DateTime @map("occurred_on") @db.Date
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  legacyDexieId Int?     @map("legacy_dexie_id")
+
+  business Business @relation(fields: [businessId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@unique([businessId, requestId])
+  @@unique([businessId, legacyDexieId])
+  @@index([businessId, customerId])
+  @@map("initial_debts")
+}
+
+model ImportIdMap {
+  businessId String @map("business_id") @db.Uuid
+  tableName  String @map("table_name")
+  dexieId    Int    @map("dexie_id")
+  pgId       String @map("pg_id") @db.Uuid
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@id([businessId, tableName, dexieId])
+  @@map("import_id_map")
+}

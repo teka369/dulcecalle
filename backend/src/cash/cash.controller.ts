@@ -1,0 +1,62 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Query,
+} from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
+import { CashService } from "./cash.service";
+import { CloseSessionDto, OpenSessionDto } from "./cash.dto";
+import { CreatePaymentDto } from "../sales/sales.dto";
+import { CurrentBusiness } from "../tenancy/business.decorator";
+import type { BusinessContext } from "../identity/auth.types";
+import { resolveIdempotencyKey } from "../shared/idempotency";
+
+@Controller()
+export class CashController {
+  constructor(private readonly cash: CashService) {}
+
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post("cash/sessions")
+  open(@CurrentBusiness() ctx: BusinessContext, @Body() dto: OpenSessionDto) {
+    return this.cash.open(ctx, dto.openingFloat);
+  }
+
+  @Post("cash/sessions/:id/close")
+  close(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+    @Body() dto: CloseSessionDto,
+  ) {
+    return this.cash.close(ctx, id, dto.countedEfectivo);
+  }
+
+  @Get("cash/today")
+  today(@CurrentBusiness() ctx: BusinessContext) {
+    return this.cash.today(ctx);
+  }
+
+  @Get("cash/moves")
+  moves(@CurrentBusiness() ctx: BusinessContext, @Query("date") date?: string) {
+    return this.cash.listMoves(ctx, date);
+  }
+
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post("customers/:id/payments")
+  pay(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+    @Body() dto: CreatePaymentDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.cash.recordPayment(
+      ctx,
+      id,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
+  }
+}

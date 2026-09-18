@@ -46,6 +46,7 @@
     "public/swe-worker*",
     "scripts",
     "server",
-    "migrations"
+    "migrations",
+    "backend"
   ]
 }
