@@ -9,7 +9,12 @@ import {
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { CashService } from "./cash.service";
-import { CloseSessionDto, OpenSessionDto } from "./cash.dto";
+import {
+  CashOwnerMoveDto,
+  CloseSessionDto,
+  CreateExpenseDto,
+  OpenSessionDto,
+} from "./cash.dto";
 import { CreatePaymentDto } from "../sales/sales.dto";
 import { CurrentBusiness } from "../tenancy/business.decorator";
 import type { BusinessContext } from "../identity/auth.types";
@@ -42,6 +47,48 @@ export class CashController {
   @Get("cash/moves")
   moves(@CurrentBusiness() ctx: BusinessContext, @Query("date") date?: string) {
     return this.cash.listMoves(ctx, date);
+  }
+
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post("cash/aportes")
+  aporte(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Body() dto: CashOwnerMoveDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.cash.ownerAporte(
+      ctx,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
+  }
+
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post("cash/retiros")
+  retiro(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Body() dto: CashOwnerMoveDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.cash.ownerRetiro(
+      ctx,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
+  }
+
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post("expenses")
+  expense(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Body() dto: CreateExpenseDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.cash.recordExpense(
+      ctx,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
   }
 
   @Throttle({ default: { limit: 30, ttl: 60000 } })

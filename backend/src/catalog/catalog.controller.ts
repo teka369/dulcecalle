@@ -7,12 +7,18 @@ import {
   Patch,
   Post,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { CatalogService } from "./catalog.service";
 import {
   CreateCustomerDto,
+  CreateInitialDebtDto,
   CreateProductDto,
+  CreateSupplierDto,
   PatchCustomerDto,
   PatchProductDto,
+  PatchSupplierDto,
+  ShrinkDto,
+  SurtirDto,
 } from "./catalog.dto";
 import { CurrentBusiness } from "../tenancy/business.decorator";
 import { Roles } from "../shared/http/decorators";
@@ -64,6 +70,38 @@ export class CatalogController {
     return this.catalog.archiveProduct(ctx, id);
   }
 
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post("products/:id/surtir")
+  surtir(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+    @Body() dto: SurtirDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.catalog.surtir(
+      ctx,
+      id,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
+  }
+
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post("products/:id/shrink")
+  shrink(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+    @Body() dto: ShrinkDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.catalog.shrink(
+      ctx,
+      id,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
+  }
+
   @Get("customers")
   listCustomers(@CurrentBusiness() ctx: BusinessContext) {
     return this.catalog.listCustomers(ctx);
@@ -89,5 +127,48 @@ export class CatalogController {
     @Body() dto: PatchCustomerDto,
   ) {
     return this.catalog.patchCustomer(ctx, id, dto);
+  }
+
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post("customers/:id/initial-debts")
+  recordInitialDebt(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+    @Body() dto: CreateInitialDebtDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.catalog.recordInitialDebt(
+      ctx,
+      id,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
+  }
+
+  @Get("suppliers")
+  listSuppliers(@CurrentBusiness() ctx: BusinessContext) {
+    return this.catalog.listSuppliers(ctx);
+  }
+
+  @Get("suppliers/:id")
+  getSupplier(@CurrentBusiness() ctx: BusinessContext, @Param("id") id: string) {
+    return this.catalog.getSupplier(ctx, id);
+  }
+
+  @Post("suppliers")
+  createSupplier(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Body() dto: CreateSupplierDto,
+  ) {
+    return this.catalog.createSupplier(ctx, dto);
+  }
+
+  @Patch("suppliers/:id")
+  patchSupplier(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+    @Body() dto: PatchSupplierDto,
+  ) {
+    return this.catalog.patchSupplier(ctx, id, dto);
   }
 }

@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -88,4 +89,93 @@ export class PatchCustomerDto {
   /** Detected so we can reject hand-edited debt. */
   @IsOptional()
   debt?: unknown;
+}
+
+export class CreateInitialDebtDto {
+  @IsInt()
+  @Min(1)
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
+}
+
+export class SurtirDto {
+  @IsInt()
+  @Min(1)
+  qty!: number;
+
+  @IsInt()
+  @Min(0)
+  unitCost!: number;
+
+  @IsInt()
+  @Min(0)
+  totalCost!: number;
+
+  @IsEnum(["Efectivo", "Nequi"])
+  method!: "Efectivo" | "Nequi";
+
+  @IsOptional()
+  @IsUUID()
+  supplierId?: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
+}
+
+export class ShrinkDto {
+  @IsInt()
+  @Min(1)
+  qty!: number;
+
+  @IsEnum(["me_lo_comi", "regalar", "perdido"])
+  reason!: "me_lo_comi" | "regalar" | "perdido";
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
+}
+
+export class CreateSupplierDto {
+  @IsString()
+  @MinLength(1)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class PatchSupplierDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

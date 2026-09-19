@@ -1,6 +1,6 @@
 # DulceCalle — API contract
 
-Conceptual REST `/v1`. **Do not implement endpoints in this phase.**
+Conceptual REST `/v1`. Implemented through M1 except stats, settings, memberships admin, wipe, import, and PWA/sync.
 Auth: Bearer or httpOnly cookie. `businessId` comes from membership, not from the body.
 
 Error envelope:
@@ -170,7 +170,7 @@ Txn: expense + cash_move kind=expense.
 
 ## 9. Stats
 
-`GET /v1/stats?period=hoy|semana|mes`  
+**Not in M1.** `GET /v1/stats?period=hoy|semana|mes`  
 Computed in **business timezone**. Formulas = DOMAIN.md §16.  
 Ventas brutas; Devoluciones separate; Ganancia = sale margins − return margins; Por cobrar = Σ debt now (includes initial debts); Gasté = expenses; Invertí = cash_moves compra; Recibido does not subtract refunds.
 

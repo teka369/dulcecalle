@@ -68,3 +68,28 @@ export class CreatePaymentDto {
   @IsUUID()
   requestId?: string;
 }
+
+export class ReturnLineDto {
+  @IsUUID()
+  saleLineId!: string;
+
+  @IsInt()
+  @Min(1)
+  qty!: number;
+}
+
+export class CreateReturnDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ReturnLineDto)
+  lines!: ReturnLineDto[];
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
+}

@@ -1,4 +1,4 @@
-# DulceCalle backend (Fase 6)
+# DulceCalle backend (Fase 6 + M1)
 
 NestJS + Prisma + PostgreSQL 16. **Does not replace Dexie.** The PWA stays local-first; this API is a parallel store. No Dexie import, no HTTP adapter, no sync.
 
@@ -33,4 +33,4 @@ COP is `BIGINT` in Postgres / `bigint` in Prisma. HTTP JSON emits a **number** (
 
 ## Out of scope (later phases)
 
-Returns, surtir, shrink, expenses API, stats, Dexie migration, PWA adapter, sync.
+Stats, settings, Dexie migration, PWA adapter, sync.

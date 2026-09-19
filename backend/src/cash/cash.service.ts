@@ -8,6 +8,7 @@ import { dateKey, occurredOnDate } from "../shared/clock";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
 import type { CreatePaymentDto } from "../sales/sales.dto";
+import type { CashOwnerMoveDto, CreateExpenseDto } from "./cash.dto";
 
 function sessionJson(s: {
   id: string;
@@ -31,6 +32,52 @@ function sessionJson(s: {
       s.expectedEfectivo == null ? null : copToJson(s.expectedEfectivo),
     expectedNequi: s.expectedNequi == null ? null : copToJson(s.expectedNequi),
     difference: s.difference == null ? null : copToJson(s.difference),
+  };
+}
+
+function cashMoveJson(m: {
+  id: string;
+  amount: bigint;
+  direction: string;
+  method: string;
+  kind: string;
+  refType: string | null;
+  refId: string | null;
+  note: string | null;
+  occurredOn: Date;
+  createdAt: Date;
+}) {
+  return {
+    id: m.id,
+    amount: copToJson(m.amount),
+    direction: m.direction,
+    method: m.method,
+    kind: m.kind,
+    refType: m.refType,
+    refId: m.refId,
+    note: m.note,
+    occurredOn: dateKey(m.occurredOn),
+    createdAt: m.createdAt,
+  };
+}
+
+function expenseJson(e: {
+  id: string;
+  amount: bigint;
+  category: string;
+  method: string;
+  note: string | null;
+  occurredOn: Date;
+  createdAt: Date;
+}) {
+  return {
+    id: e.id,
+    amount: copToJson(e.amount),
+    category: e.category,
+    method: e.method,
+    note: e.note,
+    occurredOn: dateKey(e.occurredOn),
+    createdAt: e.createdAt,
   };
 }
 
@@ -304,6 +351,170 @@ export class CashService {
             createdAt: again.createdAt,
           };
         }
+      }
+      throw e;
+    }
+  }
+
+  async ownerAporte(
+    ctx: BusinessContext,
+    dto: CashOwnerMoveDto,
+    requestId: string,
+  ) {
+    return this.recordOwnerMove(ctx, "aporte", "in", dto, requestId);
+  }
+
+  async ownerRetiro(
+    ctx: BusinessContext,
+    dto: CashOwnerMoveDto,
+    requestId: string,
+  ) {
+    return this.recordOwnerMove(ctx, "retiro", "out", dto, requestId);
+  }
+
+  async recordExpense(
+    ctx: BusinessContext,
+    dto: CreateExpenseDto,
+    requestId: string,
+  ) {
+    const existing = await this.prisma.expense.findUnique({
+      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+    });
+    if (existing) return expenseJson(existing);
+
+    const amount = asCop(dto.amount);
+    if (amount <= 0n) {
+      throw new AppError(ERROR_CODES.VALIDATION, "El monto tiene que ser mayor a 0.");
+    }
+    if (dto.method !== "Efectivo" && dto.method !== "Nequi") {
+      throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.noMethod);
+    }
+    const category = dto.category.trim();
+    if (!category) {
+      throw new AppError(ERROR_CODES.VALIDATION, "Di en qué se gastó.");
+    }
+
+    const now = new Date();
+    const occurredOn = occurredOnDate(ctx.timezone, now);
+    await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
+
+    try {
+      const row = await this.prisma.$transaction(async (tx) => {
+        await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        const id = randomUUID();
+        const expense = await tx.expense.create({
+          data: {
+            id,
+            businessId: ctx.businessId,
+            amount,
+            category,
+            note: dto.note,
+            method: dto.method,
+            requestId,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+        const open = await tx.cashSession.findFirst({
+          where: {
+            businessId: ctx.businessId,
+            localDate: occurredOn,
+            closedAt: null,
+          },
+        });
+        // requestId lives on expenses only. cash_moves.request_id is UUID and
+        // reserved for aporte/retiro; Dexie `expense-${id}` is not a UUID.
+        await tx.cashMove.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            amount,
+            direction: "out",
+            method: dto.method,
+            kind: "expense",
+            sessionId: open?.id ?? null,
+            refType: "expense",
+            refId: id,
+            note: category,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+        return expense;
+      });
+      return expenseJson(row);
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const again = await this.prisma.expense.findUnique({
+          where: {
+            businessId_requestId: { businessId: ctx.businessId, requestId },
+          },
+        });
+        if (again) return expenseJson(again);
+      }
+      throw e;
+    }
+  }
+
+  private async recordOwnerMove(
+    ctx: BusinessContext,
+    kind: "aporte" | "retiro",
+    direction: "in" | "out",
+    dto: CashOwnerMoveDto,
+    requestId: string,
+  ) {
+    const existing = await this.prisma.cashMove.findUnique({
+      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+    });
+    if (existing) return cashMoveJson(existing);
+
+    const amount = asCop(dto.amount);
+    if (amount <= 0n) {
+      throw new AppError(ERROR_CODES.VALIDATION, "El monto tiene que ser mayor a 0.");
+    }
+    if (dto.method !== "Efectivo" && dto.method !== "Nequi") {
+      throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.noMethod);
+    }
+
+    const now = new Date();
+    const occurredOn = occurredOnDate(ctx.timezone, now);
+    await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
+
+    try {
+      const move = await this.prisma.$transaction(async (tx) => {
+        await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        const open = await tx.cashSession.findFirst({
+          where: {
+            businessId: ctx.businessId,
+            localDate: occurredOn,
+            closedAt: null,
+          },
+        });
+        return tx.cashMove.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            amount,
+            direction,
+            method: dto.method,
+            kind,
+            sessionId: open?.id ?? null,
+            note: dto.note,
+            requestId,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+      });
+      return cashMoveJson(move);
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const again = await this.prisma.cashMove.findUnique({
+          where: {
+            businessId_requestId: { businessId: ctx.businessId, requestId },
+          },
+        });
+        if (again) return cashMoveJson(again);
       }
       throw e;
     }

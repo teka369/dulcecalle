@@ -7,8 +7,9 @@ import { addCop, asCop, copToJson, mulCop } from "../shared/money";
 import { occurredOnDate, dateKey } from "../shared/clock";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import { assertPaymentMath, resolveUnitPrice } from "../shared/sale-math";
+import { splitReturnSettlement } from "../shared/returns";
 import type { BusinessContext } from "../identity/auth.types";
-import type { CreateSaleDto } from "./sales.dto";
+import type { CreateReturnDto, CreateSaleDto } from "./sales.dto";
 
 function saleJson(s: {
   id: string;
@@ -50,6 +51,44 @@ function saleJson(s: {
       unitPrice: copToJson(l.unitPrice),
       unitCost: copToJson(l.unitCost),
       lineTotal: copToJson(l.lineTotal),
+    })),
+  };
+}
+
+function returnJson(r: {
+  id: string;
+  saleId: string;
+  refundAmount: bigint;
+  debtReduced: bigint;
+  method: string | null;
+  note: string | null;
+  occurredOn: Date;
+  createdAt: Date;
+  lines?: Array<{
+    id: string;
+    saleLineId: string;
+    productId: string;
+    qty: number;
+    unitPrice: bigint;
+    unitCost: bigint;
+  }>;
+}) {
+  return {
+    id: r.id,
+    saleId: r.saleId,
+    refundAmount: copToJson(r.refundAmount),
+    debtReduced: copToJson(r.debtReduced),
+    method: r.method,
+    note: r.note,
+    occurredOn: dateKey(r.occurredOn),
+    createdAt: r.createdAt,
+    lines: r.lines?.map((l) => ({
+      id: l.id,
+      saleLineId: l.saleLineId,
+      productId: l.productId,
+      qty: l.qty,
+      unitPrice: copToJson(l.unitPrice),
+      unitCost: copToJson(l.unitCost),
     })),
   };
 }
@@ -289,5 +328,242 @@ export class SalesService {
     });
     if (!s) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
     return saleJson(s);
+  }
+
+  async listReturns(ctx: BusinessContext, saleId: string) {
+    const sale = await this.prisma.sale.findFirst({
+      where: { id: saleId, businessId: ctx.businessId },
+    });
+    if (!sale) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+    const rows = await this.prisma.saleReturn.findMany({
+      where: { businessId: ctx.businessId, saleId },
+      include: { lines: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map(returnJson);
+  }
+
+  async createReturn(
+    ctx: BusinessContext,
+    saleId: string,
+    dto: CreateReturnDto,
+    requestId: string,
+  ) {
+    const existing = await this.prisma.saleReturn.findUnique({
+      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+      include: { lines: true },
+    });
+    if (existing) return returnJson(existing);
+
+    if (!dto.lines?.length) {
+      throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.returnEmpty);
+    }
+
+    const now = new Date();
+    const occurredOn = occurredOnDate(ctx.timezone, now);
+    await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
+
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+
+        const sale = await tx.sale.findFirst({
+          where: { id: saleId, businessId: ctx.businessId },
+          include: { lines: true },
+        });
+        if (!sale) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+
+        const lineById = new Map(sale.lines.map((l) => [l.id, l]));
+        const prior = await tx.saleReturn.findMany({
+          where: { businessId: ctx.businessId, saleId },
+          include: { lines: true },
+        });
+        const alreadyReturned = new Map<string, number>();
+        let alreadyDebtReduced = 0n;
+        for (const r of prior) {
+          alreadyDebtReduced = addCop(alreadyDebtReduced, r.debtReduced);
+          for (const rl of r.lines) {
+            alreadyReturned.set(
+              rl.saleLineId,
+              (alreadyReturned.get(rl.saleLineId) ?? 0) + rl.qty,
+            );
+          }
+        }
+
+        const prepared: Array<{
+          saleLineId: string;
+          productId: string;
+          qty: number;
+          unitPrice: bigint;
+          unitCost: bigint;
+        }> = [];
+        let returnValue = 0n;
+
+        for (const row of dto.lines) {
+          if (!Number.isInteger(row.qty) || row.qty <= 0) {
+            throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.badQty);
+          }
+          const line = lineById.get(row.saleLineId);
+          if (!line) {
+            throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.returnLineNotFound);
+          }
+          const used = alreadyReturned.get(row.saleLineId) ?? 0;
+          if (used + row.qty > line.qty) {
+            throw new AppError(ERROR_CODES.RETURN_EXCEEDS, MESSAGES.returnExceeds);
+          }
+          alreadyReturned.set(row.saleLineId, used + row.qty);
+          prepared.push({
+            saleLineId: line.id,
+            productId: line.productId,
+            qty: row.qty,
+            unitPrice: line.unitPrice,
+            unitCost: line.unitCost,
+          });
+          returnValue = addCop(returnValue, mulCop(line.unitPrice, row.qty));
+        }
+
+        if (prepared.length === 0) {
+          throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.returnEmpty);
+        }
+
+        let customerDebt = 0n;
+        if (sale.customerId) {
+          const customer = await tx.customer.findFirst({
+            where: { id: sale.customerId, businessId: ctx.businessId },
+          });
+          if (!customer) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+          customerDebt = customer.debt;
+        }
+
+        const { debtReduced, refundAmount } = splitReturnSettlement({
+          returnValue,
+          saleCredit: sale.credit,
+          alreadyDebtReduced,
+          customerDebt,
+        });
+
+        let method: "Efectivo" | "Nequi" | null = null;
+        if (refundAmount > 0n) {
+          method =
+            sale.method === "Nequi" || sale.method === "Efectivo"
+              ? sale.method
+              : "Efectivo";
+        }
+
+        const returnId = randomUUID();
+        await tx.saleReturn.create({
+          data: {
+            id: returnId,
+            businessId: ctx.businessId,
+            saleId,
+            refundAmount,
+            debtReduced,
+            method,
+            requestId,
+            note: dto.note,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+
+        for (const row of prepared) {
+          await tx.saleReturnLine.create({
+            data: {
+              id: randomUUID(),
+              businessId: ctx.businessId,
+              returnId,
+              saleLineId: row.saleLineId,
+              productId: row.productId,
+              qty: row.qty,
+              unitPrice: row.unitPrice,
+              unitCost: row.unitCost,
+            },
+          });
+
+          await tx.$executeRaw`
+            UPDATE products
+            SET stock = stock + ${row.qty},
+                updated_at = NOW()
+            WHERE id = ${row.productId}::uuid
+              AND business_id = ${ctx.businessId}::uuid
+          `;
+
+          await tx.stockMove.create({
+            data: {
+              id: randomUUID(),
+              businessId: ctx.businessId,
+              productId: row.productId,
+              delta: row.qty,
+              reason: "devolucion",
+              unitCost: row.unitCost,
+              refType: "saleReturn",
+              refId: returnId,
+              occurredOn,
+              createdAt: now,
+            },
+          });
+        }
+
+        if (refundAmount > 0n && method) {
+          const open = await tx.cashSession.findFirst({
+            where: {
+              businessId: ctx.businessId,
+              localDate: occurredOn,
+              closedAt: null,
+            },
+          });
+          await tx.cashMove.create({
+            data: {
+              id: randomUUID(),
+              businessId: ctx.businessId,
+              amount: refundAmount,
+              direction: "out",
+              method,
+              kind: "devolucion",
+              sessionId: open?.id ?? null,
+              refType: "saleReturn",
+              refId: returnId,
+              occurredOn,
+              createdAt: now,
+            },
+          });
+        }
+
+        if (debtReduced > 0n) {
+          if (!sale.customerId) {
+            throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+          }
+          const decremented = await tx.$executeRaw`
+            UPDATE customers
+            SET debt = debt - ${debtReduced},
+                updated_at = NOW()
+            WHERE id = ${sale.customerId}::uuid
+              AND business_id = ${ctx.businessId}::uuid
+              AND debt >= ${debtReduced}
+          `;
+          if (Number(decremented) !== 1) {
+            throw new AppError(ERROR_CODES.VALIDATION, "debt must be ≥ 0");
+          }
+        }
+
+        return tx.saleReturn.findUniqueOrThrow({
+          where: { id: returnId },
+          include: { lines: true },
+        });
+      });
+
+      return returnJson(created);
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const again = await this.prisma.saleReturn.findUnique({
+          where: {
+            businessId_requestId: { businessId: ctx.businessId, requestId },
+          },
+          include: { lines: true },
+        });
+        if (again) return returnJson(again);
+      }
+      throw e;
+    }
   }
 }

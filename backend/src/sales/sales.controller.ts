@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Headers, Param, Post, Query } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { SalesService } from "./sales.service";
-import { CreateSaleDto } from "./sales.dto";
+import { CreateReturnDto, CreateSaleDto } from "./sales.dto";
 import { CurrentBusiness } from "../tenancy/business.decorator";
 import type { BusinessContext } from "../identity/auth.types";
 import { resolveIdempotencyKey } from "../shared/idempotency";
@@ -17,6 +17,27 @@ export class SalesController {
     @Query("to") to?: string,
   ) {
     return this.sales.list(ctx, from, to);
+  }
+
+  @Get(":id/returns")
+  listReturns(@CurrentBusiness() ctx: BusinessContext, @Param("id") id: string) {
+    return this.sales.listReturns(ctx, id);
+  }
+
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post(":id/returns")
+  createReturn(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+    @Body() dto: CreateReturnDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.sales.createReturn(
+      ctx,
+      id,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
   }
 
   @Get(":id")
