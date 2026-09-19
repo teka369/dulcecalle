@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import { IdentityService } from "./identity.service";
-import { CreateBusinessDto, LoginDto, RegisterDto } from "./dto";
+import { CreateBusinessDto, LoginDto, RefreshDto, RegisterDto } from "./dto";
 import { Public, SkipBusiness } from "../shared/http/decorators";
 import { CurrentUser } from "../tenancy/business.decorator";
 import type { AuthedUser } from "./auth.types";
@@ -19,6 +19,12 @@ export class IdentityController {
   @Post("auth/login")
   login(@Body() dto: LoginDto) {
     return this.identity.login(dto.email, dto.password);
+  }
+
+  @Public()
+  @Post("auth/refresh")
+  refresh(@Body() dto: RefreshDto) {
+    return this.identity.refresh(dto.refreshToken);
   }
 
   @SkipBusiness()

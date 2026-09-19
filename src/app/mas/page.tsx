@@ -45,6 +45,13 @@ export default function MasPage() {
           <span>Datos</span>
           <span className="text-ink/40">→</span>
         </Link>
+        <Link
+          href="/login"
+          className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 text-base font-semibold shadow-sm"
+        >
+          <span>Cuenta</span>
+          <span className="text-ink/40">→</span>
+        </Link>
       </nav>
     </div>
   );

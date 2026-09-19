@@ -68,7 +68,7 @@ export class HttpRepository {
       }>("POST", "/auth/register", { body: input, skipBusiness: true });
       this.session.accessToken = body.accessToken;
       this.session.refreshToken = body.refreshToken;
-      this.session.userId = body.user.id;
+      this.session.user = body.user;
       this.session.businessId = body.business.id;
       return body;
     },
@@ -84,18 +84,26 @@ export class HttpRepository {
       });
       this.session.accessToken = body.accessToken;
       this.session.refreshToken = body.refreshToken;
-      this.session.userId = body.user.id;
-      return body;
+      this.session.user = body.user;
+      this.session.businessId = null;
+      const me = await this.auth.me();
+      if (me.memberships.length === 1) {
+        this.session.selectBusiness(me.memberships[0].businessId);
+      }
+      return { ...body, memberships: me.memberships };
     },
 
     logout: async () => {
-      const body = await this.http.request<{ ok: boolean }>(
-        "POST",
-        "/auth/logout",
-        { skipBusiness: true },
-      );
+      try {
+        await this.http.request<{ ok: boolean }>("POST", "/auth/logout", {
+          skipBusiness: true,
+          skipRefresh: true,
+        });
+      } catch {
+        /* JWT is stateless; local clear is logout. */
+      }
       this.session.clear();
-      return body;
+      return { ok: true as const };
     },
 
     me: async () => {

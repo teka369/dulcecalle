@@ -26,3 +26,9 @@ export class CreateBusinessDto {
   @MinLength(1)
   name!: string;
 }
+
+export class RefreshDto {
+  @IsString()
+  @MinLength(1)
+  refreshToken!: string;
+}

@@ -1,5 +1,10 @@
 export { HttpClient } from "./client";
-export { HttpSession } from "./session";
+export {
+  HttpSession,
+  getPwaAuthSession,
+  AUTH_STORAGE_KEY,
+} from "./session";
+export type { AuthUser, AuthStorage } from "./session";
 export { HttpRepository, createHttpRepository } from "./repository";
 export type { CreateProductInput, CreateSaleInput, PatchProductInput } from "./repository";
 export {

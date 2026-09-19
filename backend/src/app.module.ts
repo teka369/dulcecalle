@@ -13,14 +13,20 @@ import { HealthController } from "./health/health.controller";
 import { JwtAuthGuard } from "./identity/jwt.guard";
 import { BusinessGuard } from "./tenancy/business.guard";
 import { RolesGuard } from "./tenancy/roles.guard";
+import { requireJwtSecrets } from "./identity/jwt-secrets";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: [".env"] }),
-    JwtModule.register({
+    JwtModule.registerAsync({
       global: true,
-      secret: process.env.JWT_SECRET ?? "dev-access-secret",
-      signOptions: { expiresIn: "15m" },
+      useFactory: () => {
+        const { access } = requireJwtSecrets();
+        return {
+          secret: access,
+          signOptions: { expiresIn: "15m" as const },
+        };
+      },
     }),
     ThrottlerModule.forRoot({
       throttlers: [{ name: "default", ttl: 60000, limit: 120 }],

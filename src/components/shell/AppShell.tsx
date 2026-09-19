@@ -7,6 +7,8 @@ import { Fab } from "./Fab";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const hideChrome =
+    pathname === "/login" ||
+    pathname === "/register" ||
     pathname.startsWith("/ventas/nueva") ||
     pathname.startsWith("/ventas/cobrar") ||
     /^\/ventas\/[^/]+\/devolver$/.test(pathname) ||

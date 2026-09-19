@@ -1,7 +1,8 @@
 # DulceCalle — API contract
 
-Conceptual REST `/v1`. Implemented through M1 except stats, settings, memberships admin, wipe, import, and PWA/sync.
-Auth: Bearer or httpOnly cookie. `businessId` comes from membership, not from the body.
+Conceptual REST `/v1`. Business domain implemented through M1 except stats, settings, memberships admin, wipe, import, and PWA/sync.
+Auth (M2): register, login, refresh, logout. JWT is stateless.
+Auth: Bearer. `businessId` comes from membership, not from the body.
 
 Error envelope:
 
@@ -41,14 +42,22 @@ Duplicate request_id is **not** 409: it is 200 with the first result.
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
 | POST | `/v1/auth/register` | no | first owner + first business |
-| POST | `/v1/auth/login` | no | |
-| POST | `/v1/auth/logout` | yes | |
+| POST | `/v1/auth/login` | no | access 15m + refresh 7d |
+| POST | `/v1/auth/refresh` | no | body `{ refreshToken }`; new access + refresh |
+| POST | `/v1/auth/logout` | yes | `{ ok: true }`. Does **not** revoke JWTs |
 | GET | `/v1/me` | yes | user + memberships |
 | GET | `/v1/businesses` | yes | memberships only |
 | POST | `/v1/businesses` | yes | new business, caller = owner |
 | GET | `/v1/health` | no | |
 
-Selector: header `X-Business-Id` must be a membership of the user.
+Selector: header `X-Business-Id` must be a membership of the user. Do not send it when no business is selected.
+
+**JWT**
+
+- Access: 15m, `JWT_SECRET`. Refresh: 7d, `JWT_REFRESH_SECRET`, claim `typ: "refresh"`.
+- Both secrets are **required** at boot. No fallback (no `dev-access-secret`).
+- Refresh tokens are rejected as Bearer (`401 UNAUTHORIZED`).
+- There is no denylist. Logout is client-side: delete stored tokens. An old refresh remains valid until expiry.
 
 **403 vs 404**
 

@@ -33,10 +33,18 @@ export class JwtAuthGuard implements CanActivate {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, MESSAGES.unauthorized);
     }
     try {
-      const payload = this.jwt.verify<{ sub: string; email: string }>(token);
+      const payload = this.jwt.verify<{
+        sub: string;
+        email: string;
+        typ?: string;
+      }>(token);
+      if (payload.typ === "refresh") {
+        throw new AppError(ERROR_CODES.UNAUTHORIZED, MESSAGES.unauthorized);
+      }
       req.user = { id: payload.sub, email: payload.email };
       return true;
-    } catch {
+    } catch (e) {
+      if (e instanceof AppError) throw e;
       throw new AppError(ERROR_CODES.UNAUTHORIZED, MESSAGES.unauthorized);
     }
   }

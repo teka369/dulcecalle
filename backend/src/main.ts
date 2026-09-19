@@ -1,12 +1,16 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { config as loadEnv } from "dotenv";
 import { AppModule } from "./app.module";
 import { installBigIntJson } from "./shared/bigint";
 import { HttpErrorFilter } from "./shared/http/http-error.filter";
+import { requireJwtSecrets } from "./identity/jwt-secrets";
 
 installBigIntJson();
+loadEnv({ path: ".env" });
 
 async function bootstrap() {
+  requireJwtSecrets();
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix("v1");
   app.useGlobalPipes(
