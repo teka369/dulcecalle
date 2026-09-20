@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCop, mulCop, addCop, subCop } from "@/domain/money";
 import type { PaymentKind } from "@/domain/types";
 import type { RemoteCustomer, RemoteProduct } from "@/data/http/mappers";
-import { getPwaApi } from "@/data/pwa/api";
+import { createSaleWithOfflineFallback } from "@/data/pwa/offline-sales";
 import { listCachedCustomers, listCachedProducts } from "@/data/pwa/catalog";
 import { useCart } from "@/store/cartStore";
 
@@ -123,7 +123,7 @@ export default function CobrarPage() {
         requestIdRef.current = crypto.randomUUID();
       }
 
-      await getPwaApi().sales.create(
+      const result = await createSaleWithOfflineFallback(
         {
           lines: lines.map((l) => ({
             productId: l.productId,
