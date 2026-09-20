@@ -63,6 +63,9 @@ export class DulceCalleLocalDB extends Dexie {
     this.version(2).stores({
       cacheMeta: "id, businessId, resource, [businessId+resource]",
     });
+    this.version(3).stores({
+      cashSessions: "id, businessId, localDate, requestId, [businessId+localDate], [businessId+requestId]",
+    });
   }
 }
 
