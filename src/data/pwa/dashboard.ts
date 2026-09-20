@@ -48,12 +48,18 @@ export async function loadHttpDashboard(): Promise<DashboardSnapshot> {
   const api = getPwaApi();
   const today = todayKey();
 
+  const currentBusinessId = api.session.businessId;
+  const needsBusinessName =
+    !currentBusinessId ||
+    !businessNameCache ||
+    businessNameCache.businessId !== currentBusinessId;
+
   const [products, customers, sales, cash, me] = await Promise.all([
     api.products.list(),
     api.customers.list(),
     api.sales.list(today, today),
     api.cash.today(),
-    api.auth.me().catch(() => null),
+    needsBusinessName ? api.auth.me().catch(() => null) : Promise.resolve(null),
   ]);
 
   const [ledgers, stockMoveGroups] = await Promise.all([
@@ -186,15 +192,14 @@ export async function loadHttpDashboard(): Promise<DashboardSnapshot> {
     }
   }
 
-  const returnedSaleIds = new Set(
-    activity
-      .filter((row) => row.kind === "devolucion")
-      .map((row) => row.href?.split("/").pop())
-      .filter((id): id is string => Boolean(id)),
+  const saleReturns = await Promise.all(
+    sales.map(async (sale) => ({
+      sale,
+      returns: await api.sales.returns(sale.id).catch(() => []),
+    })),
   );
 
-  for (const sale of sales) {
-    const returns = await api.sales.returns(sale.id).catch(() => []);
+  for (const { sale, returns } of saleReturns) {
     for (const returned of returns) {
       if (!isToday(returned.createdAt, today)) continue;
       pushActivity({
@@ -284,7 +289,6 @@ export async function loadHttpDashboard(): Promise<DashboardSnapshot> {
       ? businessNameCache.name
       : null;
 
-  void returnedSaleIds;
 
   return {
     greeting: greetingForHour(new Date(now).getHours()),
