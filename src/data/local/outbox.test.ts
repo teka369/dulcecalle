@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { __resetLocalDbForTests, __reopenLocalDbForTests } from "./db";
 import { newEntityId, newRequestId } from "./ids";
-import { getOutboxStore, resetOutboxStoreSingleton } from "./outbox";
+import {\n  ConnectivityMonitor,\n  getOutboxStore,\n  OutboxSyncEngine,\n  resetOutboxStoreSingleton,\n} from "./outbox";
 import { resetLocalStoreSingleton } from "./store";
 
 const BIZ_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -9,7 +9,7 @@ const BIZ_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 describe("M6 OutboxStore", () => {
   beforeEach(async () => {
-    resetOutboxStoreSingleton();
+    resetOutboxStoreSingleton();\n    
     resetLocalStoreSingleton();
     await __resetLocalDbForTests();
   });
@@ -108,13 +108,13 @@ describe("M6 OutboxStore", () => {
       requestId: newRequestId(),
       payload: { n: 1 },
     });
-    const flying = await outbox.markInFlight(operationId);
+    const flying = await outbox.markInFlight(BIZ_A, operationId);
     expect(flying.status).toBe("in_flight");
     expect(flying.attempts).toBe(1);
     expect(await outbox.listPending(BIZ_A)).toHaveLength(0);
 
     const remoteId = newEntityId();
-    const synced = await outbox.markSynced(operationId, remoteId);
+    const synced = await outbox.markSynced(BIZ_A, operationId, remoteId);
     expect(synced.status).toBe("synced");
     expect(synced.remoteId).toBe(remoteId);
 
@@ -127,8 +127,8 @@ describe("M6 OutboxStore", () => {
       requestId: newRequestId(),
       payload: { amount: 500 },
     });
-    await outbox.markInFlight(other);
-    const failed = await outbox.markFailed(other, "INSUFFICIENT_STOCK", 9);
+    await outbox.markInFlight(BIZ_A, other);
+    const failed = await outbox.markFailed(BIZ_A, other, "INSUFFICIENT_STOCK", 9);
     expect(failed.status).toBe("failed");
     expect(failed.lastError).toBe("INSUFFICIENT_STOCK");
     expect(failed.nextAttemptAt).toBe(9);
@@ -197,5 +197,101 @@ describe("M6 OutboxStore", () => {
     expect((await outbox.get(BIZ_A, operationId))?.payload).toEqual({
       name: "Rosa",
     });
+  });
+});
+
+
+describe("M6.4 OutboxSyncEngine", () => {
+  it("recovers in-flight work after a reload and sends it with the stored requestId", async () => {
+    const outbox = getOutboxStore();
+    const operationId = newEntityId();
+    const requestId = newRequestId();
+    await outbox.enqueue({
+      operationId,
+      businessId: BIZ_A,
+      entity: "customer",
+      operation: "create",
+      requestId,
+      payload: { name: "Rosa" },
+    });
+    await outbox.markInFlight(BIZ_A, operationId);
+    const engine = new OutboxSyncEngine(outbox, () => 10_000);
+    const seen: string[] = [];
+    const result = await engine.flush(BIZ_A, async (item) => {
+      seen.push(item.requestId);
+      return { remoteId: newEntityId() };
+    });
+    expect(result.synced).toBe(1);
+    expect(seen).toEqual([requestId]);
+    expect((await outbox.get(BIZ_A, operationId))?.status).toBe("synced");
+  });
+
+  it("honors dependencies before sending a child operation", async () => {
+    const outbox = getOutboxStore();
+    const parent = newEntityId();
+    const child = newEntityId();
+    await outbox.enqueue({ operationId: parent, businessId: BIZ_A, entity: "customer", operation: "create", requestId: newRequestId(), payload: { name: "Rosa" }, localCreatedAt: 200 });
+    await outbox.enqueue({ operationId: child, businessId: BIZ_A, entity: "sale", operation: "create", requestId: newRequestId(), payload: { customerId: parent }, dependsOn: [parent], localCreatedAt: 100 });
+    const sent: string[] = [];
+    const result = await new OutboxSyncEngine(outbox, () => 20_000).flush(BIZ_A, async (item) => {
+      sent.push(item.operationId);
+      return { remoteId: newEntityId() };
+    });
+    expect(result.synced).toBe(2);
+    expect(sent).toEqual([parent, child]);
+  });
+
+  it("backs off on network failure and stops without losing the request", async () => {
+    const outbox = getOutboxStore();
+    const operationId = newEntityId();
+    const requestId = newRequestId();
+    await outbox.enqueue({ operationId, businessId: BIZ_A, entity: "sale", operation: "create", requestId, payload: {} });
+    const engine = new OutboxSyncEngine(outbox, () => 1_000);
+    const result = await engine.flush(BIZ_A, async () => { throw new Error("Failed to fetch"); });
+    expect(result.failed).toBe(1);
+    expect(result.stopped).toBe(true);
+    const row = await outbox.get(BIZ_A, operationId);
+    expect(row?.status).toBe("failed");
+    expect(row?.requestId).toBe(requestId);
+    expect(row?.nextAttemptAt).toBeGreaterThan(1_000);
+  });
+
+  it("marks permanent API errors failed but can continue with an independent operation", async () => {
+    const outbox = getOutboxStore();
+    const bad = newEntityId();
+    const good = newEntityId();
+    await outbox.enqueue({ operationId: bad, businessId: BIZ_A, entity: "expense", operation: "create", requestId: newRequestId(), payload: {}, localCreatedAt: 100 });
+    await outbox.enqueue({ operationId: good, businessId: BIZ_A, entity: "expense", operation: "create", requestId: newRequestId(), payload: {}, localCreatedAt: 200 });
+    const sent: string[] = [];
+    const result = await new OutboxSyncEngine(outbox, () => 10_000).flush(BIZ_A, async (item) => {
+      sent.push(item.operationId);
+      if (item.operationId === bad) throw new (await import("../errors")).ApiError("VALIDATION", "Bad", 400);
+      return { remoteId: newEntityId() };
+    });
+    expect(result.failed).toBe(1);
+    expect(result.synced).toBe(1);
+    expect(sent).toEqual([bad, good]);
+  });
+
+  it("does not send a child whose dependency is not synced", async () => {
+    const outbox = getOutboxStore();
+    const parent = newEntityId();
+    const child = newEntityId();
+    await outbox.enqueue({ operationId: child, businessId: BIZ_A, entity: "sale", operation: "create", requestId: newRequestId(), payload: {}, dependsOn: [parent] });
+    const result = await new OutboxSyncEngine(outbox, () => 10_000).flush(BIZ_A, async () => ({ remoteId: newEntityId() }));
+    expect(result.synced).toBe(0);
+    expect(result.blocked).toBe(1);
+  });
+});
+
+describe("M6.4 ConnectivityMonitor", () => {
+  it("is safe outside the browser and supports subscriptions", () => {
+    const monitor = new ConnectivityMonitor();
+    expect(typeof monitor.online).toBe("boolean");
+    const events: boolean[] = [];
+    const unsubscribe = monitor.subscribe((online) => events.push(online));
+    unsubscribe();
+    monitor.start();
+    monitor.stop();
   });
 });
