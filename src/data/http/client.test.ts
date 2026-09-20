@@ -134,24 +134,33 @@ describe("HttpClient 401 → refresh → retry", () => {
     }
   });
 
-  it("does not refresh login/register/refresh paths", async () => {
+  it("does not refresh login/register/refresh or customer-access paths", async () => {
     const session = new HttpSession();
     session.refreshToken = "r1";
-    let calls = 0;
-    const fetchImpl: typeof fetch = async () => {
-      calls += 1;
-      return jsonResponse(401, {
-        error: { code: "UNAUTHORIZED", message: "Correo o clave incorrectos." },
-      });
-    };
-    const http = new HttpClient("http://example.test/v1", session, fetchImpl);
-    await expect(
-      http.request("POST", "/auth/login", {
-        body: { email: "a@test.co", password: "x" },
-        skipBusiness: true,
-      }),
-    ).rejects.toMatchObject({ status: 401 });
-    expect(calls).toBe(1);
+    for (const path of [
+      "/auth/login",
+      "/auth/register",
+      "/auth/refresh",
+      "/customer-access/login",
+      "/customer-access/refresh",
+      "/customer-access/logout",
+    ]) {
+      let calls = 0;
+      const fetchImpl: typeof fetch = async () => {
+        calls += 1;
+        return jsonResponse(401, {
+          error: { code: "UNAUTHORIZED", message: "No pudimos identificarte." },
+        });
+      };
+      const http = new HttpClient("http://example.test/v1", session, fetchImpl);
+      await expect(
+        http.request("POST", path, {
+          body: { code: "DC-0001", name: "x" },
+          skipBusiness: true,
+        }),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(calls).toBe(1);
+    }
   });
 
   it("clears the session when refresh fails", async () => {

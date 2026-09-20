@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { asCopJson, asDateKey, asIsoEpoch, mapProduct, mapSale } from "./mappers";
+import {
+  asCopJson,
+  asDateKey,
+  asIsoEpoch,
+  mapCustomer,
+  mapProduct,
+  mapSale,
+} from "./mappers";
 
 describe("HTTP COP / date mappers", () => {
   it("accepts integer COP including 0, 500, 45000, 1000000", () => {
@@ -62,5 +69,19 @@ describe("HTTP COP / date mappers", () => {
     expect(s.saleTotal).toBe(3000);
     expect(s.lines[0].unitCost).toBe(0);
     expect(s.occurredOn).toBe("2026-09-17");
+  });
+
+  it("maps customer code without Dexie ids", () => {
+    const c = mapCustomer({
+      id: "11111111-1111-4111-8111-111111111111",
+      code: "DC-0001",
+      name: "Rosa",
+      phone: null,
+      debt: 45200,
+      archivedAt: null,
+      createdAt: "2026-09-17T12:00:00.000Z",
+    });
+    expect(c.code).toBe("DC-0001");
+    expect(c.debt).toBe(45200);
   });
 });
