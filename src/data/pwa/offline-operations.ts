@@ -247,9 +247,23 @@ export async function closeCashWithOfflineFallback(
   requestId: string,
 ): Promise<OfflineOperationResult<Awaited<ReturnType<ReturnType<typeof getPwaApi>["cash"]["close"]>>>> {
   assertNonNegativeMoney(countedEfectivo, "Revisa el monto contado.");
+  const business = businessId();
+  // D5 — An offline-opened session is known to the server under a different
+  // id once its open operation syncs (operationId === local session id).
+  // Resolve it for online calls; when the open is still unsynced, queue the
+  // close offline with its dependency instead of hitting a guaranteed 404.
+  const openOp = await getOutboxStore().get(business, sessionId);
+  const openSynced =
+    openOp?.entity === "cashSession" && openOp.operation === "open"
+      ? openOp.status === "synced" && openOp.remoteId
+        ? openOp.remoteId
+        : false
+      : null;
+  if (openSynced === false) {
+    return closeCashOffline(business, sessionId, countedEfectivo, requestId);
+  }
   try {
-    const value = await getPwaApi().cash.close(sessionId, countedEfectivo, requestId);
-    const business = businessId();
+    const value = await getPwaApi().cash.close(openSynced ?? sessionId, countedEfectivo, requestId);
     const local = await getLocalDb().cashSessions.get(sessionId);
     if (local?.businessId !== business) throw new Error("La caja no pertenece al negocio seleccionado.");
     if (local) {
@@ -266,7 +280,16 @@ export async function closeCashWithOfflineFallback(
     return { mode: "online", value };
   } catch (error) {
     if (!(error instanceof NetworkError)) throw error;
-    const business = businessId();
+    return closeCashOffline(business, sessionId, countedEfectivo, requestId);
+  }
+}
+
+async function closeCashOffline(
+  business: string,
+  sessionId: string,
+  countedEfectivo: number,
+  requestId: string,
+): Promise<OfflineOperationResult<Awaited<ReturnType<ReturnType<typeof getPwaApi>["cash"]["close"]>>>> {
     const db = getLocalDb();
     const now = Date.now();
     const id = await db.transaction("rw", [db.cashSessions, db.cashMoves, db.outbox], async () => {
@@ -304,7 +327,6 @@ export async function closeCashWithOfflineFallback(
       return operationId;
     });
     return { mode: "offline", id };
-  }
 }
 
 async function ownerMove(

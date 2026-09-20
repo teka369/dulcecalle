@@ -180,6 +180,69 @@ describe("M6.8 offline operations", () => {
     expect((await getLocalDb().cashSessions.get(sessionId))?.closingCount).toBe(4500);
   });
 
+  it("D5: closes online with the synced remote id after an offline open", async () => {
+    api.cash.open.mockRejectedValue(new NetworkError("offline"));
+    const opened = await openCashWithOfflineFallback(5000, "41414141-4141-4141-8414-414141414141");
+    const localId = (opened as { mode: "offline"; id: string }).id;
+    const remoteId = "42424242-4242-4242-8424-424242424242";
+    const outbox = getOutboxStore();
+    await outbox.markInFlight(businessId, localId);
+    await outbox.markSynced(businessId, localId, remoteId);
+    api.cash.close.mockResolvedValue({
+      id: remoteId,
+      localDate: "2026-09-20",
+      openedAt: 1000,
+      closedAt: 2000,
+      openingFloat: 5000,
+      closingCount: 4800,
+      expectedEfectivo: 5000,
+      expectedNequi: 0,
+      difference: -200,
+    });
+
+    const result = await closeCashWithOfflineFallback(
+      localId,
+      4800,
+      "43434343-4343-4343-8434-434343434343",
+    );
+
+    expect(result.mode).toBe("online");
+    expect(api.cash.close).toHaveBeenCalledWith(
+      remoteId,
+      4800,
+      "43434343-4343-4343-8434-434343434343",
+    );
+    expect((await getLocalDb().cashSessions.get(localId))?.closingCount).toBe(4800);
+  });
+
+  it("D5: queues the close offline while its open is still unsynced", async () => {
+    api.cash.open.mockRejectedValue(new NetworkError("offline"));
+    const opened = await openCashWithOfflineFallback(5000, "44444444-4444-4444-8444-444444444444");
+    const localId = (opened as { mode: "offline"; id: string }).id;
+    api.cash.close.mockResolvedValue({
+      id: "45454545-4545-4454-8454-454545454545",
+      closedAt: 2000,
+      closingCount: 4800,
+      expectedEfectivo: 5000,
+      expectedNequi: 0,
+      difference: -200,
+    });
+
+    const result = await closeCashWithOfflineFallback(
+      localId,
+      4800,
+      "46464646-4646-4464-8464-464646464646",
+    );
+
+    expect(result.mode).toBe("offline");
+    expect(api.cash.close).not.toHaveBeenCalled();
+    const item = await getOutboxStore().get(
+      businessId,
+      (result as { mode: "offline"; id: string }).id,
+    );
+    expect(item?.dependsOn).toEqual([localId]);
+  });
+
   it("records offline aporte and retiro after an open cash session", async () => {
     api.cash.open.mockRejectedValue(new NetworkError("offline"));
     await openCashWithOfflineFallback(5000, "16161616-1616-4161-8161-161616161616");
