@@ -148,6 +148,47 @@ export class OutboxStore {
     });
   }
 
+  /**
+   * M6.9 — Manual retry. Moves a `failed` operation back to `pending`
+   * without minting a new intent: same operationId, same requestId,
+   * attempts untouched, nextAttemptAt cleared so the next flush picks it
+   * up. lastError is kept for display until the next attempt clears it.
+   */
+  async requeue(businessId: string, operationId: string): Promise<OutboxItem> {
+    assertUuid(businessId, "businessId");
+    assertUuid(operationId, "operationId");
+    const row = await this.db.outbox.get(operationId);
+    if (!row) throw new Error("outbox row not found");
+    if (row.businessId !== businessId) {
+      throw new Error("operationId belongs to another business");
+    }
+    if (row.status !== "failed") {
+      throw new Error(`only failed operations can be retried (status: ${row.status})`);
+    }
+    const next: OutboxItem = { ...row, status: "pending", nextAttemptAt: null };
+    await this.db.outbox.put(next);
+    return next;
+  }
+
+  /**
+   * M6.9 — Explicit discard. Removes a `pending`/`failed` operation, i.e.
+   * the local intent. It never reverts a server-side effect and the row is
+   * never sent again. Synced rows are history and cannot be discarded.
+   */
+  async discard(businessId: string, operationId: string): Promise<void> {
+    assertUuid(businessId, "businessId");
+    assertUuid(operationId, "operationId");
+    const row = await this.db.outbox.get(operationId);
+    if (!row) throw new Error("outbox row not found");
+    if (row.businessId !== businessId) {
+      throw new Error("operationId belongs to another business");
+    }
+    if (row.status !== "pending" && row.status !== "failed") {
+      throw new Error(`only pending/failed operations can be discarded (status: ${row.status})`);
+    }
+    await this.db.outbox.delete(operationId);
+  }
+
   private async patchStatus(
     businessId: string,
     operationId: string,
@@ -306,10 +347,14 @@ export class OutboxSyncEngine {
     let blocked = 0;
     let stopped = false;
     const now = this.clock();
+    // M6.9 — Permanent failures (failed + nextAttemptAt null) are excluded
+    // from automatic flushes. They only run again via manual retry, which
+    // moves them back to pending. Scheduled retries (nextAttemptAt set and
+    // due) keep flowing automatically.
     const rows = [
       ...(await this.outbox.listByStatus(businessId, "pending")),
       ...(await this.outbox.listByStatus(businessId, "failed")).filter(
-        (row) => row.nextAttemptAt == null || row.nextAttemptAt <= now,
+        (row) => row.nextAttemptAt != null && row.nextAttemptAt <= now,
       ),
     ]
       .filter((row) => !filter || filter(row))

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type SyncState = {
   open: boolean;
@@ -63,6 +64,7 @@ const CLOSED_SYNC_STATE: SyncState = {
 };
 
 export function SyncStatusOverlay() {
+  const router = useRouter();
   const [sync, setSync] = useState<SyncState>(CLOSED_SYNC_STATE);
   const [online, setOnline] = useState(true);
   const [errorToast, setErrorToast] = useState<string | null>(null);
@@ -220,6 +222,13 @@ export function SyncStatusOverlay() {
             {sync.failed > 0 ? (
               <div className="mt-4 rounded-2xl border border-danger/20 bg-danger/5 p-3 text-sm text-danger">
                 {sync.error ?? "Algunos datos no pudieron enviarse todavía."}
+                <button
+                  type="button"
+                  onClick={() => router.push("/sincronizacion")}
+                  className="mt-2 min-h-11 w-full rounded-[14px] bg-surface text-sm font-semibold text-ink"
+                >
+                  Revisar pendientes
+                </button>
               </div>
             ) : (
               <div className="mt-4 rounded-2xl border border-ink/10 bg-bg p-3 text-xs leading-relaxed text-ink/60">
