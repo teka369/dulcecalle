@@ -212,6 +212,11 @@ function retryAt(attempts: number, now: number): number {
   const delay = Math.min(5 * 60_000, 1_000 * 2 ** Math.max(0, attempts - 1));
   return now + delay;
 }
+\nfunction emitSyncEvent(detail: Record<string, unknown>): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("dulcecalle:sync", { detail }));
+}
+
 
 export class ConnectivityMonitor {
   private started = false;
@@ -314,6 +319,14 @@ export class OutboxSyncEngine {
       return a.operationId.localeCompare(b.operationId);
     });
 
+    if (rows.length > 0) {
+      emitSyncEvent({
+        type: "start",
+        businessId,
+        total: rows.length,
+      });
+    }
+
     let remaining = rows;
 
     while (remaining.length > 0 && !stopped) {
@@ -345,6 +358,15 @@ export class OutboxSyncEngine {
           assertUuid(result.remoteId, "remoteId");
           await this.outbox.markSynced(businessId, current.operationId, result.remoteId);
           synced += 1;
+          emitSyncEvent({
+            type: "item",
+            businessId,
+            entity: current.entity,
+            operation: current.operation,
+            status: "synced",
+            completed: synced,
+            total: rows.length,
+          });
         } catch (error) {
           const retryable = isRetryableError(error);
           const message = error instanceof Error ? error.message : "Error de sincronización.";
@@ -355,6 +377,16 @@ export class OutboxSyncEngine {
             retryable ? retryAt(flying.attempts, this.clock()) : null,
           );
           failed += 1;
+          emitSyncEvent({
+            type: "item",
+            businessId,
+            entity: current.entity,
+            operation: current.operation,
+            status: "failed",
+            completed: synced + failed,
+            total: rows.length,
+            message,
+          });
           if (retryable || (error instanceof ApiError && (error.status === 401 || error.status === 403))) {
             stopped = true;
             break;
@@ -369,7 +401,15 @@ export class OutboxSyncEngine {
       remaining = deferred;
     }
 
-    return { processed, synced, failed, blocked, stopped };
+    const result = { processed, synced, failed, blocked, stopped };
+    if (rows.length > 0) {
+      emitSyncEvent({
+        type: "done",
+        businessId,
+        result,
+      });
+    }
+    return result;
   }
 
   private async dependenciesReady(businessId: string, item: OutboxItem): Promise<boolean> {
