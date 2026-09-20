@@ -278,7 +278,7 @@ export class OutboxSyncEngine {
     const active = this.active.get(businessId);
     if (active) return active;
 
-    const task = this.flushInternal(businessId, sender);
+    const task = this.flushInternal(businessId, sender, filter);
     this.active.set(businessId, task);
     try {
       return await task;
@@ -290,6 +290,7 @@ export class OutboxSyncEngine {
   private async flushInternal(
     businessId: string,
     sender: OutboxSender,
+    filter?: (item: OutboxItem) => boolean,
   ): Promise<SyncFlushResult> {
     await this.outbox.recoverInFlight(businessId);
 
