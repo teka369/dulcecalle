@@ -104,7 +104,7 @@ export const customerStore = {
     amountRaw: string;
     method: PayMethod | null;
     requestId?: string;
-  }): Promise<string> {
+  }): Promise<{ id: string; mode: "online" | "offline" }> {
     const customer = await this.getCustomer(input.customerId);
     if (!customer) throw new Error("customer not found");
 
