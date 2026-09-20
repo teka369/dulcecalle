@@ -2,16 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type SyncState =
-  | {
-      open: true;
-      total: number;
-      completed: number;
-      current: string;
-      failed: number;
-      error: string | null;
-    }
-  | { open: false };
+type SyncState = {
+  open: boolean;
+  total: number;
+  completed: number;
+  current: string;
+  failed: number;
+  error: string | null;
+};
 
 type SyncEventDetail = {
   type: "start" | "item" | "done";
@@ -55,8 +53,17 @@ function friendlyError(value: unknown): string {
   return "Ocurrió un error inesperado. Revisa la conexión e inténtalo de nuevo.";
 }
 
+const CLOSED_SYNC_STATE: SyncState = {
+  open: false,
+  total: 0,
+  completed: 0,
+  current: "",
+  failed: 0,
+  error: null,
+};
+
 export function SyncStatusOverlay() {
-  const [sync, setSync] = useState<SyncState>({ open: false });
+  const [sync, setSync] = useState<SyncState>(CLOSED_SYNC_STATE);
   const [online, setOnline] = useState(true);
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
@@ -85,6 +92,7 @@ export function SyncStatusOverlay() {
       if (detail.type === "item") {
         const failed = detail.status === "failed";
         setSync((previous) => ({
+          ...previous,
           open: true,
           total: detail.total ?? previous.total,
           completed: detail.completed ?? previous.completed,
@@ -92,7 +100,9 @@ export function SyncStatusOverlay() {
             ? "Hubo un problema con un dato"
             : operationLabel(detail.entity, detail.operation),
           failed: previous.failed + (failed ? 1 : 0),
-          error: failed ? detail.message ?? "No se pudo enviar este dato." : previous.error,
+          error: failed
+            ? detail.message ?? "No se pudo enviar este dato."
+            : previous.error,
         }));
         if (failed) {
           setErrorToast(detail.message ?? "No se pudo sincronizar un dato.");
@@ -112,14 +122,17 @@ export function SyncStatusOverlay() {
               ? "La sincronización terminó con algunos problemas"
               : "¡Todo quedó guardado en la base de datos!",
           failed,
-          error: failed > 0 ? previous.error ?? "Hay datos pendientes por enviar." : null,
+          error:
+            failed > 0
+              ? previous.error ?? "Hay datos pendientes por enviar."
+              : null,
         }));
 
         window.setTimeout(() => {
-          setSync((previous) => {
-            if (!previous.open) return previous;
-            return { open: false };
-          });
+          setSync((previous) => ({
+            ...previous,
+            open: false,
+          }));
         }, failed > 0 ? 2200 : 1200);
       }
     };
