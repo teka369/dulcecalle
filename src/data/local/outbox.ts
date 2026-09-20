@@ -89,6 +89,15 @@ export class OutboxStore {
     return rows.length;
   }
 
+  async recoverInFlight(businessId: string): Promise<number> {
+    assertUuid(businessId, "businessId");
+    const rows = await this.listByStatus(businessId, "in_flight");
+    for (const row of rows) {
+      await this.db.outbox.put({ ...row, status: "pending", nextAttemptAt: null });
+    }
+    return rows.length;
+  }
+
   async getByRequestId(
     businessId: string,
     requestId: string,
@@ -117,17 +126,17 @@ export class OutboxStore {
     return sortFifo(rows);
   }
 
-  async markInFlight(operationId: string): Promise<OutboxItem> {
-    return this.patchStatus(operationId, {
+  async markInFlight(businessId: string, operationId: string): Promise<OutboxItem> {
+    return this.patchStatus(businessId, operationId, {
       status: "in_flight",
       attemptsDelta: 1,
       lastError: null,
     });
   }
 
-  async markSynced(operationId: string, remoteId: string): Promise<OutboxItem> {
+  async markSynced(businessId: string, operationId: string, remoteId: string): Promise<OutboxItem> {
     assertUuid(remoteId, "remoteId");
-    return this.patchStatus(operationId, {
+    return this.patchStatus(businessId, operationId, {
       status: "synced",
       remoteId,
       lastError: null,
@@ -136,11 +145,12 @@ export class OutboxStore {
   }
 
   async markFailed(
+    businessId: string,
     operationId: string,
     lastError: string,
     nextAttemptAt?: number | null,
   ): Promise<OutboxItem> {
-    return this.patchStatus(operationId, {
+    return this.patchStatus(businessId, operationId, {
       status: "failed",
       lastError,
       nextAttemptAt: nextAttemptAt ?? null,
@@ -148,6 +158,7 @@ export class OutboxStore {
   }
 
   private async patchStatus(
+    businessId: string,
     operationId: string,
     patch: {
       status: OutboxStatus;
@@ -157,9 +168,13 @@ export class OutboxStore {
       attemptsDelta?: number;
     },
   ): Promise<OutboxItem> {
+    assertUuid(businessId, "businessId");
     assertUuid(operationId, "operationId");
     const row = await this.db.outbox.get(operationId);
     if (!row) throw new Error("outbox row not found");
+    if (row.businessId !== businessId) {
+      throw new Error("operationId belongs to another business");
+    }
     const next: OutboxItem = {
       ...row,
       status: patch.status,
@@ -174,7 +189,178 @@ export class OutboxStore {
   }
 }
 
+export type OutboxSendResult = { remoteId: string };
+export type OutboxSender = (item: OutboxItem) => Promise<OutboxSendResult>;
+
+export type SyncFlushResult = {
+  processed: number;
+  synced: number;
+  failed: number;
+  blocked: number;
+  stopped: boolean;
+};
+
+function isRetryableError(error: unknown): boolean {
+  if (error instanceof NetworkError) return true;
+  if (error instanceof ApiError) {
+    return error.status === 408 || error.status === 429 || error.status >= 500;
+  }
+  return true;
+}
+
+function retryAt(attempts: number, now: number): number {
+  const delay = Math.min(5 * 60_000, 1_000 * 2 ** Math.max(0, attempts - 1));
+  return now + delay;
+}
+
+export class ConnectivityMonitor {
+  private started = false;
+  private readonly listeners = new Set<(online: boolean) => void>();
+  private _online = this.readOnline();
+
+  get online(): boolean {
+    return this._online;
+  }
+
+  subscribe(listener: (online: boolean) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  start(): void {
+    if (this.started || typeof window === "undefined") return;
+    this.started = true;
+    window.addEventListener("online", this.handleOnline);
+    window.addEventListener("offline", this.handleOffline);
+  }
+
+  stop(): void {
+    if (!this.started || typeof window === "undefined") return;
+    window.removeEventListener("online", this.handleOnline);
+    window.removeEventListener("offline", this.handleOffline);
+    this.started = false;
+  }
+
+  refresh(): boolean {
+    const next = this.readOnline();
+    this.setOnline(next);
+    return next;
+  }
+
+  private readonly handleOnline = (): void => this.setOnline(true);
+  private readonly handleOffline = (): void => this.setOnline(false);
+
+  private readOnline(): boolean {
+    return typeof navigator === "undefined" ? true : navigator.onLine;
+  }
+
+  private setOnline(next: boolean): void {
+    if (this._online === next) return;
+    this._online = next;
+    for (const listener of this.listeners) listener(next);
+  }
+}
+
+export class OutboxSyncEngine {
+  constructor(
+    private readonly outbox: OutboxStore = getOutboxStore(),
+    private readonly clock: () => number = Date.now,
+  ) {}
+
+  async flush(
+    businessId: string,
+    sender: OutboxSender,
+  ): Promise<SyncFlushResult> {
+    assertUuid(businessId, "businessId");
+    await this.outbox.recoverInFlight(businessId);
+
+    let processed = 0;
+    let synced = 0;
+    let failed = 0;
+    let blocked = 0;
+    let stopped = false;
+    const now = this.clock();
+    const rows = [
+      ...(await this.outbox.listByStatus(businessId, "pending")),
+      ...(await this.outbox.listByStatus(businessId, "failed")).filter(
+        (row) => row.nextAttemptAt == null || row.nextAttemptAt <= now,
+      ),
+    ].sort((a, b) => {
+      if (a.localCreatedAt !== b.localCreatedAt) {
+        return a.localCreatedAt - b.localCreatedAt;
+      }
+      return a.operationId.localeCompare(b.operationId);
+    });
+
+    for (const candidate of rows) {
+      const current = await this.outbox.get(businessId, candidate.operationId);
+      if (!current || (current.status !== "pending" && current.status !== "failed")) continue;
+
+      if (current.status === "failed" && current.nextAttemptAt != null && current.nextAttemptAt > this.clock()) {
+        continue;
+      }
+
+      if (!(await this.dependenciesReady(businessId, current))) {
+        blocked += 1;
+        continue;
+      }
+
+      processed += 1;
+      const flying = await this.outbox.markInFlight(businessId, current.operationId);
+      try {
+        const result = await sender(flying);
+        assertUuid(result.remoteId, "remoteId");
+        await this.outbox.markSynced(businessId, current.operationId, result.remoteId);
+        synced += 1;
+      } catch (error) {
+        const retryable = isRetryableError(error);
+        const message = error instanceof Error ? error.message : "Error de sincronización.";
+        await this.outbox.markFailed(
+          businessId,
+          current.operationId,
+          message,
+          retryable ? retryAt(flying.attempts, this.clock()) : null,
+        );
+        failed += 1;
+        if (retryable || (error instanceof ApiError && (error.status === 401 || error.status === 403))) {
+          stopped = true;
+          break;
+        }
+      }
+    }
+
+    return { processed, synced, failed, blocked, stopped };
+  }
+
+  private async dependenciesReady(businessId: string, item: OutboxItem): Promise<boolean> {
+    for (const dependencyId of item.dependsOn) {
+      const dependency = await this.outbox.get(businessId, dependencyId);
+      if (!dependency || dependency.status !== "synced") return false;
+    }
+    return true;
+  }
+}
+
 let outboxSingleton: OutboxStore | null = null;
+let syncEngineSingleton: OutboxSyncEngine | null = null;
+
+export function getOutboxStore(): OutboxStore {
+  if (!outboxSingleton) outboxSingleton = new OutboxStore();
+  return outboxSingleton;
+}
+
+export function resetOutboxStoreSingleton(): void {
+  outboxSingleton = null;
+}
+
+export function getOutboxSyncEngine(): OutboxSyncEngine {
+  if (!syncEngineSingleton) syncEngineSingleton = new OutboxSyncEngine();
+  return syncEngineSingleton;
+}
+
+export function resetOutboxSyncEngineSingleton(): void {
+  syncEngineSingleton = null;
+}
 
 export function getOutboxStore(): OutboxStore {
   if (!outboxSingleton) outboxSingleton = new OutboxStore();
