@@ -4,12 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCop, mulCop, addCop, subCop } from "@/domain/money";
-import type { Customer, PaymentKind, Product } from "@/domain/types";
-import {
-  customerRepository,
-  productRepository,
-  saleRepository,
-} from "@/repositories";
+import type { PaymentKind } from "@/domain/types";
+import type { RemoteCustomer, RemoteProduct } from "@/data/http/mappers";
+import { getPwaApi } from "@/data/pwa/api";
 import { useCart } from "@/store/cartStore";
 
 export default function CobrarPage() {
@@ -26,8 +23,8 @@ export default function CobrarPage() {
     setMethod,
     clear,
   } = useCart();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<RemoteProduct[]>([]);
+  const [customers, setCustomers] = useState<RemoteCustomer[]>([]);
   const [abonoInput, setAbonoInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -35,8 +32,9 @@ export default function CobrarPage() {
   const requestIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    void productRepository.list().then(setProducts);
-    void customerRepository.list().then(setCustomers);
+    const api = getPwaApi();
+    void api.products.list().then(setProducts).catch(() => setProducts([]));
+    void api.customers.list().then(setCustomers).catch(() => setCustomers([]));
   }, []);
 
   useEffect(() => {
@@ -52,7 +50,7 @@ export default function CobrarPage() {
         if (!p) return null;
         const unitPrice = item.unitPrice ?? p.price;
         return {
-          productId: p.id!,
+          productId: p.id,
           name: p.name,
           qty: item.qty,
           unitPrice,
@@ -61,7 +59,7 @@ export default function CobrarPage() {
         };
       })
       .filter(Boolean) as Array<{
-      productId: number;
+      productId: string;
       name: string;
       qty: number;
       unitPrice: number;
@@ -114,25 +112,24 @@ export default function CobrarPage() {
             : 0;
 
       if (!requestIdRef.current) {
-        requestIdRef.current =
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `sale-${Date.now()}`;
+        requestIdRef.current = crypto.randomUUID();
       }
 
-      await saleRepository.createSale({
-        lines: lines.map((l) => ({
-          productId: l.productId,
-          qty: l.qty,
-          unitPrice: l.unitPrice,
-        })),
-        paymentKind,
-        customerId:
-          paymentKind === "paid" ? null : (customerId as number),
-        amountReceived: received,
-        method: paymentKind === "credit" ? "Efectivo" : method,
-        requestId: requestIdRef.current,
-      });
+      await getPwaApi().sales.create(
+        {
+          lines: lines.map((l) => ({
+            productId: l.productId,
+            qty: l.qty,
+            unitPrice: l.unitPrice,
+          })),
+          paymentKind,
+          customerId:
+            paymentKind === "paid" ? undefined : (customerId ?? undefined),
+          amountReceived: received,
+          method: received > 0 ? method : undefined,
+        },
+        requestIdRef.current,
+      );
 
       clear();
       setToast("Venta registrada");
@@ -354,9 +351,9 @@ function CustomerPicker({
   customerId,
   onChange,
 }: {
-  customers: Customer[];
-  customerId: number | null;
-  onChange: (id: number | null) => void;
+  customers: RemoteCustomer[];
+  customerId: string | null;
+  onChange: (id: string | null) => void;
 }) {
   return (
     <div className="mt-3">
@@ -367,9 +364,7 @@ function CustomerPicker({
         id="cliente"
         className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base"
         value={customerId ?? ""}
-        onChange={(e) =>
-          onChange(e.target.value ? Number(e.target.value) : null)
-        }
+        onChange={(e) => onChange(e.target.value ? e.target.value : null)}
       >
         <option value="">Selecciona cliente</option>
         {customers.map((c) => (

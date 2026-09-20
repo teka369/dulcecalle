@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { apiBaseUrl, getDataBackend, pwaStorage } from "./backend";
 
 describe("data backend selection", () => {
-  it("defaults to dexie and never auto-enables HTTP for the PWA", () => {
-    expect(getDataBackend()).toBe("dexie");
-    expect(pwaStorage()).toBe("dexie");
-    expect(apiBaseUrl()).toBeUndefined();
+  it("PWA talks HTTP on /v1 by default (M3)", () => {
+    expect(getDataBackend()).toBe("http");
+    expect(pwaStorage()).toBe("http");
+    expect(apiBaseUrl()).toBe("/v1");
   });
 });

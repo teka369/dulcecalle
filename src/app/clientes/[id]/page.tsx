@@ -5,24 +5,25 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { DebtStatementView } from "@/components/customers/DebtStatementView";
 import type { DebtStatement } from "@/domain/debt/statement";
-import type { Customer } from "@/domain/types";
+import type { RemoteCustomer } from "@/data/http/mappers";
+import { routeId } from "@/data/pwa/ids";
 import { customerStore } from "@/store/customerStore";
 
 export default function ClienteFichaPage() {
   const params = useParams();
-  const id = Number(params.id);
-  const [customer, setCustomer] = useState<Customer | null>(null);
+  const id = routeId(params.id);
+  const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [statement, setStatement] = useState<DebtStatement | null>(null);
   const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) {
+    if (!id) {
       setReady(true);
       return;
     }
     const c = await customerStore.getCustomer(id);
     setCustomer(c ?? null);
-    if (c?.id != null) {
+    if (c) {
       setStatement(await customerStore.getStatement(c.id));
     }
     setReady(true);

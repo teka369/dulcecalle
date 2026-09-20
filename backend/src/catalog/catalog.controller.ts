@@ -39,6 +39,14 @@ export class CatalogController {
     return this.catalog.getProduct(ctx, id);
   }
 
+  @Get("products/:id/moves")
+  listProductMoves(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+  ) {
+    return this.catalog.listProductMoves(ctx, id);
+  }
+
   @Post("products")
   createProduct(
     @CurrentBusiness() ctx: BusinessContext,
@@ -112,6 +120,14 @@ export class CatalogController {
     return this.catalog.getCustomer(ctx, id);
   }
 
+  @Get("customers/:id/ledger")
+  customerLedger(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+  ) {
+    return this.catalog.customerLedger(ctx, id);
+  }
+
   @Post("customers")
   createCustomer(
     @CurrentBusiness() ctx: BusinessContext,
@@ -153,6 +169,14 @@ export class CatalogController {
   @Get("suppliers/:id")
   getSupplier(@CurrentBusiness() ctx: BusinessContext, @Param("id") id: string) {
     return this.catalog.getSupplier(ctx, id);
+  }
+
+  @Get("suppliers/:id/surtidas")
+  supplierSurtidas(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+  ) {
+    return this.catalog.listSupplierSurtidas(ctx, id);
   }
 
   @Post("suppliers")

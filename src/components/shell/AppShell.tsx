@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { BottomNav } from "./BottomNav";
 import { Fab } from "./Fab";
+import { AuthGate } from "./AuthGate";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -26,6 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col overflow-x-hidden bg-bg text-ink">
+      <AuthGate>
       <main className={`flex-1 px-4 ${hideChrome ? "pb-6 pt-4" : "pb-28 pt-4"}`}>
         {children}
       </main>
@@ -35,6 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BottomNav />
         </>
       )}
+      </AuthGate>
     </div>
   );
 }

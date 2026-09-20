@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import type { Expense, PayMethod } from "@/domain/types";
+import type { PayMethod } from "@/domain/types";
 import {
   CASH_COPY,
   CASH_ERRORS,
@@ -11,16 +11,37 @@ import {
   validateGasto,
   validateOpeningFloat,
 } from "@/domain/cash";
-import {
-  cashRepository,
-  type DayCashSummary as RepoSummary,
-} from "@/repositories/cashRepository";
+import { ApiError } from "@/data/errors";
+import { getPwaApi } from "@/data/pwa/api";
+import type { RemoteExpense, RemoteToday } from "@/data/http/mappers";
+import { addCop } from "@/domain/money";
 
-export type { DayCashSummary } from "@/repositories/cashRepository";
+export type DayCashSummary = RemoteToday & {
+  counted: number | null;
+  difference: number | null;
+  entradas: number;
+  salidas: number;
+};
+
+function toSummary(today: RemoteToday): DayCashSummary {
+  let entradas = 0;
+  let salidas = 0;
+  for (const m of today.moves) {
+    if (m.direction === "in") entradas = addCop(entradas, m.amount);
+    else salidas = addCop(salidas, m.amount);
+  }
+  return {
+    ...today,
+    counted: today.session?.closingCount ?? null,
+    difference: today.session?.difference ?? null,
+    entradas,
+    salidas,
+  };
+}
 
 type CashState = {
-  summary: RepoSummary | null;
-  expenses: Expense[];
+  summary: DayCashSummary | null;
+  expenses: RemoteExpense[];
   loading: boolean;
   lastToast: string | null;
 };
@@ -43,6 +64,12 @@ function setState(patch: Partial<CashState>) {
   emit();
 }
 
+function fail(e: unknown): never {
+  if (e instanceof ApiError) throw new Error(e.message);
+  if (e instanceof Error) throw e;
+  throw new Error("Algo salió mal.");
+}
+
 export const cashStore = {
   subscribe(listener: () => void) {
     listeners.add(listener);
@@ -53,22 +80,33 @@ export const cashStore = {
   getSnapshot(): CashState {
     return state;
   },
-  async refresh(): Promise<RepoSummary> {
+  async refresh(): Promise<DayCashSummary> {
     setState({ loading: true });
-    const [summary, expenses] = await Promise.all([
-      cashRepository.daySummary(),
-      cashRepository.listExpenses(),
-    ]);
-    setState({ summary, expenses, loading: false });
-    return summary;
+    try {
+      const api = getPwaApi();
+      const [today, expenses] = await Promise.all([
+        api.cash.today(),
+        api.cash.expenses(),
+      ]);
+      const summary = toSummary(today);
+      setState({ summary, expenses, loading: false });
+      return summary;
+    } catch (e) {
+      setState({ loading: false });
+      fail(e);
+    }
   },
   async openCaja(openingRaw: string): Promise<void> {
     const err = validateOpeningFloat(openingRaw);
     if (err) throw new Error(err);
     const amount = openingRaw.trim() === "" ? 0 : parseCopAmount(openingRaw)!;
-    await cashRepository.openSession(amount);
-    setState({ lastToast: CASH_COPY.toastCajaAbierta });
-    await this.refresh();
+    try {
+      await getPwaApi().cash.open(amount);
+      setState({ lastToast: CASH_COPY.toastCajaAbierta });
+      await this.refresh();
+    } catch (e) {
+      fail(e);
+    }
   },
   async recordGasto(input: {
     amountRaw: string;
@@ -83,18 +121,23 @@ export const cashStore = {
       method: input.method,
     });
     if (err) throw new Error(err);
-    const summary = await cashRepository.daySummary();
+    const summary = await this.refresh();
     if (summary.closed) throw new Error(CASH_ERRORS.dayClosed);
-    if (!summary.session) throw new Error(CASH_ERRORS.noOpenSession);
-    await cashRepository.recordExpense({
-      amount: parseCopAmount(input.amountRaw)!,
-      category: input.categoryRaw.trim(),
-      method: input.method!,
-      note: input.note?.trim() || undefined,
-      requestId: input.requestId,
-    });
-    setState({ lastToast: CASH_COPY.toastGasto });
-    await this.refresh();
+    try {
+      await getPwaApi().cash.recordExpense(
+        {
+          amount: parseCopAmount(input.amountRaw)!,
+          category: input.categoryRaw.trim(),
+          method: input.method!,
+          note: input.note?.trim() || undefined,
+        },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      setState({ lastToast: CASH_COPY.toastGasto });
+      await this.refresh();
+    } catch (e) {
+      fail(e);
+    }
   },
   async recordRetiro(input: {
     amountRaw: string;
@@ -107,17 +150,22 @@ export const cashStore = {
       method: input.method,
     });
     if (err) throw new Error(err);
-    const summary = await cashRepository.daySummary();
+    const summary = await this.refresh();
     if (summary.closed) throw new Error(CASH_ERRORS.dayClosed);
-    if (!summary.session) throw new Error(CASH_ERRORS.noOpenSession);
-    await cashRepository.ownerRetiro(
-      parseCopAmount(input.amountRaw)!,
-      input.method!,
-      input.note?.trim() || undefined,
-      input.requestId,
-    );
-    setState({ lastToast: CASH_COPY.toastRetiro });
-    await this.refresh();
+    try {
+      await getPwaApi().cash.retiro(
+        {
+          amount: parseCopAmount(input.amountRaw)!,
+          method: input.method!,
+          note: input.note?.trim() || undefined,
+        },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      setState({ lastToast: CASH_COPY.toastRetiro });
+      await this.refresh();
+    } catch (e) {
+      fail(e);
+    }
   },
   async recordAporte(input: {
     amountRaw: string;
@@ -130,32 +178,39 @@ export const cashStore = {
       method: input.method,
     });
     if (err) throw new Error(err);
-    const summary = await cashRepository.daySummary();
+    const summary = await this.refresh();
     if (summary.closed) throw new Error(CASH_ERRORS.dayClosed);
-    if (!summary.session) throw new Error(CASH_ERRORS.noOpenSession);
-    await cashRepository.ownerAporte(
-      parseCopAmount(input.amountRaw)!,
-      input.method!,
-      input.note?.trim() || undefined,
-      input.requestId,
-    );
-    setState({ lastToast: CASH_COPY.toastAporte });
-    await this.refresh();
+    try {
+      await getPwaApi().cash.aporte(
+        {
+          amount: parseCopAmount(input.amountRaw)!,
+          method: input.method!,
+          note: input.note?.trim() || undefined,
+        },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      setState({ lastToast: CASH_COPY.toastAporte });
+      await this.refresh();
+    } catch (e) {
+      fail(e);
+    }
   },
   async closeCaja(countedRaw: string): Promise<void> {
     const err = validateCounted(countedRaw);
     if (err) throw new Error(err);
-    const summary = await cashRepository.daySummary();
-    if (!summary.session || summary.session.id == null) {
-      throw new Error(CASH_ERRORS.noOpenSession);
-    }
+    const summary = await this.refresh();
+    if (!summary.session) throw new Error(CASH_ERRORS.noOpenSession);
     if (summary.closed) throw new Error(CASH_ERRORS.sessionAlreadyClosed);
-    await cashRepository.closeSession(
-      summary.session.id,
-      parseCopAmount(countedRaw)!,
-    );
-    setState({ lastToast: CASH_COPY.toastCajaCerrada });
-    await this.refresh();
+    try {
+      await getPwaApi().cash.close(
+        summary.session.id,
+        parseCopAmount(countedRaw)!,
+      );
+      setState({ lastToast: CASH_COPY.toastCajaCerrada });
+      await this.refresh();
+    } catch (e) {
+      fail(e);
+    }
   },
   clearToast() {
     setState({ lastToast: null });

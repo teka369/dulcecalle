@@ -7,8 +7,7 @@ import {
   InicioSkeleton,
 } from "@/components/dashboard/InicioDashboard";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
-import { loadDashboard } from "@/repositories";
-import { loadDemoData } from "@/storage/seed";
+import { loadHttpDashboard } from "@/data/pwa/dashboard";
 
 export default function InicioPage() {
   const pathname = usePathname();
@@ -16,11 +15,13 @@ export default function InicioPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setSnap(await loadDashboard());
+    setSnap(await loadHttpDashboard());
   }, []);
 
   useEffect(() => {
-    void refresh();
+    void refresh().catch((e: unknown) => {
+      setToast(e instanceof Error ? e.message : "No se pudo cargar el inicio");
+    });
   }, [refresh, pathname]);
 
   useEffect(() => {
@@ -31,18 +32,9 @@ export default function InicioPage() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [refresh]);
 
-  async function onLoadDemo() {
-    await loadDemoData();
-    setToast("Demo cargada");
-    await refresh();
-    setTimeout(() => setToast(null), 2000);
-  }
-
   if (!snap) {
     return <InicioSkeleton />;
   }
 
-  return (
-    <InicioDashboard snap={snap} onLoadDemo={() => void onLoadDemo()} toast={toast} />
-  );
+  return <InicioDashboard snap={snap} toast={toast} />;
 }

@@ -4,16 +4,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { STATS_COPY, type StatsPeriod } from "@/domain/stats";
-import {
-  loadStats,
-  type StatsSnapshot,
-} from "@/repositories/statsRepository";
+import type { RemoteStats } from "@/data/http/mappers";
+import { getPwaApi } from "@/data/pwa/api";
 
 const PERIODS: StatsPeriod[] = ["hoy", "semana", "mes"];
 
 export default function EstadisticasPage() {
   const [period, setPeriod] = useState<StatsPeriod>("hoy");
-  const [stats, setStats] = useState<StatsSnapshot | null>(null);
+  const [stats, setStats] = useState<RemoteStats | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -21,7 +19,7 @@ export default function EstadisticasPage() {
     setLoading(true);
     setError(false);
     try {
-      const snap = await loadStats(p);
+      const snap = await getPwaApi().stats.get(p);
       setStats(snap);
     } catch {
       setError(true);

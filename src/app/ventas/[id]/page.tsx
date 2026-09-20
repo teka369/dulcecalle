@@ -4,34 +4,31 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
-import type { Sale, SaleReturn } from "@/domain/types";
-import { saleRepository } from "@/repositories";
+import { routeId } from "@/data/pwa/ids";
+import {
+  getHttpReturnable,
+  type HttpReturnable,
+} from "@/data/pwa/sales";
 
-const kindLabel: Record<Sale["paymentKind"], string> = {
+const kindLabel: Record<string, string> = {
   paid: "Pagada",
   partial: "Parcial",
   credit: "Fiada",
 };
 
-type Returnable = NonNullable<
-  Awaited<ReturnType<typeof saleRepository.getReturnable>>
->;
-
 export default function VentaDetallePage() {
   const params = useParams();
-  const id = Number(params.id);
-  const [data, setData] = useState<Returnable | null>(null);
-  const [returns, setReturns] = useState<SaleReturn[]>([]);
+  const id = routeId(params.id);
+  const [data, setData] = useState<HttpReturnable | null>(null);
   const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) {
+    if (!id) {
       setReady(true);
       return;
     }
-    const row = await saleRepository.getReturnable(id);
-    setData(row ?? null);
-    if (row) setReturns(await saleRepository.listReturns(id));
+    const row = await getHttpReturnable(id);
+    setData(row);
     setReady(true);
   }, [id]);
 
@@ -54,7 +51,7 @@ export default function VentaDetallePage() {
     );
   }
 
-  const { sale, lines, remainingValue } = data;
+  const { sale, lines, remainingValue, returns } = data;
   const canReturn = remainingValue > 0;
 
   return (
@@ -69,7 +66,9 @@ export default function VentaDetallePage() {
         </Link>
         <div>
           <h1 className="text-[22px] font-semibold">Venta</h1>
-          <p className="text-sm text-ink/60">{kindLabel[sale.paymentKind]}</p>
+          <p className="text-sm text-ink/60">
+            {kindLabel[sale.paymentKind] ?? sale.paymentKind}
+          </p>
         </div>
       </header>
 

@@ -1,35 +1,33 @@
 # DulceCalle
 
-PWA de ventas para dulcería de barrio (Next.js App Router + Dexie).
+PWA de ventas para dulcería de barrio (Next.js App Router + NestJS).
 
 ## Stack
 
 - Next.js (App Router) + TypeScript + Tailwind
-- Dexie (IndexedDB) — **fuente de verdad**; datos **no** van al Cache API / Cache Storage
-- Capas: UI → store → repository → storage
+- NestJS 11 + Prisma 6 + PostgreSQL 16 — **fuente de verdad del negocio**
+- Dexie repositories — **solo tests de dominio** (IDs numéricos). La UI no los usa.
+- Capas UI: pages → store → `HttpRepository` → `/v1`
 
-Offline-first. Sin backend ni sincronización entre dispositivos (aún).
+Hay que entrar con cuenta. El servidor arranca vacío: productos, clientes y fiados se cargan a mano. Un fiado viejo es **deuda anterior**, nunca una venta.
 
-El dominio congelado (entidades, matriz financiera, qué nunca se puede romper) está en [DOMAIN.md](DOMAIN.md). Un backend futuro debe implementar ese contrato, no inventar otro.
+El dominio congelado está en [DOMAIN.md](DOMAIN.md). Servidor: [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [API_CONTRACT.md](API_CONTRACT.md) · [MIGRATION.md](MIGRATION.md) · [IDENTITY.md](IDENTITY.md).
 
-Especificación del servidor (aún no conectado al PWA): [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [API_CONTRACT.md](API_CONTRACT.md) · [MIGRATION.md](MIGRATION.md) · [IDENTITY.md](IDENTITY.md) (Fase 6.7, Dexie `++id` ↔ UUID).
+M3: la PWA habla HTTP (UUID). No hay dual-write, sync ni import Dexie→PG. `pwaStorage()` es `"http"`. `NEXT_PUBLIC_API_URL` opcional; si falta, el cliente usa `/v1` (el PWA reescribe a Nest).
 
-El API Nest (Fase 6, ventas + caja) vive en [`backend/`](backend/README.md). El PWA **sigue** en Dexie por defecto. El HTTP adapter (`src/data/http`) está preparado y testeado contra `/v1`; no se activa en producción y no hay dual-write ni migración de datos reales. El importador Dexie→Postgres (`backend/migration`) es **dry-run TEST** solamente. El preflight de datos reales (Fase 6.9) está en [PREFLIGHT.md](PREFLIGHT.md): hace falta un export del teléfono; no se ha migrado nada.
-
-`NEXT_PUBLIC_API_URL` es la URL pública del API para una fase posterior. No pongas secrets en `NEXT_PUBLIC_*`. `NEXT_PUBLIC_DATA_BACKEND=http` **no** cambia la UI (IDs Dexie int ≠ UUID del servidor).
+No pongas secrets en `NEXT_PUBLIC_*`.
 
 ## Arquitectura
 
 ```
 UI (App Router pages)
   → store (cart / cash / customer / inventory)
-    → repository (ventas, caja, clientes, inventario, stats)
-      → Dexie / IndexedDB          ← ACTIVO / DEFAULT
-      → HTTP adapter (src/data/http) ← preparado, apagado
-           → NestJS /v1
+    → HttpRepository (src/data/http)     ← ACTIVO
+         → NestJS /v1 → Prisma → PostgreSQL
+Dexie repositories (src/repositories)    ← tests de dominio
 ```
 
-La lógica de negocio vive en repositories + `src/domain`. Los componentes no escriben IndexedDB directo.
+La lógica de negocio de la UI vive en stores + `src/domain`. Los componentes no escriben IndexedDB.
 
 ## Domain rules (separación dura)
 
@@ -149,7 +147,7 @@ Pantalla **Más → Estadísticas**. Períodos: Hoy · Semana (últimos 7 días)
 | **Inventario** | `sum(stock × avgCost)` + stock bajo (punto actual) | Efectivo en caja |
 | **Ganancia aprox** | `sum(lineTotal − qty×unitCost)` del período (snapshots) | Cierre de caja |
 
-**No** se muestran Esperado/Contado/Diferencia en Stats — solo enlace **Ir a Caja**. Lecturas 100% Dexie (offline).
+**No** se muestran Esperado/Contado/Diferencia en Stats — solo enlace **Ir a Caja**. Lecturas vía `GET /v1/stats`.
 
 ## Scripts
 
@@ -161,12 +159,12 @@ npm run build
 
 ## Offline / PWA
 
-Serwist precachea el *shell* (HTML/CSS/JS, `/offline`, icons, manifest). **Dexie (IndexedDB) es la fuente de verdad** de ventas, clientes, stock y caja: esos datos **nunca** van a Cache Storage. El seed demo también vive en Dexie, no en el service worker.
+Serwist precachea el *shell* (HTML/CSS/JS, `/offline`, icons, manifest). El negocio vive en PostgreSQL vía Nest. IndexedDB ya no es la fuente de verdad de la UI. El service worker no guarda ventas.
 
 ## Limitaciones conocidas (P1 / P2)
 
 - **Motivos de inventario (P1):** existe `adjust` en el tipo, pero la UI usa `me_lo_comi` / `regalar` / `perdido`.
-- **Backend / sync (P2):** un solo dispositivo. No hay PostgreSQL, cuentas ni sincronización.
+- **Backend / sync (P2):** un dispositivo con cuenta. No hay sync entre teléfonos ni import Dexie→PG.
 
 ### Devoluciones
 
@@ -206,7 +204,7 @@ Stock inicial > 0 exige costo > 0, salvo que marques que te lo regalaron (costo 
 
 ### Integridad de mutaciones
 
-Las páginas no escriben Dexie. Caminos de negocio:
+Las páginas no escriben Dexie. Caminos de negocio (servidor):
 
 | Qué | Quién escribe | Guarda |
 |-----|----------------|--------|

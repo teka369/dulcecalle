@@ -1,6 +1,6 @@
 # DulceCalle — API contract
 
-Conceptual REST `/v1`. Business domain implemented through M1 except stats, settings, memberships admin, wipe, import, and PWA/sync.
+Conceptual REST `/v1`. Business domain implemented through M3: catalog, sales, cash, stats reads, and PWA HTTP (UUID). Settings, memberships admin, wipe, import, and sync remain later.
 Auth (M2): register, login, refresh, logout. JWT is stateless.
 Auth: Bearer. `businessId` comes from membership, not from the body.
 
@@ -74,6 +74,7 @@ Selector: header `X-Business-Id` must be a membership of the user. Do not send i
 |--------|------|------------|-------|
 | GET | `/v1/products` | | |
 | GET | `/v1/products/:id` | | |
+| GET | `/v1/products/:id/moves` | | stock history |
 | POST | `/v1/products` | requestId | create; may include opening stock |
 
 **CreateProductDto** (client may send):
@@ -89,9 +90,10 @@ No PATCH stock. PATCH name/price/lowStockAt only.
 
 ### Customers
 POST name, phone?. Debt starts at 0. Initial debt is a **separate** POST.
+`GET /v1/customers/:id/ledger` → customer + initials + sales (with lines/returns) + payments.
 
 ### Suppliers
-name, phone?, notes?. No CxP.
+name, phone?, notes?. No CxP. `GET /v1/suppliers/:id/surtidas` → surtir history.
 
 ---
 
@@ -134,7 +136,7 @@ Dto: amount, method, requestId. Server: **reject** if amount > current debt (`AB
 `GET /v1/cash/today` → session + expected buckets (Efectivo vs Nequi).
 
 ### Cash moves (read)
-`GET /v1/cash/moves?date=`
+`GET /v1/cash/moves?date=` or `?from&to` (`occurred_on`).
 
 ### Aporte / retiro (when cash module expands)
 `POST /v1/cash/aportes` `{ amount, method, requestId }`  
@@ -175,15 +177,17 @@ The $45.200 live debts (dump `544b330b-…`, owner-confirmed) are rows here afte
 `POST /v1/expenses` `{ amount, category, method, note?, requestId }`  
 Txn: expense + cash_move kind=expense.
 
+`GET /v1/expenses?from&to`
+
 ---
 
-## 9. Stats
+## 9. Stats (M3)
 
-**Not in M1.** `GET /v1/stats?period=hoy|semana|mes`  
-Computed in **business timezone**. Formulas = DOMAIN.md §16.  
+`GET /v1/stats?period=hoy|semana|mes`  
+Computed in **business timezone** on `occurred_on`. Formulas = DOMAIN.md §16.  
 Ventas brutas; Devoluciones separate; Ganancia = sale margins − return margins; Por cobrar = Σ debt now (includes initial debts); Gasté = expenses; Invertí = cash_moves compra; Recibido does not subtract refunds.
 
-No extra BI.
+No extra BI. The PWA stats page reads this endpoint.
 
 ---
 

@@ -15,8 +15,8 @@ import {
 const SAMPLE_UUID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 
 describe("Fase 6.7 identity compatibility", () => {
-  it("PWA storage stays Dexie", () => {
-    expect(pwaStorage()).toBe("dexie");
+  it("PWA UI storage is HTTP (M3); Dexie ids stay numeric", () => {
+    expect(pwaStorage()).toBe("http");
   });
 
   it("does not coerce a UUID to Number", () => {

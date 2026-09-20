@@ -26,7 +26,7 @@ export type DebtEntry =
   | {
       kind: "fiada" | "parcial";
       id: string;
-      saleId: number;
+      saleId: number | string;
       createdAt: number;
       saleTotal: number;
       amountReceived: number;
@@ -52,7 +52,7 @@ export type DebtEntry =
     };
 
 export type DebtStatement = {
-  customerId: number;
+  customerId: number | string;
   customerName: string;
   total: number;
   charged: number;

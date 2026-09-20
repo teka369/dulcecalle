@@ -4,19 +4,22 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
-import type { Supplier } from "@/domain/types";
-import type { SupplierSurtirHistoryItem } from "@/repositories";
-import { inventoryStore } from "@/store/inventoryStore";
+import type { RemoteSupplier } from "@/data/http/mappers";
+import { routeId } from "@/data/pwa/ids";
+import {
+  inventoryStore,
+  type PwaSupplierSurtir,
+} from "@/store/inventoryStore";
 
 export default function ProveedorFichaPage() {
   const params = useParams();
-  const id = Number(params.id);
-  const [supplier, setSupplier] = useState<Supplier | null>(null);
-  const [historial, setHistorial] = useState<SupplierSurtirHistoryItem[]>([]);
+  const id = routeId(params.id);
+  const [supplier, setSupplier] = useState<RemoteSupplier | null>(null);
+  const [historial, setHistorial] = useState<PwaSupplierSurtir[]>([]);
   const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) {
+    if (!id) {
       setReady(true);
       return;
     }
@@ -96,7 +99,7 @@ export default function ProveedorFichaPage() {
           <ul className="flex flex-col gap-2">
             {historial.map((h) => (
               <li
-                key={h.id}
+                key={h.moveId}
                 className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
               >
                 <div className="flex items-center justify-between gap-2">

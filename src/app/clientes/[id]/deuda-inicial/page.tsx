@@ -9,14 +9,15 @@ import {
   validateInitialDebtAmount,
 } from "@/domain/initialDebt";
 import { formatCop } from "@/domain/money";
-import type { Customer } from "@/domain/types";
+import type { RemoteCustomer } from "@/data/http/mappers";
+import { routeId } from "@/data/pwa/ids";
 import { customerStore } from "@/store/customerStore";
 
 export default function AgregarDeudaAnteriorPage() {
   const params = useParams();
   const router = useRouter();
-  const id = Number(params.id);
-  const [customer, setCustomer] = useState<Customer | null>(null);
+  const id = routeId(params.id);
+  const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [amountRaw, setAmountRaw] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,7 +26,7 @@ export default function AgregarDeudaAnteriorPage() {
   const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) {
+    if (!id) {
       setReady(true);
       return;
     }
@@ -61,13 +62,10 @@ export default function AgregarDeudaAnteriorPage() {
     setBusy(true);
     try {
       if (!requestIdRef.current) {
-        requestIdRef.current =
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `inicial-${customer.id}-${amountRaw}-${Date.now()}`;
+        requestIdRef.current = crypto.randomUUID();
       }
       await customerStore.recordInitialDebt({
-        customerId: customer.id!,
+        customerId: customer.id,
         amountRaw,
         requestId: requestIdRef.current,
       });

@@ -58,6 +58,7 @@ scripts/
 /server/
 vite.config.ts
 startup.sh
+backend/sandbox-api.sh
 public/__grok/
 
 # Nest backend
@@ -66,6 +67,9 @@ backend/dist/
 backend/coverage/
 backend/pgdata/
 backend/test/*.so
+
+# Preview embedded Postgres (sandbox)
+.data/
 
 # Phone Dexie dumps (PII / live books). Never commit.
 **/dulcecalle-snapshot-*.json

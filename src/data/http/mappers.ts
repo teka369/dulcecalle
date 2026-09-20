@@ -195,10 +195,12 @@ export type RemoteToday = {
   session: RemoteSession | null;
   expected: { efectivo: number; nequi: number; total: number };
   closed: boolean;
+  moves: RemoteCashMove[];
 };
 
 export function mapToday(raw: Record<string, unknown>): RemoteToday {
   const expected = (raw.expected ?? {}) as Record<string, unknown>;
+  const movesRaw = Array.isArray(raw.moves) ? raw.moves : [];
   return {
     localDate: asDateKey(raw.localDate),
     session:
@@ -211,5 +213,186 @@ export function mapToday(raw: Record<string, unknown>): RemoteToday {
       total: asCopJson(expected.total, "expected.total"),
     },
     closed: Boolean(raw.closed),
+    moves: movesRaw.map((m) => mapCashMove(m as Record<string, unknown>)),
   };
 }
+
+export type RemoteCashMove = {
+  id: string;
+  amount: number;
+  direction: "in" | "out" | string;
+  method: string;
+  kind: string;
+  refType: string | null;
+  refId: string | null;
+  occurredOn: string;
+  createdAt: number;
+};
+
+export function mapCashMove(raw: Record<string, unknown>): RemoteCashMove {
+  return {
+    id: asUuid(raw.id, "cashMove.id"),
+    amount: asCopJson(raw.amount, "amount"),
+    direction: String(raw.direction),
+    method: String(raw.method),
+    kind: String(raw.kind),
+    refType: raw.refType == null ? null : String(raw.refType),
+    refId: raw.refId == null ? null : asUuid(raw.refId, "cashMove.refId"),
+    occurredOn: asDateKey(raw.occurredOn),
+    createdAt: asIsoEpoch(raw.createdAt),
+  };
+}
+
+export type RemoteStockMove = {
+  id: string;
+  productId: string;
+  delta: number;
+  reason: string;
+  unitCost: number;
+  supplierId: string | null;
+  note: string | null;
+  occurredOn: string;
+  createdAt: number;
+};
+
+export function mapStockMove(raw: Record<string, unknown>): RemoteStockMove {
+  return {
+    id: asUuid(raw.id, "stockMove.id"),
+    productId: asUuid(raw.productId, "stockMove.productId"),
+    delta: Number(raw.delta),
+    reason: String(raw.reason),
+    unitCost: asCopJson(raw.unitCost, "unitCost"),
+    supplierId:
+      raw.supplierId == null ? null : asUuid(raw.supplierId, "stockMove.supplierId"),
+    note: raw.note == null ? null : String(raw.note),
+    occurredOn: asDateKey(raw.occurredOn),
+    createdAt: asIsoEpoch(raw.createdAt),
+  };
+}
+
+export type RemoteExpense = {
+  id: string;
+  amount: number;
+  category: string;
+  method: string;
+  note: string | null;
+  occurredOn: string;
+  createdAt: number;
+};
+
+export function mapExpense(raw: Record<string, unknown>): RemoteExpense {
+  return {
+    id: asUuid(raw.id, "expense.id"),
+    amount: asCopJson(raw.amount, "amount"),
+    category: String(raw.category ?? ""),
+    method: String(raw.method),
+    note: raw.note == null ? null : String(raw.note),
+    occurredOn: asDateKey(raw.occurredOn),
+    createdAt: asIsoEpoch(raw.createdAt),
+  };
+}
+
+export type RemoteSupplier = {
+  id: string;
+  name: string;
+  phone: string | null;
+  notes: string | null;
+  createdAt: number;
+};
+
+export function mapSupplier(raw: Record<string, unknown>): RemoteSupplier {
+  return {
+    id: asUuid(raw.id, "supplier.id"),
+    name: String(raw.name ?? ""),
+    phone: raw.phone == null ? null : String(raw.phone),
+    notes: raw.notes == null ? null : String(raw.notes),
+    createdAt: asIsoEpoch(raw.createdAt),
+  };
+}
+
+export type RemoteReturnLine = {
+  id: string;
+  saleLineId: string;
+  productId: string;
+  qty: number;
+  unitPrice: number;
+  unitCost: number;
+};
+
+export type RemoteReturn = {
+  id: string;
+  saleId: string;
+  refundAmount: number;
+  debtReduced: number;
+  method: string | null;
+  note: string | null;
+  occurredOn: string;
+  createdAt: number;
+  lines: RemoteReturnLine[];
+};
+
+export function mapReturn(raw: Record<string, unknown>): RemoteReturn {
+  const linesRaw = Array.isArray(raw.lines) ? raw.lines : [];
+  return {
+    id: asUuid(raw.id, "return.id"),
+    saleId: asUuid(raw.saleId, "return.saleId"),
+    refundAmount: asCopJson(raw.refundAmount, "refundAmount"),
+    debtReduced: asCopJson(raw.debtReduced, "debtReduced"),
+    method: raw.method == null ? null : String(raw.method),
+    note: raw.note == null ? null : String(raw.note),
+    occurredOn: asDateKey(raw.occurredOn),
+    createdAt: asIsoEpoch(raw.createdAt),
+    lines: linesRaw.map((line) => {
+      const l = line as Record<string, unknown>;
+      return {
+        id: asUuid(l.id, "returnLine.id"),
+        saleLineId: asUuid(l.saleLineId, "returnLine.saleLineId"),
+        productId: asUuid(l.productId, "returnLine.productId"),
+        qty: Number(l.qty),
+        unitPrice: asCopJson(l.unitPrice, "unitPrice"),
+        unitCost: asCopJson(l.unitCost, "unitCost"),
+      };
+    }),
+  };
+}
+
+export type RemoteInitialDebt = {
+  id: string;
+  customerId: string;
+  amount: number;
+  note: string | null;
+  occurredOn: string;
+  createdAt: number;
+};
+
+export function mapInitialDebt(raw: Record<string, unknown>): RemoteInitialDebt {
+  return {
+    id: asUuid(raw.id, "initialDebt.id"),
+    customerId: asUuid(raw.customerId, "initialDebt.customerId"),
+    amount: asCopJson(raw.amount, "amount"),
+    note: raw.note == null ? null : String(raw.note),
+    occurredOn: asDateKey(raw.occurredOn),
+    createdAt: asIsoEpoch(raw.createdAt),
+  };
+}
+
+export type RemoteStats = {
+  period: string;
+  from: string;
+  to: string;
+  ventas: number;
+  ventasCount: number;
+  devoluciones: number;
+  devolucionesCount: number;
+  recibido: number;
+  recibidoEfectivo: number;
+  recibidoNequi: number;
+  porCobrar: number;
+  gaste: number;
+  inverti: number;
+  ganancia: number;
+  valorInventario: number;
+  stockBajo: number;
+  emptyPeriod: boolean;
+};
+

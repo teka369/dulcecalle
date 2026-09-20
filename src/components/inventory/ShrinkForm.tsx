@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Product } from "@/domain/types";
+import type { RemoteProduct } from "@/data/http/mappers";
 import {
   validateMotivo,
   validateShrinkQty,
   type ShrinkReason,
 } from "@/domain/inventory";
 import { newRequestId } from "@/domain/requestId";
+import { routeId } from "@/data/pwa/ids";
 import { inventoryStore } from "@/store/inventoryStore";
 
 export function ShrinkForm({
@@ -29,8 +30,8 @@ export function ShrinkForm({
 }) {
   const params = useParams();
   const router = useRouter();
-  const id = Number(params.id);
-  const [product, setProduct] = useState<Product | null>(null);
+  const id = routeId(params.id);
+  const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [qtyRaw, setQtyRaw] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export function ShrinkForm({
   const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) {
+    if (!id) {
       setReady(true);
       return;
     }
@@ -80,7 +81,7 @@ export function ShrinkForm({
     try {
       if (!requestIdRef.current) requestIdRef.current = newRequestId("shrink");
       await inventoryStore.applyShrink({
-        productId: product.id!,
+        productId: product.id,
         qtyRaw,
         reason,
         note: showNote ? note : undefined,

@@ -11,12 +11,25 @@ import {
   mapSale,
   mapSession,
   mapToday,
+  mapCashMove,
+  mapStockMove,
+  mapExpense,
+  mapSupplier,
+  mapReturn,
+  mapInitialDebt,
   type RemoteCustomer,
   type RemotePayment,
   type RemoteProduct,
   type RemoteSale,
   type RemoteSession,
   type RemoteToday,
+  type RemoteCashMove,
+  type RemoteStockMove,
+  type RemoteExpense,
+  type RemoteSupplier,
+  type RemoteReturn,
+  type RemoteInitialDebt,
+  type RemoteStats,
 } from "./mappers";
 
 export type CreateProductInput = {
@@ -209,6 +222,121 @@ export class HttpRepository {
       );
       return mapPayment(row);
     },
+
+    initialDebt: async (
+      customerId: string,
+      input: { amount: number; note?: string },
+      requestId: string,
+    ): Promise<RemoteInitialDebt> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        `/customers/${customerId}/initial-debts`,
+        { body: input, idempotencyKey: requestId },
+      );
+      return mapInitialDebt(row);
+    },
+
+    ledger: async (customerId: string) => {
+      return this.http.request<{
+        customer: Record<string, unknown>;
+        initials: Record<string, unknown>[];
+        sales: Array<Record<string, unknown> & { returns?: Record<string, unknown>[] }>;
+        payments: Record<string, unknown>[];
+      }>("GET", `/customers/${customerId}/ledger`);
+    },
+  };
+
+  readonly suppliers = {
+    list: async (): Promise<RemoteSupplier[]> => {
+      const rows = await this.http.request<Record<string, unknown>[]>(
+        "GET",
+        "/suppliers",
+      );
+      return rows.map(mapSupplier);
+    },
+
+    get: async (id: string): Promise<RemoteSupplier> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "GET",
+        `/suppliers/${id}`,
+      );
+      return mapSupplier(row);
+    },
+
+    create: async (input: {
+      name: string;
+      phone?: string;
+      notes?: string;
+    }): Promise<RemoteSupplier> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        "/suppliers",
+        { body: input },
+      );
+      return mapSupplier(row);
+    },
+
+    surtidas: async (id: string) => {
+      return this.http.request<
+        Array<{
+          moveId: string;
+          createdAt: string;
+          productId: string;
+          productName: string;
+          qty: number;
+          unitCost: number;
+          totalCost: number;
+          method: string | null;
+        }>
+      >("GET", `/suppliers/${id}/surtidas`);
+    },
+  };
+
+  readonly inventory = {
+    surtir: async (
+      productId: string,
+      input: {
+        qty: number;
+        unitCost: number;
+        totalCost: number;
+        method: "Efectivo" | "Nequi";
+        supplierId?: string | null;
+        note?: string;
+      },
+      requestId: string,
+    ): Promise<RemoteStockMove> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        `/products/${productId}/surtir`,
+        { body: input, idempotencyKey: requestId },
+      );
+      return mapStockMove(row);
+    },
+
+    shrink: async (
+      productId: string,
+      input: {
+        qty: number;
+        reason: "me_lo_comi" | "regalar" | "perdido";
+        note?: string;
+      },
+      requestId: string,
+    ): Promise<RemoteStockMove> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        `/products/${productId}/shrink`,
+        { body: input, idempotencyKey: requestId },
+      );
+      return mapStockMove(row);
+    },
+
+    moves: async (productId: string): Promise<RemoteStockMove[]> => {
+      const rows = await this.http.request<Record<string, unknown>[]>(
+        "GET",
+        `/products/${productId}/moves`,
+      );
+      return rows.map(mapStockMove);
+    },
   };
 
   readonly sales = {
@@ -243,6 +371,27 @@ export class HttpRepository {
       );
       return mapSale(row);
     },
+
+    returns: async (saleId: string): Promise<RemoteReturn[]> => {
+      const rows = await this.http.request<Record<string, unknown>[]>(
+        "GET",
+        `/sales/${saleId}/returns`,
+      );
+      return rows.map(mapReturn);
+    },
+
+    createReturn: async (
+      saleId: string,
+      input: { lines: Array<{ saleLineId: string; qty: number }>; note?: string },
+      requestId: string,
+    ): Promise<RemoteReturn> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        `/sales/${saleId}/returns`,
+        { body: input, idempotencyKey: requestId },
+      );
+      return mapReturn(row);
+    },
   };
 
   readonly cash = {
@@ -275,9 +424,79 @@ export class HttpRepository {
       return mapSession(row);
     },
 
-    moves: async (date?: string) => {
-      const suffix = date ? `?date=${encodeURIComponent(date)}` : "";
-      return this.http.request<unknown[]>("GET", `/cash/moves${suffix}`);
+    moves: async (date?: string, from?: string, to?: string) => {
+      const q = new URLSearchParams();
+      if (from) q.set("from", from);
+      if (to) q.set("to", to);
+      else if (date) q.set("date", date);
+      const suffix = q.size ? `?${q.toString()}` : "";
+      const rows = await this.http.request<Record<string, unknown>[]>(
+        "GET",
+        `/cash/moves${suffix}`,
+      );
+      return rows.map(mapCashMove);
+    },
+
+    aporte: async (
+      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string },
+      requestId: string,
+    ): Promise<RemoteCashMove> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        "/cash/aportes",
+        { body: input, idempotencyKey: requestId },
+      );
+      return mapCashMove(row);
+    },
+
+    retiro: async (
+      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string },
+      requestId: string,
+    ): Promise<RemoteCashMove> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        "/cash/retiros",
+        { body: input, idempotencyKey: requestId },
+      );
+      return mapCashMove(row);
+    },
+
+    expenses: async (from?: string, to?: string): Promise<RemoteExpense[]> => {
+      const q = new URLSearchParams();
+      if (from) q.set("from", from);
+      if (to) q.set("to", to);
+      const suffix = q.size ? `?${q.toString()}` : "";
+      const rows = await this.http.request<Record<string, unknown>[]>(
+        "GET",
+        `/expenses${suffix}`,
+      );
+      return rows.map(mapExpense);
+    },
+
+    recordExpense: async (
+      input: {
+        amount: number;
+        category: string;
+        method: "Efectivo" | "Nequi";
+        note?: string;
+      },
+      requestId: string,
+    ): Promise<RemoteExpense> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        "/expenses",
+        { body: input, idempotencyKey: requestId },
+      );
+      return mapExpense(row);
+    },
+  };
+
+  readonly stats = {
+    get: async (period: "hoy" | "semana" | "mes"): Promise<RemoteStats> => {
+      return this.http.request<RemoteStats>(
+        "GET",
+        `/stats?period=${encodeURIComponent(period)}`,
+      );
     },
   };
 }

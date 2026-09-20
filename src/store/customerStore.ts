@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import type { Customer, PayMethod } from "@/domain/types";
+import type { PayMethod } from "@/domain/types";
 import {
   CUSTOMER_ERRORS,
   parseAbonoAmount,
@@ -12,14 +12,14 @@ import {
   parseInitialDebtAmount,
   validateInitialDebtAmount,
 } from "@/domain/initialDebt";
-import {
-  customerRepository,
-  type CustomerHistoryItem,
-} from "@/repositories/customerRepository";
+import { ApiError } from "@/data/errors";
+import { getPwaApi } from "@/data/pwa/api";
+import { loadHttpStatement } from "@/data/pwa/statement";
+import type { RemoteCustomer } from "@/data/http/mappers";
 import type { DebtStatement } from "@/domain/debt/statement";
 
 type CustomerState = {
-  customers: Customer[];
+  customers: RemoteCustomer[];
   loading: boolean;
   lastToast: string | null;
 };
@@ -41,6 +41,12 @@ function setState(patch: Partial<CustomerState>) {
   emit();
 }
 
+function fail(e: unknown): never {
+  if (e instanceof ApiError) throw new Error(e.message);
+  if (e instanceof Error) throw e;
+  throw new Error("Algo salió mal.");
+}
+
 export const customerStore = {
   subscribe(listener: () => void) {
     listeners.add(listener);
@@ -51,40 +57,50 @@ export const customerStore = {
   getSnapshot(): CustomerState {
     return state;
   },
-  async refresh(): Promise<Customer[]> {
+  async refresh(): Promise<RemoteCustomer[]> {
     setState({ loading: true });
-    const customers = await customerRepository.list();
-    setState({ customers, loading: false });
-    return customers;
+    try {
+      const customers = await getPwaApi().customers.list();
+      setState({ customers, loading: false });
+      return customers;
+    } catch (e) {
+      setState({ loading: false });
+      fail(e);
+    }
   },
-  async createCustomer(name: string): Promise<number> {
+  async createCustomer(name: string): Promise<string> {
     const trimmed = name.trim();
     if (!trimmed) throw new Error(CUSTOMER_ERRORS.emptyName);
-    const id = await customerRepository.create({ name: trimmed });
-    await this.refresh();
-    setState({ lastToast: "Cliente guardado" });
-    return id;
+    try {
+      const created = await getPwaApi().customers.create({ name: trimmed });
+      await this.refresh();
+      setState({ lastToast: "Cliente guardado" });
+      return created.id;
+    } catch (e) {
+      fail(e);
+    }
   },
-  async getCustomer(id: number): Promise<Customer | undefined> {
-    return customerRepository.getById(id);
+  async getCustomer(id: string): Promise<RemoteCustomer | undefined> {
+    try {
+      return await getPwaApi().customers.get(id);
+    } catch {
+      return undefined;
+    }
   },
-  async getHistory(id: number): Promise<CustomerHistoryItem[]> {
-    return customerRepository.listHistory(id);
+  async getStatement(id: string): Promise<DebtStatement | null> {
+    try {
+      return await loadHttpStatement(id);
+    } catch {
+      return null;
+    }
   },
-  async getStatement(id: number): Promise<DebtStatement | null> {
-    return customerRepository.getStatement(id);
-  },
-  /**
-   * UI → store → repository → Dexie abono.
-   * Validates with exact S2 copy errors before persistence.
-   */
   async recordAbono(input: {
-    customerId: number;
+    customerId: string;
     amountRaw: string;
     method: PayMethod | null;
     requestId?: string;
-  }): Promise<number> {
-    const customer = await customerRepository.getById(input.customerId);
+  }): Promise<string> {
+    const customer = await this.getCustomer(input.customerId);
     if (!customer) throw new Error("customer not found");
 
     const error = validateAbono({
@@ -95,40 +111,43 @@ export const customerStore = {
     if (error) throw new Error(error);
 
     const amount = parseAbonoAmount(input.amountRaw);
-    const paymentId = await customerRepository.recordPayment({
-      customerId: input.customerId,
-      amount,
-      method: input.method as PayMethod,
-      requestId: input.requestId,
-    });
-    await this.refresh();
-    setState({ lastToast: "Abono registrado" });
-    return paymentId;
+    try {
+      const payment = await getPwaApi().customers.pay(
+        input.customerId,
+        { amount, method: input.method as PayMethod },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      await this.refresh();
+      setState({ lastToast: "Abono registrado" });
+      return payment.id;
+    } catch (e) {
+      fail(e);
+    }
   },
-  /**
-   * UI → store → repository → Dexie deuda anterior.
-   * Not a sale. Idempotent via requestId.
-   */
   async recordInitialDebt(input: {
-    customerId: number;
+    customerId: string;
     amountRaw: string;
     requestId?: string;
-  }): Promise<number> {
-    const customer = await customerRepository.getById(input.customerId);
+  }): Promise<string> {
+    const customer = await this.getCustomer(input.customerId);
     if (!customer) throw new Error("customer not found");
 
     const error = validateInitialDebtAmount(input.amountRaw);
     if (error) throw new Error(error);
 
     const amount = parseInitialDebtAmount(input.amountRaw);
-    const id = await customerRepository.recordInitialDebt({
-      customerId: input.customerId,
-      amount,
-      requestId: input.requestId,
-    });
-    await this.refresh();
-    setState({ lastToast: INITIAL_DEBT_TOAST });
-    return id;
+    try {
+      const row = await getPwaApi().customers.initialDebt(
+        input.customerId,
+        { amount },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      await this.refresh();
+      setState({ lastToast: INITIAL_DEBT_TOAST });
+      return row.id;
+    } catch (e) {
+      fail(e);
+    }
   },
   clearToast() {
     setState({ lastToast: null });
@@ -149,7 +168,7 @@ export function useCustomers() {
   );
   const recordAbono = useCallback(
     (input: {
-      customerId: number;
+      customerId: string;
       amountRaw: string;
       method: PayMethod | null;
       requestId?: string;
@@ -158,7 +177,7 @@ export function useCustomers() {
   );
   const recordInitialDebt = useCallback(
     (input: {
-      customerId: number;
+      customerId: string;
       amountRaw: string;
       requestId?: string;
     }) => customerStore.recordInitialDebt(input),
@@ -172,7 +191,6 @@ export function useCustomers() {
     recordAbono,
     recordInitialDebt,
     getCustomer: customerStore.getCustomer,
-    getHistory: customerStore.getHistory,
     getStatement: customerStore.getStatement,
     clearToast: customerStore.clearToast,
   };

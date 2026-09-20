@@ -80,7 +80,7 @@ export function InicioDashboard({
   toast,
 }: {
   snap: DashboardSnapshot;
-  onLoadDemo: () => void;
+  onLoadDemo?: () => void;
   toast: string | null;
 }) {
   const caja = cajaCopy(snap);
@@ -287,13 +287,22 @@ export function InicioDashboard({
       </section>
 
       {snap.emptyDb && (
-        <button
-          type="button"
-          onClick={onLoadDemo}
-          className="min-h-11 rounded-[14px] bg-primary px-4 text-sm font-semibold text-ink"
-        >
-          Cargar demo
-        </button>
+        onLoadDemo ? (
+          <button
+            type="button"
+            onClick={onLoadDemo}
+            className="min-h-11 rounded-[14px] bg-primary px-4 text-sm font-semibold text-ink"
+          >
+            Cargar demo
+          </button>
+        ) : (
+          <Link
+            href="/inventario/nuevo"
+            className="flex min-h-11 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
+          >
+            Agregar el primer producto
+          </Link>
+        )
       )}
 
       {toast && (

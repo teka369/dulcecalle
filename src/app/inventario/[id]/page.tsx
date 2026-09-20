@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
-import type { Product, StockMove } from "@/domain/types";
+import type { RemoteProduct, RemoteStockMove } from "@/data/http/mappers";
+import { routeId } from "@/data/pwa/ids";
 import { inventoryStore } from "@/store/inventoryStore";
 
 const REASON_LABEL: Record<string, string> = {
@@ -20,13 +21,13 @@ const REASON_LABEL: Record<string, string> = {
 
 export default function ProductoFichaPage() {
   const params = useParams();
-  const id = Number(params.id);
-  const [product, setProduct] = useState<Product | null>(null);
-  const [moves, setMoves] = useState<StockMove[]>([]);
+  const id = routeId(params.id);
+  const [product, setProduct] = useState<RemoteProduct | null>(null);
+  const [moves, setMoves] = useState<RemoteStockMove[]>([]);
   const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) {
+    if (!id) {
       setReady(true);
       return;
     }

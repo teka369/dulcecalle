@@ -6,7 +6,7 @@ import type { CartItem, PayMethod, PaymentKind } from "@/domain/types";
 type CartState = {
   items: CartItem[];
   paymentKind: PaymentKind;
-  customerId: number | null;
+  customerId: string | null;
   amountReceived: number | null;
   method: PayMethod;
 };
@@ -51,7 +51,7 @@ export const cartStore = {
       method: "Efectivo",
     });
   },
-  setQty(productId: number, qty: number, unitPrice?: number) {
+  setQty(productId: string, qty: number, unitPrice?: number) {
     setState((s) => {
       const existing = s.items.find((i) => i.productId === productId);
       const next = s.items.filter((i) => i.productId !== productId);
@@ -65,7 +65,7 @@ export const cartStore = {
       return { ...s, items: next };
     });
   },
-  setUnitPrice(productId: number, unitPrice: number) {
+  setUnitPrice(productId: string, unitPrice: number) {
     setState((s) => ({
       ...s,
       items: s.items.map((i) =>
@@ -81,7 +81,7 @@ export const cartStore = {
       customerId: paymentKind === "paid" ? null : s.customerId,
     }));
   },
-  setCustomerId(customerId: number | null) {
+  setCustomerId(customerId: string | null) {
     setState({ customerId });
   },
   setAmountReceived(amountReceived: number | null) {
@@ -104,11 +104,11 @@ export function useCart() {
     [snap.items],
   );
 
-  const setQty = useCallback((productId: number, qty: number, unitPrice?: number) => {
+  const setQty = useCallback((productId: string, qty: number, unitPrice?: number) => {
     cartStore.setQty(productId, qty, unitPrice);
   }, []);
 
-  const setUnitPrice = useCallback((productId: number, unitPrice: number) => {
+  const setUnitPrice = useCallback((productId: string, unitPrice: number) => {
     cartStore.setUnitPrice(productId, unitPrice);
   }, []);
 

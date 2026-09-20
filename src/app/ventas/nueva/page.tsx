@@ -5,22 +5,24 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop, mulCop, addCop } from "@/domain/money";
 import { parseSaleUnitPrice } from "@/domain/sale/validate";
-import type { Product } from "@/domain/types";
-import { productRepository } from "@/repositories";
+import type { RemoteProduct } from "@/data/http/mappers";
+import { getPwaApi } from "@/data/pwa/api";
 import { useCart } from "@/store/cartStore";
 
 export default function NuevaVentaPage() {
   const router = useRouter();
   const { items, setQty, setUnitPrice, totalQty } = useCart();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<RemoteProduct[]>([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [stockError, setStockError] = useState<string | null>(null);
-  const [pendingPrices, setPendingPrices] = useState<Record<number, number>>({});
-
+  const [pendingPrices, setPendingPrices] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    void productRepository.list().then(setProducts);
+    void getPwaApi()
+      .products.list()
+      .then(setProducts)
+      .catch(() => setProducts([]));
   }, []);
 
   const categories = useMemo(() => {
@@ -39,12 +41,10 @@ export default function NuevaVentaPage() {
     });
   }, [products, query, category]);
 
-  function linePrice(product: Product): number {
+  function linePrice(product: RemoteProduct): number {
     const item = items.find((i) => i.productId === product.id);
     if (item?.unitPrice != null) return item.unitPrice;
-    if (product.id != null && pendingPrices[product.id] != null) {
-      return pendingPrices[product.id]!;
-    }
+    if (pendingPrices[product.id] != null) return pendingPrices[product.id]!;
     return product.price;
   }
 
@@ -57,12 +57,12 @@ export default function NuevaVentaPage() {
     }, 0);
   }, [items, products]);
 
-  function qtyOf(productId: number): number {
+  function qtyOf(productId: string): number {
     return items.find((i) => i.productId === productId)?.qty ?? 0;
   }
 
-  function bump(product: Product, delta: number) {
-    const current = qtyOf(product.id!);
+  function bump(product: RemoteProduct, delta: number) {
+    const current = qtyOf(product.id);
     const next = current + delta;
     if (next < 0) return;
     if (next > product.stock) {
@@ -73,21 +73,19 @@ export default function NuevaVentaPage() {
     setStockError(null);
     const existing = items.find((i) => i.productId === product.id);
     const price =
-      existing?.unitPrice ??
-      (product.id != null ? pendingPrices[product.id] : undefined) ??
-      product.price;
-    setQty(product.id!, next, price);
+      existing?.unitPrice ?? pendingPrices[product.id] ?? product.price;
+    setQty(product.id, next, price);
   }
 
-  function onPriceChange(product: Product, raw: string) {
+  function onPriceChange(product: RemoteProduct, raw: string) {
     const digits = raw.replace(/\D/g, "");
     const parsed = parseSaleUnitPrice(digits, product.price);
     if ("error" in parsed) return;
-    if (qtyOf(product.id!) > 0) {
-      setUnitPrice(product.id!, parsed.unitPrice);
+    if (qtyOf(product.id) > 0) {
+      setUnitPrice(product.id, parsed.unitPrice);
       return;
     }
-    setPendingPrices((prev) => ({ ...prev, [product.id!]: parsed.unitPrice }));
+    setPendingPrices((prev) => ({ ...prev, [product.id]: parsed.unitPrice }));
   }
 
   return (
@@ -134,7 +132,7 @@ export default function NuevaVentaPage() {
       ) : (
         <div className="grid grid-cols-2 gap-3 pb-28">
           {filtered.map((p) => {
-            const qty = qtyOf(p.id!);
+            const qty = qtyOf(p.id);
             const price = linePrice(p);
             const custom = qty > 0 && price !== p.price;
             return (

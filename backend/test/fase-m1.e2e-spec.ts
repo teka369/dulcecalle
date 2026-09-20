@@ -925,7 +925,7 @@ describe("Fase M1 domain endpoints", () => {
       .expect(403);
   });
 
-  it("mismatching requestId is VALIDATION; stats stay out of M1", async () => {
+  it("mismatching requestId is VALIDATION", async () => {
     await api()
       .post("/v1/expenses")
       .set(auth(tokenB, bizB))
@@ -938,11 +938,5 @@ describe("Fase M1 domain endpoints", () => {
       })
       .expect(400)
       .expect((r) => expect(r.body.error.code).toBe("VALIDATION"));
-
-    const stats = await api()
-      .get("/v1/stats")
-      .set(auth(tokenA, bizA))
-      .query({ period: "hoy" });
-    expect(stats.status).toBe(404);
   });
 });

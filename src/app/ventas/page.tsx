@@ -3,20 +3,23 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatCop } from "@/domain/money";
-import type { Sale } from "@/domain/types";
-import { saleRepository } from "@/repositories";
+import type { RemoteSale } from "@/data/http/mappers";
+import { getPwaApi } from "@/data/pwa/api";
 
-const kindLabel: Record<Sale["paymentKind"], string> = {
+const kindLabel: Record<string, string> = {
   paid: "Pagada",
   partial: "Parcial",
   credit: "Fiada",
 };
 
 export default function VentasPage() {
-  const [sales, setSales] = useState<Sale[]>([]);
+  const [sales, setSales] = useState<RemoteSale[]>([]);
 
   useEffect(() => {
-    void saleRepository.list().then(setSales);
+    void getPwaApi()
+      .sales.list()
+      .then(setSales)
+      .catch(() => setSales([]));
   }, []);
 
   return (
@@ -43,7 +46,7 @@ export default function VentasPage() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">
-                    {kindLabel[s.paymentKind]}
+                    {kindLabel[s.paymentKind] ?? s.paymentKind}
                   </span>
                   <span className="text-sm font-semibold">
                     {formatCop(s.saleTotal)}

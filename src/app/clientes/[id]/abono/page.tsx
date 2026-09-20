@@ -9,14 +9,16 @@ import {
   validateAbono,
 } from "@/domain/abono";
 import { formatCop } from "@/domain/money";
-import type { Customer, PayMethod } from "@/domain/types";
+import type { PayMethod } from "@/domain/types";
+import type { RemoteCustomer } from "@/data/http/mappers";
+import { routeId } from "@/data/pwa/ids";
 import { customerStore } from "@/store/customerStore";
 
 export default function RegistrarAbonoPage() {
   const params = useParams();
   const router = useRouter();
-  const id = Number(params.id);
-  const [customer, setCustomer] = useState<Customer | null>(null);
+  const id = routeId(params.id);
+  const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [amountRaw, setAmountRaw] = useState("");
   const [method, setMethod] = useState<PayMethod>("Efectivo");
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +28,7 @@ export default function RegistrarAbonoPage() {
   const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) {
+    if (!id) {
       setReady(true);
       return;
     }
@@ -76,13 +78,10 @@ export default function RegistrarAbonoPage() {
     setBusy(true);
     try {
       if (!requestIdRef.current) {
-        requestIdRef.current =
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `abono-${customer.id}-${amountRaw}-${Date.now()}`;
+        requestIdRef.current = crypto.randomUUID();
       }
       await customerStore.recordAbono({
-        customerId: customer.id!,
+        customerId: customer.id,
         amountRaw,
         method,
         requestId: requestIdRef.current,

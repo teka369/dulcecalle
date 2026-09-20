@@ -197,7 +197,7 @@ export interface Setting {
 }
 
 export interface CartItem {
-  productId: number;
+  productId: string;
   qty: number;
   /** Price charged on this sale; omit → catalog product.price at confirm. */
   unitPrice?: number;

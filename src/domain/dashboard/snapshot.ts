@@ -44,12 +44,12 @@ export type DashboardSnapshot = {
   todaySalesCount: number;
   debtTotal: number;
   debtorCount: number;
-  debtors: Array<{ id: number; name: string; debt: number }>;
+  debtors: Array<{ id: number | string; name: string; debt: number }>;
   cajaState: DashboardCajaState;
   cajaExpectedEfectivo: number | null;
   productCount: number;
   lowStockCount: number;
-  lowStock: Array<{ id: number; name: string; stock: number; lowStockAt: number }>;
+  lowStock: Array<{ id: number | string; name: string; stock: number; lowStockAt: number }>;
   activity: DashboardActivity[];
   emptyDb: boolean;
   actions: DashboardQuickAction[];

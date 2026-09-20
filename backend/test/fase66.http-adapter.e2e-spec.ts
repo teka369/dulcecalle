@@ -56,8 +56,8 @@ describe("Fase 6.6 HTTP adapter ↔ Nest contract", () => {
     pg?.stop();
   });
 
-  it("PWA storage stays Dexie even while the adapter talks HTTP", () => {
-    expect(pwaStorage()).toBe("dexie");
+  it("PWA storage is HTTP (M3)", () => {
+    expect(pwaStorage()).toBe("http");
   });
 
   it("auth: register, login, me, logout, 401", async () => {

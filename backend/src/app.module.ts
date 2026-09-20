@@ -9,6 +9,7 @@ import { TenancyModule } from "./tenancy/tenancy.module";
 import { CatalogModule } from "./catalog/catalog.module";
 import { SalesModule } from "./sales/sales.module";
 import { CashModule } from "./cash/cash.module";
+import { StatsModule } from "./stats/stats.module";
 import { HealthController } from "./health/health.controller";
 import { JwtAuthGuard } from "./identity/jwt.guard";
 import { BusinessGuard } from "./tenancy/business.guard";
@@ -37,6 +38,7 @@ import { requireJwtSecrets } from "./identity/jwt-secrets";
     CatalogModule,
     SalesModule,
     CashModule,
+    StatsModule,
   ],
   controllers: [HealthController],
   providers: [

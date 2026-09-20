@@ -81,9 +81,7 @@ export default function LoginPage() {
             {session.user?.email ?? "Sesión activa"}
           </p>
           {session.businessId && (
-            <p className="mt-2 text-sm text-ink/60">
-              Negocio: {session.businessId}
-            </p>
+            <p className="mt-2 text-sm text-ink/60">Negocio seleccionado</p>
           )}
         </section>
         <button
@@ -104,7 +102,8 @@ export default function LoginPage() {
     <div className="flex flex-col gap-4">
       <h1 className="text-[22px] font-semibold">Entrar</h1>
       <p className="text-sm text-ink/60">
-        Cuenta del servidor. El negocio del teléfono sigue en este dispositivo.
+        Entras al negocio en el servidor. Los datos viven allá, no en este
+        teléfono.
       </p>
 
       {memberships.length > 0 ? (

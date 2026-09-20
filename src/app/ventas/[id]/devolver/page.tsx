@@ -6,18 +6,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCop, mulCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
 import { RETURN_ERRORS, RETURN_TOAST } from "@/domain/sale/returns";
-import { saleRepository } from "@/repositories";
-
-type Returnable = NonNullable<
-  Awaited<ReturnType<typeof saleRepository.getReturnable>>
->;
+import { routeId } from "@/data/pwa/ids";
+import { getPwaApi } from "@/data/pwa/api";
+import {
+  getHttpReturnable,
+  type HttpReturnable,
+} from "@/data/pwa/sales";
 
 export default function DevolverVentaPage() {
   const params = useParams();
   const router = useRouter();
-  const id = Number(params.id);
-  const [data, setData] = useState<Returnable | null>(null);
-  const [qtyByLine, setQtyByLine] = useState<Record<number, string>>({});
+  const id = routeId(params.id);
+  const [data, setData] = useState<HttpReturnable | null>(null);
+  const [qtyByLine, setQtyByLine] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -25,15 +26,15 @@ export default function DevolverVentaPage() {
   const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) {
+    if (!id) {
       setReady(true);
       return;
     }
-    const row = await saleRepository.getReturnable(id);
-    setData(row ?? null);
+    const row = await getHttpReturnable(id);
+    setData(row);
     if (row) {
-      const next: Record<number, string> = {};
-      for (const l of row.lines) next[l.id!] = "";
+      const next: Record<string, string> = {};
+      for (const l of row.lines) next[l.id] = "";
       setQtyByLine(next);
     }
     setReady(true);
@@ -47,7 +48,7 @@ export default function DevolverVentaPage() {
     if (!data) return [];
     return data.lines
       .map((l) => {
-        const raw = qtyByLine[l.id!] ?? "";
+        const raw = qtyByLine[l.id] ?? "";
         const qty = Number.parseInt(raw, 10);
         return { line: l, qty: Number.isInteger(qty) ? qty : 0 };
       })
@@ -63,9 +64,9 @@ export default function DevolverVentaPage() {
 
   function fillAll() {
     if (!data) return;
-    const next: Record<number, string> = {};
+    const next: Record<string, string> = {};
     for (const l of data.lines) {
-      next[l.id!] = l.remaining > 0 ? String(l.remaining) : "";
+      next[l.id] = l.remaining > 0 ? String(l.remaining) : "";
     }
     setQtyByLine(next);
   }
@@ -86,11 +87,13 @@ export default function DevolverVentaPage() {
     setBusy(true);
     try {
       if (!requestIdRef.current) requestIdRef.current = newRequestId("dev");
-      await saleRepository.createReturn({
-        saleId: data.sale.id!,
-        lines: selected.map((x) => ({ saleLineId: x.line.id!, qty: x.qty })),
-        requestId: requestIdRef.current,
-      });
+      await getPwaApi().sales.createReturn(
+        data.sale.id,
+        {
+          lines: selected.map((x) => ({ saleLineId: x.line.id, qty: x.qty })),
+        },
+        requestIdRef.current,
+      );
       setToast(RETURN_TOAST);
       setTimeout(() => {
         router.push(`/ventas/${data.sale.id}`);
@@ -160,11 +163,11 @@ export default function DevolverVentaPage() {
                 <input
                   id={`qty-${l.id}`}
                   inputMode="numeric"
-                  value={qtyByLine[l.id!] ?? ""}
+                  value={qtyByLine[l.id] ?? ""}
                   onChange={(e) =>
                     setQtyByLine((prev) => ({
                       ...prev,
-                      [l.id!]: e.target.value.replace(/\D/g, ""),
+                      [l.id]: e.target.value.replace(/\D/g, ""),
                     }))
                   }
                   className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"

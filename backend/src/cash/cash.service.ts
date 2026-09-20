@@ -214,25 +214,43 @@ export class CashService {
     };
   }
 
-  async listMoves(ctx: BusinessContext, date?: string) {
-    const occurredOn = date
-      ? new Date(`${date}T00:00:00.000Z`)
-      : occurredOnDate(ctx.timezone);
+  async listMoves(
+    ctx: BusinessContext,
+    date?: string,
+    from?: string,
+    to?: string,
+  ) {
+    const where: Prisma.CashMoveWhereInput = { businessId: ctx.businessId };
+    if (from || to) {
+      where.occurredOn = {
+        ...(from ? { gte: new Date(`${from}T00:00:00.000Z`) } : {}),
+        ...(to ? { lte: new Date(`${to}T00:00:00.000Z`) } : {}),
+      };
+    } else {
+      where.occurredOn = date
+        ? new Date(`${date}T00:00:00.000Z`)
+        : occurredOnDate(ctx.timezone);
+    }
     const moves = await this.prisma.cashMove.findMany({
-      where: { businessId: ctx.businessId, occurredOn },
+      where,
       orderBy: { createdAt: "asc" },
     });
-    return moves.map((m) => ({
-      id: m.id,
-      amount: copToJson(m.amount),
-      direction: m.direction,
-      method: m.method,
-      kind: m.kind,
-      refType: m.refType,
-      refId: m.refId,
-      occurredOn: dateKey(m.occurredOn),
-      createdAt: m.createdAt,
-    }));
+    return moves.map(cashMoveJson);
+  }
+
+  async listExpenses(ctx: BusinessContext, from?: string, to?: string) {
+    const where: Prisma.ExpenseWhereInput = { businessId: ctx.businessId };
+    if (from || to) {
+      where.occurredOn = {
+        ...(from ? { gte: new Date(`${from}T00:00:00.000Z`) } : {}),
+        ...(to ? { lte: new Date(`${to}T00:00:00.000Z`) } : {}),
+      };
+    }
+    const rows = await this.prisma.expense.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map(expenseJson);
   }
 
   async recordPayment(

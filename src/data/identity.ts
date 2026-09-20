@@ -38,7 +38,7 @@ export function isDexieNumericId(value: unknown): value is DexieId {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
-/** Current PWA pages: `Number(params.id)`. UUID → NaN → lookup fails. */
+/** Dexie-era helper. PWA routes now use `routeId()` (UUID). */
 export function dexieRouteIdFromParam(raw: string): DexieId {
   const n = Number(raw);
   if (!isDexieNumericId(n) || String(n) !== raw.trim()) {

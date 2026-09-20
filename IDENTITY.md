@@ -1,7 +1,8 @@
 # DulceCalle — Identity & compatibility bridge (Fase 6.7)
 
-Audit only. **Do not run an import.** Dexie stays the PWA source of truth.
-HTTP adapter stays off (`pwaStorage() === "dexie"`).
+Audit only. **Do not run an import.** The owner re-enters products, customers and fiados by hand (deudas as **deuda anterior**, never as sales).
+
+M3: the PWA business UI talks HTTP (`pwaStorage() === "http"`, UUID routes via `routeId()`). Dexie repositories remain for domain tests only. Dexie `++id` and PG UUID must not mix.
 
 Contracts this document does **not** change: [DOMAIN.md](DOMAIN.md), [DATABASE.md](DATABASE.md), [MIGRATION.md](MIGRATION.md), [API_CONTRACT.md](API_CONTRACT.md), [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md).
 

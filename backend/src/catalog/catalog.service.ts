@@ -15,7 +15,7 @@ import type {
   SurtirDto,
 } from "./catalog.dto";
 import { reconcileSurtirCost, weightedAvgCost } from "../shared/inventory";
-import { asCop, copToJson } from "../shared/money";
+import { asCop, copToJson, mulCop } from "../shared/money";
 import { occurredOnDate, dateKey } from "../shared/clock";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
@@ -154,6 +154,18 @@ export class CatalogService {
     return productJson(p);
   }
 
+  async listProductMoves(ctx: BusinessContext, productId: string) {
+    const p = await this.prisma.product.findFirst({
+      where: { id: productId, businessId: ctx.businessId },
+    });
+    if (!p) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+    const rows = await this.prisma.stockMove.findMany({
+      where: { businessId: ctx.businessId, productId },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((m) => this.stockMoveJson(m));
+  }
+
   async patchProduct(ctx: BusinessContext, id: string, dto: PatchProductDto) {
     const p = await this.prisma.product.findFirst({
       where: { id, businessId: ctx.businessId },
@@ -214,6 +226,88 @@ export class CatalogService {
     });
     if (!c) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
     return customerJson(c);
+  }
+
+  async customerLedger(ctx: BusinessContext, customerId: string) {
+    const c = await this.prisma.customer.findFirst({
+      where: { id: customerId, businessId: ctx.businessId },
+    });
+    if (!c) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+
+    const [initials, sales, payments] = await Promise.all([
+      this.prisma.initialDebt.findMany({
+        where: { businessId: ctx.businessId, customerId },
+        orderBy: { createdAt: "asc" },
+      }),
+      this.prisma.sale.findMany({
+        where: { businessId: ctx.businessId, customerId },
+        include: { lines: true, returns: { include: { lines: true } } },
+        orderBy: { createdAt: "asc" },
+      }),
+      this.prisma.customerPayment.findMany({
+        where: { businessId: ctx.businessId, customerId },
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
+
+    return {
+      customer: customerJson(c),
+      initials: initials.map((d) => ({
+        id: d.id,
+        customerId: d.customerId,
+        amount: copToJson(d.amount),
+        note: d.note,
+        occurredOn: dateKey(d.occurredOn),
+        createdAt: d.createdAt,
+      })),
+      sales: sales.map((s) => ({
+        id: s.id,
+        customerId: s.customerId,
+        paymentKind: s.paymentKind,
+        method: s.method,
+        saleTotal: copToJson(s.saleTotal),
+        amountReceived: copToJson(s.amountReceived),
+        credit: copToJson(s.credit),
+        note: s.note,
+        occurredOn: dateKey(s.occurredOn),
+        createdAt: s.createdAt,
+        lines: s.lines.map((l) => ({
+          id: l.id,
+          productId: l.productId,
+          productName: l.productName,
+          qty: l.qty,
+          unitPrice: copToJson(l.unitPrice),
+          unitCost: copToJson(l.unitCost),
+          lineTotal: copToJson(l.lineTotal),
+        })),
+        returns: s.returns.map((r) => ({
+          id: r.id,
+          saleId: r.saleId,
+          refundAmount: copToJson(r.refundAmount),
+          debtReduced: copToJson(r.debtReduced),
+          method: r.method,
+          note: r.note,
+          occurredOn: dateKey(r.occurredOn),
+          createdAt: r.createdAt,
+          lines: r.lines.map((l) => ({
+            id: l.id,
+            saleLineId: l.saleLineId,
+            productId: l.productId,
+            qty: l.qty,
+            unitPrice: copToJson(l.unitPrice),
+            unitCost: copToJson(l.unitCost),
+          })),
+        })),
+      })),
+      payments: payments.map((p) => ({
+        id: p.id,
+        customerId: p.customerId,
+        amount: copToJson(p.amount),
+        method: p.method,
+        occurredOn: dateKey(p.occurredOn),
+        createdAt: p.createdAt,
+      })),
+    };
   }
 
   async patchCustomer(ctx: BusinessContext, id: string, dto: PatchCustomerDto) {
@@ -540,6 +634,46 @@ export class CatalogService {
     });
     if (!s) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
     return this.supplierJson(s);
+  }
+
+  async listSupplierSurtidas(ctx: BusinessContext, supplierId: string) {
+    const s = await this.prisma.supplier.findFirst({
+      where: { id: supplierId, businessId: ctx.businessId },
+    });
+    if (!s) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+    const moves = await this.prisma.stockMove.findMany({
+      where: {
+        businessId: ctx.businessId,
+        supplierId,
+        reason: "surtir",
+      },
+      include: { product: true },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+    const compras = await this.prisma.cashMove.findMany({
+      where: {
+        businessId: ctx.businessId,
+        kind: "compra",
+        refId: { in: moves.map((m) => m.id) },
+      },
+    });
+    const compraByRef = new Map(compras.map((row) => [row.refId, row]));
+    return moves.map((m) => {
+      const cash = compraByRef.get(m.id);
+      return {
+        moveId: m.id,
+        createdAt: m.createdAt,
+        productId: m.productId,
+        productName: m.product.name,
+        qty: m.delta,
+        unitCost: copToJson(m.unitCost),
+        totalCost: cash
+          ? copToJson(cash.amount)
+          : copToJson(mulCop(m.unitCost, m.delta)),
+        method: cash?.method ?? null,
+      };
+    });
   }
 
   async createSupplier(ctx: BusinessContext, dto: CreateSupplierDto) {

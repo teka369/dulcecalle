@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { CASH_COPY } from "@/domain/cash";
-import type { Expense } from "@/domain/types";
+import type { RemoteExpense } from "@/data/http/mappers";
 import { cashStore } from "@/store/cashStore";
 
 export default function GastosPage() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<RemoteExpense[]>([]);
   const [closed, setClosed] = useState(false);
   const [hasSession, setHasSession] = useState(false);
   const [ready, setReady] = useState(false);

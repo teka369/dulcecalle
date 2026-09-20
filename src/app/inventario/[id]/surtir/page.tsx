@@ -5,17 +5,19 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
-import type { PayMethod, Product, Supplier } from "@/domain/types";
+import type { PayMethod } from "@/domain/types";
+import type { RemoteProduct, RemoteSupplier } from "@/data/http/mappers";
 import { validateSurtirForm } from "@/domain/inventory";
+import { routeId } from "@/data/pwa/ids";
 import { inventoryStore } from "@/store/inventoryStore";
 
 export default function SurtirPage() {
   const params = useParams();
   const router = useRouter();
-  const id = Number(params.id);
-  const [product, setProduct] = useState<Product | null>(null);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [supplierId, setSupplierId] = useState<number | "">("");
+  const id = routeId(params.id);
+  const [product, setProduct] = useState<RemoteProduct | null>(null);
+  const [suppliers, setSuppliers] = useState<RemoteSupplier[]>([]);
+  const [supplierId, setSupplierId] = useState("");
   const [supplierCreate, setSupplierCreate] = useState("");
   const [qtyRaw, setQtyRaw] = useState("");
   const [unitCostRaw, setUnitCostRaw] = useState("");
@@ -30,7 +32,7 @@ export default function SurtirPage() {
   const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) {
+    if (!id) {
       setReady(true);
       return;
     }
@@ -117,12 +119,12 @@ export default function SurtirPage() {
     try {
       if (!requestIdRef.current) requestIdRef.current = newRequestId("surtir");
       await inventoryStore.surtir({
-        productId: product.id!,
+        productId: product.id,
         qtyRaw,
         unitCostRaw,
         totalCostRaw,
         method,
-        supplierId: supplierId === "" ? null : Number(supplierId),
+        supplierId: supplierId || null,
         supplierNameCreate: supplierCreate,
         note,
         requestId: requestIdRef.current,
@@ -183,9 +185,9 @@ export default function SurtirPage() {
           </label>
           <select
             id="proveedor"
-            value={supplierId === "" ? "" : String(supplierId)}
+            value={supplierId}
             onChange={(e) => {
-              setSupplierId(e.target.value ? Number(e.target.value) : "");
+              setSupplierId(e.target.value);
               setSupplierCreate("");
             }}
             className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base outline-none focus:border-primary"

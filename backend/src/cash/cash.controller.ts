@@ -45,8 +45,22 @@ export class CashController {
   }
 
   @Get("cash/moves")
-  moves(@CurrentBusiness() ctx: BusinessContext, @Query("date") date?: string) {
-    return this.cash.listMoves(ctx, date);
+  moves(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Query("date") date?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    return this.cash.listMoves(ctx, date, from, to);
+  }
+
+  @Get("expenses")
+  expenses(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    return this.cash.listExpenses(ctx, from, to);
   }
 
   @Throttle({ default: { limit: 30, ttl: 60000 } })

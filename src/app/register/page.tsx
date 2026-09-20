@@ -50,7 +50,8 @@ export default function RegisterPage() {
     <div className="flex flex-col gap-4">
       <h1 className="text-[22px] font-semibold">Crear cuenta</h1>
       <p className="text-sm text-ink/60">
-        Cuenta del servidor. No mueve las ventas de este teléfono.
+        Crea el negocio en el servidor. Puedes cargar productos, clientes y
+        fiados a mano.
       </p>
 
       <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">

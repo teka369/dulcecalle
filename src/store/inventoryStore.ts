@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import type { PayMethod, Product, Supplier } from "@/domain/types";
+import type { PayMethod } from "@/domain/types";
 import {
   INVENTORY_ERRORS,
   INVENTORY_TOASTS,
@@ -10,16 +10,24 @@ import {
   validateSurtirForm,
   type ShrinkReason,
 } from "@/domain/inventory";
-import {
-  inventoryRepository,
-  productRepository,
-  supplierRepository,
-  type SupplierSurtirHistoryItem,
-} from "@/repositories";
+import { ApiError } from "@/data/errors";
+import { getPwaApi } from "@/data/pwa/api";
+import type { RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http/mappers";
+
+export type PwaSupplierSurtir = {
+  moveId: string;
+  createdAt: number;
+  productId: string;
+  productName: string;
+  qty: number;
+  unitCost: number;
+  totalCost: number;
+  method: string | null;
+};
 
 type InventoryState = {
-  products: Product[];
-  suppliers: Supplier[];
+  products: RemoteProduct[];
+  suppliers: RemoteSupplier[];
   loading: boolean;
   lastToast: string | null;
 };
@@ -42,6 +50,12 @@ function setState(patch: Partial<InventoryState>) {
   emit();
 }
 
+function fail(e: unknown): never {
+  if (e instanceof ApiError) throw new Error(e.message);
+  if (e instanceof Error) throw e;
+  throw new Error("Algo salió mal.");
+}
+
 function todayLocalDateInput(): string {
   const d = new Date();
   const y = d.getFullYear();
@@ -61,38 +75,65 @@ export const inventoryStore = {
     return state;
   },
   todayLocalDateInput,
-  async refreshProducts(): Promise<Product[]> {
+  async refreshProducts(): Promise<RemoteProduct[]> {
     setState({ loading: true });
-    const products = await productRepository.list();
-    setState({ products, loading: false });
-    return products;
+    try {
+      const products = await getPwaApi().products.list();
+      setState({ products, loading: false });
+      return products;
+    } catch (e) {
+      setState({ loading: false });
+      fail(e);
+    }
   },
-  async refreshSuppliers(): Promise<Supplier[]> {
-    const suppliers = await supplierRepository.list();
-    setState({ suppliers });
-    return suppliers;
+  async refreshSuppliers(): Promise<RemoteSupplier[]> {
+    try {
+      const suppliers = await getPwaApi().suppliers.list();
+      setState({ suppliers });
+      return suppliers;
+    } catch (e) {
+      fail(e);
+    }
   },
   async refreshAll(): Promise<void> {
     setState({ loading: true });
-    const [products, suppliers] = await Promise.all([
-      productRepository.list(),
-      supplierRepository.list(),
-    ]);
-    setState({ products, suppliers, loading: false });
+    try {
+      const [products, suppliers] = await Promise.all([
+        getPwaApi().products.list(),
+        getPwaApi().suppliers.list(),
+      ]);
+      setState({ products, suppliers, loading: false });
+    } catch (e) {
+      setState({ loading: false });
+      fail(e);
+    }
   },
-  async getProduct(id: number): Promise<Product | undefined> {
-    return productRepository.getById(id);
+  async getProduct(id: string): Promise<RemoteProduct | undefined> {
+    try {
+      return await getPwaApi().products.get(id);
+    } catch {
+      return undefined;
+    }
   },
-  async getSupplier(id: number): Promise<Supplier | undefined> {
-    return supplierRepository.getById(id);
+  async getSupplier(id: string): Promise<RemoteSupplier | undefined> {
+    try {
+      return await getPwaApi().suppliers.get(id);
+    } catch {
+      return undefined;
+    }
   },
-  async listProductMoves(productId: number) {
-    return inventoryRepository.listMoves(productId);
+  async listProductMoves(productId: string): Promise<RemoteStockMove[]> {
+    return getPwaApi().inventory.moves(productId);
   },
-  async listSupplierSurtidas(
-    supplierId: number,
-  ): Promise<SupplierSurtirHistoryItem[]> {
-    return supplierRepository.listSurtidas(supplierId);
+  async listSupplierSurtidas(supplierId: string): Promise<PwaSupplierSurtir[]> {
+    const rows = await getPwaApi().suppliers.surtidas(supplierId);
+    return rows.map((r) => ({
+      ...r,
+      createdAt:
+        typeof r.createdAt === "number"
+          ? r.createdAt
+          : Date.parse(String(r.createdAt)),
+    }));
   },
   async createProduct(input: {
     name: string;
@@ -100,7 +141,7 @@ export const inventoryStore = {
     stockRaw?: string;
     avgCostRaw?: string;
     gifted?: boolean;
-  }): Promise<number> {
+  }): Promise<string> {
     const name = input.name.trim();
     if (!name) throw new Error(INVENTORY_ERRORS.emptyProductName);
     const price = Number.parseInt(input.priceRaw.trim() || "0", 10);
@@ -118,44 +159,43 @@ export const inventoryStore = {
     if (stock > 0 && avgCost <= 0 && !gifted) {
       throw new Error(INVENTORY_ERRORS.needCost);
     }
-    const id = await productRepository.create({
-      name,
-      category: "General",
-      price,
-      avgCost,
-      stock,
-      lowStockAt: 5,
-      gifted,
-    });
-    await this.refreshProducts();
-    setState({ lastToast: INVENTORY_TOASTS.productSaved });
-    return id;
+    try {
+      const created = await getPwaApi().products.create(
+        { name, price, stock, avgCost, lowStockAt: 5, gifted },
+        crypto.randomUUID(),
+      );
+      await this.refreshProducts();
+      setState({ lastToast: INVENTORY_TOASTS.productSaved });
+      return created.id;
+    } catch (e) {
+      fail(e);
+    }
   },
   async createSupplier(input: {
     name: string;
     phone?: string;
     notes?: string;
-  }): Promise<number> {
-    const id = await supplierRepository.create(input);
-    await this.refreshSuppliers();
-    setState({ lastToast: INVENTORY_TOASTS.supplierSaved });
-    return id;
+  }): Promise<string> {
+    try {
+      const created = await getPwaApi().suppliers.create(input);
+      await this.refreshSuppliers();
+      setState({ lastToast: INVENTORY_TOASTS.supplierSaved });
+      return created.id;
+    } catch (e) {
+      fail(e);
+    }
   },
-  /**
-   * UI → store → repository → Dexie surtir.
-   * Pay method required (Efectivo|Nequi). Mermas do NOT use this.
-   */
   async surtir(input: {
-    productId: number;
+    productId: string;
     qtyRaw: string;
     unitCostRaw: string;
     totalCostRaw: string;
     method: PayMethod | null;
-    supplierId?: number | null;
+    supplierId?: string | null;
     supplierNameCreate?: string;
     note?: string;
     requestId?: string;
-  }): Promise<number> {
+  }): Promise<string> {
     const parsed = validateSurtirForm({
       qtyRaw: input.qtyRaw,
       unitCostRaw: input.unitCostRaw,
@@ -165,39 +205,42 @@ export const inventoryStore = {
     if ("error" in parsed) throw new Error(parsed.error);
 
     let supplierId = input.supplierId ?? null;
-    if (
-      (supplierId == null || supplierId <= 0) &&
-      input.supplierNameCreate?.trim()
-    ) {
-      supplierId = await supplierRepository.findOrCreateByName(
-        input.supplierNameCreate,
-      );
+    if (!supplierId && input.supplierNameCreate?.trim()) {
+      const created = await getPwaApi().suppliers.create({
+        name: input.supplierNameCreate.trim(),
+      });
+      supplierId = created.id;
     }
 
-    const moveId = await inventoryRepository.surtir({
-      productId: input.productId,
-      qty: parsed.qty,
-      unitCost: parsed.unitCost,
-      totalCost: parsed.totalCost,
-      method: parsed.method,
-      supplierId,
-      note: input.note?.trim() || undefined,
-      requestId: input.requestId,
-    });
-    await this.refreshAll();
-    setState({ lastToast: INVENTORY_TOASTS.surtir });
-    return moveId;
+    try {
+      const move = await getPwaApi().inventory.surtir(
+        input.productId,
+        {
+          qty: parsed.qty,
+          unitCost: parsed.unitCost,
+          totalCost: parsed.totalCost,
+          method: parsed.method,
+          supplierId,
+          note: input.note?.trim() || undefined,
+        },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      await this.refreshAll();
+      setState({ lastToast: INVENTORY_TOASTS.surtir });
+      return move.id;
+    } catch (e) {
+      fail(e);
+    }
   },
   async applyShrink(input: {
-    productId: number;
+    productId: string;
     qtyRaw: string;
     reason: ShrinkReason;
     note?: string;
-    /** Required when reason === perdido */
     motivoRaw?: string;
     requestId?: string;
-  }): Promise<number> {
-    const product = await productRepository.getById(input.productId);
+  }): Promise<string> {
+    const product = await this.getProduct(input.productId);
     if (!product) throw new Error("product not found");
 
     const parsed = validateShrinkQty(input.qtyRaw, product.stock);
@@ -213,22 +256,24 @@ export const inventoryStore = {
         ? (input.motivoRaw ?? "").trim()
         : input.note?.trim() || undefined;
 
-    const moveId = await inventoryRepository.applyShrink({
-      productId: input.productId,
-      qty: parsed.qty,
-      reason: input.reason,
-      note,
-      requestId: input.requestId,
-    });
-    await this.refreshProducts();
-    const toast =
-      input.reason === "me_lo_comi"
-        ? INVENTORY_TOASTS.meLoComi
-        : input.reason === "regalar"
-          ? INVENTORY_TOASTS.regalo
-          : INVENTORY_TOASTS.perdido;
-    setState({ lastToast: toast });
-    return moveId;
+    try {
+      const move = await getPwaApi().inventory.shrink(
+        input.productId,
+        { qty: parsed.qty, reason: input.reason, note },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      await this.refreshProducts();
+      const toast =
+        input.reason === "me_lo_comi"
+          ? INVENTORY_TOASTS.meLoComi
+          : input.reason === "regalar"
+            ? INVENTORY_TOASTS.regalo
+            : INVENTORY_TOASTS.perdido;
+      setState({ lastToast: toast });
+      return move.id;
+    } catch (e) {
+      fail(e);
+    }
   },
   clearToast() {
     setState({ lastToast: null });
@@ -265,7 +310,7 @@ export function useInventory() {
     createSupplier: inventoryStore.createSupplier.bind(inventoryStore),
     surtir: inventoryStore.surtir.bind(inventoryStore),
     applyShrink: inventoryStore.applyShrink.bind(inventoryStore),
-    clearToast: inventoryStore.clearToast,
     todayLocalDateInput: inventoryStore.todayLocalDateInput,
+    clearToast: inventoryStore.clearToast,
   };
 }

@@ -1,6 +1,6 @@
-# DulceCalle backend (Fase 6 + M1 + M2 auth)
+# DulceCalle backend (Fase 6 + M1 + M2 auth + M3 PWA HTTP)
 
-NestJS + Prisma + PostgreSQL 16. **Does not replace Dexie.** The PWA stays local-first for sales/caja/inventario. Auth (login / register / refresh) talks to this API. The HTTP business adapter stays off. No Dexie import, no sync.
+NestJS + Prisma + PostgreSQL 16. **Source of truth for the business.** The PWA UI talks HTTP (UUID). Dexie repositories remain for domain tests only. No Dexie import, no sync.
 
 Contract: `../DOMAIN.md`, `../BACKEND_ARCHITECTURE.md`, `../DATABASE.md`, `../API_CONTRACT.md`.
 
@@ -39,4 +39,4 @@ COP is `BIGINT` in Postgres / `bigint` in Prisma. HTTP JSON emits a **number** (
 
 ## Out of scope (later phases)
 
-Stats, settings, Dexie migration, HTTP adapter for business data, sync.
+Settings, memberships admin, wipe, Dexie import, sync.
