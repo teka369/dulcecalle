@@ -231,7 +231,7 @@ export async function syncPendingSales(businessId: string) {
     return {
       remoteId: (await getPwaApi().sales.create(item.payload as CreateSaleInput, item.requestId)).id,
     };
-  });
+  }, (item) => item.entity === "sale" && item.operation === "create");
 }
 
 let stopSalesSync: (() => void) | null = null;
