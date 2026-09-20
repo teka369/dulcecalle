@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import { IdentityService } from "./identity.service";
 import { CreateBusinessDto, LoginDto, RefreshDto } from "./dto";
-import { SkipBusiness } from "../shared/http/decorators";
+import { Public, SkipBusiness } from "../shared/http/decorators";
 import { CurrentUser } from "../tenancy/business.decorator";
 import type { AuthedUser } from "./auth.types";
 
