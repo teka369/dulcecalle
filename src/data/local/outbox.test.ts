@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { ApiError } from "../errors";
 import { __resetLocalDbForTests, __reopenLocalDbForTests } from "./db";
 import { newEntityId, newRequestId } from "./ids";
 import {\n  ConnectivityMonitor,\n  getOutboxStore,\n  OutboxSyncEngine,\n  resetOutboxStoreSingleton,\n} from "./outbox";
@@ -265,7 +266,7 @@ describe("M6.4 OutboxSyncEngine", () => {
     const sent: string[] = [];
     const result = await new OutboxSyncEngine(outbox, () => 10_000).flush(BIZ_A, async (item) => {
       sent.push(item.operationId);
-      if (item.operationId === bad) throw new (await import("../errors")).ApiError("VALIDATION", "Bad", 400);
+      if (item.operationId === bad) throw new ApiError("VALIDATION", "Bad", 400);
       return { remoteId: newEntityId() };
     });
     expect(result.failed).toBe(1);
