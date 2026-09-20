@@ -215,6 +215,84 @@ describe("M6.8 offline operations", () => {
     ]);
   });
 
+  it("rejects shrink when cached stock is insufficient", async () => {
+    api.inventory.shrink.mockRejectedValue(new NetworkError("offline"));
+    await getLocalDb().products.put(productRow(2, 120));
+    await expect(
+      shrinkWithOfflineFallback(
+        { productId, qty: 3, reason: "perdido" },
+        "32323232-3232-4232-8232-323232323232",
+      ),
+    ).rejects.toThrow("Stock insuficiente.");
+    expect(await getLocalDb().stockMoves.where("businessId").equals(businessId).count()).toBe(0);
+    expect(await getLocalDb().outbox.where("businessId").equals(businessId).count()).toBe(0);
+  });
+
+  it("rejects inventory writes for archived products", async () => {
+    api.inventory.surtir.mockRejectedValue(new NetworkError("offline"));
+    await getLocalDb().products.put({ ...productRow(), archivedAt: "2026-09-20T00:00:00.000Z" });
+    await expect(
+      surtirWithOfflineFallback(
+        { productId, qty: 1, unitCost: 100, totalCost: 100, method: "Efectivo" },
+        "33333333-3333-4333-8333-333333333333",
+      ),
+    ).rejects.toThrow("El producto está archivado.");
+  });
+
+  it("syncs an offline expense with the same requestId", async () => {
+    api.cash.recordExpense.mockRejectedValueOnce(new NetworkError("offline"));
+    const requestId = "34343434-3434-4343-8343-343434343434";
+    const local = await recordExpenseWithOfflineFallback(
+      { amount: 1200, category: "transporte", method: "Efectivo" },
+      requestId,
+    );
+    expect(local.mode).toBe("offline");
+    api.cash.recordExpense.mockResolvedValueOnce({
+      id: "35353535-3535-4353-8353-353535353535",
+      amount: 1200,
+      category: "transporte",
+      method: "Efectivo",
+      note: null,
+      occurredOn: "2026-09-20",
+      createdAt: Date.now(),
+    });
+    await syncPendingOperations(businessId);
+    expect(api.cash.recordExpense).toHaveBeenLastCalledWith(
+      { amount: 1200, category: "transporte", method: "Efectivo", note: undefined },
+      requestId,
+    );
+    expect((await getOutboxStore().get(businessId, (local as {mode:"offline";id:string}).id))?.status).toBe("synced");
+  });
+
+  it("syncs an offline surtida with the same requestId", async () => {
+    api.inventory.surtir.mockRejectedValueOnce(new NetworkError("offline"));
+    await getLocalDb().products.put(productRow());
+    const requestId = "36363636-3636-4363-8363-363636363636";
+    const local = await surtirWithOfflineFallback(
+      { productId, qty: 2, unitCost: 100, totalCost: 200, method: "Efectivo" },
+      requestId,
+    );
+    expect(local.mode).toBe("offline");
+    api.inventory.surtir.mockResolvedValueOnce({
+      id: "37373737-3737-4373-8373-373737373737",
+      productId,
+      delta: 2,
+      reason: "surtir",
+      unitCost: 100,
+      supplierId: null,
+      note: null,
+      occurredOn: "2026-09-20",
+      createdAt: Date.now(),
+    });
+    await syncPendingOperations(businessId);
+    expect(api.inventory.surtir).toHaveBeenLastCalledWith(
+      productId,
+      { productId, qty: 2, unitCost: 100, totalCost: 200, method: "Efectivo" },
+      requestId,
+    );
+    expect((await getOutboxStore().get(businessId, (local as {mode:"offline";id:string}).id))?.status).toBe("synced");
+  });
+
   it("shrink updates cached stock and queues one operation", async () => {
     api.inventory.shrink.mockRejectedValue(new NetworkError("offline"));
     await getLocalDb().products.put(productRow(8, 120));
