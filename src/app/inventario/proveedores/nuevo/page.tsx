@@ -21,10 +21,10 @@ export default function AgregarProveedorPage() {
     setError(null);
     setBusy(true);
     try {
-      const id = await createSupplier({ name, phone, notes });
-      setToast("Proveedor guardado");
+      const result = await createSupplier({ name, phone, notes });
+      setToast(result.mode === "offline" ? "Proveedor guardado sin conexión" : "Proveedor guardado");
       setTimeout(() => {
-        router.push(`/inventario/proveedores/${id}`);
+        router.push(result.mode === "offline" ? "/inventario" : `/inventario/proveedores/${result.id}`);
       }, 700);
     } catch (e) {
       setError(

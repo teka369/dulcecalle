@@ -65,6 +65,8 @@ export type LocalCustomer = {
   businessId: string;
   /** null until the server assigns DC-NNNN. Never invent DC-TEMP / DC-PENDING. */
   code: string | null;
+  /** Request id while this locally-created row is pending/syncing. */
+  requestId?: string;
   name: string;
   phone: string | null;
   /** CACHE / OPTIMISTIC — server debt. */
@@ -78,6 +80,8 @@ export type LocalSupplier = {
   id: string;
   businessId: string;
   name: string;
+  /** Request id while this locally-created row is pending/syncing. */
+  requestId?: string;
   phone: string | null;
   notes: string | null;
   createdAt: number;

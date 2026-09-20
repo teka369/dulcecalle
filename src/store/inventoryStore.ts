@@ -19,6 +19,7 @@ import {
   listCachedSuppliers,
 } from "@/data/pwa/catalog";
 import type { RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http/mappers";
+import { createSupplierWithOfflineFallback } from "@/data/pwa/offline-catalog";
 
 export type PwaSupplierSurtir = {
   moveId: string;
@@ -181,15 +182,23 @@ export const inventoryStore = {
     name: string;
     phone?: string;
     notes?: string;
-  }): Promise<string> {
+  }): Promise<{ id: string; mode: "online" | "offline" }> {
     try {
-      const created = await getPwaApi().suppliers.create(
+      const result = await createSupplierWithOfflineFallback(
         input,
         crypto.randomUUID(),
       );
       await this.refreshSuppliers();
-      setState({ lastToast: INVENTORY_TOASTS.supplierSaved });
-      return created.id;
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Proveedor guardado sin conexión"
+            : INVENTORY_TOASTS.supplierSaved,
+      });
+      return {
+        id: result.mode === "offline" ? result.supplierId : result.supplier.id,
+        mode: result.mode,
+      };
     } catch (e) {
       fail(e);
     }

@@ -16,6 +16,7 @@ import { ApiError } from "@/data/errors";
 import { getPwaApi } from "@/data/pwa/api";
 import { getCachedCustomer, listCachedCustomers } from "@/data/pwa/catalog";
 import { createPaymentWithOfflineFallback } from "@/data/pwa/offline-payments";
+import { createCustomerWithOfflineFallback } from "@/data/pwa/offline-catalog";
 import { loadHttpStatement } from "@/data/pwa/statement";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import type { DebtStatement } from "@/domain/debt/statement";
@@ -74,13 +75,18 @@ export const customerStore = {
     const trimmed = name.trim();
     if (!trimmed) throw new Error(CUSTOMER_ERRORS.emptyName);
     try {
-      const created = await getPwaApi().customers.create(
+      const result = await createCustomerWithOfflineFallback(
         { name: trimmed },
         crypto.randomUUID(),
       );
       await this.refresh();
-      setState({ lastToast: "Cliente guardado" });
-      return created.id;
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Cliente guardado sin conexión"
+            : "Cliente guardado",
+      });
+      return result.mode === "offline" ? result.customerId : result.customer.id;
     } catch (e) {
       fail(e);
     }
