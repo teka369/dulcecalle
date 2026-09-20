@@ -3,7 +3,7 @@ import type { CreateSaleInput } from "../http/repository";
 import type { RemoteSale } from "../http/mappers";
 import { getPwaApi } from "./api";
 import { getPwaAuthSession } from "../http/session";
-import { getLocalStore } from "../local/store";
+import { getLocalDb } from "../local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
 import { newEntityId } from "../local/ids";
 import { addCop, mulCop, subCop } from "@/domain/money";
@@ -15,10 +15,7 @@ export type CreateSaleResult =
 
 function todayLocal(): string {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function paymentValues(input: CreateSaleInput, total: number) {
@@ -46,153 +43,169 @@ async function createLocalSale(
   businessId: string,
   requestId: string,
 ): Promise<string> {
-  const store = getLocalStore();
-  const products = await store.products.list(businessId);
-  const customers = await store.customers.list(businessId);
-  const productById = new Map(products.map((p) => [p.id, p]));
-  const customerById = new Map(customers.map((c) => [c.id, c]));
-
-  if (!input.lines.length) throw new Error("Agrega al menos un producto.");
-
-  const needsCustomer = input.paymentKind !== "paid";
-  if (needsCustomer && !input.customerId) {
-    throw new Error("Selecciona un cliente.");
-  }
-  if (needsCustomer && !customerById.has(input.customerId!)) {
-    throw new Error("El cliente no está disponible sin conexión.");
-  }
-
-  let total = 0;
-  const prepared: Array<{
-    product: LocalProduct;
-    qty: number;
-    unitPrice: number;
-    lineTotal: number;
-  }> = [];
-
-  for (const line of input.lines) {
-    if (!Number.isInteger(line.qty) || line.qty <= 0) {
-      throw new Error("La cantidad tiene que ser mayor a 0.");
-    }
-    const product = productById.get(line.productId);
-    if (!product) throw new Error("El producto no está disponible sin conexión.");
-    if (product.archivedAt) throw new Error(`El producto "${product.name}" está archivado.`);
-    if (product.stock < line.qty) {
-      throw new Error(`Stock insuficiente para "${product.name}".`);
-    }
-    const unitPrice = line.unitPrice ?? product.price;
-    if (!Number.isInteger(unitPrice) || unitPrice < 0) {
-      throw new Error("El precio tiene que ser 0 o más.");
-    }
-    const lineTotal = mulCop(unitPrice, line.qty);
-    total = addCop(total, lineTotal);
-    prepared.push({ product, qty: line.qty, unitPrice, lineTotal });
-  }
-
-  const { received, credit } = paymentValues(input, total);
+  const db = getLocalDb();
   const now = Date.now();
   const occurredOn = todayLocal();
-  const saleId = newEntityId();
 
-  const sale: LocalSale = {
-    id: saleId,
-    businessId,
-    customerId: input.customerId ?? null,
-    paymentKind: input.paymentKind,
-    method: received > 0 ? input.method! : null,
-    saleTotal: total,
-    amountReceived: received,
-    credit,
-    requestId,
-    note: input.note ?? null,
-    occurredOn,
-    createdAt: now,
-    updatedAt: now,
-  };
+  return db.transaction(
+    "rw",
+    [
+      db.products,
+      db.customers,
+      db.sales,
+      db.saleLines,
+      db.stockMoves,
+      db.cashMoves,
+      db.outbox,
+    ],
+    async () => {
+      const existingOutbox = await db.outbox
+        .where("[businessId+requestId]")
+        .equals([businessId, requestId])
+        .first();
+      if (existingOutbox) return existingOutbox.operationId;
 
-  await store.sales.put(sale);
+      if (!input.lines.length) throw new Error("Agrega al menos un producto.");
 
-  for (const row of prepared) {
-    const lineId = newEntityId();
-    const line: LocalSaleLine = {
-      id: lineId,
-      businessId,
-      saleId,
-      productId: row.product.id,
-      productName: row.product.name,
-      qty: row.qty,
-      unitPrice: row.unitPrice,
-      unitCost: row.product.avgCost,
-      lineTotal: row.lineTotal,
-      createdAt: now,
-    };
-    await store.saleLines.put(line);
+      const needsCustomer = input.paymentKind !== "paid";
+      if (needsCustomer && !input.customerId) throw new Error("Selecciona un cliente.");
 
-    const nextStock = row.product.stock - row.qty;
-    await store.products.put({
-      ...row.product,
-      stock: nextStock,
-      updatedAt: now,
-    });
+      const products = await db.products.where("businessId").equals(businessId).toArray();
+      const customers = await db.customers.where("businessId").equals(businessId).toArray();
+      const productById = new Map(products.map((p) => [p.id, p]));
+      const customerById = new Map(customers.map((c) => [c.id, c]));
 
-    const stockMove: LocalStockMove = {
-      id: newEntityId(),
-      businessId,
-      productId: row.product.id,
-      delta: -row.qty,
-      reason: "sale",
-      unitCost: row.product.avgCost,
-      supplierId: null,
-      refType: "sale",
-      refId: saleId,
-      note: null,
-      requestId,
-      occurredOn,
-      createdAt: now,
-    };
-    await store.stockMoves.put(stockMove);
-  }
+      if (needsCustomer && !customerById.has(input.customerId!)) {
+        throw new Error("El cliente no está disponible sin conexión.");
+      }
 
-  if (received > 0) {
-    const cashMove: LocalCashMove = {
-      id: newEntityId(),
-      businessId,
-      amount: received,
-      direction: "in",
-      method: input.method!,
-      kind: "sale",
-      sessionId: null,
-      refType: "sale",
-      refId: saleId,
-      requestId,
-      note: input.note ?? null,
-      occurredOn,
-      createdAt: now,
-    };
-    await store.cashMoves.put(cashMove);
-  }
+      let total = 0;
+      const prepared: Array<{
+        product: LocalProduct;
+        qty: number;
+        unitPrice: number;
+        lineTotal: number;
+      }> = [];
 
-  if (credit > 0 && input.customerId) {
-    const customer = customerById.get(input.customerId);
-    if (!customer) throw new Error("El cliente no está disponible sin conexión.");
-    await store.customers.put({
-      ...customer,
-      debt: addCop(customer.debt, credit),
-      updatedAt: now,
-    });
-  }
+      for (const line of input.lines) {
+        if (!Number.isInteger(line.qty) || line.qty <= 0) {
+          throw new Error("La cantidad tiene que ser mayor a 0.");
+        }
+        const product = productById.get(line.productId);
+        if (!product) throw new Error("El producto no está disponible sin conexión.");
+        if (product.archivedAt) throw new Error(`El producto "${product.name}" está archivado.`);
+        if (product.stock < line.qty) throw new Error(`Stock insuficiente para "${product.name}".`);
+        const unitPrice = line.unitPrice ?? product.price;
+        if (!Number.isInteger(unitPrice) || unitPrice < 0) {
+          throw new Error("El precio tiene que ser 0 o más.");
+        }
+        const lineTotal = mulCop(unitPrice, line.qty);
+        total = addCop(total, lineTotal);
+        prepared.push({ product, qty: line.qty, unitPrice, lineTotal });
+      }
 
-  await getOutboxStore().enqueue({
-    operationId: saleId,
-    businessId,
-    entity: "sale",
-    operation: "create",
-    requestId,
-    payload: input,
-    localCreatedAt: now,
-  });
+      const { received, credit } = paymentValues(input, total);
+      const saleId = newEntityId();
 
-  return saleId;
+      const sale: LocalSale = {
+        id: saleId,
+        businessId,
+        customerId: input.customerId ?? null,
+        paymentKind: input.paymentKind,
+        method: received > 0 ? input.method! : null,
+        saleTotal: total,
+        amountReceived: received,
+        credit,
+        requestId,
+        note: input.note ?? null,
+        occurredOn,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await db.sales.put(sale);
+
+      for (const row of prepared) {
+        const line: LocalSaleLine = {
+          id: newEntityId(),
+          businessId,
+          saleId,
+          productId: row.product.id,
+          productName: row.product.name,
+          qty: row.qty,
+          unitPrice: row.unitPrice,
+          unitCost: row.product.avgCost,
+          lineTotal: row.lineTotal,
+          createdAt: now,
+        };
+        await db.saleLines.put(line);
+        await db.products.put({ ...row.product, stock: row.product.stock - row.qty, updatedAt: now });
+        const move: LocalStockMove = {
+          id: newEntityId(),
+          businessId,
+          productId: row.product.id,
+          delta: -row.qty,
+          reason: "sale",
+          unitCost: row.product.avgCost,
+          supplierId: null,
+          refType: "sale",
+          refId: saleId,
+          note: null,
+          requestId,
+          occurredOn,
+          createdAt: now,
+        };
+        await db.stockMoves.put(move);
+      }
+
+      if (received > 0) {
+        const move: LocalCashMove = {
+          id: newEntityId(),
+          businessId,
+          amount: received,
+          direction: "in",
+          method: input.method!,
+          kind: "sale",
+          sessionId: null,
+          refType: "sale",
+          refId: saleId,
+          requestId,
+          note: input.note ?? null,
+          occurredOn,
+          createdAt: now,
+        };
+        await db.cashMoves.put(move);
+      }
+
+      if (credit > 0 && input.customerId) {
+        const customer = customerById.get(input.customerId);
+        if (!customer) throw new Error("El cliente no está disponible sin conexión.");
+        const updated: LocalCustomer = {
+          ...customer,
+          debt: addCop(customer.debt, credit),
+          updatedAt: now,
+        };
+        await db.customers.put(updated);
+      }
+
+      await db.outbox.put({
+        operationId: saleId,
+        businessId,
+        entity: "sale",
+        operation: "create",
+        requestId,
+        payload: input,
+        dependsOn: [],
+        localCreatedAt: now,
+        status: "pending",
+        remoteId: null,
+        attempts: 0,
+        lastError: null,
+        nextAttemptAt: null,
+      });
+
+      return saleId;
+    },
+  );
 }
 
 export async function createSaleWithOfflineFallback(
@@ -211,12 +224,13 @@ export async function createSaleWithOfflineFallback(
 }
 
 export async function syncPendingSales(businessId: string) {
-  const engine = getOutboxSyncEngine();
-  return engine.flush(businessId, async (item) => {
+  return getOutboxSyncEngine().flush(businessId, async (item) => {
     if (item.entity !== "sale" || item.operation !== "create") {
       throw new Error("Operación de outbox no compatible con M6.5.");
     }
-    return { remoteId: (await getPwaApi().sales.create(item.payload as CreateSaleInput, item.requestId)).id };
+    return {
+      remoteId: (await getPwaApi().sales.create(item.payload as CreateSaleInput, item.requestId)).id,
+    };
   });
 }
 
