@@ -18,6 +18,18 @@ export type CreatePaymentResult =
   | { mode: "online"; payment: RemotePayment }
   | { mode: "offline"; paymentId: string };
 
+export function validateOfflinePayment(input: CreatePaymentInput, debt: number): void {
+  if (!Number.isInteger(input.amount) || input.amount <= 0) {
+    throw new Error("El abono tiene que ser mayor a 0.");
+  }
+  if (input.amount > debt) {
+    throw new Error("El abono no puede ser mayor al saldo.");
+  }
+  if (input.method !== "Efectivo" && input.method !== "Nequi") {
+    throw new Error("Elige Efectivo o Nequi.");
+  }
+}
+
 function todayLocal(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -48,12 +60,7 @@ async function createLocalPayment(
         .first();
 
       if (!customer) throw new Error("El cliente no está disponible sin conexión.");
-      if (!Number.isInteger(input.amount) || input.amount <= 0) {
-        throw new Error("El abono tiene que ser mayor a 0.");
-      }
-      if (input.amount > customer.debt) {
-        throw new Error("El abono no puede ser mayor al saldo.");
-      }
+      validateOfflinePayment(input, customer.debt);
 
       const paymentId = newEntityId();
       await db.customerPayments.put({
