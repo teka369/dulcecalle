@@ -212,7 +212,8 @@ function retryAt(attempts: number, now: number): number {
   const delay = Math.min(5 * 60_000, 1_000 * 2 ** Math.max(0, attempts - 1));
   return now + delay;
 }
-\nfunction emitSyncEvent(detail: Record<string, unknown>): void {
+
+function emitSyncEvent(detail: Record<string, unknown>): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent("dulcecalle:sync", { detail }));
 }
