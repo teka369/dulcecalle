@@ -161,7 +161,7 @@ export type OfflineOperationResult<T> =
 export async function openCashWithOfflineFallback(
   openingFloat: number,
   requestId: string,
-): Promise<OfflineOperationResult<Awaited<ReturnType<typeof getPwaApi>["cash"]["open"]>>> {
+): Promise<OfflineOperationResult<Awaited<ReturnType<ReturnType<typeof getPwaApi>["cash"]["open"]>>>> {
   try {
     const value = await getPwaApi().cash.open(openingFloat, requestId);
     const business = businessId();
@@ -235,7 +235,7 @@ export async function closeCashWithOfflineFallback(
   sessionId: string,
   countedEfectivo: number,
   requestId: string,
-): Promise<OfflineOperationResult<Awaited<ReturnType<typeof getPwaApi>["cash"]["close"]>>> {
+): Promise<OfflineOperationResult<Awaited<ReturnType<ReturnType<typeof getPwaApi>["cash"]["close"]>>>> {
   try {
     const value = await getPwaApi().cash.close(sessionId, countedEfectivo, requestId);
     const business = businessId();
