@@ -265,7 +265,10 @@ export async function closeCashWithOfflineFallback(
   try {
     const value = await getPwaApi().cash.close(openSynced ?? sessionId, countedEfectivo, requestId);
     const local = await getLocalDb().cashSessions.get(sessionId);
-    if (local?.businessId !== business) throw new Error("La caja no pertenece al negocio seleccionado.");
+    // D8 — No local row (e.g. session opened on another device) is not a
+    // block: the server is the authority and already scoped the close by
+    // business. Only a row from another business is rejected.
+    if (local && local.businessId !== business) throw new Error("La caja no pertenece al negocio seleccionado.");
     if (local) {
       await getLocalDb().cashSessions.put({
         ...local,

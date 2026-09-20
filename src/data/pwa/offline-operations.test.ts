@@ -243,6 +243,65 @@ describe("M6.8 offline operations", () => {
     expect(item?.dependsOn).toEqual([localId]);
   });
 
+  it("D8: closes online a session unknown locally (opened on another device)", async () => {
+    const remoteId = "51515151-5151-4515-8151-515151515151";
+    api.cash.close.mockResolvedValue({
+      id: remoteId,
+      localDate: "2026-09-20",
+      openedAt: 1000,
+      closedAt: 2000,
+      openingFloat: 0,
+      closingCount: 1200,
+      expectedEfectivo: 1000,
+      expectedNequi: 0,
+      difference: 200,
+    });
+
+    const result = await closeCashWithOfflineFallback(
+      remoteId,
+      1200,
+      "52525252-5252-4525-8252-525252525252",
+    );
+
+    expect(result.mode).toBe("online");
+    expect(api.cash.close).toHaveBeenCalledWith(
+      remoteId,
+      1200,
+      "52525252-5252-4525-8252-525252525252",
+    );
+  });
+
+  it("D8: still rejects a local row from another business", async () => {
+    const foreignId = "53535353-5353-4535-8353-535353535353";
+    await getLocalDb().cashSessions.put({
+      id: foreignId,
+      businessId: otherBusinessId,
+      localDate: "2026-09-20",
+      openedAt: 1000,
+      closedAt: null,
+      openingFloat: 0,
+      closingCount: null,
+      expectedEfectivo: null,
+      expectedNequi: null,
+      difference: null,
+      note: null,
+      createdAt: 1000,
+      updatedAt: 1000,
+    });
+    api.cash.close.mockResolvedValue({
+      id: foreignId,
+      closedAt: 2000,
+      closingCount: 0,
+      expectedEfectivo: 0,
+      expectedNequi: 0,
+      difference: 0,
+    });
+
+    await expect(
+      closeCashWithOfflineFallback(foreignId, 0, "54545454-5454-4545-8545-545454545454"),
+    ).rejects.toThrow("no pertenece al negocio");
+  });
+
   it("records offline aporte and retiro after an open cash session", async () => {
     api.cash.open.mockRejectedValue(new NetworkError("offline"));
     await openCashWithOfflineFallback(5000, "16161616-1616-4161-8161-161616161616");
