@@ -78,6 +78,17 @@ describe("M6 LocalStore tenant isolation", () => {
     });
   });
 
+  it("refuses to overwrite a Business A id with a Business B row", async () => {
+    const store = getLocalStore();
+    const galleta = product(BIZ_A, "Galleta");
+    await store.products.put(galleta);
+    await expect(
+      store.products.put({ ...galleta, businessId: BIZ_B, name: "Chicle" }),
+    ).rejects.toThrow(/another business/);
+    expect((await store.products.get(BIZ_A, galleta.id))?.name).toBe("Galleta");
+    expect(await store.products.get(BIZ_B, galleta.id)).toBeUndefined();
+  });
+
   it("rejects numeric Dexie ids", async () => {
     const store = getLocalStore();
     await expect(

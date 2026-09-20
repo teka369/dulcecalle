@@ -40,7 +40,14 @@ export class OutboxStore {
       if (existing.businessId !== input.businessId) {
         throw new Error("operationId belongs to another business");
       }
+      if (existing.requestId !== input.requestId) {
+        throw new Error("operationId already used with a different requestId");
+      }
       return existing;
+    }
+    const byKey = await this.getByRequestId(input.businessId, input.requestId);
+    if (byKey) {
+      throw new Error("requestId already used");
     }
     const row: OutboxItem = {
       operationId: input.operationId,

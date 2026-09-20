@@ -214,6 +214,27 @@ describe("HttpClient 401 → refresh → retry", () => {
     expect(session.user).toEqual({ id: "u", email: "a@test.co" });
   });
 
+  it("keeps the session when refresh is aborted", async () => {
+    const session = new HttpSession();
+    session.accessToken = "old";
+    session.refreshToken = "r1";
+    session.businessId = "biz";
+    const fetchImpl: typeof fetch = async (url) => {
+      if (String(url).endsWith("/auth/refresh")) {
+        throw new DOMException("The operation was aborted.", "AbortError");
+      }
+      return jsonResponse(401, {
+        error: { code: "UNAUTHORIZED", message: "Inicia sesión." },
+      });
+    };
+    const http = new HttpClient("http://example.test/v1", session, fetchImpl);
+    await expect(http.request("GET", "/products")).rejects.toBeInstanceOf(
+      NetworkError,
+    );
+    expect(session.accessToken).toBe("old");
+    expect(session.refreshToken).toBe("r1");
+  });
+
   it("keeps the session when the original fetch fails with a network error", async () => {
     const session = new HttpSession();
     session.accessToken = "tok";

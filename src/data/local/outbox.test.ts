@@ -133,4 +133,51 @@ describe("M6 OutboxStore", () => {
     expect(failed.nextAttemptAt).toBe(9);
     expect(failed.attempts).toBe(1);
   });
+
+  it("retries reuse operationId+requestId and reject a new requestId", async () => {
+    const outbox = getOutboxStore();
+    const operationId = newEntityId();
+    const requestId = newRequestId();
+    const first = await outbox.enqueue({
+      operationId,
+      businessId: BIZ_A,
+      entity: "customer",
+      operation: "create",
+      requestId,
+      payload: { name: "Rosa" },
+    });
+    const retry = await outbox.enqueue({
+      operationId,
+      businessId: BIZ_A,
+      entity: "customer",
+      operation: "create",
+      requestId,
+      payload: { name: "Rosa otra" },
+    });
+    expect(retry.operationId).toBe(first.operationId);
+    expect(retry.requestId).toBe(requestId);
+    expect(retry.payload).toEqual({ name: "Rosa" });
+
+    await expect(
+      outbox.enqueue({
+        operationId,
+        businessId: BIZ_A,
+        entity: "customer",
+        operation: "create",
+        requestId: newRequestId(),
+        payload: { name: "Rosa" },
+      }),
+    ).rejects.toThrow(/different requestId/);
+
+    await expect(
+      outbox.enqueue({
+        operationId: newEntityId(),
+        businessId: BIZ_A,
+        entity: "customer",
+        operation: "create",
+        requestId,
+        payload: { name: "Copia" },
+      }),
+    ).rejects.toThrow(/requestId already used/);
+  });
 });

@@ -10,6 +10,10 @@ function scoped<T extends TenantRow>(table: EntityTable<T, "id">) {
     async put(row: T): Promise<void> {
       assertUuid(row.id, "id");
       assertUuid(row.businessId, "businessId");
+      const existing = await table.where("id").equals(row.id).first();
+      if (existing && existing.businessId !== row.businessId) {
+        throw new Error("id belongs to another business");
+      }
       await table.put(row);
     },
     async get(businessId: string, id: string): Promise<T | undefined> {

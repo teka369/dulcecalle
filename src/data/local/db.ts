@@ -55,7 +55,7 @@ export class DulceCalleLocalDB extends Dexie {
       customerPayments: "id, businessId, customerId, requestId, [businessId+customerId]",
       initialDebts: "id, businessId, customerId, requestId, [businessId+customerId]",
       outbox:
-        "operationId, businessId, status, requestId, localCreatedAt, [businessId+status], [businessId+requestId], [businessId+localCreatedAt]",
+        "operationId, businessId, status, requestId, localCreatedAt, [businessId+status], &[businessId+requestId], [businessId+localCreatedAt]",
     });
   }
 }

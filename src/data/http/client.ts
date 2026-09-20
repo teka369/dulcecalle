@@ -68,12 +68,15 @@ export class HttpClient {
       headers["Idempotency-Key"] = opts.idempotencyKey;
     }
 
+    const body =
+      opts.body !== undefined ? JSON.stringify(opts.body) : undefined;
+
     let res: Response;
     try {
       res = await this.fetchImpl(url, {
         method,
         headers,
-        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+        body,
       });
     } catch (e) {
       throw toNetworkError(e);
