@@ -23,6 +23,17 @@ function originAllowed(origin: string): boolean {
   return false;
 }
 
+function corsOrigin(
+  origin: string | undefined,
+  cb: (err: Error | null, allow?: boolean) => void,
+): void {
+  if (!origin || originAllowed(origin)) {
+    cb(null, true);
+    return;
+  }
+  cb(new Error(`CORS blocked: ${origin}`), false);
+}
+
 async function bootstrap() {
   requireJwtSecrets();
   const app = await NestFactory.create(AppModule);
@@ -37,13 +48,7 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new HttpErrorFilter());
   app.enableCors({
-    origin: (origin, cb) => {
-      if (!origin || originAllowed(origin)) {
-        cb(null, true);
-        return;
-      }
-      cb(new Error(`CORS blocked: ${origin}`), false);
-    },
+    origin: corsOrigin,
     credentials: true,
     allowedHeaders: [
       "Authorization",
