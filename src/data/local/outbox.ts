@@ -89,15 +89,6 @@ export class OutboxStore {
     return rows.length;
   }
 
-  async recoverInFlight(businessId: string): Promise<number> {
-    assertUuid(businessId, "businessId");
-    const rows = await this.listByStatus(businessId, "in_flight");
-    for (const row of rows) {
-      await this.db.outbox.put({ ...row, status: "pending", nextAttemptAt: null });
-    }
-    return rows.length;
-  }
-
   async getByRequestId(
     businessId: string,
     requestId: string,
@@ -260,7 +251,7 @@ export class ConnectivityMonitor {
   private readonly handleOffline = (): void => this.setOnline(false);
 
   private readOnline(): boolean {
-    return typeof navigator === "undefined" ? true : navigator.onLine;
+    return typeof navigator === "undefined" || typeof navigator.onLine !== "boolean" ? true : navigator.onLine;
   }
 
   private setOnline(next: boolean): void {
