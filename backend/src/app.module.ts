@@ -10,6 +10,7 @@ import { CatalogModule } from "./catalog/catalog.module";
 import { SalesModule } from "./sales/sales.module";
 import { CashModule } from "./cash/cash.module";
 import { StatsModule } from "./stats/stats.module";
+import { CustomerAccessModule } from "./customer-access/customer-access.module";
 import { HealthController } from "./health/health.controller";
 import { JwtAuthGuard } from "./identity/jwt.guard";
 import { BusinessGuard } from "./tenancy/business.guard";
@@ -31,6 +32,7 @@ import { requireJwtSecrets } from "./identity/jwt-secrets";
     }),
     ThrottlerModule.forRoot({
       throttlers: [{ name: "default", ttl: 60000, limit: 120 }],
+      skipIf: () => process.env.DISABLE_THROTTLE === "1",
     }),
     PrismaModule,
     TenancyModule,
@@ -39,6 +41,7 @@ import { requireJwtSecrets } from "./identity/jwt-secrets";
     SalesModule,
     CashModule,
     StatsModule,
+    CustomerAccessModule,
   ],
   controllers: [HealthController],
   providers: [

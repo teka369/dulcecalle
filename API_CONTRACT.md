@@ -50,13 +50,24 @@ Duplicate request_id is **not** 409: it is 200 with the first result.
 | POST | `/v1/businesses` | yes | new business, caller = owner |
 | GET | `/v1/health` | no | |
 
+Customer portal (M5). Not a `User`. Business comes from the token, not `X-Business-Id`.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| POST | `/v1/customer-access/login` | no | `{ code, name }`; 10/min; generic fail |
+| POST | `/v1/customer-access/refresh` | no | `{ refreshToken }` |
+| POST | `/v1/customer-access/logout` | customer | `{ ok: true }`; does not revoke JWTs |
+| GET | `/v1/customer/me` | customer | id, code, name, debt |
+| GET | `/v1/customer/me/ledger` | customer | ledger without `unitCost` / extra ids |
+
 Selector: header `X-Business-Id` must be a membership of the user. Do not send it when no business is selected.
 
 **JWT**
 
 - Access: 15m, `JWT_SECRET`. Refresh: 7d, `JWT_REFRESH_SECRET`, claim `typ: "refresh"`.
+- Customer portal access: 15m, claim `typ: "customer"` + `businessId`. Customer refresh: 7d, `typ: "customer_refresh"`.
 - Both secrets are **required** at boot. No fallback (no `dev-access-secret`).
-- Refresh tokens are rejected as Bearer (`401 UNAUTHORIZED`).
+- Refresh tokens and customer tokens are rejected as admin Bearer (`401 UNAUTHORIZED`).
 - There is no denylist. Logout is client-side: delete stored tokens. An old refresh remains valid until expiry.
 
 **403 vs 404**

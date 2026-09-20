@@ -38,7 +38,7 @@ export class JwtAuthGuard implements CanActivate {
         email: string;
         typ?: string;
       }>(token);
-      if (payload.typ === "refresh") {
+      if (payload.typ === "refresh" || payload.typ === "customer" || payload.typ === "customer_refresh") {
         throw new AppError(ERROR_CODES.UNAUTHORIZED, MESSAGES.unauthorized);
       }
       req.user = { id: payload.sub, email: payload.email };
