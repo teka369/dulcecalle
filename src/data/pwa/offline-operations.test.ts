@@ -68,6 +68,62 @@ beforeEach(async () => {
 });
 
 describe("M6.8 offline operations", () => {
+  it("mirrors server validation before queueing invalid cash operations", async () => {
+    api.cash.open.mockRejectedValue(new NetworkError("offline"));
+    api.cash.aporte.mockRejectedValue(new NetworkError("offline"));
+    api.cash.recordExpense.mockRejectedValue(new NetworkError("offline"));
+
+    await expect(
+      openCashWithOfflineFallback(-1, "41414141-4141-4141-8414-414141414141"),
+    ).rejects.toThrow("El monto no puede ser negativo.");
+
+    await expect(
+      recordAporteOffline(
+        { amount: 0, method: "Efectivo" },
+        "42424242-4242-4242-8424-424242424242",
+      ),
+    ).rejects.toThrow("El monto tiene que ser mayor a 0.");
+
+    await expect(
+      recordExpenseWithOfflineFallback(
+        { amount: 100, category: "   ", method: "Efectivo" },
+        "43434343-4343-4343-8434-434343434343",
+      ),
+    ).rejects.toThrow("Di en qué se gastó.");
+
+    expect(await getLocalDb().outbox.where("businessId").equals(businessId).count()).toBe(0);
+  });
+
+  it("mirrors closed-day protection for offline shrink", async () => {
+    await getLocalDb().cashSessions.put({
+      id: "44444444-4444-4444-8444-444444444444",
+      businessId,
+      localDate: "2026-09-20",
+      openedAt: Date.now() - 1000,
+      closedAt: Date.now(),
+      openingFloat: 5000,
+      closingCount: 5000,
+      expectedEfectivo: 5000,
+      expectedNequi: 0,
+      difference: 0,
+      note: null,
+      createdAt: Date.now() - 1000,
+      updatedAt: Date.now(),
+    });
+    await getLocalDb().products.put(productRow(10, 120));
+    api.inventory.shrink.mockRejectedValue(new NetworkError("offline"));
+
+    await expect(
+      shrinkWithOfflineFallback(
+        { productId, qty: 1, reason: "perdido" },
+        "45454545-4545-4454-8454-454545454545",
+      ),
+    ).rejects.toThrow("La caja de hoy ya está cerrada.");
+
+    expect((await getLocalDb().products.get(productId))?.stock).toBe(10);
+    expect(await getLocalDb().outbox.where("businessId").equals(businessId).count()).toBe(0);
+  });
+
   it("opens cash locally and survives a Dexie reopen", async () => {
     api.cash.open.mockRejectedValue(new NetworkError("offline"));
     const result = await openCashWithOfflineFallback(10000, "55555555-5555-4555-8555-555555555555");
