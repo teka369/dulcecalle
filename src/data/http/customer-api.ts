@@ -1,5 +1,6 @@
 import { apiBaseUrl } from "../backend";
 import { HttpClient } from "./client";
+import { getLocalDb } from "../local/db";
 import {
   CustomerSession,
   getCustomerAuthSession,
@@ -118,6 +119,7 @@ export class CustomerApi {
   }
 
   async logout() {
+    const customerId = this.session.customer?.id;
     try {
       await this.http.request<{ ok: boolean }>(
         "POST",
@@ -128,6 +130,15 @@ export class CustomerApi {
       /* stateless JWT */
     }
     this.session.clear();
+    // M6.10 — Never leave the private ledger stored after logout.
+    // Only the closing customer's snapshot is removed.
+    if (customerId) {
+      try {
+        await getLocalDb().customerLedgers.delete(customerId);
+      } catch {
+        /* local-only cleanup; session is already cleared */
+      }
+    }
     return { ok: true as const };
   }
 }

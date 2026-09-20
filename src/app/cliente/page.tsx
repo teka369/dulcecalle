@@ -2,19 +2,25 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CustomerChrome } from "@/components/customer/CustomerChrome";
-import { getCustomerApi, type CustomerLedger } from "@/data/http/customer-api";
+import { CustomerChrome, CustomerCacheNotice } from "@/components/customer/CustomerChrome";
+import type { CustomerLedger } from "@/data/http/customer-api";
+import { loadCachedCustomerLedger } from "@/data/pwa/customer-ledger-cache";
 import { customerPortalSummary } from "@/data/pwa/customer-portal";
 import { formatCop } from "@/domain/money";
 
 export default function CustomerHomePage() {
   const [ledger, setLedger] = useState<CustomerLedger | null>(null);
+  const [capturedAt, setCapturedAt] = useState<number | null>(null);
+  const [fromCache, setFromCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void getCustomerApi()
-      .ledger()
-      .then(setLedger)
+    void loadCachedCustomerLedger()
+      .then((result) => {
+        setLedger(result.ledger);
+        setCapturedAt(result.capturedAt);
+        setFromCache(result.source === "cache");
+      })
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : "No se pudo cargar.");
       });
@@ -40,6 +46,9 @@ export default function CustomerHomePage() {
 
   return (
     <CustomerChrome>
+      {fromCache && capturedAt != null && (
+        <CustomerCacheNotice capturedAt={capturedAt} />
+      )}
       <h1 className="text-[22px] font-semibold tracking-tight">
         Hola, {summary.name}
       </h1>

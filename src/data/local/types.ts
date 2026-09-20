@@ -3,6 +3,7 @@
  * stock / debt / avgCost / expected* are CACHE / OPTIMISTIC — PostgreSQL is
  * the financial authority. Do not treat these as source of truth.
  */
+import type { CustomerLedger } from "../http/customer-api";
 
 export type CatalogResource = "products" | "customers" | "suppliers";
 
@@ -12,6 +13,18 @@ export type LocalCacheMeta = {
   businessId: string;
   resource: CatalogResource;
   cachedAt: number;
+};
+
+/**
+ * M6.10 — Customer portal ledger snapshot. Keyed by customerId (the portal
+ * never uses businessId; identity comes from the token). Read-only copy of
+ * the last successful GET /customer/me/ledger. Never invent rows: presence
+ * of the row means "cached", even when the ledger itself is empty.
+ */
+export type CustomerLedgerSnapshot = {
+  customerId: string;
+  ledger: CustomerLedger;
+  capturedAt: number;
 };
 
 export type LocalEntityId = string;

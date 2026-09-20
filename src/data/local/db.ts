@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from "dexie";
 import type {
+  CustomerLedgerSnapshot,
   LocalCacheMeta,
   LocalCashMove,
   LocalCashSession,
@@ -38,6 +39,7 @@ export class DulceCalleLocalDB extends Dexie {
   customerPayments!: EntityTable<LocalCustomerPayment, "id">;
   initialDebts!: EntityTable<LocalInitialDebt, "id">;
   cacheMeta!: EntityTable<LocalCacheMeta, "id">;
+  customerLedgers!: EntityTable<CustomerLedgerSnapshot, "customerId">;
   outbox!: EntityTable<OutboxItem, "operationId">;
 
   constructor() {
@@ -65,6 +67,11 @@ export class DulceCalleLocalDB extends Dexie {
     });
     this.version(3).stores({
       cashSessions: "id, businessId, localDate, requestId, [businessId+localDate], [businessId+requestId]",
+    });
+    // v4 (M6.10): customer portal ledger snapshot, keyed by customerId.
+    // The portal never uses businessId, so it stays out of cacheMeta.
+    this.version(4).stores({
+      customerLedgers: "customerId, capturedAt",
     });
   }
 }

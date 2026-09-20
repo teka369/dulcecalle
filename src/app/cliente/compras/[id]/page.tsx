@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CustomerChrome } from "@/components/customer/CustomerChrome";
-import { getCustomerApi, type CustomerLedger } from "@/data/http/customer-api";
+import { CustomerChrome, CustomerCacheNotice } from "@/components/customer/CustomerChrome";
+import type { CustomerLedger } from "@/data/http/customer-api";
+import { loadCachedCustomerLedger } from "@/data/pwa/customer-ledger-cache";
 import { findCustomerSale } from "@/data/pwa/customer-portal";
 import { routeId } from "@/data/pwa/ids";
 import { formatCop } from "@/domain/money";
@@ -13,12 +14,17 @@ export default function CustomerPurchaseDetailPage() {
   const params = useParams();
   const id = routeId(params.id);
   const [ledger, setLedger] = useState<CustomerLedger | null>(null);
+  const [capturedAt, setCapturedAt] = useState<number | null>(null);
+  const [fromCache, setFromCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void getCustomerApi()
-      .ledger()
-      .then(setLedger)
+    void loadCachedCustomerLedger()
+      .then((result) => {
+        setLedger(result.ledger);
+        setCapturedAt(result.capturedAt);
+        setFromCache(result.source === "cache");
+      })
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : "No se pudo cargar.");
       });
@@ -53,6 +59,9 @@ export default function CustomerPurchaseDetailPage() {
 
   return (
     <CustomerChrome title="Compra">
+      {fromCache && capturedAt != null && (
+        <CustomerCacheNotice capturedAt={capturedAt} />
+      )}
       <Link href="/cliente/compras" className="text-sm font-semibold text-ink/70">
         ← Compras
       </Link>

@@ -117,7 +117,8 @@ describe("customer portal routing", () => {
     expect(home).toContain("Saldo pendiente");
     expect(home).toContain("summary.debt");
     expect(home).toContain("Cargando…");
-    expect(home).toContain("getCustomerApi");
+    expect(home).toContain("loadCachedCustomerLedger");
+    expect(home).toContain("CustomerCacheNotice");
 
     const compras = readFileSync(
       join(__dirname, "../../app/cliente/compras/page.tsx"),

@@ -67,3 +67,20 @@ export function CustomerChrome({
     </div>
   );
 }
+
+/** M6.10 — Shown when the portal renders a cached ledger instead of live data. */
+export function CustomerCacheNotice({ capturedAt }: { capturedAt: number }) {
+  const at = new Date(capturedAt);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const when = `${pad(at.getDate())}/${pad(at.getMonth() + 1)}/${at.getFullYear()} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  return (
+    <div className="rounded-2xl border border-ink/10 bg-surface px-4 py-3 text-sm">
+      <p className="font-semibold">
+        Sin conexión · Mostrando datos de la última consulta
+      </p>
+      <p className="mt-1 text-ink/60">
+        Última consulta: {when}. No es el saldo en tiempo real.
+      </p>
+    </div>
+  );
+}
