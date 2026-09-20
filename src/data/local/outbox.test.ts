@@ -90,10 +90,11 @@ describe("M6 OutboxStore", () => {
     resetOutboxStoreSingleton();
     __reopenLocalDbForTests();
     const reopened = getOutboxStore();
-    const row = await reopened.get(operationId);
+    const row = await reopened.get(BIZ_A, operationId);
     expect(row?.requestId).toBe(requestId);
     expect(row?.status).toBe("pending");
     expect(row?.payload).toEqual({ name: "Galleta" });
+    expect(await reopened.get(BIZ_B, operationId)).toBeUndefined();
   });
 
   it("transitions pending → in_flight → synced / failed", async () => {
@@ -179,5 +180,22 @@ describe("M6 OutboxStore", () => {
         payload: { name: "Copia" },
       }),
     ).rejects.toThrow(/requestId already used/);
+  });
+
+  it("does not return a Business A operationId to Business B", async () => {
+    const outbox = getOutboxStore();
+    const operationId = newEntityId();
+    await outbox.enqueue({
+      operationId,
+      businessId: BIZ_A,
+      entity: "customer",
+      operation: "create",
+      requestId: newRequestId(),
+      payload: { name: "Rosa" },
+    });
+    expect(await outbox.get(BIZ_B, operationId)).toBeUndefined();
+    expect((await outbox.get(BIZ_A, operationId))?.payload).toEqual({
+      name: "Rosa",
+    });
   });
 });

@@ -68,9 +68,15 @@ export class OutboxStore {
     return row;
   }
 
-  async get(operationId: string): Promise<OutboxItem | undefined> {
+  async get(
+    businessId: string,
+    operationId: string,
+  ): Promise<OutboxItem | undefined> {
+    assertUuid(businessId, "businessId");
     assertUuid(operationId, "operationId");
-    return this.db.outbox.get(operationId);
+    const row = await this.db.outbox.get(operationId);
+    if (!row || row.businessId !== businessId) return undefined;
+    return row;
   }
 
   async getByRequestId(
