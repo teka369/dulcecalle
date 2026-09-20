@@ -14,6 +14,10 @@ export class CloseSessionDto {
   @IsInt()
   @Min(0)
   countedEfectivo!: number;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 }
 
 export class CashOwnerMoveDto {
