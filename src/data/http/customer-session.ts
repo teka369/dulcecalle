@@ -64,7 +64,8 @@ export class CustomerSession {
   }
 
   get authenticated(): boolean {
-    return Boolean(this._accessToken);
+    // M6.2: same rule as admin — refresh keeps the portal session offline.
+    return Boolean(this._accessToken || this._refreshToken);
   }
 
   clear(): void {

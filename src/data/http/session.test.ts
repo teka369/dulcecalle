@@ -40,6 +40,30 @@ describe("HttpSession persist", () => {
     expect(JSON.stringify(parsed)).not.toMatch(/password/i);
   });
 
+  it("treats refresh-only as an authenticated local session (expired access)", () => {
+    const storage = memoryStorage();
+    const session = new HttpSession(storage);
+    session.refreshToken = "refresh-only";
+    session.user = { id: "u1", email: "a@test.co" };
+    session.businessId = "biz-1";
+    expect(session.accessToken).toBeNull();
+    expect(session.authenticated).toBe(true);
+
+    const reloaded = new HttpSession(storage);
+    expect(reloaded.authenticated).toBe(true);
+    expect(reloaded.refreshToken).toBe("refresh-only");
+    expect(reloaded.businessId).toBe("biz-1");
+  });
+
+  it("empty storage is not an invented session", () => {
+    const session = new HttpSession(memoryStorage());
+    expect(session.authenticated).toBe(false);
+    expect(session.accessToken).toBeNull();
+    expect(session.refreshToken).toBeNull();
+    expect(session.businessId).toBeNull();
+    expect(session.user).toBeNull();
+  });
+
   it("hydrates a new session from the same store (reload)", () => {
     const storage = memoryStorage();
     const first = new HttpSession(storage);

@@ -62,9 +62,13 @@ export class HttpRepository {
   readonly session: HttpSession;
   private readonly http: HttpClient;
 
-  constructor(baseUrl: string, session: HttpSession = new HttpSession()) {
+  constructor(
+    baseUrl: string,
+    session: HttpSession = new HttpSession(),
+    fetchImpl?: typeof fetch,
+  ) {
     this.session = session;
-    this.http = new HttpClient(baseUrl, session);
+    this.http = new HttpClient(baseUrl, session, fetchImpl);
   }
 
   readonly auth = {

@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: () => undefined, push: () => undefined }),
 }));
 
-import { ADMIN_PUBLIC, isCustomerPath } from "./AuthGate";
+import { ADMIN_PUBLIC, decideAuthGate, isCustomerPath } from "./AuthGate";
 
 describe("customer portal routing", () => {
   it("treats /cliente as customer and /clientes as admin", () => {
@@ -25,6 +25,65 @@ describe("customer portal routing", () => {
     expect(ADMIN_PUBLIC.has("/register")).toBe(true);
     expect(ADMIN_PUBLIC.has("/cliente")).toBe(false);
     expect(ADMIN_PUBLIC.has("/cliente/login")).toBe(false);
+  });
+
+  it("decideAuthGate is local-only: NetworkError is not a logout", () => {
+    const signedIn = {
+      adminAuthenticated: true,
+      adminBusinessId: "biz-a",
+      customerAuthenticated: false,
+    };
+    expect(decideAuthGate({ pathname: "/", ...signedIn })).toEqual({
+      kind: "allow",
+    });
+    expect(
+      decideAuthGate({
+        pathname: "/",
+        adminAuthenticated: false,
+        adminBusinessId: null,
+        customerAuthenticated: false,
+      }),
+    ).toEqual({ kind: "redirect", to: "/login" });
+    expect(
+      decideAuthGate({
+        pathname: "/",
+        adminAuthenticated: true,
+        adminBusinessId: null,
+        customerAuthenticated: false,
+      }),
+    ).toEqual({ kind: "redirect", to: "/login" });
+    expect(
+      decideAuthGate({
+        pathname: "/login",
+        adminAuthenticated: false,
+        adminBusinessId: null,
+        customerAuthenticated: false,
+      }),
+    ).toEqual({ kind: "allow" });
+    expect(
+      decideAuthGate({
+        pathname: "/cliente",
+        adminAuthenticated: true,
+        adminBusinessId: "biz-a",
+        customerAuthenticated: false,
+      }),
+    ).toEqual({ kind: "redirect", to: "/cliente/login" });
+    expect(
+      decideAuthGate({
+        pathname: "/cliente",
+        adminAuthenticated: false,
+        adminBusinessId: null,
+        customerAuthenticated: true,
+      }),
+    ).toEqual({ kind: "allow" });
+    expect(
+      decideAuthGate({
+        pathname: "/",
+        adminAuthenticated: false,
+        adminBusinessId: null,
+        customerAuthenticated: true,
+      }),
+    ).toEqual({ kind: "redirect", to: "/login" });
   });
 
   it("admin login offers ¿Eres cliente? toward /cliente/login", () => {

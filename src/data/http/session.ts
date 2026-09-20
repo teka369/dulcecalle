@@ -89,7 +89,9 @@ export class HttpSession {
   }
 
   get authenticated(): boolean {
-    return Boolean(this._accessToken);
+    // M6.2: a local session is alive while access or refresh remains.
+    // Expired access is still a string; missing access + refresh also counts.
+    return Boolean(this._accessToken || this._refreshToken);
   }
 
   clear(): void {

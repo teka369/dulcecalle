@@ -4,12 +4,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getCustomerAuthSession } from "@/data/http/customer-session";
 import { getPwaAuthSession } from "@/data/http/session";
+import {
+  ADMIN_PUBLIC,
+  decideAuthGate,
+  isCustomerPath,
+} from "./auth-gate-decision";
 
-export const ADMIN_PUBLIC = new Set(["/login", "/register", "/offline"]);
-
-export function isCustomerPath(pathname: string): boolean {
-  return pathname === "/cliente" || pathname.startsWith("/cliente/");
-}
+export { ADMIN_PUBLIC, decideAuthGate, isCustomerPath };
+export type { AuthGateDecision } from "./auth-gate-decision";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,31 +19,18 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [ok, setOk] = useState(false);
 
   useEffect(() => {
-    if (isCustomerPath(pathname)) {
-      if (pathname === "/cliente/login") {
-        setOk(true);
-        return;
-      }
-      const customer = getCustomerAuthSession();
-      if (!customer.authenticated) {
-        router.replace("/cliente/login");
-        return;
-      }
-      setOk(true);
-      return;
-    }
-
-    const session = getPwaAuthSession();
-    if (ADMIN_PUBLIC.has(pathname)) {
-      setOk(true);
-      return;
-    }
-    if (!session.authenticated) {
-      router.replace("/login");
-      return;
-    }
-    if (!session.businessId) {
-      router.replace("/login");
+    const admin = getPwaAuthSession();
+    const customer = isCustomerPath(pathname)
+      ? getCustomerAuthSession()
+      : null;
+    const decision = decideAuthGate({
+      pathname,
+      adminAuthenticated: admin.authenticated,
+      adminBusinessId: admin.businessId,
+      customerAuthenticated: customer?.authenticated ?? false,
+    });
+    if (decision.kind === "redirect") {
+      router.replace(decision.to);
       return;
     }
     setOk(true);

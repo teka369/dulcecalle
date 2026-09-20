@@ -10,7 +10,8 @@ PWA de ventas para dulcería de barrio (Next.js App Router + NestJS).
 - NestJS 11 + Prisma 6 + PostgreSQL 16 — **fuente de verdad del negocio** (Render: `dulcecalle-teka369`)
 - Dexie repositories — **solo tests de dominio** (IDs numéricos). La UI no los usa.
 - Capas UI: pages → store → `HttpRepository` → `/v1`
-- M6.1: Local Store UUID + Outbox en `src/data/local` (`dulcecalle-local`). **No cableado a la UI.** Contrato: [M6.md](M6.md).
+- M6.1: Local Store UUID + Outbox en `src/data/local` (`dulcecalle-local`). **No cableado a la UI.**
+- M6.2: sesión local sobrevive `NetworkError` (login inicial sigue online). Contrato: [M6.md](M6.md).
 
 Hay que entrar con cuenta. El servidor arranca vacío: productos, clientes y fiados se cargan a mano. Un fiado viejo es **deuda anterior**, nunca una venta.
 

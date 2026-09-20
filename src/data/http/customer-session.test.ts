@@ -44,6 +44,18 @@ describe("CustomerSession persist", () => {
     expect(storage.getItem("dulcecalle.auth")).toBeNull();
   });
 
+  it("refresh-only still counts as authenticated; empty storage does not", () => {
+    const storage = memoryStorage();
+    const empty = new CustomerSession(storage);
+    expect(empty.authenticated).toBe(false);
+
+    empty.refreshToken = "c-refresh";
+    empty.customer = { id: "id", code: "DC-0001", name: "Rosa" };
+    expect(empty.accessToken).toBeNull();
+    expect(empty.authenticated).toBe(true);
+    expect(new CustomerSession(storage).authenticated).toBe(true);
+  });
+
   it("hydrates after reload and clear() drops the key", () => {
     const storage = memoryStorage();
     const first = new CustomerSession(storage);
