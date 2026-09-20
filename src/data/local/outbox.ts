@@ -379,12 +379,3 @@ export function getOutboxSyncEngine(): OutboxSyncEngine {
 export function resetOutboxSyncEngineSingleton(): void {
   syncEngineSingleton = null;
 }
-
-export function getOutboxStore(): OutboxStore {
-  if (!outboxSingleton) outboxSingleton = new OutboxStore();
-  return outboxSingleton;
-}
-
-export function resetOutboxStoreSingleton(): void {
-  outboxSingleton = null;
-}
