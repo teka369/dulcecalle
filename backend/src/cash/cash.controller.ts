@@ -26,8 +26,12 @@ export class CashController {
 
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post("cash/sessions")
-  open(@CurrentBusiness() ctx: BusinessContext, @Body() dto: OpenSessionDto) {
-    return this.cash.open(ctx, dto.openingFloat);
+  open(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Body() dto: OpenSessionDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.cash.open(ctx, dto.openingFloat, resolveIdempotencyKey(key, dto.requestId));
   }
 
   @Post("cash/sessions/:id/close")
@@ -35,8 +39,9 @@ export class CashController {
     @CurrentBusiness() ctx: BusinessContext,
     @Param("id") id: string,
     @Body() dto: CloseSessionDto,
+    @Headers("idempotency-key") key?: string,
   ) {
-    return this.cash.close(ctx, id, dto.countedEfectivo);
+    return this.cash.close(ctx, id, dto.countedEfectivo, resolveIdempotencyKey(key, dto.requestId));
   }
 
   @Get("cash/today")
