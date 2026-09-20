@@ -26,6 +26,14 @@ function clean(value?: string): string | undefined {
   return trimmed || undefined;
 }
 
+function assertNonNegativeMoney(value: number, message: string): void {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error(message);
+}
+
+function assertPositiveMoney(value: number, message: string): void {
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(message);
+}
+
 async function openDependency(db: DulceCalleLocalDB, business: string): Promise<string[]> {
   const session = await db.cashSessions
     .where("[businessId+localDate]")
@@ -162,6 +170,7 @@ export async function openCashWithOfflineFallback(
   openingFloat: number,
   requestId: string,
 ): Promise<OfflineOperationResult<Awaited<ReturnType<ReturnType<typeof getPwaApi>["cash"]["open"]>>>> {
+  assertNonNegativeMoney(openingFloat, "El monto no puede ser negativo.");
   try {
     const value = await getPwaApi().cash.open(openingFloat, requestId);
     const business = businessId();
@@ -236,6 +245,7 @@ export async function closeCashWithOfflineFallback(
   countedEfectivo: number,
   requestId: string,
 ): Promise<OfflineOperationResult<Awaited<ReturnType<ReturnType<typeof getPwaApi>["cash"]["close"]>>>> {
+  assertNonNegativeMoney(countedEfectivo, "Revisa el monto contado.");
   try {
     const value = await getPwaApi().cash.close(sessionId, countedEfectivo, requestId);
     const business = businessId();
@@ -303,6 +313,7 @@ async function ownerMove(
   note: string | undefined,
   requestId: string,
 ) {
+  assertPositiveMoney(amount, "El monto tiene que ser mayor a 0.");
   try {
     const value =
       kind === "aporte"
@@ -366,6 +377,9 @@ export async function recordExpenseWithOfflineFallback(
   input: { amount: number; category: string; method: "Efectivo" | "Nequi"; note?: string },
   requestId: string,
 ) {
+  assertPositiveMoney(input.amount, "El monto tiene que ser mayor a 0.");
+  const category = input.category.trim();
+  if (!category) throw new Error("Di en qué se gastó.");
   try {
     return {
       mode: "online" as const,
@@ -402,7 +416,7 @@ export async function recordExpenseWithOfflineFallback(
         refType: "expense",
         refId: id,
         requestId,
-        note: input.category,
+        note: category,
         occurredOn: todayLocal(),
         createdAt: now,
       });
@@ -412,7 +426,7 @@ export async function recordExpenseWithOfflineFallback(
         entity: "expense",
         operation: "create",
         requestId,
-        payload: { ...input, note: clean(input.note) },
+        payload: { ...input, category, note: clean(input.note) },
         dependsOn,
         localCreatedAt: now,
       });
@@ -565,6 +579,7 @@ export async function shrinkWithOfflineFallback(
     const business = businessId();
     const db = getLocalDb();
     const now = Date.now();
+    await ensureOpenDayEditable(business);
     const product = await db.products
       .where("[businessId+id]")
       .equals([business, input.productId])
