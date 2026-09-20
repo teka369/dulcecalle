@@ -13,6 +13,7 @@ PWA de ventas para dulcería de barrio (Next.js App Router + NestJS).
 - M6.1: Local Store UUID + Outbox en `src/data/local` (`dulcecalle-local`). **No cableado a la UI.**
 - M6.2: sesión local sobrevive `NetworkError` (login inicial sigue online). Contrato: [M6.md](M6.md).
 - M6.3: cache de lectura del catálogo (productos/clientes/proveedores) en `dulcecalle-local`. PostgreSQL sigue siendo la autoridad.
+- M6.4: monitor de conectividad + motor genérico de flush del outbox, con dependencias, reintentos y recuperación de `in_flight`. Las escrituras offline de negocio empiezan en M6.5+.
 
 Hay que entrar con cuenta. El servidor arranca vacío: productos, clientes y fiados se cargan a mano. Un fiado viejo es **deuda anterior**, nunca una venta.
 
