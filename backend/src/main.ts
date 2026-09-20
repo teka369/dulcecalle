@@ -9,6 +9,20 @@ import { requireJwtSecrets } from "./identity/jwt-secrets";
 installBigIntJson();
 loadEnv({ path: ".env" });
 
+function originAllowed(origin: string): boolean {
+  const extra = (process.env.CORS_ORIGIN ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (extra.includes(origin)) return true;
+  if (origin === "https://dulcecalle.vercel.app") return true;
+  if (/^https:\/\/dulcecalle(-[a-z0-9-]+)?\.vercel\.app$/i.test(origin)) {
+    return true;
+  }
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return true;
+  return false;
+}
+
 async function bootstrap() {
   requireJwtSecrets();
   const app = await NestFactory.create(AppModule);
@@ -22,11 +36,21 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new HttpErrorFilter());
-  const origin = process.env.CORS_ORIGIN ?? "http://localhost:8080";
   app.enableCors({
-    origin,
+    origin: (origin, cb) => {
+      if (!origin || originAllowed(origin)) {
+        cb(null, true);
+        return;
+      }
+      cb(new Error(`CORS blocked: ${origin}`), false);
+    },
     credentials: true,
-    allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "X-Business-Id"],
+    allowedHeaders: [
+      "Authorization",
+      "Content-Type",
+      "Idempotency-Key",
+      "X-Business-Id",
+    ],
   });
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port, "0.0.0.0");

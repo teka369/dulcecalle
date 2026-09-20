@@ -3,10 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "description": "DulceCalle NestJS API — Sales + Cash first slice. Does not replace Dexie.",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
+    "start:render": "prisma migrate deploy && node dist/main.js",
     "build": "nest build",
     "lint": "eslint \"{src,test,migration}/**/*.ts\"",
     "test": "jest --runInBand --forceExit",

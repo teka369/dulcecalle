@@ -2,10 +2,12 @@
 
 PWA de ventas para dulcería de barrio (Next.js App Router + NestJS).
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/teka369/dulcecalle)
+
 ## Stack
 
-- Next.js (App Router) + TypeScript + Tailwind
-- NestJS 11 + Prisma 6 + PostgreSQL 16 — **fuente de verdad del negocio**
+- Next.js (App Router) + TypeScript + Tailwind — PWA en [Vercel](https://dulcecalle.vercel.app)
+- NestJS 11 + Prisma 6 + PostgreSQL 16 — **fuente de verdad del negocio** (Render: `dulcecalle-teka369`)
 - Dexie repositories — **solo tests de dominio** (IDs numéricos). La UI no los usa.
 - Capas UI: pages → store → `HttpRepository` → `/v1`
 
@@ -13,7 +15,10 @@ Hay que entrar con cuenta. El servidor arranca vacío: productos, clientes y fia
 
 El dominio congelado está en [DOMAIN.md](DOMAIN.md). Servidor: [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [API_CONTRACT.md](API_CONTRACT.md) · [MIGRATION.md](MIGRATION.md) · [IDENTITY.md](IDENTITY.md).
 
-M3: la PWA habla HTTP (UUID). No hay dual-write, sync ni import Dexie→PG. `pwaStorage()` es `"http"`. `NEXT_PUBLIC_API_URL` opcional; si falta, el cliente usa `/v1` (el PWA reescribe a Nest).
+M3: la PWA habla HTTP (UUID). No hay dual-write, sync ni import Dexie→PG. `pwaStorage()` es `"http"`.
+
+- Dev: `NEXT_PUBLIC_API_URL` opcional; si falta, el cliente usa `/v1` (el PWA reescribe a Nest).
+- Producción: si falta `NEXT_PUBLIC_API_URL`, el cliente usa `https://dulcecalle-teka369.onrender.com/v1`.
 
 No pongas secrets en `NEXT_PUBLIC_*`.
 

@@ -4,6 +4,19 @@ NestJS + Prisma + PostgreSQL 16. **Source of truth for the business.** The PWA U
 
 Contract: `../DOMAIN.md`, `../BACKEND_ARCHITECTURE.md`, `../DATABASE.md`, `../API_CONTRACT.md`.
 
+## Render (production)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/teka369/dulcecalle)
+
+Blueprint: [`../render.yaml`](../render.yaml). Creates:
+
+- Web: `dulcecalle-teka369` → `https://dulcecalle-teka369.onrender.com`
+- Postgres 16 free: `dulcecalle-db` (expires after **30 days** on the free plan)
+
+JWT secrets are generated on first deploy. CORS allows `https://dulcecalle.vercel.app`.
+
+Health: `GET /v1/health` → `{ ok: true, db: "up" }`.
+
 ## Run locally
 
 ```bash

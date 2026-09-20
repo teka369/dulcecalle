@@ -1,0 +1,39 @@
+# DulceCalle — Nest API + PostgreSQL 16 on Render (free).
+# One-click: https://render.com/deploy?repo=https://github.com/teka369/dulcecalle
+#
+# Free Postgres expires after 30 days — upgrade before that if these are real books.
+# Free web sleeps after 15 min idle; first request can take ~1 min to wake.
+
+services:
+  - type: web
+    name: dulcecalle-teka369
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: NPM_CONFIG_PRODUCTION=false npm ci && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/main.js
+    healthCheckPath: /v1/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: CORS_ORIGIN
+        value: https://dulcecalle.vercel.app
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dulcecalle-db
+          property: connectionString
+
+databases:
+  - name: dulcecalle-db
+    plan: free
+    postgresMajorVersion: "16"
+    databaseName: dulcecalle
+    user: dulcecalle
