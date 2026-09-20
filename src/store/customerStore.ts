@@ -132,7 +132,10 @@ export const customerStore = {
             ? "Abono guardado sin conexión"
             : "Abono registrado",
       });
-      return result.mode === "offline" ? result.paymentId : result.payment.id;
+      return {
+        id: result.mode === "offline" ? result.paymentId : result.payment.id,
+        mode: result.mode,
+      };
     } catch (e) {
       fail(e);
     }
