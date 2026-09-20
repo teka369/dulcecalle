@@ -18,7 +18,7 @@ function todayLocal(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function paymentValues(input: CreateSaleInput, total: number) {
+export function paymentValues(input: CreateSaleInput, total: number) {
   const received = input.amountReceived;
   if (!Number.isInteger(received) || received < 0 || received > total) {
     throw new Error("El valor recibido no es válido.");
