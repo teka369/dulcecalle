@@ -272,6 +272,7 @@ export class OutboxSyncEngine {
   async flush(
     businessId: string,
     sender: OutboxSender,
+    filter?: (item: OutboxItem) => boolean,
   ): Promise<SyncFlushResult> {
     assertUuid(businessId, "businessId");
     const active = this.active.get(businessId);
@@ -303,7 +304,9 @@ export class OutboxSyncEngine {
       ...(await this.outbox.listByStatus(businessId, "failed")).filter(
         (row) => row.nextAttemptAt == null || row.nextAttemptAt <= now,
       ),
-    ].sort((a, b) => {
+    ]
+      .filter((row) => !filter || filter(row))
+      .sort((a, b) => {
       if (a.localCreatedAt !== b.localCreatedAt) {
         return a.localCreatedAt - b.localCreatedAt;
       }
