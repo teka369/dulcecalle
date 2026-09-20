@@ -161,10 +161,26 @@ export async function openCashWithOfflineFallback(
   requestId: string,
 ): Promise<OfflineOperationResult<Awaited<ReturnType<typeof getPwaApi>["cash"]["open"]>>> {
   try {
-    return {
-      mode: "online",
-      value: await getPwaApi().cash.open(openingFloat, requestId),
-    };
+    const value = await getPwaApi().cash.open(openingFloat, requestId);
+    const business = businessId();
+    const now = Date.now();
+    await getLocalDb().cashSessions.put({
+      id: value.id,
+      businessId: business,
+      localDate: value.localDate,
+      openedAt: value.openedAt,
+      closedAt: value.closedAt,
+      openingFloat: value.openingFloat,
+      closingCount: value.closingCount,
+      expectedEfectivo: value.expectedEfectivo,
+      expectedNequi: value.expectedNequi,
+      difference: value.difference,
+      note: null,
+      createdAt: now,
+      updatedAt: now,
+      requestId,
+    });
+    return { mode: "online", value };
   } catch (error) {
     if (!(error instanceof NetworkError)) throw error;
     const business = businessId();
@@ -219,10 +235,24 @@ export async function closeCashWithOfflineFallback(
   requestId: string,
 ): Promise<OfflineOperationResult<Awaited<ReturnType<typeof getPwaApi>["cash"]["close"]>>> {
   try {
-    return {
-      mode: "online",
-      value: await getPwaApi().cash.close(sessionId, countedEfectivo, requestId),
-    };
+    const value = await getPwaApi().cash.close(sessionId, countedEfectivo, requestId);
+    const business = businessId();
+    const local = await getLocalDb().cashSessions
+      .where("[businessId+id]")
+      .equals([business, sessionId])
+      .first();
+    if (local) {
+      await getLocalDb().cashSessions.put({
+        ...local,
+        closedAt: value.closedAt,
+        closingCount: value.closingCount,
+        expectedEfectivo: value.expectedEfectivo,
+        expectedNequi: value.expectedNequi,
+        difference: value.difference,
+        updatedAt: Date.now(),
+      });
+    }
+    return { mode: "online", value };
   } catch (error) {
     if (!(error instanceof NetworkError)) throw error;
     const business = businessId();
