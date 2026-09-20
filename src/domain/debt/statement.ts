@@ -41,6 +41,7 @@ export type DebtEntry =
       createdAt: number;
       amount: number;
       method: string;
+      note?: string;
       runningBalance: number;
     }
   | {

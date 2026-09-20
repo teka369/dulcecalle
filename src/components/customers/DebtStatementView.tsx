@@ -44,6 +44,11 @@ function EntryCard({ entry }: { entry: DebtEntry }) {
         <p className="mt-3 text-lg font-semibold tabular-nums text-ok">
           −{formatCop(entry.amount)}
         </p>
+        {entry.note && (
+          <p className="mt-2 break-words text-sm text-ink/70">
+            Nota: {entry.note}
+          </p>
+        )}
         <p className="mt-3 text-xs tabular-nums text-ink/50">
           Saldo después: {formatCop(entry.runningBalance)}
         </p>

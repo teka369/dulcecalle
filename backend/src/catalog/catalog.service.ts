@@ -338,6 +338,7 @@ export class CatalogService {
         customerId: p.customerId,
         amount: copToJson(p.amount),
         method: p.method,
+        note: p.note,
         occurredOn: dateKey(p.occurredOn),
         createdAt: p.createdAt,
       })),

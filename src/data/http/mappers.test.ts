@@ -4,6 +4,7 @@ import {
   asDateKey,
   asIsoEpoch,
   mapCustomer,
+  mapPayment,
   mapProduct,
   mapSale,
 } from "./mappers";
@@ -83,5 +84,18 @@ describe("HTTP COP / date mappers", () => {
     });
     expect(c.code).toBe("DC-0001");
     expect(c.debt).toBe(45200);
+  });
+
+  it("maps payment note, defaulting to null", () => {
+    const base = {
+      id: "11111111-1111-4111-8111-111111111111",
+      customerId: "22222222-2222-4222-8222-222222222222",
+      amount: 1000,
+      method: "Efectivo",
+      occurredOn: "2026-09-17",
+      createdAt: "2026-09-17T12:00:00.000Z",
+    };
+    expect(mapPayment({ ...base, note: "abono semanal" }).note).toBe("abono semanal");
+    expect(mapPayment({ ...base, note: null }).note).toBeNull();
   });
 });

@@ -86,6 +86,7 @@ export async function loadHttpStatement(
           createdAt: p.createdAt,
           amount: p.amount,
           method: p.method,
+          ...(p.note ? { note: p.note } : {}),
           runningBalance: 0,
         },
       }),

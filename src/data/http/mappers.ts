@@ -145,6 +145,7 @@ export type RemotePayment = {
   customerId: string;
   amount: number;
   method: string;
+  note: string | null;
   occurredOn: string;
   createdAt: number;
 };
@@ -155,6 +156,7 @@ export function mapPayment(raw: Record<string, unknown>): RemotePayment {
     customerId: asUuid(raw.customerId, "payment.customerId"),
     amount: asCopJson(raw.amount, "amount"),
     method: String(raw.method),
+    note: raw.note == null ? null : String(raw.note),
     occurredOn: asDateKey(raw.occurredOn),
     createdAt: asIsoEpoch(raw.createdAt),
   };
