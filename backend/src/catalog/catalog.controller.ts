@@ -11,7 +11,6 @@ import { Throttle } from "@nestjs/throttler";
 import { CatalogService } from "./catalog.service";
 import {
   CreateCustomerDto,
-  CreateCustomerPaymentDto,
   CreateInitialDebtDto,
   CreateProductDto,
   CreateSupplierDto,
@@ -137,22 +136,6 @@ export class CatalogController {
   ) {
     return this.catalog.createCustomer(
       ctx,
-      dto,
-      resolveIdempotencyKey(key, dto.requestId),
-    );
-  }
-
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @Post("customers/:id/payments")
-  recordCustomerPayment(
-    @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
-    @Body() dto: CreateCustomerPaymentDto,
-    @Headers("idempotency-key") key?: string,
-  ) {
-    return this.catalog.recordCustomerPayment(
-      ctx,
-      id,
       dto,
       resolveIdempotencyKey(key, dto.requestId),
     );

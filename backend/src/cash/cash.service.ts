@@ -279,6 +279,7 @@ export class CashService {
         customerId: existing.customerId,
         amount: copToJson(existing.amount),
         method: existing.method,
+        note: existing.note,
         occurredOn: dateKey(existing.occurredOn),
         createdAt: existing.createdAt,
       };
@@ -311,6 +312,7 @@ export class CashService {
             customerId,
             amount,
             method: dto.method,
+            note: dto.note ?? null,
             requestId,
             occurredOn,
             createdAt: now,
@@ -360,6 +362,7 @@ export class CashService {
         customerId: pay.customerId,
         amount: copToJson(pay.amount),
         method: pay.method,
+        note: pay.note,
         occurredOn: dateKey(pay.occurredOn),
         createdAt: pay.createdAt,
       };
@@ -376,6 +379,7 @@ export class CashService {
             customerId: again.customerId,
             amount: copToJson(again.amount),
             method: again.method,
+            note: again.note,
             occurredOn: dateKey(again.occurredOn),
             createdAt: again.createdAt,
           };

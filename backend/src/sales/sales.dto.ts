@@ -65,6 +65,10 @@ export class CreatePaymentDto {
   method!: "Efectivo" | "Nequi";
 
   @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
   @IsUUID()
   requestId?: string;
 }
