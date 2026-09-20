@@ -4,6 +4,7 @@
  */
 
 import type { AuthStorage } from "./session";
+import { jwtExpIsPast } from "./jwt-exp";
 
 export const CUSTOMER_AUTH_STORAGE_KEY = "dulcecalle.customer.auth";
 
@@ -64,8 +65,9 @@ export class CustomerSession {
   }
 
   get authenticated(): boolean {
-    // M6.2: same rule as admin — refresh keeps the portal session offline.
-    return Boolean(this._accessToken || this._refreshToken);
+    // Same rule as admin: refresh `exp` is the local lifetime, not access.
+    if (this._refreshToken) return !jwtExpIsPast(this._refreshToken);
+    return Boolean(this._accessToken);
   }
 
   clear(): void {

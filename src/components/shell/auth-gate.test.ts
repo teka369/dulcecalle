@@ -8,6 +8,8 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { ADMIN_PUBLIC, decideAuthGate, isCustomerPath } from "./AuthGate";
+import { CustomerSession } from "@/data/http/customer-session";
+import { HttpSession, type AuthStorage } from "@/data/http/session";
 
 describe("customer portal routing", () => {
   it("treats /cliente as customer and /clientes as admin", () => {
@@ -130,5 +132,104 @@ describe("customer portal routing", () => {
     expect(chrome).toContain("Salir");
     expect(chrome).toContain("logout");
     expect(chrome).toContain('router.replace("/cliente/login")');
+  });
+});
+
+function memoryStorage(): AuthStorage {
+  const map = new Map<string, string>();
+  return {
+    getItem(key) {
+      return map.has(key) ? map.get(key)! : null;
+    },
+    setItem(key, value) {
+      map.set(key, value);
+    },
+    removeItem(key) {
+      map.delete(key);
+    },
+  };
+}
+
+function unsignedJwt(payload: Record<string, unknown>): string {
+  const b64url = (value: string) =>
+    Buffer.from(value, "utf8")
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  return `${b64url('{"alg":"none"}')}.${b64url(JSON.stringify(payload))}.sig`;
+}
+
+const nowSec = () => Math.floor(Date.now() / 1000);
+
+describe("AuthGate vs refresh exp", () => {
+  it("expired admin refresh → redirect to /login", () => {
+    const session = new HttpSession(memoryStorage());
+    session.accessToken = unsignedJwt({ exp: nowSec() + 900 });
+    session.refreshToken = unsignedJwt({ exp: nowSec() - 60 });
+    session.businessId = "biz-a";
+    expect(
+      decideAuthGate({
+        pathname: "/",
+        adminAuthenticated: session.authenticated,
+        adminBusinessId: session.businessId,
+        customerAuthenticated: false,
+      }),
+    ).toEqual({ kind: "redirect", to: "/login" });
+  });
+
+  it("valid admin refresh + expired access → allow", () => {
+    const session = new HttpSession(memoryStorage());
+    session.accessToken = unsignedJwt({ exp: nowSec() - 60 });
+    session.refreshToken = unsignedJwt({ exp: nowSec() + 7 * 24 * 3600 });
+    session.businessId = "biz-a";
+    expect(
+      decideAuthGate({
+        pathname: "/",
+        adminAuthenticated: session.authenticated,
+        adminBusinessId: session.businessId,
+        customerAuthenticated: false,
+      }),
+    ).toEqual({ kind: "allow" });
+  });
+
+  it("expired customer refresh → redirect to /cliente/login", () => {
+    const session = new CustomerSession(memoryStorage());
+    session.accessToken = unsignedJwt({
+      typ: "customer",
+      exp: nowSec() + 900,
+    });
+    session.refreshToken = unsignedJwt({
+      typ: "customer_refresh",
+      exp: nowSec() - 60,
+    });
+    expect(
+      decideAuthGate({
+        pathname: "/cliente",
+        adminAuthenticated: false,
+        adminBusinessId: null,
+        customerAuthenticated: session.authenticated,
+      }),
+    ).toEqual({ kind: "redirect", to: "/cliente/login" });
+  });
+
+  it("valid customer refresh + expired access → allow", () => {
+    const session = new CustomerSession(memoryStorage());
+    session.accessToken = unsignedJwt({
+      typ: "customer",
+      exp: nowSec() - 60,
+    });
+    session.refreshToken = unsignedJwt({
+      typ: "customer_refresh",
+      exp: nowSec() + 7 * 24 * 3600,
+    });
+    expect(
+      decideAuthGate({
+        pathname: "/cliente",
+        adminAuthenticated: false,
+        adminBusinessId: null,
+        customerAuthenticated: session.authenticated,
+      }),
+    ).toEqual({ kind: "allow" });
   });
 });

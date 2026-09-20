@@ -106,3 +106,65 @@ describe("HttpSession persist", () => {
     expect(memoryOnly.accessToken).toBe("only-ram");
   });
 });
+
+function unsignedJwt(payload: Record<string, unknown>): string {
+  const b64url = (value: string) =>
+    Buffer.from(value, "utf8")
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  return `${b64url('{"alg":"none"}')}.${b64url(JSON.stringify(payload))}.sig`;
+}
+
+const nowSec = () => Math.floor(Date.now() / 1000);
+
+describe("HttpSession authenticated vs refresh exp", () => {
+  it("1. future refresh → authenticated", () => {
+    const session = new HttpSession(memoryStorage());
+    session.refreshToken = unsignedJwt({ exp: nowSec() + 7 * 24 * 3600 });
+    session.businessId = "biz-a";
+    expect(session.authenticated).toBe(true);
+  });
+
+  it("2. expired refresh → not authenticated", () => {
+    const session = new HttpSession(memoryStorage());
+    session.refreshToken = unsignedJwt({ exp: nowSec() - 60 });
+    session.businessId = "biz-a";
+    expect(session.authenticated).toBe(false);
+  });
+
+  it("3. expired access + future refresh → authenticated", () => {
+    const session = new HttpSession(memoryStorage());
+    session.accessToken = unsignedJwt({ exp: nowSec() - 60 });
+    session.refreshToken = unsignedJwt({ exp: nowSec() + 3600 });
+    session.businessId = "biz-a";
+    expect(session.authenticated).toBe(true);
+  });
+
+  it("4. future access + expired refresh → not authenticated", () => {
+    const session = new HttpSession(memoryStorage());
+    session.accessToken = unsignedJwt({ exp: nowSec() + 900 });
+    session.refreshToken = unsignedJwt({ exp: nowSec() - 60 });
+    session.businessId = "biz-a";
+    expect(session.authenticated).toBe(false);
+  });
+
+  it("5. both expired → not authenticated", () => {
+    const session = new HttpSession(memoryStorage());
+    session.accessToken = unsignedJwt({ exp: nowSec() - 60 });
+    session.refreshToken = unsignedJwt({ exp: nowSec() - 7 * 24 * 3600 });
+    session.businessId = "biz-a";
+    expect(session.authenticated).toBe(false);
+  });
+
+  it("6. non-JWT tokens keep presence compatibility", () => {
+    const storage = memoryStorage();
+    const session = new HttpSession(storage);
+    session.accessToken = "expired";
+    session.refreshToken = "r1";
+    session.businessId = "biz-a";
+    expect(session.authenticated).toBe(true);
+    expect(new HttpSession(storage).authenticated).toBe(true);
+  });
+});

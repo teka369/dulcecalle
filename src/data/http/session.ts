@@ -4,6 +4,8 @@
  * Not Dexie. Tokens never go in NEXT_PUBLIC_*. Passwords are never stored.
  */
 
+import { jwtExpIsPast } from "./jwt-exp";
+
 export type AuthUser = { id: string; email: string };
 
 export type AuthStorage = {
@@ -89,9 +91,11 @@ export class HttpSession {
   }
 
   get authenticated(): boolean {
-    // M6.2: a local session is alive while access or refresh remains.
-    // Expired access is still a string; missing access + refresh also counts.
-    return Boolean(this._accessToken || this._refreshToken);
+    // Local lifetime follows the refresh token (7d), never access (15m).
+    // A parseable refresh JWT with past `exp` is not authenticated.
+    // Non-JWT strings (tests) keep the presence rule.
+    if (this._refreshToken) return !jwtExpIsPast(this._refreshToken);
+    return Boolean(this._accessToken);
   }
 
   clear(): void {

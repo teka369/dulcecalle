@@ -73,3 +73,75 @@ describe("CustomerSession persist", () => {
     expect(storage.getItem(CUSTOMER_AUTH_STORAGE_KEY)).toBeNull();
   });
 });
+
+function unsignedJwt(payload: Record<string, unknown>): string {
+  const b64url = (value: string) =>
+    Buffer.from(value, "utf8")
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  return `${b64url('{"alg":"none"}')}.${b64url(JSON.stringify(payload))}.sig`;
+}
+
+const nowSec = () => Math.floor(Date.now() / 1000);
+
+describe("CustomerSession authenticated vs refresh exp", () => {
+  it("future refresh → authenticated", () => {
+    const session = new CustomerSession(memoryStorage());
+    session.refreshToken = unsignedJwt({
+      typ: "customer_refresh",
+      exp: nowSec() + 7 * 24 * 3600,
+    });
+    expect(session.authenticated).toBe(true);
+  });
+
+  it("expired refresh → not authenticated", () => {
+    const session = new CustomerSession(memoryStorage());
+    session.refreshToken = unsignedJwt({
+      typ: "customer_refresh",
+      exp: nowSec() - 60,
+    });
+    expect(session.authenticated).toBe(false);
+  });
+
+  it("expired access + future refresh → authenticated", () => {
+    const session = new CustomerSession(memoryStorage());
+    session.accessToken = unsignedJwt({
+      typ: "customer",
+      exp: nowSec() - 60,
+    });
+    session.refreshToken = unsignedJwt({
+      typ: "customer_refresh",
+      exp: nowSec() + 3600,
+    });
+    expect(session.authenticated).toBe(true);
+  });
+
+  it("future access + expired refresh → not authenticated", () => {
+    const session = new CustomerSession(memoryStorage());
+    session.accessToken = unsignedJwt({
+      typ: "customer",
+      exp: nowSec() + 900,
+    });
+    session.refreshToken = unsignedJwt({
+      typ: "customer_refresh",
+      exp: nowSec() - 60,
+    });
+    expect(session.authenticated).toBe(false);
+  });
+
+  it("both expired → not authenticated", () => {
+    const session = new CustomerSession(memoryStorage());
+    session.accessToken = unsignedJwt({ exp: nowSec() - 60 });
+    session.refreshToken = unsignedJwt({ exp: nowSec() - 3600 });
+    expect(session.authenticated).toBe(false);
+  });
+
+  it("non-JWT tokens keep presence compatibility", () => {
+    const session = new CustomerSession(memoryStorage());
+    session.accessToken = "expired";
+    session.refreshToken = "cust-ref";
+    expect(session.authenticated).toBe(true);
+  });
+});
