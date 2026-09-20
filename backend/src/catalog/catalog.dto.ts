@@ -80,6 +80,24 @@ export class CreateCustomerDto {
   requestId?: string;
 }
 
+
+export class CreateCustomerPaymentDto {
+  @IsInt()
+  @Min(1)
+  amount!: number;
+
+  @IsEnum(["Efectivo", "Nequi"])
+  method!: "Efectivo" | "Nequi";
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
+}
+
 export class PatchCustomerDto {
   @IsOptional()
   @IsString()
