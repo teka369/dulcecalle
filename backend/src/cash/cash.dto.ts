@@ -4,6 +4,10 @@ export class OpenSessionDto {
   @IsInt()
   @Min(0)
   openingFloat!: number;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 }
 
 export class CloseSessionDto {
