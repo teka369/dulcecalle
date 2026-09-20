@@ -68,6 +68,7 @@ export function mapProduct(raw: Record<string, unknown>): RemoteProduct {
 
 export type RemoteCustomer = {
   id: string;
+  code: string;
   name: string;
   phone: string | null;
   debt: number;
@@ -78,6 +79,7 @@ export type RemoteCustomer = {
 export function mapCustomer(raw: Record<string, unknown>): RemoteCustomer {
   return {
     id: asUuid(raw.id, "customer.id"),
+    code: String(raw.code ?? ""),
     name: String(raw.name ?? ""),
     phone: raw.phone == null ? null : String(raw.phone),
     debt: asCopJson(raw.debt, "debt"),

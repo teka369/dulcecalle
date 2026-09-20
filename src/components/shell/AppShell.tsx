@@ -10,6 +10,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const hideChrome =
     pathname === "/login" ||
     pathname === "/register" ||
+    pathname === "/cliente" ||
+    pathname.startsWith("/cliente/") ||
     pathname.startsWith("/ventas/nueva") ||
     pathname.startsWith("/ventas/cobrar") ||
     /^\/ventas\/[^/]+\/devolver$/.test(pathname) ||

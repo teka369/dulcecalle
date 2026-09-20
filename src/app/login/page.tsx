@@ -163,6 +163,12 @@ export default function LoginPage() {
         </button>
       )}
 
+      <p className="text-center text-sm text-ink/60">
+        ¿Eres cliente?{" "}
+        <Link href="/cliente/login" className="font-semibold text-ink">
+          Consulta tu saldo
+        </Link>
+      </p>
     </div>
   );
 }

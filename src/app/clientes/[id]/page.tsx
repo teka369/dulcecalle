@@ -64,6 +64,9 @@ export default function ClienteFichaPage() {
           {customer.name}
         </h1>
       </header>
+      {customer.code && (
+        <p className="text-sm text-ink/55">Código {customer.code}</p>
+      )}
 
       {statement ? (
         <DebtStatementView statement={statement} />

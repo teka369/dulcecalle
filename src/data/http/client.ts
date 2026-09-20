@@ -1,5 +1,11 @@
 import { apiErrorFromBody } from "../errors";
-import type { HttpSession } from "./session";
+
+export type FetchAuthSession = {
+  accessToken: string | null;
+  refreshToken: string | null;
+  businessId?: string | null;
+  clear(): void;
+};
 
 export type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
@@ -14,7 +20,10 @@ export type RequestOptions = {
 };
 
 function isAuthRefreshPath(path: string): boolean {
-  return /\/auth\/(refresh|login|register)$/.test(path);
+  return (
+    /\/auth\/(refresh|login|register)$/.test(path) ||
+    /\/customer-access\/(login|refresh|logout)$/.test(path)
+  );
 }
 
 export class HttpClient {
@@ -22,8 +31,9 @@ export class HttpClient {
 
   constructor(
     private readonly baseUrl: string,
-    private readonly session: HttpSession,
+    private readonly session: FetchAuthSession,
     private readonly fetchImpl: typeof fetch = fetch.bind(globalThis),
+    private readonly refreshPath: string = "/auth/refresh",
   ) {}
 
   async request<T>(
@@ -112,7 +122,7 @@ export class HttpClient {
       refreshToken?: string;
     }>(
       "POST",
-      "/auth/refresh",
+      this.refreshPath,
       { body: { refreshToken }, skipBusiness: true, skipRefresh: true },
       true,
     );

@@ -68,7 +68,12 @@ export default function ClientesPage() {
                 href={`/clientes/${c.id}`}
                 className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
-                <span className="min-w-0 truncate font-medium">{c.name}</span>
+                <span className="min-w-0 truncate">
+                  <span className="block font-medium">{c.name}</span>
+                  {c.code && (
+                    <span className="block text-xs text-ink/50">{c.code}</span>
+                  )}
+                </span>
                 <span className="flex shrink-0 flex-col items-end">
                   <span
                     className={`text-sm font-semibold tabular-nums ${
