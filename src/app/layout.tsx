@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreviewHostBridge } from "@/components/shell/PreviewHostBridge";
+import { SalesSyncBridge } from "@/components/shell/SalesSyncBridge";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
@@ -45,6 +46,7 @@ export default function RootLayout({
     <html lang="es" data-theme="amber" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full bg-bg text-ink">
         <PreviewHostBridge />
+        <SalesSyncBridge />
         <ThemeProvider>
           <AppShell>{children}</AppShell>
         </ThemeProvider>
