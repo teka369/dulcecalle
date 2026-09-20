@@ -2,7 +2,12 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { ApiError } from "../errors";
 import { __resetLocalDbForTests, __reopenLocalDbForTests } from "./db";
 import { newEntityId, newRequestId } from "./ids";
-import {\n  ConnectivityMonitor,\n  getOutboxStore,\n  OutboxSyncEngine,\n  resetOutboxStoreSingleton,\n} from "./outbox";
+import {
+  ConnectivityMonitor,
+  getOutboxStore,
+  OutboxSyncEngine,
+  resetOutboxStoreSingleton,
+} from "./outbox";
 import { resetLocalStoreSingleton } from "./store";
 
 const BIZ_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -10,7 +15,8 @@ const BIZ_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 describe("M6 OutboxStore", () => {
   beforeEach(async () => {
-    resetOutboxStoreSingleton();\n    
+    resetOutboxStoreSingleton();
+    
     resetLocalStoreSingleton();
     await __resetLocalDbForTests();
   });
