@@ -23,7 +23,7 @@ export class HttpClient {
   constructor(
     private readonly baseUrl: string,
     private readonly session: HttpSession,
-    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly fetchImpl: typeof fetch = fetch.bind(globalThis),
   ) {}
 
   async request<T>(
