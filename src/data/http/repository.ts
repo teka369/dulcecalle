@@ -405,11 +405,11 @@ export class HttpRepository {
   };
 
   readonly cash = {
-    open: async (openingFloat: number): Promise<RemoteSession> => {
+    open: async (openingFloat: number, requestId: string = crypto.randomUUID()): Promise<RemoteSession> => {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         "/cash/sessions",
-        { body: { openingFloat } },
+        { body: { openingFloat }, idempotencyKey: requestId },
       );
       return mapSession(row);
     },
@@ -425,11 +425,12 @@ export class HttpRepository {
     close: async (
       sessionId: string,
       countedEfectivo: number,
+      requestId: string = crypto.randomUUID(),
     ): Promise<RemoteSession> => {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         `/cash/sessions/${sessionId}/close`,
-        { body: { countedEfectivo } },
+        { body: { countedEfectivo }, idempotencyKey: requestId },
       );
       return mapSession(row);
     },
