@@ -209,6 +209,16 @@ describe("M6 OutboxStore", () => {
 
 
 describe("M6.4 OutboxSyncEngine", () => {
+  beforeEach(async () => {
+    resetOutboxStoreSingleton();
+    await __resetLocalDbForTests();
+  });
+
+  afterEach(async () => {
+    resetOutboxStoreSingleton();
+    await __resetLocalDbForTests();
+  });
+
   it("recovers in-flight work after a reload and sends it with the stored requestId", async () => {
     const outbox = getOutboxStore();
     const operationId = newEntityId();
