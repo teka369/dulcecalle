@@ -20,6 +20,7 @@ import {
 } from "@/data/pwa/catalog";
 import type { RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http/mappers";
 import { createSupplierWithOfflineFallback } from "@/data/pwa/offline-catalog";
+import { shrinkWithOfflineFallback, surtirWithOfflineFallback } from "@/data/pwa/offline-operations";
 
 export type PwaSupplierSurtir = {
   moveId: string;
@@ -224,19 +225,17 @@ export const inventoryStore = {
 
     let supplierId = input.supplierId ?? null;
     if (!supplierId && input.supplierNameCreate?.trim()) {
-      const created = await getPwaApi().suppliers.create(
-        {
-          name: input.supplierNameCreate.trim(),
-        },
+      const created = await createSupplierWithOfflineFallback(
+        { name: input.supplierNameCreate.trim() },
         crypto.randomUUID(),
       );
-      supplierId = created.id;
+      supplierId = created.mode === "offline" ? created.supplierId : created.supplier.id;
     }
 
     try {
-      const move = await getPwaApi().inventory.surtir(
-        input.productId,
+      const move = await surtirWithOfflineFallback(
         {
+          productId: input.productId,
           qty: parsed.qty,
           unitCost: parsed.unitCost,
           totalCost: parsed.totalCost,
@@ -248,7 +247,7 @@ export const inventoryStore = {
       );
       await this.refreshAll();
       setState({ lastToast: INVENTORY_TOASTS.surtir });
-      return move.id;
+      return move.mode === "offline" ? move.id : move.value.id;
     } catch (e) {
       fail(e);
     }
@@ -278,9 +277,13 @@ export const inventoryStore = {
         : input.note?.trim() || undefined;
 
     try {
-      const move = await getPwaApi().inventory.shrink(
-        input.productId,
-        { qty: parsed.qty, reason: input.reason, note },
+      const move = await shrinkWithOfflineFallback(
+        {
+          productId: input.productId,
+          qty: parsed.qty,
+          reason: input.reason,
+          note,
+        },
         input.requestId ?? crypto.randomUUID(),
       );
       await this.refreshProducts();
@@ -291,7 +294,7 @@ export const inventoryStore = {
             ? INVENTORY_TOASTS.regalo
             : INVENTORY_TOASTS.perdido;
       setState({ lastToast: toast });
-      return move.id;
+      return move.mode === "offline" ? move.id : move.value.id;
     } catch (e) {
       fail(e);
     }
