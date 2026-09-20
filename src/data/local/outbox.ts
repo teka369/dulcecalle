@@ -292,41 +292,59 @@ export class OutboxSyncEngine {
       return a.operationId.localeCompare(b.operationId);
     });
 
-    for (const candidate of rows) {
-      const current = await this.outbox.get(businessId, candidate.operationId);
-      if (!current || (current.status !== "pending" && current.status !== "failed")) continue;
+    let remaining = rows;
 
-      if (current.status === "failed" && current.nextAttemptAt != null && current.nextAttemptAt > this.clock()) {
-        continue;
-      }
+    while (remaining.length > 0 && !stopped) {
+      let progress = false;
+      const deferred: OutboxItem[] = [];
 
-      if (!(await this.dependenciesReady(businessId, current))) {
-        blocked += 1;
-        continue;
-      }
+      for (const candidate of remaining) {
+        const current = await this.outbox.get(businessId, candidate.operationId);
+        if (!current || (current.status !== "pending" && current.status !== "failed")) {
+          progress = true;
+          continue;
+        }
 
-      processed += 1;
-      const flying = await this.outbox.markInFlight(businessId, current.operationId);
-      try {
-        const result = await sender(flying);
-        assertUuid(result.remoteId, "remoteId");
-        await this.outbox.markSynced(businessId, current.operationId, result.remoteId);
-        synced += 1;
-      } catch (error) {
-        const retryable = isRetryableError(error);
-        const message = error instanceof Error ? error.message : "Error de sincronización.";
-        await this.outbox.markFailed(
-          businessId,
-          current.operationId,
-          message,
-          retryable ? retryAt(flying.attempts, this.clock()) : null,
-        );
-        failed += 1;
-        if (retryable || (error instanceof ApiError && (error.status === 401 || error.status === 403))) {
-          stopped = true;
-          break;
+        if (current.status === "failed" && current.nextAttemptAt != null && current.nextAttemptAt > this.clock()) {
+          progress = true;
+          continue;
+        }
+
+        if (!(await this.dependenciesReady(businessId, current))) {
+          deferred.push(current);
+          continue;
+        }
+
+        progress = true;
+        processed += 1;
+        const flying = await this.outbox.markInFlight(businessId, current.operationId);
+        try {
+          const result = await sender(flying);
+          assertUuid(result.remoteId, "remoteId");
+          await this.outbox.markSynced(businessId, current.operationId, result.remoteId);
+          synced += 1;
+        } catch (error) {
+          const retryable = isRetryableError(error);
+          const message = error instanceof Error ? error.message : "Error de sincronización.";
+          await this.outbox.markFailed(
+            businessId,
+            current.operationId,
+            message,
+            retryable ? retryAt(flying.attempts, this.clock()) : null,
+          );
+          failed += 1;
+          if (retryable || (error instanceof ApiError && (error.status === 401 || error.status === 403))) {
+            stopped = true;
+            break;
+          }
         }
       }
+
+      if (stopped || !progress) {
+        blocked += deferred.length;
+        break;
+      }
+      remaining = deferred;
     }
 
     return { processed, synced, failed, blocked, stopped };
