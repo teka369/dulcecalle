@@ -175,6 +175,15 @@ export class OutboxStore {
     if (row.businessId !== businessId) {
       throw new Error("operationId belongs to another business");
     }
+    const allowed =
+      patch.status === "in_flight"
+        ? row.status === "pending" || row.status === "failed"
+        : patch.status === "synced" || patch.status === "failed"
+          ? row.status === "in_flight"
+          : false;
+    if (!allowed) {
+      throw new Error(`invalid outbox transition: ${row.status} -> ${patch.status}`);
+    }
     const next: OutboxItem = {
       ...row,
       status: patch.status,
@@ -262,6 +271,8 @@ export class ConnectivityMonitor {
 }
 
 export class OutboxSyncEngine {
+  private readonly active = new Map<string, Promise<SyncFlushResult>>();
+
   constructor(
     private readonly outbox: OutboxStore = getOutboxStore(),
     private readonly clock: () => number = Date.now,
@@ -272,6 +283,22 @@ export class OutboxSyncEngine {
     sender: OutboxSender,
   ): Promise<SyncFlushResult> {
     assertUuid(businessId, "businessId");
+    const active = this.active.get(businessId);
+    if (active) return active;
+
+    const task = this.flushInternal(businessId, sender);
+    this.active.set(businessId, task);
+    try {
+      return await task;
+    } finally {
+      if (this.active.get(businessId) === task) this.active.delete(businessId);
+    }
+  }
+
+  private async flushInternal(
+    businessId: string,
+    sender: OutboxSender,
+  ): Promise<SyncFlushResult> {
     await this.outbox.recoverInFlight(businessId);
 
     let processed = 0;
