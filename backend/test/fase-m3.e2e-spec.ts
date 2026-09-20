@@ -82,7 +82,7 @@ describe("Fase M3 PWA HTTP reads + playable domain", () => {
       true,
     );
 
-    const customer = await api.customers.create({ name: "Doña Rosa" });
+    const customer = await api.customers.create({ name: "Doña Rosa" }, randomUUID());
     await api.customers.initialDebt(
       customer.id,
       { amount: 45200, note: "deuda anterior" },
@@ -134,7 +134,7 @@ describe("Fase M3 PWA HTTP reads + playable domain", () => {
     await http.get("/v1/expenses").set(auth).expect(200);
     await http.get("/v1/cash/moves").set(auth).expect(200);
 
-    const supplier = await api.suppliers.create({ name: "Mayorista" });
+    const supplier = await api.suppliers.create({ name: "Mayorista" }, randomUUID());
     await api.inventory.surtir(
       product.id,
       {

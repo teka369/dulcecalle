@@ -164,7 +164,7 @@ describe("Fase 6.6 HTTP adapter ↔ Nest contract", () => {
   it("customers + sales + payments + cash (adapter does not compute economics)", async () => {
     const products = await api.products.list();
     const galleta = products.find((p) => p.name === "Galleta de chocolate italiano")!;
-    const customer = await api.customers.create({ name: "Doña Test" });
+    const customer = await api.customers.create({ name: "Doña Test" }, randomUUID());
     expect(customer.debt).toBe(0);
 
     const opened = await api.cash.open(5000);

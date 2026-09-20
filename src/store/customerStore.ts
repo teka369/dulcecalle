@@ -72,7 +72,10 @@ export const customerStore = {
     const trimmed = name.trim();
     if (!trimmed) throw new Error(CUSTOMER_ERRORS.emptyName);
     try {
-      const created = await getPwaApi().customers.create({ name: trimmed });
+      const created = await getPwaApi().customers.create(
+        { name: trimmed },
+        crypto.randomUUID(),
+      );
       await this.refresh();
       setState({ lastToast: "Cliente guardado" });
       return created.id;

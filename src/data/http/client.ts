@@ -1,4 +1,9 @@
-import { apiErrorFromBody } from "../errors";
+import {
+  ApiError,
+  apiErrorFromBody,
+  isNetworkError,
+  toNetworkError,
+} from "../errors";
 
 export type FetchAuthSession = {
   accessToken: string | null;
@@ -63,11 +68,16 @@ export class HttpClient {
       headers["Idempotency-Key"] = opts.idempotencyKey;
     }
 
-    const res = await this.fetchImpl(url, {
-      method,
-      headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    });
+    let res: Response;
+    try {
+      res = await this.fetchImpl(url, {
+        method,
+        headers,
+        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      });
+    } catch (e) {
+      throw toNetworkError(e);
+    }
 
     const text = await res.text();
     let parsed: unknown = null;
@@ -89,6 +99,11 @@ export class HttpClient {
       try {
         await this.refreshTokens();
       } catch (e) {
+        // Network / 5xx: keep tokens. Only a real auth rejection logs out.
+        if (isNetworkError(e)) throw e;
+        if (e instanceof ApiError && e.status !== 401 && e.status !== 403) {
+          throw e;
+        }
         this.session.clear();
         throw e;
       }

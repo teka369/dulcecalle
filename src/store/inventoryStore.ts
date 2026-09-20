@@ -177,7 +177,10 @@ export const inventoryStore = {
     notes?: string;
   }): Promise<string> {
     try {
-      const created = await getPwaApi().suppliers.create(input);
+      const created = await getPwaApi().suppliers.create(
+        input,
+        crypto.randomUUID(),
+      );
       await this.refreshSuppliers();
       setState({ lastToast: INVENTORY_TOASTS.supplierSaved });
       return created.id;
@@ -206,9 +209,12 @@ export const inventoryStore = {
 
     let supplierId = input.supplierId ?? null;
     if (!supplierId && input.supplierNameCreate?.trim()) {
-      const created = await getPwaApi().suppliers.create({
-        name: input.supplierNameCreate.trim(),
-      });
+      const created = await getPwaApi().suppliers.create(
+        {
+          name: input.supplierNameCreate.trim(),
+        },
+        crypto.randomUUID(),
+      );
       supplierId = created.id;
     }
 

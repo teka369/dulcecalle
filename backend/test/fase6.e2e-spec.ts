@@ -161,6 +161,7 @@ describe("Fase 6 backend", () => {
       .post("/v1/customers")
       .set("Authorization", `Bearer ${tokenA}`)
       .set("X-Business-Id", bizA)
+      .set("Idempotency-Key", randomUUID())
       .send({ name: "Doña Test" })
       .expect(201);
     expect(c.body.debt).toBe(0);
@@ -390,6 +391,7 @@ describe("Fase 6 backend", () => {
       .post("/v1/customers")
       .set("Authorization", `Bearer ${tokenB}`)
       .set("X-Business-Id", bizB)
+      .set("Idempotency-Key", randomUUID())
       .send({ name: "Carlos" })
       .expect(201);
 
@@ -604,6 +606,7 @@ describe("Fase 6 backend", () => {
       .post("/v1/customers")
       .set("Authorization", `Bearer ${tokenB}`)
       .set("X-Business-Id", bizB)
+      .set("Idempotency-Key", randomUUID())
       .send({ name: "No patch debt" })
       .expect(201);
     await api()
@@ -664,6 +667,7 @@ describe("Fase 6 backend", () => {
       .post("/v1/customers")
       .set("Authorization", `Bearer ${tokenB}`)
       .set("X-Business-Id", bizB)
+      .set("Idempotency-Key", randomUUID())
       .send({ name: "Fiado race" })
       .expect(201);
     await api()

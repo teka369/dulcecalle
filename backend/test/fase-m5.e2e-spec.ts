@@ -101,6 +101,7 @@ describe("Fase M5 customer portal", () => {
     const res = await api()
       .post("/v1/customers")
       .set(adminHeaders(token, businessId))
+      .set("Idempotency-Key", randomUUID())
       .send({ name })
       .expect(201);
     return res.body as { id: string; code: string; name: string; debt: number };

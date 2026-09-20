@@ -100,11 +100,11 @@ Reject: client `id`, `businessId`.
 No PATCH stock. PATCH name/price/lowStockAt only.
 
 ### Customers
-POST name, phone?. Debt starts at 0. Initial debt is a **separate** POST.
+POST name, phone?. `Idempotency-Key` required (M6.0). Debt starts at 0. `code` (`DC-NNNN`) is assigned by the server, including archived, never reused. Client must not invent a code. Same requestId → same customer. Initial debt is a **separate** POST.
 `GET /v1/customers/:id/ledger` → customer + initials + sales (with lines/returns) + payments.
 
 ### Suppliers
-name, phone?, notes?. No CxP. `GET /v1/suppliers/:id/surtidas` → surtir history.
+name, phone?, notes?. `Idempotency-Key` required (M6.0). Same requestId → same supplier. No CxP. `GET /v1/suppliers/:id/surtidas` → surtir history.
 
 ---
 

@@ -10,10 +10,11 @@ PWA de ventas para dulcería de barrio (Next.js App Router + NestJS).
 - NestJS 11 + Prisma 6 + PostgreSQL 16 — **fuente de verdad del negocio** (Render: `dulcecalle-teka369`)
 - Dexie repositories — **solo tests de dominio** (IDs numéricos). La UI no los usa.
 - Capas UI: pages → store → `HttpRepository` → `/v1`
+- M6.1: Local Store UUID + Outbox en `src/data/local` (`dulcecalle-local`). **No cableado a la UI.** Contrato: [M6.md](M6.md).
 
 Hay que entrar con cuenta. El servidor arranca vacío: productos, clientes y fiados se cargan a mano. Un fiado viejo es **deuda anterior**, nunca una venta.
 
-El dominio congelado está en [DOMAIN.md](DOMAIN.md). Servidor: [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [API_CONTRACT.md](API_CONTRACT.md) · [MIGRATION.md](MIGRATION.md) · [IDENTITY.md](IDENTITY.md).
+El dominio congelado está en [DOMAIN.md](DOMAIN.md). Servidor: [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [API_CONTRACT.md](API_CONTRACT.md) · [MIGRATION.md](MIGRATION.md) · [IDENTITY.md](IDENTITY.md) · [M6.md](M6.md).
 
 M3: la PWA habla HTTP (UUID). No hay dual-write, sync ni import Dexie→PG. `pwaStorage()` es `"http"`.
 
@@ -27,9 +28,10 @@ No pongas secrets en `NEXT_PUBLIC_*`.
 ```
 UI (App Router pages)
   → store (cart / cash / customer / inventory)
-    → HttpRepository (src/data/http)     ← ACTIVO
+    → HttpRepository (src/data/http)     ← ACTIVO M3–M5
          → NestJS /v1 → Prisma → PostgreSQL
-Dexie repositories (src/repositories)    ← tests de dominio
+src/data/local (dulcecalle-local, UUID)  ← M6.1, no UI
+Dexie repositories (src/repositories)    ← tests de dominio (++id)
 ```
 
 La lógica de negocio de la UI vive en stores + `src/domain`. Los componentes no escriben IndexedDB.

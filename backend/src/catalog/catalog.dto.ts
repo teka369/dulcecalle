@@ -74,6 +74,10 @@ export class CreateCustomerDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 }
 
 export class PatchCustomerDto {
@@ -163,6 +167,10 @@ export class CreateSupplierDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 }
 
 export class PatchSupplierDto {

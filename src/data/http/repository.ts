@@ -198,14 +198,17 @@ export class HttpRepository {
       return mapCustomer(row);
     },
 
-    create: async (input: {
-      name: string;
-      phone?: string;
-    }): Promise<RemoteCustomer> => {
+    create: async (
+      input: {
+        name: string;
+        phone?: string;
+      },
+      requestId: string,
+    ): Promise<RemoteCustomer> => {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         "/customers",
-        { body: input },
+        { body: input, idempotencyKey: requestId },
       );
       return mapCustomer(row);
     },
@@ -263,15 +266,18 @@ export class HttpRepository {
       return mapSupplier(row);
     },
 
-    create: async (input: {
-      name: string;
-      phone?: string;
-      notes?: string;
-    }): Promise<RemoteSupplier> => {
+    create: async (
+      input: {
+        name: string;
+        phone?: string;
+        notes?: string;
+      },
+      requestId: string,
+    ): Promise<RemoteSupplier> => {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         "/suppliers",
-        { body: input },
+        { body: input, idempotencyKey: requestId },
       );
       return mapSupplier(row);
     },

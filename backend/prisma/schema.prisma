@@ -141,6 +141,7 @@ model Customer {
   legacyDexieId Int?      @map("legacy_dexie_id")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  requestId     String?   @map("request_id") @db.Uuid
 
   business Business           @relation(fields: [businessId], references: [id])
   sales    Sale[]
@@ -148,6 +149,7 @@ model Customer {
   initials InitialDebt[]
 
   @@unique([businessId, code])
+  @@unique([businessId, requestId])
   @@unique([businessId, legacyDexieId])
   @@index([businessId, debt])
   @@map("customers")
@@ -162,10 +164,12 @@ model Supplier {
   legacyDexieId Int?     @map("legacy_dexie_id")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  requestId     String?  @map("request_id") @db.Uuid
 
   business   Business    @relation(fields: [businessId], references: [id])
   stockMoves StockMove[]
 
+  @@unique([businessId, requestId])
   @@unique([businessId, legacyDexieId])
   @@map("suppliers")
 }

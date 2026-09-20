@@ -201,7 +201,7 @@ Exact, small, **future** list (not done here):
 5. Cart / selects / React keys follow the same id type.
 6. Keep Dexie on the phone until HTTP is proven (MIGRATION §8.10).
 
-Out of scope until a later phase: sync, outbox, CRDT, returns/surtir/merma on the API, Fase 7.
+Out of scope until a later phase: sync, CRDT, dual-write. M6.1 adds a **separate** UUID IndexedDB (`dulcecalle-local`) + outbox that is **not** wired to the UI and does **not** use `import_id_map`. See [M6.md](M6.md).
 
 ---
 

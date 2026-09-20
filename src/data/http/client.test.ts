@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "../errors";
+import { ApiError, NetworkError } from "../errors";
 import { HttpClient } from "./client";
 import { HttpSession } from "./session";
 
@@ -188,6 +188,71 @@ describe("HttpClient 401 → refresh → retry", () => {
     expect(session.refreshToken).toBeNull();
     expect(session.businessId).toBeNull();
     expect(session.user).toBeNull();
+  });
+
+  it("keeps the session when refresh fetch fails with a network error", async () => {
+    const session = new HttpSession();
+    session.accessToken = "old";
+    session.refreshToken = "r1";
+    session.businessId = "biz";
+    session.user = { id: "u", email: "a@test.co" };
+    const fetchImpl: typeof fetch = async (url) => {
+      if (String(url).endsWith("/auth/refresh")) {
+        throw new TypeError("Failed to fetch");
+      }
+      return jsonResponse(401, {
+        error: { code: "UNAUTHORIZED", message: "Inicia sesión." },
+      });
+    };
+    const http = new HttpClient("http://example.test/v1", session, fetchImpl);
+    await expect(http.request("GET", "/products")).rejects.toBeInstanceOf(
+      NetworkError,
+    );
+    expect(session.accessToken).toBe("old");
+    expect(session.refreshToken).toBe("r1");
+    expect(session.businessId).toBe("biz");
+    expect(session.user).toEqual({ id: "u", email: "a@test.co" });
+  });
+
+  it("keeps the session when the original fetch fails with a network error", async () => {
+    const session = new HttpSession();
+    session.accessToken = "tok";
+    session.refreshToken = "r1";
+    session.businessId = "biz";
+    const fetchImpl: typeof fetch = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    const http = new HttpClient("http://example.test/v1", session, fetchImpl);
+    await expect(http.request("GET", "/products")).rejects.toBeInstanceOf(
+      NetworkError,
+    );
+    expect(session.accessToken).toBe("tok");
+    expect(session.refreshToken).toBe("r1");
+    expect(session.businessId).toBe("biz");
+  });
+
+  it("keeps the session when refresh returns 500", async () => {
+    const session = new HttpSession();
+    session.accessToken = "old";
+    session.refreshToken = "r1";
+    session.businessId = "biz";
+    const fetchImpl: typeof fetch = async (url) => {
+      if (String(url).endsWith("/auth/refresh")) {
+        return jsonResponse(500, {
+          error: { code: "INTERNAL", message: "Algo salió mal." },
+        });
+      }
+      return jsonResponse(401, {
+        error: { code: "UNAUTHORIZED", message: "Inicia sesión." },
+      });
+    };
+    const http = new HttpClient("http://example.test/v1", session, fetchImpl);
+    await expect(http.request("GET", "/products")).rejects.toMatchObject({
+      status: 500,
+    });
+    expect(session.accessToken).toBe("old");
+    expect(session.refreshToken).toBe("r1");
+    expect(session.businessId).toBe("biz");
   });
 
   it("single-flights concurrent 401s through one refresh", async () => {

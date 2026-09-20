@@ -132,8 +132,13 @@ export class CatalogController {
   createCustomer(
     @CurrentBusiness() ctx: BusinessContext,
     @Body() dto: CreateCustomerDto,
+    @Headers("idempotency-key") key?: string,
   ) {
-    return this.catalog.createCustomer(ctx, dto);
+    return this.catalog.createCustomer(
+      ctx,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
   }
 
   @Patch("customers/:id")
@@ -183,8 +188,13 @@ export class CatalogController {
   createSupplier(
     @CurrentBusiness() ctx: BusinessContext,
     @Body() dto: CreateSupplierDto,
+    @Headers("idempotency-key") key?: string,
   ) {
-    return this.catalog.createSupplier(ctx, dto);
+    return this.catalog.createSupplier(
+      ctx,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
   }
 
   @Patch("suppliers/:id")

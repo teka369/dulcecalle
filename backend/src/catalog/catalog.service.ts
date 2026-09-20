@@ -200,27 +200,50 @@ export class CatalogService {
     return productJson(updated);
   }
 
-  async createCustomer(ctx: BusinessContext, dto: CreateCustomerDto) {
+  async createCustomer(
+    ctx: BusinessContext,
+    dto: CreateCustomerDto,
+    requestId: string,
+  ) {
+    const existing = await this.prisma.customer.findUnique({
+      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+    });
+    if (existing) return customerJson(existing);
+
     const name = dto.name.trim();
     if (!name) throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.emptyName);
-    const c = await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.customer.findMany({
-        where: { businessId: ctx.businessId },
-        select: { code: true },
+
+    try {
+      const c = await this.prisma.$transaction(async (tx) => {
+        const existingCodes = await tx.customer.findMany({
+          where: { businessId: ctx.businessId },
+          select: { code: true },
+        });
+        const code = nextCodeFromExisting(existingCodes.map((row) => row.code));
+        return tx.customer.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            code,
+            name,
+            phone: dto.phone,
+            debt: 0n,
+            requestId,
+          },
+        });
       });
-      const code = nextCodeFromExisting(existing.map((row) => row.code));
-      return tx.customer.create({
-        data: {
-          id: randomUUID(),
-          businessId: ctx.businessId,
-          code,
-          name,
-          phone: dto.phone,
-          debt: 0n,
-        },
-      });
-    });
-    return customerJson(c);
+      return customerJson(c);
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const again = await this.prisma.customer.findUnique({
+          where: {
+            businessId_requestId: { businessId: ctx.businessId, requestId },
+          },
+        });
+        if (again) return customerJson(again);
+      }
+      throw e;
+    }
   }
 
   async listCustomers(ctx: BusinessContext) {
@@ -687,19 +710,42 @@ export class CatalogService {
     });
   }
 
-  async createSupplier(ctx: BusinessContext, dto: CreateSupplierDto) {
+  async createSupplier(
+    ctx: BusinessContext,
+    dto: CreateSupplierDto,
+    requestId: string,
+  ) {
+    const existing = await this.prisma.supplier.findUnique({
+      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+    });
+    if (existing) return this.supplierJson(existing);
+
     const name = dto.name.trim();
     if (!name) throw new AppError(ERROR_CODES.VALIDATION, "Ponle un nombre al proveedor.");
-    const s = await this.prisma.supplier.create({
-      data: {
-        id: randomUUID(),
-        businessId: ctx.businessId,
-        name,
-        phone: dto.phone?.trim() || null,
-        notes: dto.notes?.trim() || null,
-      },
-    });
-    return this.supplierJson(s);
+
+    try {
+      const s = await this.prisma.supplier.create({
+        data: {
+          id: randomUUID(),
+          businessId: ctx.businessId,
+          name,
+          phone: dto.phone?.trim() || null,
+          notes: dto.notes?.trim() || null,
+          requestId,
+        },
+      });
+      return this.supplierJson(s);
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const again = await this.prisma.supplier.findUnique({
+          where: {
+            businessId_requestId: { businessId: ctx.businessId, requestId },
+          },
+        });
+        if (again) return this.supplierJson(again);
+      }
+      throw e;
+    }
   }
 
   async patchSupplier(ctx: BusinessContext, id: string, dto: PatchSupplierDto) {

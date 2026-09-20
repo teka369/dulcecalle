@@ -81,6 +81,7 @@ describe("Fase M1 domain endpoints", () => {
     const created = await api()
       .post("/v1/suppliers")
       .set(auth(tokenA, bizA))
+      .set("Idempotency-Key", randomUUID())
       .send({ name: "  Dulces del Valle  ", phone: "3001112222", notes: "frio" })
       .expect(201);
     expect(created.body.name).toBe("Dulces del Valle");
@@ -111,6 +112,7 @@ describe("Fase M1 domain endpoints", () => {
     await api()
       .post("/v1/suppliers")
       .set(auth(tokenA, bizA))
+      .set("Idempotency-Key", randomUUID())
       .send({ name: "   " })
       .expect(400)
       .expect((r) => expect(r.body.error.code).toBe("VALIDATION"));
@@ -153,6 +155,7 @@ describe("Fase M1 domain endpoints", () => {
     const c = await api()
       .post("/v1/customers")
       .set(auth(tokenA, bizA))
+      .set("Idempotency-Key", randomUUID())
       .send({ name: "Doña M1" })
       .expect(201);
     customerId = c.body.id;
@@ -884,6 +887,7 @@ describe("Fase M1 domain endpoints", () => {
     const cB = await api()
       .post("/v1/customers")
       .set(auth(tokenB, bizB))
+      .set("Idempotency-Key", randomUUID())
       .send({ name: "Cliente B" })
       .expect(201);
     await api()
