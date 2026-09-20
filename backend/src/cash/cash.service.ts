@@ -109,12 +109,16 @@ export class CashService {
     return { efectivo, nequi, total: addCop(efectivo, nequi) };
   }
 
-  async open(ctx: BusinessContext, openingFloat: number) {
+  async open(ctx: BusinessContext, openingFloat: number, requestId: string = randomUUID()) {
     const float = asCop(openingFloat);
     if (float < 0n) {
       throw new AppError(ERROR_CODES.VALIDATION, "El monto no puede ser negativo.");
     }
     const localDate = occurredOnDate(ctx.timezone);
+    const existingByRequest = await this.prisma.cashSession.findUnique({
+      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+    });
+    if (existingByRequest) return sessionJson(existingByRequest);
     const existing = await this.prisma.cashSession.findUnique({
       where: { businessId_localDate: { businessId: ctx.businessId, localDate } },
     });
@@ -130,6 +134,7 @@ export class CashService {
           openedAt: new Date(),
           closedAt: null,
           openingFloat: float,
+          requestId,
         },
       });
       return sessionJson(created);
@@ -146,7 +151,12 @@ export class CashService {
     }
   }
 
-  async close(ctx: BusinessContext, sessionId: string, countedEfectivo: number) {
+  async close(ctx: BusinessContext, sessionId: string, countedEfectivo: number, requestId: string = randomUUID()) {
+    const existingByRequest = await this.prisma.cashSession.findUnique({
+      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+    });
+    if (existingByRequest) return sessionJson(existingByRequest);
+
     const counted = asCop(countedEfectivo);
     if (counted < 0n) {
       throw new AppError(ERROR_CODES.VALIDATION, "Revisa el monto contado.");
@@ -177,6 +187,7 @@ export class CashService {
           expectedEfectivo: expected.efectivo,
           expectedNequi: expected.nequi,
           difference,
+          requestId,
         },
       });
       return sessionJson(updated);
