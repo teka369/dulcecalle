@@ -1,10 +1,17 @@
 import "fake-indexeddb/auto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NetworkError } from "@/data/errors";
+import Dexie from "dexie";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError, NetworkError } from "@/data/errors";
 import {
+  LOCAL_DB_NAME,
+  __reopenLocalDbForTests,
   __resetLocalDbForTests,
   getLocalDb,
 } from "@/data/local/db";
+import {
+  resetOutboxStoreSingleton,
+  resetOutboxSyncEngineSingleton,
+} from "@/data/local/outbox";
 import { resetLocalStoreSingleton } from "@/data/local/store";
 
 const businessId = "11111111-1111-4111-8111-111111111111";
@@ -32,12 +39,55 @@ import {
   validateCatalogName,
 } from "./offline-catalog";
 
+function offlineCustomerId(
+  result: Awaited<ReturnType<typeof createCustomerWithOfflineFallback>>,
+): string {
+  expect(result.mode).toBe("offline");
+  if (result.mode !== "offline") {
+    throw new Error("expected offline customer creation");
+  }
+  expect(result.customerId).toBeTruthy();
+  return result.customerId;
+}
+
+function offlineSupplierId(
+  result: Awaited<ReturnType<typeof createSupplierWithOfflineFallback>>,
+): string {
+  expect(result.mode).toBe("offline");
+  if (result.mode !== "offline") {
+    throw new Error("expected offline supplier creation");
+  }
+  expect(result.supplierId).toBeTruthy();
+  return result.supplierId;
+}
+
+async function expectHttpDoesNotFallback(error: Error) {
+  api.customers.create.mockRejectedValue(error);
+  await expect(
+    createCustomerWithOfflineFallback(
+      { name: "Ana" },
+      "55555555-5555-4555-8555-555555555555",
+    ),
+  ).rejects.toThrow(error.message);
+  expect(await getLocalDb().customers.count()).toBe(0);
+  expect(await getLocalDb().outbox.count()).toBe(0);
+}
+
 describe("M6.7 offline catalog creation", () => {
   beforeEach(async () => {
-    await __resetLocalDbForTests();
+    resetOutboxStoreSingleton();
+    resetOutboxSyncEngineSingleton();
     resetLocalStoreSingleton();
+    await __resetLocalDbForTests();
     vi.clearAllMocks();
     api.session.businessId = businessId;
+  });
+
+  afterEach(async () => {
+    resetOutboxStoreSingleton();
+    resetOutboxSyncEngineSingleton();
+    resetLocalStoreSingleton();
+    await __resetLocalDbForTests();
   });
 
   it("validates and normalizes names", () => {
@@ -52,12 +102,12 @@ describe("M6.7 offline catalog creation", () => {
       { name: "  Ana  ", phone: " 300 " },
       "33333333-3333-4333-8333-333333333333",
     );
+    const customerId = offlineCustomerId(result);
 
-    expect(result.mode).toBe("offline");
     const db = getLocalDb();
-    const row = await db.customers.get(result.customerId);
+    const row = await db.customers.get(customerId);
     expect(row).toMatchObject({
-      id: result.customerId,
+      id: customerId,
       businessId,
       code: null,
       name: "Ana",
@@ -83,12 +133,12 @@ describe("M6.7 offline catalog creation", () => {
       { name: "  Proveedor X ", phone: "", notes: "  " },
       "44444444-4444-4444-8444-444444444444",
     );
+    const supplierId = offlineSupplierId(result);
 
-    expect(result.mode).toBe("offline");
     const db = getLocalDb();
-    const row = await db.suppliers.get(result.supplierId);
+    const row = await db.suppliers.get(supplierId);
     expect(row).toMatchObject({
-      id: result.supplierId,
+      id: supplierId,
       businessId,
       name: "Proveedor X",
       phone: null,
@@ -99,14 +149,89 @@ describe("M6.7 offline catalog creation", () => {
   });
 
   it("does not fallback for HTTP errors", async () => {
-    api.customers.create.mockRejectedValue(Object.assign(new Error("bad request"), { status: 400 }));
+    await expectHttpDoesNotFallback(
+      Object.assign(new Error("bad request"), { status: 400 }),
+    );
+  });
 
-    await expect(
-      createCustomerWithOfflineFallback({ name: "Ana" }, "55555555-5555-4555-8555-555555555555"),
-    ).rejects.toThrow("bad request");
+  it("does not fallback for HTTP 401", async () => {
+    await expectHttpDoesNotFallback(new ApiError("UNAUTHORIZED", "unauthorized", 401));
+  });
 
-    expect(await getLocalDb().customers.count()).toBe(0);
-    expect(await getLocalDb().outbox.count()).toBe(0);
+  it("does not fallback for HTTP 403", async () => {
+    await expectHttpDoesNotFallback(new ApiError("FORBIDDEN", "forbidden", 403));
+  });
+
+  it("does not fallback for HTTP 5xx", async () => {
+    await expectHttpDoesNotFallback(new ApiError("INTERNAL", "server error", 500));
+  });
+
+  it("writes cacheMeta for the tenant when creating offline", async () => {
+    api.customers.create.mockRejectedValue(new NetworkError("offline"));
+    api.suppliers.create.mockRejectedValue(new NetworkError("offline"));
+
+    await createCustomerWithOfflineFallback(
+      { name: "Ana" },
+      "33333333-3333-4333-8333-333333333333",
+    );
+    await createSupplierWithOfflineFallback(
+      { name: "Proveedor X" },
+      "44444444-4444-4444-8444-444444444444",
+    );
+
+    const db = getLocalDb();
+    expect(await db.cacheMeta.get(`${businessId}::customers`)).toMatchObject({
+      id: `${businessId}::customers`,
+      businessId,
+      resource: "customers",
+    });
+    expect(await db.cacheMeta.get(`${businessId}::suppliers`)).toMatchObject({
+      id: `${businessId}::suppliers`,
+      businessId,
+      resource: "suppliers",
+    });
+    expect(await db.cacheMeta.where("businessId").equals(otherBusinessId).count()).toBe(0);
+  });
+
+  it("survives closing and reopening Dexie with the outbox row", async () => {
+    api.customers.create.mockRejectedValue(new NetworkError("offline"));
+    const requestId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const result = await createCustomerWithOfflineFallback({ name: "Ana" }, requestId);
+    const customerId = offlineCustomerId(result);
+
+    resetOutboxStoreSingleton();
+    resetOutboxSyncEngineSingleton();
+    resetLocalStoreSingleton();
+    __reopenLocalDbForTests();
+
+    const db = getLocalDb();
+    expect(db.name).toBe(LOCAL_DB_NAME);
+    expect(await db.customers.get(customerId)).toMatchObject({
+      id: customerId,
+      businessId,
+      code: null,
+      requestId,
+    });
+    const outbox = await db.outbox.where("businessId").equals(businessId).toArray();
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({
+      entity: "customer",
+      operation: "create",
+      requestId,
+      status: "pending",
+    });
+  });
+
+  it("does not create or use the legacy dulcecalle database", async () => {
+    api.customers.create.mockRejectedValue(new NetworkError("offline"));
+    await createCustomerWithOfflineFallback(
+      { name: "Ana" },
+      "33333333-3333-4333-8333-333333333333",
+    );
+
+    expect(getLocalDb().name).toBe("dulcecalle-local");
+    expect(await Dexie.exists(LOCAL_DB_NAME)).toBe(true);
+    expect(await Dexie.exists("dulcecalle")).toBe(false);
   });
 
   it("preserves the same requestId on retry of the same local intention", async () => {
@@ -117,7 +242,7 @@ describe("M6.7 offline catalog creation", () => {
     const second = await createCustomerWithOfflineFallback({ name: "Ana" }, requestId);
 
     expect(second.mode).toBe("offline");
-    expect(second.customerId).toBe(first.customerId);
+    expect(offlineCustomerId(second)).toBe(offlineCustomerId(first));
     expect(await getLocalDb().outbox.count()).toBe(1);
   });
 
@@ -125,6 +250,7 @@ describe("M6.7 offline catalog creation", () => {
     api.customers.create.mockRejectedValueOnce(new NetworkError("offline"));
     const requestId = "77777777-7777-4777-8777-777777777777";
     const local = await createCustomerWithOfflineFallback({ name: "Ana" }, requestId);
+    const customerId = offlineCustomerId(local);
     const remote = {
       id: "88888888-8888-4888-8888-888888888888",
       code: "DC-0042",
@@ -140,7 +266,7 @@ describe("M6.7 offline catalog creation", () => {
     await syncPendingCustomers(businessId);
 
     expect(api.customers.create).toHaveBeenLastCalledWith({ name: "Ana" }, requestId);
-    expect(await getLocalDb().customers.get(local.customerId)).toBeUndefined();
+    expect(await getLocalDb().customers.get(customerId)).toBeUndefined();
     expect(await getLocalDb().customers.get(remote.id)).toMatchObject({
       id: remote.id,
       code: "DC-0042",
@@ -155,6 +281,7 @@ describe("M6.7 offline catalog creation", () => {
       { name: "Proveedor X", notes: "nota" },
       requestId,
     );
+    const supplierId = offlineSupplierId(local);
     const remote = {
       id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       name: "Proveedor X",
@@ -171,7 +298,7 @@ describe("M6.7 offline catalog creation", () => {
       { name: "Proveedor X", notes: "nota" },
       requestId,
     );
-    expect(await getLocalDb().suppliers.get(local.supplierId)).toBeUndefined();
+    expect(await getLocalDb().suppliers.get(supplierId)).toBeUndefined();
     expect(await getLocalDb().suppliers.get(remote.id)).toMatchObject({
       id: remote.id,
       businessId,
@@ -182,6 +309,7 @@ describe("M6.7 offline catalog creation", () => {
     api.customers.create.mockRejectedValue(new NetworkError("offline"));
     const requestId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
     const local = await createCustomerWithOfflineFallback({ name: "Ana" }, requestId);
+    const customerId = offlineCustomerId(local);
 
     const db = getLocalDb();
     await db.customers.put({
@@ -197,6 +325,6 @@ describe("M6.7 offline catalog creation", () => {
     });
 
     const rows = await db.customers.where("businessId").equals(otherBusinessId).toArray();
-    expect(rows.map((row) => row.id)).not.toContain(local.customerId);
+    expect(rows.map((row) => row.id)).not.toContain(customerId);
   });
 });
