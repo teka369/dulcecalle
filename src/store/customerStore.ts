@@ -15,6 +15,7 @@ import {
 import { ApiError } from "@/data/errors";
 import { getPwaApi } from "@/data/pwa/api";
 import { getCachedCustomer, listCachedCustomers } from "@/data/pwa/catalog";
+import { createPaymentWithOfflineFallback } from "@/data/pwa/offline-payments";
 import { loadHttpStatement } from "@/data/pwa/statement";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import type { DebtStatement } from "@/domain/debt/statement";
@@ -116,14 +117,22 @@ export const customerStore = {
 
     const amount = parseAbonoAmount(input.amountRaw);
     try {
-      const payment = await getPwaApi().customers.pay(
-        input.customerId,
-        { amount, method: input.method as PayMethod },
+      const result = await createPaymentWithOfflineFallback(
+        {
+          customerId: input.customerId,
+          amount,
+          method: input.method as PayMethod,
+        },
         input.requestId ?? crypto.randomUUID(),
       );
       await this.refresh();
-      setState({ lastToast: "Abono registrado" });
-      return payment.id;
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Abono guardado sin conexión"
+            : "Abono registrado",
+      });
+      return result.mode === "offline" ? result.paymentId : result.payment.id;
     } catch (e) {
       fail(e);
     }
