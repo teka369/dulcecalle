@@ -11,7 +11,8 @@ import {
   validateGasto,
   validateOpeningFloat,
 } from "@/domain/cash";
-import { ApiError } from "@/data/errors";
+import { ApiError, NetworkError } from "@/data/errors";
+import { getLocalCashSnapshot, openCashWithOfflineFallback, closeCashWithOfflineFallback, recordAporteOffline, recordRetiroOffline, recordExpenseWithOfflineFallback } from "@/data/pwa/offline-operations";
 import { getPwaApi } from "@/data/pwa/api";
 import type { RemoteExpense, RemoteToday } from "@/data/http/mappers";
 import { addCop } from "@/domain/money";
@@ -84,14 +85,21 @@ export const cashStore = {
     setState({ loading: true });
     try {
       const api = getPwaApi();
-      const [today, expenses] = await Promise.all([
-        api.cash.today(),
-        api.cash.expenses(),
-      ]);
+      const [today, expenses] = await Promise.all([api.cash.today(), api.cash.expenses()]);
       const summary = toSummary(today);
       setState({ summary, expenses, loading: false });
       return summary;
     } catch (e) {
+      if (e instanceof NetworkError) {
+        try {
+          const local = await getLocalCashSnapshot();
+          setState({ summary: local.summary, expenses: local.expenses, loading: false });
+          return local.summary;
+        } catch (localError) {
+          setState({ loading: false });
+          fail(localError);
+        }
+      }
       setState({ loading: false });
       fail(e);
     }
@@ -101,8 +109,8 @@ export const cashStore = {
     if (err) throw new Error(err);
     const amount = openingRaw.trim() === "" ? 0 : parseCopAmount(openingRaw)!;
     try {
-      await getPwaApi().cash.open(amount);
-      setState({ lastToast: CASH_COPY.toastCajaAbierta });
+      const result = await openCashWithOfflineFallback(amount, crypto.randomUUID());
+      setState({ lastToast: result.mode === "offline" ? "Caja guardada sin conexión" : CASH_COPY.toastCajaAbierta });
       await this.refresh();
     } catch (e) {
       fail(e);
@@ -124,16 +132,11 @@ export const cashStore = {
     const summary = await this.refresh();
     if (summary.closed) throw new Error(CASH_ERRORS.dayClosed);
     try {
-      await getPwaApi().cash.recordExpense(
-        {
-          amount: parseCopAmount(input.amountRaw)!,
-          category: input.categoryRaw.trim(),
-          method: input.method!,
-          note: input.note?.trim() || undefined,
-        },
+      const result = await recordExpenseWithOfflineFallback(
+        { amount: parseCopAmount(input.amountRaw)!, category: input.categoryRaw.trim(), method: input.method!, note: input.note?.trim() || undefined },
         input.requestId ?? crypto.randomUUID(),
       );
-      setState({ lastToast: CASH_COPY.toastGasto });
+      setState({ lastToast: result.mode === "offline" ? "Gasto guardado sin conexión" : CASH_COPY.toastGasto });
       await this.refresh();
     } catch (e) {
       fail(e);
@@ -153,15 +156,11 @@ export const cashStore = {
     const summary = await this.refresh();
     if (summary.closed) throw new Error(CASH_ERRORS.dayClosed);
     try {
-      await getPwaApi().cash.retiro(
-        {
-          amount: parseCopAmount(input.amountRaw)!,
-          method: input.method!,
-          note: input.note?.trim() || undefined,
-        },
+      const result = await recordRetiroOffline(
+        { amount: parseCopAmount(input.amountRaw)!, method: input.method!, note: input.note?.trim() || undefined },
         input.requestId ?? crypto.randomUUID(),
       );
-      setState({ lastToast: CASH_COPY.toastRetiro });
+      setState({ lastToast: result.mode === "offline" ? "Retiro guardado sin conexión" : CASH_COPY.toastRetiro });
       await this.refresh();
     } catch (e) {
       fail(e);
@@ -181,15 +180,11 @@ export const cashStore = {
     const summary = await this.refresh();
     if (summary.closed) throw new Error(CASH_ERRORS.dayClosed);
     try {
-      await getPwaApi().cash.aporte(
-        {
-          amount: parseCopAmount(input.amountRaw)!,
-          method: input.method!,
-          note: input.note?.trim() || undefined,
-        },
+      const result = await recordAporteOffline(
+        { amount: parseCopAmount(input.amountRaw)!, method: input.method!, note: input.note?.trim() || undefined },
         input.requestId ?? crypto.randomUUID(),
       );
-      setState({ lastToast: CASH_COPY.toastAporte });
+      setState({ lastToast: result.mode === "offline" ? "Aporte guardado sin conexión" : CASH_COPY.toastAporte });
       await this.refresh();
     } catch (e) {
       fail(e);
@@ -202,11 +197,8 @@ export const cashStore = {
     if (!summary.session) throw new Error(CASH_ERRORS.noOpenSession);
     if (summary.closed) throw new Error(CASH_ERRORS.sessionAlreadyClosed);
     try {
-      await getPwaApi().cash.close(
-        summary.session.id,
-        parseCopAmount(countedRaw)!,
-      );
-      setState({ lastToast: CASH_COPY.toastCajaCerrada });
+      const result = await closeCashWithOfflineFallback(summary.session.id, parseCopAmount(countedRaw)!, crypto.randomUUID());
+      setState({ lastToast: result.mode === "offline" ? "Caja cerrada sin conexión" : CASH_COPY.toastCajaCerrada });
       await this.refresh();
     } catch (e) {
       fail(e);
