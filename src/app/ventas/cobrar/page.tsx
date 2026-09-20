@@ -7,6 +7,7 @@ import { formatCop, mulCop, addCop, subCop } from "@/domain/money";
 import type { PaymentKind } from "@/domain/types";
 import type { RemoteCustomer, RemoteProduct } from "@/data/http/mappers";
 import { getPwaApi } from "@/data/pwa/api";
+import { listCachedCustomers, listCachedProducts } from "@/data/pwa/catalog";
 import { useCart } from "@/store/cartStore";
 
 export default function CobrarPage() {
@@ -32,9 +33,16 @@ export default function CobrarPage() {
   const requestIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const api = getPwaApi();
-    void api.products.list().then(setProducts).catch(() => setProducts([]));
-    void api.customers.list().then(setCustomers).catch(() => setCustomers([]));
+    void listCachedProducts()
+      .then(setProducts)
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "Sin conexión.");
+      });
+    void listCachedCustomers()
+      .then(setCustomers)
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "Sin conexión.");
+      });
   }, []);
 
   useEffect(() => {

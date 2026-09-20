@@ -12,6 +12,12 @@ import {
 } from "@/domain/inventory";
 import { ApiError } from "@/data/errors";
 import { getPwaApi } from "@/data/pwa/api";
+import {
+  getCachedProduct,
+  getCachedSupplier,
+  listCachedProducts,
+  listCachedSuppliers,
+} from "@/data/pwa/catalog";
 import type { RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http/mappers";
 
 export type PwaSupplierSurtir = {
@@ -78,7 +84,7 @@ export const inventoryStore = {
   async refreshProducts(): Promise<RemoteProduct[]> {
     setState({ loading: true });
     try {
-      const products = await getPwaApi().products.list();
+      const products = await listCachedProducts();
       setState({ products, loading: false });
       return products;
     } catch (e) {
@@ -88,7 +94,7 @@ export const inventoryStore = {
   },
   async refreshSuppliers(): Promise<RemoteSupplier[]> {
     try {
-      const suppliers = await getPwaApi().suppliers.list();
+      const suppliers = await listCachedSuppliers();
       setState({ suppliers });
       return suppliers;
     } catch (e) {
@@ -99,8 +105,8 @@ export const inventoryStore = {
     setState({ loading: true });
     try {
       const [products, suppliers] = await Promise.all([
-        getPwaApi().products.list(),
-        getPwaApi().suppliers.list(),
+        listCachedProducts(),
+        listCachedSuppliers(),
       ]);
       setState({ products, suppliers, loading: false });
     } catch (e) {
@@ -110,14 +116,14 @@ export const inventoryStore = {
   },
   async getProduct(id: string): Promise<RemoteProduct | undefined> {
     try {
-      return await getPwaApi().products.get(id);
+      return await getCachedProduct(id);
     } catch {
       return undefined;
     }
   },
   async getSupplier(id: string): Promise<RemoteSupplier | undefined> {
     try {
-      return await getPwaApi().suppliers.get(id);
+      return await getCachedSupplier(id);
     } catch {
       return undefined;
     }

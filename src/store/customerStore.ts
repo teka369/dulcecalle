@@ -14,6 +14,7 @@ import {
 } from "@/domain/initialDebt";
 import { ApiError } from "@/data/errors";
 import { getPwaApi } from "@/data/pwa/api";
+import { getCachedCustomer, listCachedCustomers } from "@/data/pwa/catalog";
 import { loadHttpStatement } from "@/data/pwa/statement";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import type { DebtStatement } from "@/domain/debt/statement";
@@ -60,7 +61,7 @@ export const customerStore = {
   async refresh(): Promise<RemoteCustomer[]> {
     setState({ loading: true });
     try {
-      const customers = await getPwaApi().customers.list();
+      const customers = await listCachedCustomers();
       setState({ customers, loading: false });
       return customers;
     } catch (e) {
@@ -85,7 +86,7 @@ export const customerStore = {
   },
   async getCustomer(id: string): Promise<RemoteCustomer | undefined> {
     try {
-      return await getPwaApi().customers.get(id);
+      return await getCachedCustomer(id);
     } catch {
       return undefined;
     }

@@ -4,6 +4,16 @@
  * the financial authority. Do not treat these as source of truth.
  */
 
+export type CatalogResource = "products" | "customers" | "suppliers";
+
+export type LocalCacheMeta = {
+  /** `${businessId}::${resource}` — not a UUID. */
+  id: string;
+  businessId: string;
+  resource: CatalogResource;
+  cachedAt: number;
+};
+
 export type LocalEntityId = string;
 
 export type OutboxStatus = "pending" | "in_flight" | "synced" | "failed";

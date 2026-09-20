@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from "dexie";
 import type {
+  LocalCacheMeta,
   LocalCashMove,
   LocalCashSession,
   LocalCustomer,
@@ -36,6 +37,7 @@ export class DulceCalleLocalDB extends Dexie {
   expenses!: EntityTable<LocalExpense, "id">;
   customerPayments!: EntityTable<LocalCustomerPayment, "id">;
   initialDebts!: EntityTable<LocalInitialDebt, "id">;
+  cacheMeta!: EntityTable<LocalCacheMeta, "id">;
   outbox!: EntityTable<OutboxItem, "operationId">;
 
   constructor() {
@@ -56,6 +58,10 @@ export class DulceCalleLocalDB extends Dexie {
       initialDebts: "id, businessId, customerId, requestId, [businessId+customerId]",
       outbox:
         "operationId, businessId, status, requestId, localCreatedAt, [businessId+status], &[businessId+requestId], [businessId+localCreatedAt]",
+    });
+    // v2: snapshot presence so an empty GET is distinct from "never cached".
+    this.version(2).stores({
+      cacheMeta: "id, businessId, resource, [businessId+resource]",
     });
   }
 }
