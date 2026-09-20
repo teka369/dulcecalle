@@ -176,17 +176,52 @@ export async function syncPendingCustomers(businessId: string) {
   for (const operationId of operationIds) {
     const item = await outbox.get(businessId, operationId);
     if (!item || item.status !== "synced" || !item.remoteId) continue;
-    const rows = await getLocalStore().customers.list(businessId);
-    const local = rows.find((row) => row.requestId === item.requestId);
-    if (local) {
-      await reconcileCustomer(
-        businessId,
-        local.id,
-        await api.customers.get(item.remoteId),
-      );
+    // D4 — A failed post-flush GET must not abort the whole cycle nor
+    // strand the local row: it is retried on the next cycle.
+    try {
+      const rows = await getLocalStore().customers.list(businessId);
+      const local = rows.find((row) => row.requestId === item.requestId);
+      if (local) {
+        await reconcileCustomer(
+          businessId,
+          local.id,
+          await api.customers.get(item.remoteId),
+        );
+      }
+    } catch {
+      /* keep the local row; reconcile again next cycle */
     }
   }
+  await reconcileStrandedCustomers(businessId, api);
   return result;
+}
+
+/**
+ * D4 — Recover rows stranded by an earlier failed reconcile: any local row
+ * whose requestId already maps to a synced operation is reconciled, even
+ * when its operation was never in this flush's pending snapshot.
+ */
+async function reconcileStrandedCustomers(
+  businessId: string,
+  api: ReturnType<typeof getPwaApi>,
+): Promise<void> {
+  const outbox = getOutboxStore();
+  const rows = await getLocalStore().customers.list(businessId);
+  for (const row of rows) {
+    if (!row.requestId) continue;
+    try {
+      const item = await outbox.getByRequestId(businessId, row.requestId);
+      if (item?.entity !== "customer" || item.operation !== "create") continue;
+      if (item.status !== "synced" || !item.remoteId) continue;
+      await reconcileCustomer(
+        businessId,
+        row.id,
+        await api.customers.get(item.remoteId),
+      );
+    } catch {
+      /* keep the local row; reconcile again next cycle */
+    }
+  }
 }
 
 export async function syncPendingSuppliers(businessId: string) {
@@ -215,17 +250,47 @@ export async function syncPendingSuppliers(businessId: string) {
   for (const operationId of operationIds) {
     const item = await outbox.get(businessId, operationId);
     if (!item || item.status !== "synced" || !item.remoteId) continue;
-    const rows = await getLocalStore().suppliers.list(businessId);
-    const local = rows.find((row) => row.requestId === item.requestId);
-    if (local) {
-      await reconcileSupplier(
-        businessId,
-        local.id,
-        await api.suppliers.get(item.remoteId),
-      );
+    // D4 — see syncPendingCustomers: never abort on a failed GET.
+    try {
+      const rows = await getLocalStore().suppliers.list(businessId);
+      const local = rows.find((row) => row.requestId === item.requestId);
+      if (local) {
+        await reconcileSupplier(
+          businessId,
+          local.id,
+          await api.suppliers.get(item.remoteId),
+        );
+      }
+    } catch {
+      /* keep the local row; reconcile again next cycle */
     }
   }
+  await reconcileStrandedSuppliers(businessId, api);
   return result;
+}
+
+/** D4 — Supplier counterpart of reconcileStrandedCustomers. */
+async function reconcileStrandedSuppliers(
+  businessId: string,
+  api: ReturnType<typeof getPwaApi>,
+): Promise<void> {
+  const outbox = getOutboxStore();
+  const rows = await getLocalStore().suppliers.list(businessId);
+  for (const row of rows) {
+    if (!row.requestId) continue;
+    try {
+      const item = await outbox.getByRequestId(businessId, row.requestId);
+      if (item?.entity !== "supplier" || item.operation !== "create") continue;
+      if (item.status !== "synced" || !item.remoteId) continue;
+      await reconcileSupplier(
+        businessId,
+        row.id,
+        await api.suppliers.get(item.remoteId),
+      );
+    } catch {
+      /* keep the local row; reconcile again next cycle */
+    }
+  }
 }
 
 export function startCatalogCreationSync() {

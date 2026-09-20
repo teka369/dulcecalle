@@ -9,6 +9,7 @@ import {
   getLocalDb,
 } from "@/data/local/db";
 import {
+  getOutboxStore,
   resetOutboxStoreSingleton,
   resetOutboxSyncEngineSingleton,
 } from "@/data/local/outbox";
@@ -326,5 +327,73 @@ describe("M6.7 offline catalog creation", () => {
 
     const rows = await db.customers.where("businessId").equals(otherBusinessId).toArray();
     expect(rows.map((row) => row.id)).not.toContain(customerId);
+  });
+
+  it("D4: a failed post-flush GET does not throw and is recovered next cycle", async () => {
+    api.customers.create.mockRejectedValueOnce(new NetworkError("offline"));
+    const requestId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const local = await createCustomerWithOfflineFallback({ name: "Ana" }, requestId);
+    const customerId = offlineCustomerId(local);
+    const remote = {
+      id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      code: "DC-0043",
+      name: "Ana",
+      phone: null,
+      debt: 0,
+      archivedAt: null,
+      createdAt: Date.now(),
+    };
+    api.customers.create.mockResolvedValue(remote);
+    api.customers.get.mockReset();
+    api.customers.get.mockRejectedValueOnce(new NetworkError("offline"));
+
+    // POST succeeds, GET fails: must not throw, op stays synced.
+    await syncPendingCustomers(businessId);
+    expect(
+      (await getOutboxStore().listByStatus(businessId, "synced")).length,
+    ).toBe(1);
+    // Row stranded with pending requestId…
+    expect(await getLocalDb().customers.get(customerId)).toMatchObject({
+      requestId,
+      code: null,
+    });
+
+    // …recovered on the next cycle once GET works.
+    api.customers.get.mockResolvedValue(remote);
+    await syncPendingCustomers(businessId);
+    expect(await getLocalDb().customers.get(customerId)).toBeUndefined();
+    expect(await getLocalDb().customers.get(remote.id)).toMatchObject({
+      code: "DC-0043",
+      businessId,
+    });
+  });
+
+  it("D4: supplier reconcile survives a failed GET the same way", async () => {
+    api.suppliers.create.mockRejectedValueOnce(new NetworkError("offline"));
+    const requestId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    const local = await createSupplierWithOfflineFallback({ name: "Prov" }, requestId);
+    const supplierId = offlineSupplierId(local);
+    const remote = {
+      id: "12121212-1212-4121-8121-121212121212",
+      name: "Prov",
+      phone: null,
+      notes: null,
+      createdAt: Date.now(),
+    };
+    api.suppliers.create.mockResolvedValue(remote);
+    api.suppliers.get.mockReset();
+    api.suppliers.get.mockRejectedValueOnce(new NetworkError("offline"));
+
+    await syncPendingSuppliers(businessId);
+    expect(
+      (await getLocalDb().suppliers.get(supplierId))?.requestId,
+    ).toBe(requestId);
+
+    api.suppliers.get.mockResolvedValue(remote);
+    await syncPendingSuppliers(businessId);
+    expect(await getLocalDb().suppliers.get(supplierId)).toBeUndefined();
+    expect(await getLocalDb().suppliers.get(remote.id)).toMatchObject({
+      businessId,
+    });
   });
 });
