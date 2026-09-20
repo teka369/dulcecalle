@@ -174,6 +174,7 @@ export type LocalCashSession = {
   note: string | null;
   createdAt: number;
   updatedAt: number;
+  requestId?: string;
 };
 
 export type LocalCashMove = {
