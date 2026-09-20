@@ -163,12 +163,6 @@ export default function LoginPage() {
         </button>
       )}
 
-      <p className="text-center text-sm text-ink/60">
-        ¿No tienes cuenta?{" "}
-        <Link href="/register" className="font-semibold text-ink">
-          Crear cuenta
-        </Link>
-      </p>
     </div>
   );
 }
