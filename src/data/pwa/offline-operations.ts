@@ -132,6 +132,8 @@ export async function getLocalCashSnapshot(): Promise<{
         direction: move.direction,
         method: move.method,
         kind: move.kind,
+        refType: move.refType,
+        refId: move.refId,
         occurredOn: move.occurredOn,
         createdAt: move.createdAt,
       })),
@@ -237,10 +239,8 @@ export async function closeCashWithOfflineFallback(
   try {
     const value = await getPwaApi().cash.close(sessionId, countedEfectivo, requestId);
     const business = businessId();
-    const local = await getLocalDb().cashSessions
-      .where("[businessId+id]")
-      .equals([business, sessionId])
-      .first();
+    const local = await getLocalDb().cashSessions.get(sessionId);
+    if (local?.businessId !== business) throw new Error("La caja no pertenece al negocio seleccionado.");
     if (local) {
       await getLocalDb().cashSessions.put({
         ...local,
@@ -259,10 +259,8 @@ export async function closeCashWithOfflineFallback(
     const db = getLocalDb();
     const now = Date.now();
     const id = await db.transaction("rw", [db.cashSessions, db.cashMoves, db.outbox], async () => {
-      const session = await db.cashSessions
-        .where("[businessId+id]")
-        .equals([business, sessionId])
-        .first();
+      const session = await db.cashSessions.get(sessionId);
+      if (session?.businessId !== business) throw new Error("La caja no pertenece al negocio seleccionado.");
       if (!session) throw new Error("No hay una caja abierta.");
       if (session.closedAt) throw new Error("La caja ya está cerrada.");
       const moves = await db.cashMoves.where("businessId").equals(business).toArray();
