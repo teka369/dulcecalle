@@ -19,6 +19,7 @@ import { asCop, copToJson, mulCop } from "../shared/money";
 import { occurredOnDate, dateKey } from "../shared/clock";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
+import { nextCodeFromExisting } from "../shared/customer-code";
 
 function productJson(p: {
   id: string;
@@ -46,6 +47,7 @@ function productJson(p: {
 
 function customerJson(c: {
   id: string;
+  code: string;
   name: string;
   phone: string | null;
   debt: bigint;
@@ -54,6 +56,7 @@ function customerJson(c: {
 }) {
   return {
     id: c.id,
+    code: c.code,
     name: c.name,
     phone: c.phone,
     debt: copToJson(c.debt),
@@ -200,14 +203,22 @@ export class CatalogService {
   async createCustomer(ctx: BusinessContext, dto: CreateCustomerDto) {
     const name = dto.name.trim();
     if (!name) throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.emptyName);
-    const c = await this.prisma.customer.create({
-      data: {
-        id: randomUUID(),
-        businessId: ctx.businessId,
-        name,
-        phone: dto.phone,
-        debt: 0n,
-      },
+    const c = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.customer.findMany({
+        where: { businessId: ctx.businessId },
+        select: { code: true },
+      });
+      const code = nextCodeFromExisting(existing.map((row) => row.code));
+      return tx.customer.create({
+        data: {
+          id: randomUUID(),
+          businessId: ctx.businessId,
+          code,
+          name,
+          phone: dto.phone,
+          debt: 0n,
+        },
+      });
     });
     return customerJson(c);
   }

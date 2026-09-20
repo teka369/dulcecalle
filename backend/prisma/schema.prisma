@@ -133,6 +133,7 @@ model Product {
 model Customer {
   id            String    @id @db.Uuid
   businessId    String    @map("business_id") @db.Uuid
+  code          String
   name          String
   phone         String?
   debt          BigInt    @default(0)
@@ -146,6 +147,7 @@ model Customer {
   payments CustomerPayment[]
   initials InitialDebt[]
 
+  @@unique([businessId, code])
   @@unique([businessId, legacyDexieId])
   @@index([businessId, debt])
   @@map("customers")

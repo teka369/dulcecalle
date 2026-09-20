@@ -16,6 +16,7 @@ import {
 import { mapRequestId } from "./request-id";
 import { assertTestImportEnv } from "./safety";
 import type { DexieDump, ImportResult, ImportWarning } from "./types";
+import { formatCustomerCode } from "../src/shared/customer-code";
 
 export const IMPORT_ORDER = [
   "settings",
@@ -168,12 +169,20 @@ async function runImport(
     throw new Error("dry-run rollback probe");
   }
 
+  const customerCodes = new Map<number, string>();
+  [...dump.tables.customers]
+    .sort((a, b) => a.createdAt - b.createdAt || a.id - b.id)
+    .forEach((c, i) => {
+      customerCodes.set(c.id, formatCustomerCode(i + 1));
+    });
+
   for (const c of dump.tables.customers) {
     await ensure("customers", c.id, async (id) => {
       await tx.customer.create({
         data: {
           id,
           businessId,
+          code: customerCodes.get(c.id) ?? formatCustomerCode(c.id),
           name: c.name,
           phone: c.phone ?? null,
           debt: BigInt(c.debt),

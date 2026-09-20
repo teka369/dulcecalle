@@ -78,7 +78,7 @@ Unique import: `(business_id, legacy_dexie_id)` WHERE legacy not null.
 **No `gifted` column.** Gift is a birth `stock_moves.reason = inicial` + note.
 
 ### customers
-Same pattern: name, phone, `debt BIGINT CHECK >= 0` (cache), archived_at, legacy_dexie_id.
+Same pattern: name, phone, `code TEXT` unique per `(business_id, code)` (`DC-0001`…, never reused), `debt BIGINT CHECK >= 0` (cache), archived_at, legacy_dexie_id.
 
 ### suppliers
 name, phone, notes. **No accounts payable.**
