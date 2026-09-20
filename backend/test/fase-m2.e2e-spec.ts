@@ -11,6 +11,7 @@ import { installBigIntJson } from "../src/shared/bigint";
 import { HttpErrorFilter } from "../src/shared/http/http-error.filter";
 import { HttpRepository } from "../../src/data/http/repository";
 import { startLocalPostgres, type PgHandle } from "./pg-harness";
+import { applyOwnerSession, seedOwner } from "./seed-owner";
 
 installBigIntJson();
 
@@ -110,16 +111,7 @@ describe("Fase M2 auth + session", () => {
   const api = () => request(app.getHttpServer());
 
   async function registerUser(email: string, businessName: string) {
-    const res = await api()
-      .post("/v1/auth/register")
-      .send({ email, password: "password12", businessName })
-      .expect(201);
-    return res.body as {
-      user: { id: string; email: string };
-      business: { id: string; name: string };
-      accessToken: string;
-      refreshToken: string;
-    };
+    return seedOwner(app, email, businessName);
   }
 
   it("register + login issue access and refresh tokens", async () => {
@@ -236,11 +228,8 @@ describe("Fase M2 auth + session", () => {
   it("HttpRepository login auto-selects the only business; 401 refreshes once", async () => {
     const base = `${await app.getUrl()}/v1`;
     const repo = new HttpRepository(base);
-    const reg = await repo.auth.register({
-      email: "m2-http@test.co",
-      password: "password12",
-      businessName: "Puesto HTTP",
-    });
+    const reg = await seedOwner(app, "m2-http@test.co", "Puesto HTTP");
+    applyOwnerSession(repo.session, reg);
     const biz = repo.session.businessId;
     expect(biz).toBe(reg.business.id);
 
@@ -274,11 +263,8 @@ describe("Fase M2 auth + session", () => {
     const base = `${await app.getUrl()}/v1`;
     const repo = new HttpRepository(base);
 
-    const a = await repo.auth.register({
-      email: "m2-switch-a@test.co",
-      password: "password12",
-      businessName: "Negocio Switch A",
-    });
+    const a = await seedOwner(app, "m2-switch-a@test.co", "Negocio Switch A");
+    applyOwnerSession(repo.session, a);
     expect(repo.session.businessId).toBe(a.business.id);
 
     const b = await registerUser("m2-switch-b@test.co", "Negocio Switch B");

@@ -11,6 +11,7 @@ import { installBigIntJson } from "../src/shared/bigint";
 import { occurredOnKey } from "../src/shared/clock";
 import { HttpErrorFilter } from "../src/shared/http/http-error.filter";
 import { startLocalPostgres, type PgHandle } from "./pg-harness";
+import { seedOwner } from "./seed-owner";
 
 installBigIntJson();
 
@@ -67,14 +68,11 @@ describe("Fase 6 backend", () => {
 
   it("register + login + me", async () => {
     const email = "a@test.co";
-    const reg = await api()
-      .post("/v1/auth/register")
-      .send({ email, password: "password12", businessName: "Puesto A" })
-      .expect(201);
-    expect(reg.body.accessToken).toBeTruthy();
-    expect(reg.body.user.email).toBe(email);
-    bizA = reg.body.business.id;
-    tokenA = reg.body.accessToken;
+    const reg = await seedOwner(app, email, "Puesto A");
+    expect(reg.accessToken).toBeTruthy();
+    expect(reg.user.email).toBe(email);
+    bizA = reg.business.id;
+    tokenA = reg.accessToken;
 
     await api()
       .post("/v1/auth/login")
@@ -96,16 +94,9 @@ describe("Fase 6 backend", () => {
   });
 
   it("second business + tenant isolation", async () => {
-    const reg = await api()
-      .post("/v1/auth/register")
-      .send({
-        email: "b@test.co",
-        password: "password12",
-        businessName: "Puesto B",
-      })
-      .expect(201);
-    tokenB = reg.body.accessToken;
-    bizB = reg.body.business.id;
+    const reg = await seedOwner(app, "b@test.co", "Puesto B");
+    tokenB = reg.accessToken;
+    bizB = reg.business.id;
 
     await api()
       .get("/v1/products")

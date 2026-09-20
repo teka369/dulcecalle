@@ -9,6 +9,7 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { installBigIntJson } from "../src/shared/bigint";
 import { HttpErrorFilter } from "../src/shared/http/http-error.filter";
 import { startLocalPostgres, type PgHandle } from "./pg-harness";
+import { seedOwner } from "./seed-owner";
 
 installBigIntJson();
 
@@ -67,27 +68,13 @@ describe("Fase M1 domain endpoints", () => {
   }
 
   it("register two tenants", async () => {
-    const a = await api()
-      .post("/v1/auth/register")
-      .send({
-        email: "m1a@test.co",
-        password: "password12",
-        businessName: "M1 A",
-      })
-      .expect(201);
-    tokenA = a.body.accessToken;
-    bizA = a.body.business.id;
+    const a = await seedOwner(app, "m1a@test.co", "M1 A");
+    tokenA = a.accessToken;
+    bizA = a.business.id;
 
-    const b = await api()
-      .post("/v1/auth/register")
-      .send({
-        email: "m1b@test.co",
-        password: "password12",
-        businessName: "M1 B",
-      })
-      .expect(201);
-    tokenB = b.body.accessToken;
-    bizB = b.body.business.id;
+    const b = await seedOwner(app, "m1b@test.co", "M1 B");
+    tokenB = b.accessToken;
+    bizB = b.business.id;
   });
 
   it("suppliers: CRUD, tenant isolation, empty name", async () => {

@@ -10,6 +10,7 @@ import { HttpErrorFilter } from "../src/shared/http/http-error.filter";
 import { HttpRepository } from "../../src/data/http/repository";
 import { pwaStorage } from "../../src/data/backend";
 import { startLocalPostgres, type PgHandle } from "./pg-harness";
+import { applyOwnerSession, seedOwner } from "./seed-owner";
 
 installBigIntJson();
 
@@ -58,11 +59,8 @@ describe("Fase M3 PWA HTTP reads + playable domain", () => {
   });
 
   it("register → product → sale → stats / ledger / moves", async () => {
-    const reg = await api.auth.register({
-      email: "m3@test.co",
-      password: "password12",
-      businessName: "Puesto M3",
-    });
+    const reg = await seedOwner(app, "m3@test.co", "Puesto M3");
+    applyOwnerSession(api.session, reg);
     expect(reg.business.id).toBeTruthy();
     expect(api.session.businessId).toBe(reg.business.id);
 

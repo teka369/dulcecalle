@@ -16,6 +16,7 @@ import {
   normalizePersonName,
 } from "../src/shared/customer-code";
 import { startLocalPostgres, type PgHandle } from "./pg-harness";
+import { seedOwner } from "./seed-owner";
 
 installBigIntJson();
 
@@ -82,16 +83,7 @@ describe("Fase M5 customer portal", () => {
   const api = () => request(app.getHttpServer());
 
   async function registerUser(email: string, businessName: string) {
-    const res = await api()
-      .post("/v1/auth/register")
-      .send({ email, password: "password12", businessName })
-      .expect(201);
-    return res.body as {
-      user: { id: string; email: string };
-      business: { id: string; name: string };
-      accessToken: string;
-      refreshToken: string;
-    };
+    return seedOwner(app, email, businessName);
   }
 
   function adminHeaders(token: string, businessId: string) {

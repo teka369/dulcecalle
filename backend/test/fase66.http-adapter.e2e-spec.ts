@@ -10,6 +10,7 @@ import { ApiError } from "../../src/data/errors";
 import { HttpRepository } from "../../src/data/http/repository";
 import { pwaStorage } from "../../src/data/backend";
 import { startLocalPostgres, type PgHandle } from "./pg-harness";
+import { applyOwnerSession, seedOwner } from "./seed-owner";
 
 installBigIntJson();
 
@@ -61,11 +62,8 @@ describe("Fase 6.6 HTTP adapter ↔ Nest contract", () => {
   });
 
   it("auth: register, login, me, logout, 401", async () => {
-    const reg = await api.auth.register({
-      email: "a@test.co",
-      password: "password12",
-      businessName: "Puesto A",
-    });
+    const reg = await seedOwner(app, "a@test.co", "Puesto A");
+    applyOwnerSession(api.session, reg);
     expect(reg.accessToken).toBeTruthy();
     expect(reg.refreshToken).toBeTruthy();
     expect(reg.business.id).toBeTruthy();
@@ -90,11 +88,8 @@ describe("Fase 6.6 HTTP adapter ↔ Nest contract", () => {
   });
 
   it("tenancy: 403 without membership, 404 for other-tenant ids", async () => {
-    await apiB.auth.register({
-      email: "b@test.co",
-      password: "password12",
-      businessName: "Puesto B",
-    });
+    const b = await seedOwner(app, "b@test.co", "Puesto B");
+    applyOwnerSession(apiB.session, b);
 
     const stolen = api.session.businessId!;
     apiB.auth.selectBusiness(stolen);
