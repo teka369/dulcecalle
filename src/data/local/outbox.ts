@@ -1,3 +1,4 @@
+import { ApiError, NetworkError } from "../errors";
 import { getLocalDb, type DulceCalleLocalDB } from "./db";
 import { assertUuid } from "./ids";
 import type { OutboxItem, OutboxStatus } from "./types";
@@ -77,6 +78,15 @@ export class OutboxStore {
     const row = await this.db.outbox.get(operationId);
     if (!row || row.businessId !== businessId) return undefined;
     return row;
+  }
+
+  async recoverInFlight(businessId: string): Promise<number> {
+    assertUuid(businessId, "businessId");
+    const rows = await this.listByStatus(businessId, "in_flight");
+    for (const row of rows) {
+      await this.db.outbox.put({ ...row, status: "pending", nextAttemptAt: null });
+    }
+    return rows.length;
   }
 
   async getByRequestId(
