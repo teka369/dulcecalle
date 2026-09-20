@@ -7,8 +7,14 @@ import { ConnectivityMonitor, getOutboxStore, getOutboxSyncEngine } from "@/data
 import { assertUuid } from "@/data/local/ids";
 import { customerToLocal, supplierToLocal } from "@/data/local/read-cache";
 
-type CustomerInput = { name: string; phone?: string };
-type SupplierInput = { name: string; phone?: string; notes?: string };
+export type CustomerInput = { name: string; phone?: string };
+export type SupplierInput = { name: string; phone?: string; notes?: string };
+
+export function validateCatalogName(name: string): string {
+  const value = name.trim();
+  if (!value) throw new Error("El nombre es obligatorio.");
+  return value;
+}
 
 function businessId(): string {
   const id = getPwaApi().session.businessId;
@@ -98,8 +104,7 @@ async function createLocalSupplier(input: SupplierInput, requestId: string): Pro
 }
 
 export async function createCustomerWithOfflineFallback(input: CustomerInput, requestId: string) {
-  const name = input.name.trim();
-  if (!name) throw new Error("El nombre es obligatorio.");
+  const name = validateCatalogName(input.name);
   const normalized = { name, phone: cleanOptional(input.phone) };
   try {
     const customer = await getPwaApi().customers.create(normalized, requestId);
@@ -112,8 +117,7 @@ export async function createCustomerWithOfflineFallback(input: CustomerInput, re
 }
 
 export async function createSupplierWithOfflineFallback(input: SupplierInput, requestId: string) {
-  const name = input.name.trim();
-  if (!name) throw new Error("El nombre es obligatorio.");
+  const name = validateCatalogName(input.name);
   const normalized = {
     name, phone: cleanOptional(input.phone), notes: cleanOptional(input.notes),
   };
