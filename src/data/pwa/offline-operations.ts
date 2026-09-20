@@ -736,6 +736,7 @@ export function startOperationsSync() {
   };
   monitor.start();
   monitor.refresh();
+  if (monitor.online) run();
   const unsubscribe = monitor.subscribe((online) => {
     if (online) run();
   });
