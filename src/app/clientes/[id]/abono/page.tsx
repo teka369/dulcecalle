@@ -12,6 +12,7 @@ import { formatCop } from "@/domain/money";
 import type { PayMethod } from "@/domain/types";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import { routeId } from "@/data/pwa/ids";
+import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { customerStore } from "@/store/customerStore";
 
 export default function RegistrarAbonoPage() {
@@ -25,6 +26,7 @@ export default function RegistrarAbonoPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [pendingSync, setPendingSync] = useState(false);
   const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
@@ -34,6 +36,11 @@ export default function RegistrarAbonoPage() {
     }
     const c = await customerStore.getCustomer(id);
     setCustomer(c ?? null);
+    if (c) {
+      void getPendingCustomerIds().then((ids) =>
+        setPendingSync(ids.includes(c.id)),
+      );
+    }
     setReady(true);
   }, [id]);
 
@@ -171,6 +178,13 @@ export default function RegistrarAbonoPage() {
           <p className="mt-3 text-sm text-ink/70">{helper}</p>
         )}
 
+        {pendingSync && (
+          <p className="mt-3 text-sm text-ink/70">
+            Este cliente aún se está sincronizando. Podrás registrar el abono
+            en cuanto termine la sincronización.
+          </p>
+        )}
+
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </section>
 
@@ -178,7 +192,7 @@ export default function RegistrarAbonoPage() {
         <div className="mx-auto max-w-lg">
           <button
             type="button"
-            disabled={!canSubmit || busy}
+            disabled={!canSubmit || busy || pendingSync}
             onClick={() => void confirm()}
             className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
           >

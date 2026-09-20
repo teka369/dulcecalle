@@ -243,7 +243,10 @@ export class CatalogReadCache {
       const locals = data.map((row) =>
         opts.toLocal(row, opts.businessId, cachedAt),
       );
-      await opts.replaceAll(opts.businessId, locals);
+      await opts.replaceAll(opts.businessId, [
+        ...locals,
+        ...(await this.pendingLocalRows(opts)),
+      ]);
       await this.writeMeta(opts.businessId, opts.resource, cachedAt);
       return { data, source: "server", cachedAt };
     } catch (e) {
@@ -282,6 +285,33 @@ export class CatalogReadCache {
       if (!cached) throw e;
       return opts.toRemote(cached);
     }
+  }
+
+  /**
+   * D2 — An online refresh must never delete a local row that still has a
+   * non-synced outbox operation. Server rows always win by id; client-minted
+   * pending rows (unknown to the server) are carried over untouched.
+   */
+  private async pendingLocalRows<
+    TLocal extends { id: string; businessId: string },
+  >(opts: {
+    businessId: string;
+    list: (businessId: string) => Promise<TLocal[]>;
+  }): Promise<TLocal[]> {
+    const pendingRequestIds = new Set<string>();
+    for (const status of ["pending", "failed", "in_flight"] as const) {
+      const items = await this.db.outbox
+        .where("[businessId+status]")
+        .equals([opts.businessId, status])
+        .toArray();
+      for (const item of items) pendingRequestIds.add(item.requestId);
+    }
+    if (pendingRequestIds.size === 0) return [];
+    const current = await opts.list(opts.businessId);
+    return current.filter((row) => {
+      const requestId = (row as { requestId?: unknown }).requestId;
+      return typeof requestId === "string" && pendingRequestIds.has(requestId);
+    });
   }
 
   private rethrowUnlessNetwork(e: unknown): void {

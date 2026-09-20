@@ -7,6 +7,7 @@ import { formatCop, mulCop, addCop, subCop } from "@/domain/money";
 import type { PaymentKind } from "@/domain/types";
 import type { RemoteCustomer, RemoteProduct } from "@/data/http/mappers";
 import { createSaleWithOfflineFallback } from "@/data/pwa/offline-sales";
+import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { listCachedCustomers, listCachedProducts } from "@/data/pwa/catalog";
 import { useCart } from "@/store/cartStore";
 
@@ -26,6 +27,7 @@ export default function CobrarPage() {
   } = useCart();
   const [products, setProducts] = useState<RemoteProduct[]>([]);
   const [customers, setCustomers] = useState<RemoteCustomer[]>([]);
+  const [pendingCustomerIds, setPendingCustomerIds] = useState<string[]>([]);
   const [abonoInput, setAbonoInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -43,6 +45,7 @@ export default function CobrarPage() {
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : "Sin conexión.");
       });
+    void getPendingCustomerIds().then(setPendingCustomerIds);
   }, []);
 
   useEffect(() => {
@@ -258,6 +261,7 @@ export default function CobrarPage() {
           <CustomerPicker
             customers={customers}
             customerId={customerId}
+            pendingIds={pendingCustomerIds}
             onChange={setCustomerId}
           />
         </section>
@@ -268,6 +272,7 @@ export default function CobrarPage() {
           <CustomerPicker
             customers={customers}
             customerId={customerId}
+            pendingIds={pendingCustomerIds}
             onChange={setCustomerId}
           />
         </section>
@@ -357,12 +362,15 @@ function MethodButton({
 function CustomerPicker({
   customers,
   customerId,
+  pendingIds,
   onChange,
 }: {
   customers: RemoteCustomer[];
   customerId: string | null;
+  pendingIds: string[];
   onChange: (id: string | null) => void;
 }) {
+  const pending = new Set(pendingIds);
   return (
     <div className="mt-3">
       <label className="text-sm font-medium" htmlFor="cliente">
@@ -375,12 +383,24 @@ function CustomerPicker({
         onChange={(e) => onChange(e.target.value ? e.target.value : null)}
       >
         <option value="">Selecciona cliente</option>
-        {customers.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
+        {customers.map((c) =>
+          pending.has(c.id) ? (
+            <option key={c.id} value={c.id} disabled>
+              {c.name} (sincronizando…)
+            </option>
+          ) : (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ),
+        )}
       </select>
+      {pendingIds.length > 0 && (
+        <p className="mt-2 text-xs text-ink/60">
+          Los clientes marcados se están sincronizando y estarán disponibles
+          en cuanto terminen.
+        </p>
+      )}
     </div>
   );
 }

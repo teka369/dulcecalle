@@ -3,6 +3,7 @@ import { getPwaApi } from "@/data/pwa/api";
 import { getPwaAuthSession } from "@/data/http/session";
 import { getLocalDb, type DulceCalleLocalDB } from "@/data/local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "@/data/local/outbox";
+import { PENDING_SUPPLIER_MESSAGE } from "@/data/pwa/offline-catalog";
 import { newEntityId, assertUuid } from "@/data/local/ids";
 import type { LocalCashMove, LocalCashSession, LocalExpense } from "@/data/local/types";
 import type { RemoteExpense, RemoteStockMove } from "@/data/http/mappers";
@@ -497,6 +498,7 @@ export async function surtirWithOfflineFallback(
       if (supplier.requestId) {
         const dependency = await getOutboxStore().getByRequestId(business, supplier.requestId);
         if (dependency?.entity === "supplier" && dependency.operation === "create") {
+          if (dependency.status !== "synced") throw new Error(PENDING_SUPPLIER_MESSAGE);
           dependsOn.push(dependency.operationId);
         }
       }

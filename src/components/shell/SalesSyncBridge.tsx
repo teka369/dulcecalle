@@ -1,22 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { startSalesSync } from "@/data/pwa/offline-sales";
-import { startPaymentsSync } from "@/data/pwa/offline-payments";
-import { startCatalogCreationSync } from "@/data/pwa/offline-catalog";
-import { startOperationsSync } from "@/data/pwa/offline-operations";
+import { startOutboxSync } from "@/data/pwa/sync-coordinator";
 
 export function SalesSyncBridge() {
   useEffect(() => {
-    const stopSales = startSalesSync();
-    const stopPayments = startPaymentsSync();
-    const stopCatalog = startCatalogCreationSync();
-    const stopOperations = startOperationsSync();
+    const stop = startOutboxSync();
     return () => {
-      stopSales();
-      stopPayments();
-      stopCatalog();
-      stopOperations();
+      stop();
     };
   }, []);
   return null;

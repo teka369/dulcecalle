@@ -9,6 +9,7 @@ import type { PayMethod } from "@/domain/types";
 import type { RemoteProduct, RemoteSupplier } from "@/data/http/mappers";
 import { validateSurtirForm } from "@/domain/inventory";
 import { routeId } from "@/data/pwa/ids";
+import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
 import { inventoryStore } from "@/store/inventoryStore";
 
 export default function SurtirPage() {
@@ -17,6 +18,7 @@ export default function SurtirPage() {
   const id = routeId(params.id);
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [suppliers, setSuppliers] = useState<RemoteSupplier[]>([]);
+  const [pendingSupplierIds, setPendingSupplierIds] = useState<string[]>([]);
   const [supplierId, setSupplierId] = useState("");
   const [supplierCreate, setSupplierCreate] = useState("");
   const [qtyRaw, setQtyRaw] = useState("");
@@ -40,6 +42,7 @@ export default function SurtirPage() {
     setProduct(p ?? null);
     const s = await inventoryStore.refreshSuppliers();
     setSuppliers(s);
+    void getPendingSupplierIds().then(setPendingSupplierIds);
     setReady(true);
   }, [id]);
 
@@ -193,12 +196,24 @@ export default function SurtirPage() {
             className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base outline-none focus:border-primary"
           >
             <option value="">Elegir o crear…</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
+            {suppliers.map((s) =>
+              pendingSupplierIds.includes(s.id) ? (
+                <option key={s.id} value={s.id} disabled>
+                  {s.name} (sincronizando…)
+                </option>
+              ) : (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ),
+            )}
           </select>
+          {pendingSupplierIds.length > 0 && (
+            <p className="mt-2 text-xs text-ink/60">
+              Los proveedores marcados se están sincronizando y estarán
+              disponibles en cuanto terminen.
+            </p>
+          )}
           {supplierId === "" && (
             <input
               value={supplierCreate}

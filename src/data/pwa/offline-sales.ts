@@ -5,6 +5,7 @@ import { getPwaApi } from "./api";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
+import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
 import { newEntityId } from "../local/ids";
 import { addCop, mulCop, subCop } from "@/domain/money";
 import type { LocalCustomer, LocalProduct, LocalSale, LocalSaleLine, LocalStockMove, LocalCashMove } from "../local/types";
@@ -179,6 +180,13 @@ async function createLocalSale(
       if (credit > 0 && input.customerId) {
         const customer = customerById.get(input.customerId);
         if (!customer) throw new Error("El cliente no está disponible sin conexión.");
+        if (customer.requestId) {
+          const op = await db.outbox
+            .where("[businessId+requestId]")
+            .equals([businessId, customer.requestId])
+            .first();
+          if (op && op.status !== "synced") throw new Error(PENDING_CUSTOMER_MESSAGE);
+        }
         const updated: LocalCustomer = {
           ...customer,
           debt: addCop(customer.debt, credit),

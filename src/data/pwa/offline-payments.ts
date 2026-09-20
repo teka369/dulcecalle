@@ -4,6 +4,7 @@ import { getPwaApi } from "./api";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
 import { ConnectivityMonitor, getOutboxSyncEngine } from "../local/outbox";
+import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
 import { newEntityId } from "../local/ids";
 import { subCop } from "@/domain/money";
 
@@ -60,6 +61,13 @@ async function createLocalPayment(
         .first();
 
       if (!customer) throw new Error("El cliente no está disponible sin conexión.");
+      if (customer.requestId) {
+        const op = await db.outbox
+          .where("[businessId+requestId]")
+          .equals([businessId, customer.requestId])
+          .first();
+        if (op && op.status !== "synced") throw new Error(PENDING_CUSTOMER_MESSAGE);
+      }
       validateOfflinePayment(input, customer.debt);
 
       const paymentId = newEntityId();

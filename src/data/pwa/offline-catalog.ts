@@ -10,6 +10,11 @@ import { customerToLocal, supplierToLocal } from "@/data/local/read-cache";
 export type CustomerInput = { name: string; phone?: string };
 export type SupplierInput = { name: string; phone?: string; notes?: string };
 
+export const PENDING_CUSTOMER_MESSAGE =
+  "Este cliente aún se está sincronizando. Podrás usarlo en cuanto termine la sincronización.";
+export const PENDING_SUPPLIER_MESSAGE =
+  "Este proveedor aún se está sincronizando. Podrás usarlo en cuanto termine la sincronización.";
+
 export function validateCatalogName(name: string): string {
   const value = name.trim();
   if (!value) throw new Error("El nombre es obligatorio.");
@@ -235,4 +240,64 @@ export function startCatalogCreationSync() {
   monitor.start();
   if (monitor.online) run();
   return () => monitor.stop();
+}
+
+/**
+ * D3 — Local ids of customers/suppliers whose create operation is still
+ * not synced. While an entity is in this set it is visible and editable,
+ * but it must not be used as a reference (credit sale, payment, surtir)
+ * because the server does not know its local UUID yet.
+ */
+async function pendingCreateIds(
+  businessId: string,
+  entity: "customer" | "supplier",
+): Promise<string[]> {
+  assertUuid(businessId, "businessId");
+  const db = getLocalDb();
+  const pendingRequestIds = new Set<string>();
+  for (const status of ["pending", "failed", "in_flight"] as const) {
+    const rows = await db.outbox
+      .where("[businessId+status]")
+      .equals([businessId, status])
+      .toArray();
+    for (const row of rows) {
+      if (row.entity === entity && row.operation === "create") {
+        pendingRequestIds.add(row.requestId);
+      }
+    }
+  }
+  if (pendingRequestIds.size === 0) return [];
+  const store = getLocalStore();
+  const rows =
+    entity === "customer"
+      ? await store.customers.list(businessId)
+      : await store.suppliers.list(businessId);
+  return rows
+    .filter((row) => row.requestId && pendingRequestIds.has(row.requestId))
+    .map((row) => row.id);
+}
+
+export function listPendingCustomerIds(businessId: string): Promise<string[]> {
+  return pendingCreateIds(businessId, "customer");
+}
+
+export function listPendingSupplierIds(businessId: string): Promise<string[]> {
+  return pendingCreateIds(businessId, "supplier");
+}
+
+/** UI-friendly variants: empty when there is no active business. */
+export async function getPendingCustomerIds(): Promise<string[]> {
+  try {
+    return await listPendingCustomerIds(businessId());
+  } catch {
+    return [];
+  }
+}
+
+export async function getPendingSupplierIds(): Promise<string[]> {
+  try {
+    return await listPendingSupplierIds(businessId());
+  } catch {
+    return [];
+  }
 }
