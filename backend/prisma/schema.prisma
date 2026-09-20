@@ -318,12 +318,14 @@ model CashSession {
   expectedNequi    BigInt?   @map("expected_nequi")
   difference       BigInt?
   note             String?
+  requestId        String?   @map("request_id") @db.Uuid
   legacyDexieId    Int?      @map("legacy_dexie_id")
 
   business Business   @relation(fields: [businessId], references: [id])
   moves    CashMove[]
 
   @@unique([businessId, localDate])
+  @@unique([businessId, requestId])
   @@unique([businessId, legacyDexieId])
   @@map("cash_sessions")
 }
