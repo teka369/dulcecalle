@@ -6,6 +6,7 @@ import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import type {
   CreateCustomerDto,
   CreateInitialDebtDto,
+  CreateCustomerPaymentDto,
   CreateProductDto,
   CreateSupplierDto,
   PatchCustomerDto,
@@ -360,6 +361,131 @@ export class CatalogService {
       },
     });
     return customerJson(updated);
+  }
+
+  async recordCustomerPayment(
+    ctx: BusinessContext,
+    customerId: string,
+    dto: CreateCustomerPaymentDto,
+    requestId: string,
+  ) {
+    const existing = await this.prisma.customerPayment.findUnique({
+      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+    });
+    if (existing) {
+      return {
+        id: existing.id,
+        customerId: existing.customerId,
+        amount: copToJson(existing.amount),
+        method: existing.method,
+        occurredOn: dateKey(existing.occurredOn),
+        createdAt: existing.createdAt,
+      };
+    }
+
+    const amount = asCop(dto.amount);
+    if (amount <= 0n) {
+      throw new AppError(ERROR_CODES.VALIDATION, "El abono tiene que ser mayor a 0.");
+    }
+
+    const now = new Date();
+    const occurredOn = occurredOnDate(ctx.timezone, now);
+    await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
+
+    try {
+      const row = await this.prisma.$transaction(async (tx) => {
+        await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+
+        const customer = await tx.customer.findFirst({
+          where: { id: customerId, businessId: ctx.businessId },
+        });
+        if (!customer) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+        if (customer.debt < amount) {
+          throw new AppError(ERROR_CODES.ABONO_EXCEEDS_DEBT, MESSAGES.abonoExceeds);
+        }
+
+        const paymentId = randomUUID();
+        const payment = await tx.customerPayment.create({
+          data: {
+            id: paymentId,
+            businessId: ctx.businessId,
+            customerId,
+            amount,
+            method: dto.method,
+            note: dto.note,
+            requestId,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+
+        const decremented = await tx.$executeRaw`
+          UPDATE customers
+          SET debt = debt - ${amount}
+          WHERE id = ${customerId}::uuid
+            AND business_id = ${ctx.businessId}::uuid
+            AND debt >= ${amount}
+        `;
+        if (Number(decremented) !== 1) {
+          throw new AppError(ERROR_CODES.ABONO_EXCEEDS_DEBT, MESSAGES.abonoExceeds);
+        }
+
+        const open = await tx.cashSession.findFirst({
+          where: {
+            businessId: ctx.businessId,
+            localDate: occurredOn,
+            closedAt: null,
+          },
+        });
+        await tx.cashMove.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            amount,
+            direction: "in",
+            method: dto.method,
+            kind: "debt_collect",
+            sessionId: open?.id ?? null,
+            refType: "customer_payment",
+            refId: paymentId,
+            requestId,
+            note: dto.note,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+
+        return payment;
+      });
+
+      return {
+        id: row.id,
+        customerId: row.customerId,
+        amount: copToJson(row.amount),
+        method: row.method,
+        occurredOn: dateKey(row.occurredOn),
+        createdAt: row.createdAt,
+      };
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const again = await this.prisma.customerPayment.findUnique({
+          where: {
+            businessId_requestId: { businessId: ctx.businessId, requestId },
+          },
+        });
+        if (again) {
+          return {
+            id: again.id,
+            customerId: again.customerId,
+            amount: copToJson(again.amount),
+            method: again.method,
+            occurredOn: dateKey(again.occurredOn),
+            createdAt: again.createdAt,
+          };
+        }
+      }
+      throw e;
+    }
   }
 
   async recordInitialDebt(
