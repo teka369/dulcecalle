@@ -80,13 +80,17 @@ export default function RegistrarAbonoPage() {
       if (!requestIdRef.current) {
         requestIdRef.current = crypto.randomUUID();
       }
-      await customerStore.recordAbono({
+      const result = await customerStore.recordAbono({
         customerId: customer.id,
         amountRaw,
         method,
         requestId: requestIdRef.current,
       });
-      setToast("Abono registrado");
+      setToast(
+        result.mode === "offline"
+          ? "Abono guardado sin conexión"
+          : "Abono registrado",
+      );
       setTimeout(() => {
         router.push(`/clientes/${customer.id}`);
       }, 700);
