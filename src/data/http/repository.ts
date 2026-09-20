@@ -219,7 +219,7 @@ export class HttpRepository {
 
     pay: async (
       customerId: string,
-      input: { amount: number; method: "Efectivo" | "Nequi" },
+      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string },
       requestId: string,
     ): Promise<RemotePayment> => {
       const row = await this.http.request<Record<string, unknown>>(
