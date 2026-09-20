@@ -1,6 +1,13 @@
 export { LOCAL_DB_NAME, getLocalDb } from "./db";
 export { getLocalStore, LocalStore } from "./store";
-export {\n  ConnectivityMonitor,\n  getOutboxStore,\n  getOutboxSyncEngine,\n  OutboxStore,\n  OutboxSyncEngine,\n  resetOutboxSyncEngineSingleton,\n} from "./outbox";
+export {
+  ConnectivityMonitor,
+  getOutboxStore,
+  getOutboxSyncEngine,
+  OutboxStore,
+  OutboxSyncEngine,
+  resetOutboxSyncEngineSingleton,
+} from "./outbox";
 export {
   CatalogReadCache,
   getCatalogReadCache,
