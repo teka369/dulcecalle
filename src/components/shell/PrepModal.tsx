@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { usePrep } from "@/store/prepStore";
 
@@ -23,12 +24,13 @@ function TaskIcon({ status }: { status: string }) {
 export function PrepModal() {
   const { phase, tasks, completed, total, modalOpen, evaluate, start, closeModal } = usePrep();
 
+  const pathname = usePathname();
   useEffect(() => {
     void evaluate();
     const onOnline = () => void evaluate();
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
-  }, [evaluate]);
+  }, [evaluate, pathname]);
 
   useEffect(() => {
     if (phase !== "ready" || !modalOpen) return;

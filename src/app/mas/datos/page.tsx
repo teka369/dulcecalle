@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
 import { resetPwaApi } from "@/data/pwa/api";
 import { usePrep } from "@/store/prepStore";
@@ -11,6 +11,23 @@ export default function DatosPage() {
   const router = useRouter();
   const [done, setDone] = useState(false);
   const { phase, lastReadyAt, start } = usePrep();
+  const [online, setOnline] = useState(true);
+
+  useEffect(() => {
+    try {
+      setOnline(navigator.onLine);
+    } catch {
+      /* ignore */
+    }
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   function onLogout() {
     getPwaAuthSession().clear();
@@ -52,7 +69,8 @@ export default function DatosPage() {
         <button
           type="button"
           onClick={() => void start()}
-          className="mt-4 min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white"
+          disabled={!online}
+          className="mt-4 min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
         >
           Actualizar preparación offline
         </button>
