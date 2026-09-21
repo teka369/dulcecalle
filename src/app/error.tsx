@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 
 /**
@@ -35,12 +36,12 @@ export default function RootError({
         >
           Reintentar
         </button>
-        <a
+        <Link
           href="/"
           className="inline-flex min-h-11 items-center rounded-xl border border-ink/10 bg-surface px-4 text-sm font-medium"
         >
           Ir al inicio
-        </a>
+        </Link>
       </div>
     </div>
   );
