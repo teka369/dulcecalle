@@ -46,12 +46,12 @@ async function openAsV3(): Promise<Dexie> {
   return old;
 }
 
-describe("Dexie v3 → v4 migration (M6.10)", () => {
+describe("Dexie v3 → current migration (M6.10/M6.12)", () => {
   beforeEach(async () => {
     await __resetLocalDbForTests();
   });
 
-  it("preserves v3 data and adds customerLedgers", async () => {
+  it("preserves v3 data and adds customerLedgers + prepState", async () => {
     const old = await openAsV3();
     const now = Date.now();
     await old.table("products").put({
@@ -101,7 +101,7 @@ describe("Dexie v3 → v4 migration (M6.10)", () => {
     old.close();
 
     const db = getLocalDb();
-    expect(db.verno).toBe(4);
+    expect(db.verno).toBe(5);
     expect(
       (await db.products.get("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))?.stock,
     ).toBe(10);
@@ -113,7 +113,18 @@ describe("Dexie v3 → v4 migration (M6.10)", () => {
         ?.openingFloat,
     ).toBe(5000);
 
-    // New table exists, starts empty, and is writable.
+    // New tables exist, start empty, and are writable.
+    expect(await db.prepState.count()).toBe(0);
+    await db.prepState.put({
+      id: "readiness::" + BIZ,
+      businessId: BIZ,
+      status: "ready",
+      prepVersion: 1,
+      dbVersion: 5,
+      completedAt: now,
+      tasks: [],
+    });
+    expect((await db.prepState.get("readiness::" + BIZ))?.status).toBe("ready");
     expect(await db.customerLedgers.count()).toBe(0);
     await db.customerLedgers.put({
       customerId: "ffffffff-ffff-4fff-8fff-ffffffffffff",

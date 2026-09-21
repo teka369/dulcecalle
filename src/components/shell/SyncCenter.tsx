@@ -1,6 +1,7 @@
 "use client";
 
 import { useSync } from "@/store/syncStore";
+import { usePrep } from "@/store/prepStore";
 import {
   SyncOperationList,
   formatDateTime,
@@ -20,6 +21,7 @@ export function SyncCenter() {
     closeCenter,
     syncNow,
   } = useSync();
+  const { phase: prepPhase, lastReadyAt: prepReadyAt } = usePrep();
   const { items, loading } = useSyncItems();
 
   if (!centerOpen) return null;
@@ -77,6 +79,11 @@ export function SyncCenter() {
         {lastDoneAt && (
           <p className="mt-2 text-xs text-ink/55">
             Última sincronización: {formatDateTime(lastDoneAt)}
+          </p>
+        )}
+        {prepPhase === "ready" && prepReadyAt && (
+          <p className="mt-1 text-xs text-ink/55">
+            ✓ Offline listo desde {formatDateTime(prepReadyAt)}
           </p>
         )}
       </div>

@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from "dexie";
 import type {
   CustomerLedgerSnapshot,
   LocalCacheMeta,
+  PrepReadiness,
   LocalCashMove,
   LocalCashSession,
   LocalCustomer,
@@ -40,6 +41,7 @@ export class DulceCalleLocalDB extends Dexie {
   initialDebts!: EntityTable<LocalInitialDebt, "id">;
   cacheMeta!: EntityTable<LocalCacheMeta, "id">;
   customerLedgers!: EntityTable<CustomerLedgerSnapshot, "customerId">;
+  prepState!: EntityTable<PrepReadiness, "id">;
   outbox!: EntityTable<OutboxItem, "operationId">;
 
   constructor() {
@@ -72,6 +74,10 @@ export class DulceCalleLocalDB extends Dexie {
     // The portal never uses businessId, so it stays out of cacheMeta.
     this.version(4).stores({
       customerLedgers: "customerId, capturedAt",
+    });
+    // v5: offline preparation readiness (per business, metadata only).
+    this.version(5).stores({
+      prepState: "id, businessId",
     });
   }
 }

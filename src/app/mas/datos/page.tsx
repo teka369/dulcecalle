@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
 import { resetPwaApi } from "@/data/pwa/api";
+import { usePrep } from "@/store/prepStore";
 
 export default function DatosPage() {
   const router = useRouter();
   const [done, setDone] = useState(false);
+  const { phase, lastReadyAt, start } = usePrep();
 
   function onLogout() {
     getPwaAuthSession().clear();
@@ -46,6 +48,18 @@ export default function DatosPage() {
         <p className="font-semibold">Cerrar sesión en este teléfono</p>
         <p className="mt-2 text-sm text-ink/70">
           Quita la sesión de aquí. No toca productos, ventas ni deudas.
+        </p>
+        <button
+          type="button"
+          onClick={() => void start()}
+          className="mt-4 min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white"
+        >
+          Actualizar preparación offline
+        </button>
+        <p className="mt-2 text-xs text-ink/60">
+          {phase === "ready" && lastReadyAt
+            ? `Dispositivo preparado el ${new Date(lastReadyAt).toLocaleString()}.`
+            : "Prepara este dispositivo para trabajar sin conexión."}
         </p>
         <button
           type="button"

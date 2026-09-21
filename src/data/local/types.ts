@@ -27,6 +27,31 @@ export type CustomerLedgerSnapshot = {
   capturedAt: number;
 };
 
+export type PrepTaskStatus = "pending" | "running" | "done" | "failed";
+
+export type PrepTaskRecord = {
+  key: string;
+  status: PrepTaskStatus;
+  error: string | null;
+  finishedAt: number | null;
+};
+
+/**
+ * Offline preparation readiness (admin, per business). Records that the
+ * device warmed the documents + catalogs the offline flows need. Never
+ * stores business data itself.
+ */
+export type PrepReadiness = {
+  /** `readiness::<businessId>`. */
+  id: string;
+  businessId: string;
+  status: "ready" | "failed";
+  prepVersion: number;
+  dbVersion: number;
+  completedAt: number;
+  tasks: PrepTaskRecord[];
+};
+
 export type LocalEntityId = string;
 
 export type OutboxStatus = "pending" | "in_flight" | "synced" | "failed";
