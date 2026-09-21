@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -7,6 +8,7 @@ import { apiBaseUrl } from "@/data/backend";
 import { ApiError } from "@/data/errors";
 import { HttpRepository } from "@/data/http/repository";
 import { getPwaAuthSession } from "@/data/http/session";
+import { ResetBusinessDataZone } from "@/components/account/ResetBusinessDataZone";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -74,6 +76,14 @@ export default function LoginPage() {
   if (loggedIn && memberships.length === 0) {
     return (
       <div className="flex flex-col gap-4">
+        <Image
+          src="/DulceCalle.png"
+          alt="Dulce Calle"
+          width={80}
+          height={80}
+          className="h-20 w-20 rounded-2xl object-cover"
+          priority
+        />
         <h1 className="text-[22px] font-semibold">Cuenta</h1>
         <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
           <p className="text-sm text-ink/70">Sesión en el servidor</p>
@@ -91,6 +101,7 @@ export default function LoginPage() {
         >
           Cerrar sesión
         </button>
+        <ResetBusinessDataZone />
         <Link href="/" className="text-center text-sm text-ink/60">
           Volver al inicio
         </Link>
@@ -100,6 +111,14 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <Image
+        src="/DulceCalle.png"
+        alt="Dulce Calle"
+        width={80}
+        height={80}
+        className="h-20 w-20 rounded-2xl object-cover"
+        priority
+      />
       <h1 className="text-[22px] font-semibold">Entrar</h1>
       <p className="text-sm text-ink/60">
         Entras al negocio en el servidor. Los datos viven allá, no en este
