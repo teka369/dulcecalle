@@ -3,7 +3,8 @@ import { Geist } from "next/font/google";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreviewHostBridge } from "@/components/shell/PreviewHostBridge";
 import { SalesSyncBridge } from "@/components/shell/SalesSyncBridge";
-import { SyncStatusOverlay } from "@/components/shell/SyncStatusOverlay";
+import { SyncCenter } from "@/components/shell/SyncCenter";
+import { SyncPill } from "@/components/shell/SyncPill";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
@@ -48,7 +49,8 @@ export default function RootLayout({
       <body className="min-h-full bg-bg text-ink">
         <PreviewHostBridge />
         <SalesSyncBridge />
-        <SyncStatusOverlay />
+        <SyncPill />
+        <SyncCenter />
         <ThemeProvider>
           <AppShell>{children}</AppShell>
         </ThemeProvider>

@@ -66,6 +66,7 @@ export class OutboxStore {
       nextAttemptAt: null,
     };
     await this.db.outbox.put(row);
+    emitSyncEvent({ type: "queued", businessId: row.businessId });
     return row;
   }
 

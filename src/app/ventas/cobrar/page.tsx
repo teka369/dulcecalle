@@ -143,7 +143,11 @@ export default function CobrarPage() {
       );
 
       clear();
-      setToast("Venta registrada");
+      setToast(
+        result.mode === "offline"
+          ? "Venta guardada en este dispositivo · se sincronizará automáticamente."
+          : "Venta registrada",
+      );
       setTimeout(() => {
         router.push("/");
       }, 700);
