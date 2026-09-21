@@ -1,10 +1,13 @@
 import { NetworkError } from "../errors";
 import type { CreateSaleInput } from "../http/repository";
+import type { RemoteReturn, RemoteSaleLine } from "../http/mappers";
 import type { RemoteSale } from "../http/mappers";
 import { getPwaApi } from "./api";
+import { getHttpReturnable } from "./sales";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
+import { getLocalStore } from "../local/store";
 import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
 import { newEntityId } from "../local/ids";
 import { addCop, mulCop, subCop } from "@/domain/money";
@@ -13,6 +16,73 @@ import type { LocalCustomer, LocalProduct, LocalSale, LocalSaleLine, LocalStockM
 export type CreateSaleResult =
   | { mode: "online"; sale: RemoteSale }
   | { mode: "offline"; saleId: string };
+
+export type LocalSaleRow = RemoteSale & { pending: boolean };
+
+function localSaleToRow(
+  sale: LocalSale,
+  lines: LocalSaleLine[],
+  pending: boolean,
+): LocalSaleRow {
+  return {
+    id: sale.id,
+    customerId: sale.customerId,
+    paymentKind: sale.paymentKind,
+    method: sale.method,
+    saleTotal: sale.saleTotal,
+    amountReceived: sale.amountReceived,
+    credit: sale.credit,
+    note: sale.note,
+    occurredOn: sale.occurredOn,
+    createdAt: sale.createdAt,
+    lines: lines.map((l) => ({
+      id: l.id,
+      productId: l.productId,
+      productName: l.productName,
+      qty: l.qty,
+      unitPrice: l.unitPrice,
+      unitCost: l.unitCost,
+      lineTotal: l.lineTotal,
+    })),
+    pending,
+  };
+}
+
+async function salePending(businessId: string, saleId: string): Promise<boolean> {
+  const op = await getOutboxStore().get(businessId, saleId);
+  return !!op && op.entity === "sale" && op.status !== "synced";
+}
+
+/**
+ * Local-first sales read for offline lists/detail. Reads the same Dexie
+ * rows the offline writer created; never invents rows. Pending is derived
+ * from the sale's own outbox operation (operationId === sale id).
+ */
+export async function listLocalSales(businessId: string): Promise<LocalSaleRow[]> {
+  const db = getLocalDb();
+  const sales = await db.sales.where("businessId").equals(businessId).toArray();
+  const rows: LocalSaleRow[] = [];
+  for (const sale of sales.sort((a, b) => b.createdAt - a.createdAt)) {
+    const lines = await db.saleLines.where("[businessId+saleId]").equals([businessId, sale.id]).toArray();
+    rows.push(localSaleToRow(sale, lines, await salePending(businessId, sale.id)));
+  }
+  return rows;
+}
+
+export async function getLocalSale(
+  businessId: string,
+  saleId: string,
+): Promise<LocalSaleRow | undefined> {
+  const db = getLocalDb();
+  const sale = await getLocalStoreSafe(businessId, saleId);
+  if (!sale) return undefined;
+  const lines = await db.saleLines.where("[businessId+saleId]").equals([businessId, sale.id]).toArray();
+  return localSaleToRow(sale, lines, await salePending(businessId, sale.id));
+}
+
+async function getLocalStoreSafe(businessId: string, saleId: string) {
+  return getLocalStore().sales.get(businessId, saleId);
+}
 
 function todayLocal(): string {
   const d = new Date();
@@ -229,6 +299,71 @@ export async function createSaleWithOfflineFallback(
     const saleId = await createLocalSale(input, businessId, requestId);
     return { mode: "offline", saleId };
   }
+}
+
+export type SalesListResult = {
+  sales: LocalSaleRow[];
+  source: "server" | "cache";
+};
+
+/**
+ * Ventas list with an honest offline fallback. Online returns the server
+ * list; only a NetworkError falls back to local Dexie rows (which carry
+ * their pending flag). Any other error is rethrown: an empty array always
+ * means "no sales", never "could not reach the server".
+ */
+export async function listSalesWithOfflineFallback(): Promise<SalesListResult> {
+  try {
+    const sales = await getPwaApi().sales.list();
+    return {
+      sales: sales.map((s) => ({ ...s, pending: false })),
+      source: "server",
+    };
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
+    const businessId = getPwaAuthSession().businessId;
+    if (!businessId) throw error;
+    return { sales: await listLocalSales(businessId), source: "cache" };
+  }
+}
+
+export type SaleDetailResult = {
+  sale: LocalSaleRow;
+  lines: Array<RemoteSaleLine & { returnedQty: number; remaining: number }>;
+  remainingValue: number;
+  returns: RemoteReturn[];
+  source: "server" | "cache";
+};
+
+/**
+ * Sale detail that also resolves locally-created sales. The server never
+ * saw the local UUID, so a null server lookup falls back to the Dexie
+ * row (served with its pending flag) instead of a "not found".
+ */
+export async function getSaleDetailWithOfflineFallback(
+  saleId: string,
+): Promise<SaleDetailResult | null> {
+  const found = await getHttpReturnable(saleId);
+  if (found) {
+    return {
+      sale: { ...found.sale, pending: false },
+      lines: found.lines,
+      remainingValue: found.remainingValue,
+      returns: found.returns,
+      source: "server",
+    };
+  }
+  const businessId = getPwaAuthSession().businessId;
+  if (!businessId) return null;
+  const local = await getLocalSale(businessId, saleId);
+  if (!local) return null;
+  return {
+    sale: local,
+    lines: local.lines.map((l) => ({ ...l, returnedQty: 0, remaining: l.qty })),
+    remainingValue: local.saleTotal,
+    returns: [],
+    source: "cache",
+  };
 }
 
 export async function syncPendingSales(businessId: string) {

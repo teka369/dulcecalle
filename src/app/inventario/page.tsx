@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
+import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
 import { useInventory } from "@/store/inventoryStore";
 
 type Segment = "productos" | "proveedores";
@@ -16,9 +17,11 @@ export default function InventarioPage() {
   } = useInventory();
   const [segment, setSegment] = useState<Segment>("productos");
   const [query, setQuery] = useState("");
+  const [pendingSupplierIds, setPendingSupplierIds] = useState<string[]>([]);
 
   useEffect(() => {
     void refreshAll();
+    void getPendingSupplierIds().then(setPendingSupplierIds);
   }, [refreshAll]);
 
   const filteredProducts = useMemo(() => {
@@ -165,7 +168,14 @@ export default function InventarioPage() {
                 href={`/inventario/proveedores/${s.id}`}
                 className="flex min-h-11 flex-col justify-center rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
-                <span className="font-medium">{s.name}</span>
+                <span className="font-medium">
+                  {s.name}
+                  {pendingSupplierIds.includes(s.id) && (
+                    <span className="ml-2 rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold text-ink/70">
+                      ⏳ Pendiente
+                    </span>
+                  )}
+                </span>
                 {s.phone && (
                   <span className="text-sm text-ink/50">{s.phone}</span>
                 )}

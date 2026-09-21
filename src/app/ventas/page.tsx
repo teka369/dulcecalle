@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatCop } from "@/domain/money";
-import type { RemoteSale } from "@/data/http/mappers";
-import { getPwaApi } from "@/data/pwa/api";
+import { listSalesWithOfflineFallback, type LocalSaleRow } from "@/data/pwa/offline-sales";
 
 const kindLabel: Record<string, string> = {
   paid: "Pagada",
@@ -13,13 +12,19 @@ const kindLabel: Record<string, string> = {
 };
 
 export default function VentasPage() {
-  const [sales, setSales] = useState<RemoteSale[]>([]);
+  const [sales, setSales] = useState<LocalSaleRow[]>([]);
+  const [fromCache, setFromCache] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void getPwaApi()
-      .sales.list()
-      .then(setSales)
-      .catch(() => setSales([]));
+    void listSalesWithOfflineFallback()
+      .then((result) => {
+        setSales(result.sales);
+        setFromCache(result.source === "cache");
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "No se pudo cargar.");
+      });
   }, []);
 
   return (
@@ -34,8 +39,20 @@ export default function VentasPage() {
         </Link>
       </header>
 
-      {sales.length === 0 ? (
-        <p className="text-sm text-ink/60">Aún no hay ventas hoy.</p>
+      {error && <p className="text-sm text-danger">{error}</p>}
+
+      {fromCache && sales.length > 0 && (
+        <p className="text-xs text-ink/60">
+          Sin conexión · mostrando ventas guardadas en este dispositivo.
+        </p>
+      )}
+
+      {sales.length === 0 && !error ? (
+        <p className="text-sm text-ink/60">
+          {fromCache
+            ? "No hay ventas guardadas en este dispositivo."
+            : "Aún no hay ventas hoy."}
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {sales.map((s) => (
@@ -47,6 +64,11 @@ export default function VentasPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">
                     {kindLabel[s.paymentKind] ?? s.paymentKind}
+                    {s.pending && (
+                      <span className="ml-2 rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold text-ink/70">
+                        ⏳ Pendiente
+                      </span>
+                    )}
                   </span>
                   <span className="text-sm font-semibold">
                     {formatCop(s.saleTotal)}

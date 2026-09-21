@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
+import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { useCustomers } from "@/store/customerStore";
 
 export default function ClientesPage() {
   const { customers, refresh, loading } = useCustomers();
   const [query, setQuery] = useState("");
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
 
   useEffect(() => {
     void refresh();
+    void getPendingCustomerIds().then(setPendingIds);
   }, [refresh]);
 
   const filtered = useMemo(() => {
@@ -69,7 +72,14 @@ export default function ClientesPage() {
                 className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
                 <span className="min-w-0 truncate">
-                  <span className="block font-medium">{c.name}</span>
+                  <span className="block font-medium">
+                    {c.name}
+                    {pendingIds.includes(c.id) && (
+                      <span className="ml-2 rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold text-ink/70">
+                        ⏳ Pendiente
+                      </span>
+                    )}
+                  </span>
                   {c.code && (
                     <span className="block text-xs text-ink/50">{c.code}</span>
                   )}

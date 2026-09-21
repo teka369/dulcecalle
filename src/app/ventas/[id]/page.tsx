@@ -6,9 +6,9 @@ import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { routeId } from "@/data/pwa/ids";
 import {
-  getHttpReturnable,
-  type HttpReturnable,
-} from "@/data/pwa/sales";
+  getSaleDetailWithOfflineFallback,
+  type SaleDetailResult,
+} from "@/data/pwa/offline-sales";
 
 const kindLabel: Record<string, string> = {
   paid: "Pagada",
@@ -19,7 +19,7 @@ const kindLabel: Record<string, string> = {
 export default function VentaDetallePage() {
   const params = useParams();
   const id = routeId(params.id);
-  const [data, setData] = useState<HttpReturnable | null>(null);
+  const [data, setData] = useState<SaleDetailResult | null>(null);
   const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
@@ -27,7 +27,7 @@ export default function VentaDetallePage() {
       setReady(true);
       return;
     }
-    const row = await getHttpReturnable(id);
+    const row = await getSaleDetailWithOfflineFallback(id);
     setData(row);
     setReady(true);
   }, [id]);
@@ -52,7 +52,9 @@ export default function VentaDetallePage() {
   }
 
   const { sale, lines, remainingValue, returns } = data;
-  const canReturn = remainingValue > 0;
+  const pending = sale.pending;
+  const fromCache = data.source === "cache";
+  const canReturn = remainingValue > 0 && !pending;
 
   return (
     <div className="flex flex-col gap-4">
@@ -68,6 +70,11 @@ export default function VentaDetallePage() {
           <h1 className="text-[22px] font-semibold">Venta</h1>
           <p className="text-sm text-ink/60">
             {kindLabel[sale.paymentKind] ?? sale.paymentKind}
+            {pending && (
+              <span className="ml-2 rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold text-ink/70">
+                ⏳ Pendiente de sincronización
+              </span>
+            )}
           </p>
         </div>
       </header>
@@ -114,8 +121,20 @@ export default function VentaDetallePage() {
         </Link>
       )}
 
-      {!canReturn && (
-        <p className="text-sm text-ink/60">Esta venta ya se devolvió.</p>
+      {pending ? (
+        <p className="text-xs text-ink/60">
+          Las devoluciones estarán disponibles cuando la venta se sincronice.
+        </p>
+      ) : (
+        !canReturn && (
+          <p className="text-sm text-ink/60">Esta venta ya se devolvió.</p>
+        )
+      )}
+
+      {fromCache && (
+        <p className="text-xs text-ink/60">
+          Sin conexión · mostrando venta guardada en este dispositivo.
+        </p>
       )}
 
       {returns.length > 0 && (
