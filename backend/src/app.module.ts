@@ -7,6 +7,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { IdentityModule } from "./identity/identity.module";
 import { TenancyModule } from "./tenancy/tenancy.module";
 import { CatalogModule } from "./catalog/catalog.module";
+import { BusinessModule } from "./business/business.module";
 import { SalesModule } from "./sales/sales.module";
 import { CashModule } from "./cash/cash.module";
 import { StatsModule } from "./stats/stats.module";
@@ -38,6 +39,7 @@ import { requireJwtSecrets } from "./identity/jwt-secrets";
     TenancyModule,
     IdentityModule,
     CatalogModule,
+    BusinessModule,
     SalesModule,
     CashModule,
     StatsModule,

@@ -1,0 +1,138 @@
+import "fake-indexeddb/auto";
+import { beforeEach, describe, expect, it } from "vitest";
+import { __resetLocalDbForTests, getLocalDb } from "@/data/local/db";
+import {
+  getOutboxStore,
+  resetOutboxStoreSingleton,
+  resetOutboxSyncEngineSingleton,
+} from "@/data/local/outbox";
+import { resetLocalStoreSingleton } from "@/data/local/store";
+import { clearLocalBusinessData } from "./business-reset";
+import { RESET_CONFIRM_PHRASE, RESET_ENTITY_LABELS } from "@/components/account/ResetBusinessDataZone";
+
+const BIZ = "11111111-1111-4111-8111-111111111111";
+const OTHER = "22222222-2222-4222-8222-222222222222";
+
+async function seedBusiness(businessId: string, suffix: string) {
+  const db = getLocalDb();
+  const now = Date.now();
+  await db.products.put({
+    id: `aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa${suffix}`,
+    businessId,
+    name: "Gomitas",
+    category: "General",
+    price: 500,
+    avgCost: 100,
+    stock: 10,
+    lowStockAt: 5,
+    archivedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.customers.put({
+    id: `bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb${suffix}`,
+    businessId,
+    code: null,
+    name: "Rosa",
+    phone: null,
+    debt: 0,
+    archivedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.sales.put({
+    id: `cccccccc-cccc-4ccc-8ccc-cccccccccc${suffix}`,
+    businessId,
+    customerId: null,
+    paymentKind: "paid",
+    method: "Efectivo",
+    saleTotal: 500,
+    amountReceived: 500,
+    credit: 0,
+    requestId: `dddddddd-dddd-4ddd-8ddd-dddddddddd${suffix}`,
+    note: null,
+    occurredOn: "2026-09-20",
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.cacheMeta.put({
+    id: `${businessId}::products`,
+    businessId,
+    resource: "products",
+    cachedAt: now,
+  });
+  await db.prepState.put({
+    id: `readiness::${businessId}`,
+    businessId,
+    status: "ready",
+    prepVersion: 1,
+    dbVersion: 5,
+    completedAt: now,
+    tasks: [],
+  });
+}
+
+describe("business reset (local)", () => {
+  beforeEach(async () => {
+    resetOutboxStoreSingleton();
+    resetOutboxSyncEngineSingleton();
+    resetLocalStoreSingleton();
+    await __resetLocalDbForTests();
+  });
+
+  it("clears every business row but keeps other tenants", async () => {
+    await seedBusiness(BIZ, "a1");
+    await seedBusiness(OTHER, "b2");
+    await clearLocalBusinessData(BIZ);
+    const db = getLocalDb();
+    expect(await db.products.where("businessId").equals(BIZ).count()).toBe(0);
+    expect(await db.customers.where("businessId").equals(BIZ).count()).toBe(0);
+    expect(await db.sales.where("businessId").equals(BIZ).count()).toBe(0);
+    expect(await db.cacheMeta.where("businessId").equals(BIZ).count()).toBe(0);
+    expect(await db.prepState.where("businessId").equals(BIZ).count()).toBe(0);
+    expect(await db.products.where("businessId").equals(OTHER).count()).toBe(1);
+    expect(await db.cacheMeta.where("businessId").equals(OTHER).count()).toBe(1);
+  });
+
+  it("removes pending outbox ops so nothing resurrects after reconnect", async () => {
+    await seedBusiness(BIZ, "a1");
+    const outbox = getOutboxStore();
+    await outbox.enqueue({
+      operationId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      businessId: BIZ,
+      entity: "sale",
+      operation: "create",
+      requestId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      payload: {},
+    });
+    await clearLocalBusinessData(BIZ);
+    expect(await getLocalDb().outbox.where("businessId").equals(BIZ).count()).toBe(0);
+  });
+
+  it("keeps portal ledger snapshots (separate M6.10 scope)", async () => {
+    await getLocalDb().customerLedgers.put({
+      customerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      ledger: {
+        customer: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", code: "DC-1", name: "R", debt: 0, createdAt: 1 },
+        initials: [],
+        sales: [],
+        payments: [],
+      },
+      capturedAt: 1,
+    });
+    await clearLocalBusinessData(BIZ);
+    expect(await getLocalDb().customerLedgers.count()).toBe(1);
+  });
+
+  it("confirmation phrase and entity labels are exact", () => {
+    expect(RESET_CONFIRM_PHRASE).toBe("ELIMINAR DATOS");
+    expect(Object.keys(RESET_ENTITY_LABELS).sort()).toEqual(
+      [
+        "cashMoves", "cashSessions", "customerPayments", "customers",
+        "expenses", "importIdMap", "initialDebts", "products",
+        "saleLines", "saleReturnLines", "saleReturns", "sales",
+        "settings", "stockMoves", "suppliers",
+      ].sort(),
+    );
+  });
+});
