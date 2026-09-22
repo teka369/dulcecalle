@@ -20,6 +20,7 @@ import { occurredOnDate, dateKey } from "../shared/clock";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
 import { nextCodeFromExisting } from "../shared/customer-code";
+import { imageJson } from "./media.service";
 
 function productJson(p: {
   id: string;
@@ -31,6 +32,21 @@ function productJson(p: {
   lowStockAt: number;
   archivedAt: Date | null;
   createdAt: Date;
+  images?: Array<{
+    id: string;
+    productId: string;
+    publicId: string;
+    secureUrl: string;
+    version: number | null;
+    width: number | null;
+    height: number | null;
+    format: string | null;
+    bytes: number | null;
+    position: number;
+    isPrimary: boolean;
+    altText: string | null;
+    createdAt: Date;
+  }>;
 }) {
   return {
     id: p.id,
@@ -42,6 +58,7 @@ function productJson(p: {
     lowStockAt: p.lowStockAt,
     archivedAt: p.archivedAt,
     createdAt: p.createdAt,
+    images: (p.images ?? []).map(imageJson),
   };
 }
 
@@ -76,6 +93,7 @@ export class CatalogService {
   ) {
     const existing = await this.prisma.product.findUnique({
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+      include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
     });
     if (existing) return productJson(existing);
 
@@ -134,6 +152,7 @@ export class CatalogService {
           where: {
             businessId_requestId: { businessId: ctx.businessId, requestId },
           },
+          include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
         });
         if (again) return productJson(again);
       }
@@ -145,6 +164,7 @@ export class CatalogService {
     const rows = await this.prisma.product.findMany({
       where: { businessId: ctx.businessId, archivedAt: null },
       orderBy: { name: "asc" },
+      include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
     });
     return rows.map(productJson);
   }
@@ -152,6 +172,7 @@ export class CatalogService {
   async getProduct(ctx: BusinessContext, id: string) {
     const p = await this.prisma.product.findFirst({
       where: { id, businessId: ctx.businessId },
+      include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
     });
     if (!p) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
     return productJson(p);
@@ -184,6 +205,7 @@ export class CatalogService {
         ...(dto.price != null ? { price: asCop(dto.price) } : {}),
         ...(dto.lowStockAt != null ? { lowStockAt: dto.lowStockAt } : {}),
       },
+      include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
     });
     return productJson(updated);
   }
@@ -196,6 +218,7 @@ export class CatalogService {
     const updated = await this.prisma.product.update({
       where: { id },
       data: { archivedAt: new Date() },
+      include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
     });
     return productJson(updated);
   }

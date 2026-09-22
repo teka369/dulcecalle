@@ -86,6 +86,7 @@ model Business {
   customerPayments   CustomerPayment[]
   initialDebts       InitialDebt[]
   importIdMap        ImportIdMap[]
+  productImages      ProductImage[]
 
   @@map("businesses")
 }
@@ -123,6 +124,7 @@ model Product {
   saleLines  SaleLine[]
   stockMoves StockMove[]
   returnLines SaleReturnLine[]
+  images     ProductImage[]
 
   @@unique([businessId, requestId])
   @@unique([businessId, legacyDexieId])
@@ -428,4 +430,32 @@ model ImportIdMap {
 
   @@id([businessId, tableName, dexieId])
   @@map("import_id_map")
+}
+
+model ProductImage {
+  id                String    @id @db.Uuid
+  businessId        String    @map("business_id") @db.Uuid
+  productId         String    @map("product_id") @db.Uuid
+  cloudinaryAssetId String?   @map("cloudinary_asset_id")
+  publicId          String    @map("public_id")
+  secureUrl         String    @map("secure_url")
+  version           Int?
+  width             Int?
+  height            Int?
+  format            String?
+  bytes             Int?
+  position          Int       @default(0)
+  isPrimary         Boolean   @default(false) @map("is_primary")
+  altText           String?   @map("alt_text")
+  requestId         String?   @map("request_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  business Business @relation(fields: [businessId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@unique([publicId])
+  @@unique([businessId, requestId])
+  @@index([businessId, productId, position])
+  @@map("product_images")
 }
