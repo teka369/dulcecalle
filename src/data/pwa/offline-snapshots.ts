@@ -2,7 +2,7 @@ import { NetworkError } from "../errors";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import type { RemoteStats } from "../http/mappers";
 import { getPwaApi } from "./api";
-import { loadHttpDashboard } from "./dashboard";
+import { loadDashboardResult } from "./dashboard";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
 
@@ -52,18 +52,35 @@ async function loadWithSnapshot<T>(opts: {
   }
 }
 
-function isDashboardSnapshot(data: unknown): data is DashboardSnapshot {
-  const row = data as Record<string, unknown> | null;
-  return !!row && typeof row === "object";
+export function isDashboardSnapshot(data: unknown): data is DashboardSnapshot {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return false;
+  const row = data as Record<string, unknown>;
+  return (
+    typeof row.greeting === "string" &&
+    typeof row.dateLabel === "string" &&
+    typeof row.todaySalesTotal === "number" &&
+    typeof row.todaySalesCount === "number" &&
+    typeof row.debtTotal === "number" &&
+    typeof row.debtorCount === "number" &&
+    Array.isArray(row.debtors) &&
+    typeof row.productCount === "number" &&
+    typeof row.lowStockCount === "number" &&
+    Array.isArray(row.lowStock) &&
+    Array.isArray(row.activity) &&
+    (row.cajaState === "none" || row.cajaState === "open" || row.cajaState === "closed") &&
+    typeof row.emptyDb === "boolean" &&
+    Array.isArray(row.actions)
+  );
 }
 
-function isRemoteStats(data: unknown): data is RemoteStats {
+export function isRemoteStats(data: unknown): data is RemoteStats {
   const row = data as Record<string, unknown> | null;
+  if (!row || typeof row !== "object" || Array.isArray(row)) return false;
   return (
-    !!row &&
-    typeof row === "object" &&
     typeof row.ventas === "number" &&
-    typeof row.period === "string"
+    typeof row.period === "string" &&
+    typeof row.emptyPeriod === "boolean" &&
+    Array.isArray(row) === false
   );
 }
 
@@ -73,12 +90,47 @@ function isRemoteStats(data: unknown): data is RemoteStats {
  * would silently undercount); offline serves the last snapshot labeled
  * with its capture time. Never a fake zero.
  */
-export function loadDashboardWithOfflineFallback(): Promise<SnapshotResult<DashboardSnapshot>> {
-  return loadWithSnapshot({
-    kind: DASHBOARD_SNAPSHOT_KIND,
-    fetch: () => loadHttpDashboard(),
-    validate: isDashboardSnapshot,
+export async function loadDashboardWithOfflineFallback(): Promise<
+  SnapshotResult<DashboardSnapshot>
+> {
+  let result: { snapshot: DashboardSnapshot; complete: boolean; networkFailure: boolean };
+  try {
+    result = await loadDashboardResult();
+  } catch (e: unknown) {
+    // Core queries have no fallback: a transport failure serves the
+    // previous snapshot, anything else propagates.
+    if (!(e instanceof NetworkError)) throw e;
+    return loadCachedSnapshot<DashboardSnapshot>(DASHBOARD_SNAPSHOT_KIND);
+  }
+  const { snapshot, complete, networkFailure } = result;
+  if (!complete) {
+    // A partial snapshot must never replace a complete one. Transport
+    // causes fall back to the previous snapshot; real server errors
+    // propagate so the UI shows an error instead of stale data as fresh.
+    if (networkFailure) return loadCachedSnapshot<DashboardSnapshot>(DASHBOARD_SNAPSHOT_KIND);
+    throw new Error("Respuesta incompleta del servidor.");
+  }
+  return saveSnapshot(DASHBOARD_SNAPSHOT_KIND, snapshot);
+}
+
+async function loadCachedSnapshot<T>(kind: string): Promise<SnapshotResult<T>> {
+  const businessId = requireBusinessId();
+  const cached = await getLocalDb().snapshots.get(snapshotId(businessId, kind));
+  if (!cached) throw new NetworkError("Sin conexión.");
+  return { data: cached.payload as T, source: "cache", capturedAt: cached.capturedAt };
+}
+
+async function saveSnapshot<T>(kind: string, data: T): Promise<SnapshotResult<T>> {
+  const businessId = requireBusinessId();
+  const capturedAt = Date.now();
+  await getLocalDb().snapshots.put({
+    id: snapshotId(businessId, kind),
+    businessId,
+    kind,
+    payload: data,
+    capturedAt,
   });
+  return { data, source: "server", capturedAt };
 }
 
 export function loadStatsWithOfflineFallback(

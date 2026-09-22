@@ -5,6 +5,7 @@ import {
   type DashboardSnapshot,
 } from "@/domain/dashboard/snapshot";
 import { addCop } from "@/domain/money";
+import { isNetworkError } from "../errors";
 import { getPwaApi } from "./api";
 
 function todayKey(): string {
@@ -45,8 +46,36 @@ type LedgerBundle = {
 let businessNameCache: { businessId: string; name: string } | null = null;
 
 export async function loadHttpDashboard(): Promise<DashboardSnapshot> {
+  return (await loadDashboardResult()).snapshot;
+}
+
+/**
+ * Same snapshot plus completeness bookkeeping. The core queries
+ * (products, customers, sales, cash) have no fallback: any failure there
+ * propagates. Per-entity subqueries (ledgers, moves, returns) degrade to
+ * empty on failure and mark the result partial instead of failing the
+ * whole dashboard; `networkFailure` tells whether the cause was transport
+ * (safe to fall back to a previous snapshot) or a real server error.
+ */
+export async function loadDashboardResult(): Promise<{
+  snapshot: DashboardSnapshot;
+  complete: boolean;
+  networkFailure: boolean;
+}> {
   const api = getPwaApi();
   const today = todayKey();
+  let complete = true;
+  let networkFailure = false;
+
+  async function subquery<T>(work: Promise<T>, fallback: T): Promise<T> {
+    try {
+      return await work;
+    } catch (e) {
+      complete = false;
+      if (isNetworkError(e)) networkFailure = true;
+      return fallback;
+    }
+  }
 
   const currentBusinessId = api.session.businessId;
   const needsBusinessName =
@@ -65,17 +94,17 @@ export async function loadHttpDashboard(): Promise<DashboardSnapshot> {
   const [ledgers, stockMoveGroups] = await Promise.all([
     Promise.all(
       customers.map((customer) =>
-        api.customers.ledger(customer.id).catch((): LedgerBundle => ({
+        subquery(api.customers.ledger(customer.id), {
           customer: { id: customer.id, name: customer.name },
           initials: [],
           sales: [],
           payments: [],
-        })),
+        } as LedgerBundle),
       ),
     ),
     Promise.all(
       products.map((product) =>
-        api.inventory.moves(product.id).catch(() => []),
+        subquery(api.inventory.moves(product.id), []),
       ),
     ),
   ]);
@@ -195,7 +224,7 @@ export async function loadHttpDashboard(): Promise<DashboardSnapshot> {
   const saleReturns = await Promise.all(
     sales.map(async (sale) => ({
       sale,
-      returns: await api.sales.returns(sale.id).catch(() => []),
+      returns: await subquery(api.sales.returns(sale.id), []),
     })),
   );
 
@@ -291,6 +320,7 @@ export async function loadHttpDashboard(): Promise<DashboardSnapshot> {
 
 
   return {
+    snapshot: {
     greeting: greetingForHour(new Date(now).getHours()),
     dateLabel: formatDashboardDate(now),
     businessLabel,
@@ -308,5 +338,8 @@ export async function loadHttpDashboard(): Promise<DashboardSnapshot> {
     emptyDb:
       products.length === 0 && customers.length === 0 && sales.length === 0,
     actions: DASHBOARD_ACTIONS,
+    },
+    complete,
+    networkFailure,
   };
 }

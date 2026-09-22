@@ -17,14 +17,22 @@ const OTHER = "22222222-2222-4222-8222-222222222222";
 
 const api = {
   session: { businessId: BIZ },
-  dashboard: vi.fn(),
+  dashboardResult: vi.fn(),
   stats: { get: vi.fn() },
 };
 
 vi.mock("./api", () => ({ getPwaApi: () => api }));
 vi.mock("./dashboard", () => ({
-  loadHttpDashboard: () => api.dashboard(),
+  loadDashboardResult: () => api.dashboardResult(),
 }));
+
+function snap(ventasHoy: number) {
+  return {
+    snapshot: { businessName: "Tienda", ventasHoy } as unknown as DashboardSnapshot,
+    complete: true,
+    networkFailure: false,
+  };
+}
 
 function stats(period = "hoy") {
   return { period, ventas: 100, emptyPeriod: false };
@@ -44,10 +52,10 @@ describe("offline snapshots", () => {
   });
 
   it("saves the server snapshot and serves it offline with its capture time", async () => {
-    api.dashboard.mockResolvedValue({ businessName: "Tienda", ventasHoy: 5 } as unknown as DashboardSnapshot);
+    api.dashboardResult.mockResolvedValue(snap(5));
     const first = await loadDashboardWithOfflineFallback();
     expect(first.source).toBe("server");
-    api.dashboard.mockRejectedValue(new NetworkError("offline"));
+    api.dashboardResult.mockRejectedValue(new NetworkError("offline"));
     const cached = await loadDashboardWithOfflineFallback();
     expect(cached.source).toBe("cache");
     expect(cached.capturedAt).toBe(first.capturedAt);
@@ -55,34 +63,79 @@ describe("offline snapshots", () => {
   });
 
   it("isolates snapshots per business", async () => {
-    api.dashboard.mockResolvedValue({ businessName: "A", ventasHoy: 1 } as unknown as DashboardSnapshot);
+    api.dashboardResult.mockResolvedValue(snap(1));
     await loadDashboardWithOfflineFallback();
     api.session.businessId = OTHER;
     getPwaAuthSession().businessId = OTHER;
-    api.dashboard.mockRejectedValue(new NetworkError("offline"));
+    api.dashboardResult.mockRejectedValue(new NetworkError("offline"));
     await expect(loadDashboardWithOfflineFallback()).rejects.toThrow();
   });
 
   it("overwrites with every online fetch", async () => {
-    api.dashboard.mockResolvedValue({ businessName: "A", ventasHoy: 1 } as unknown as DashboardSnapshot);
+    api.dashboardResult.mockResolvedValue(snap(1));
     await loadDashboardWithOfflineFallback();
-    api.dashboard.mockResolvedValue({ businessName: "A", ventasHoy: 9 } as unknown as DashboardSnapshot);
+    api.dashboardResult.mockResolvedValue(snap(9));
     const second = await loadDashboardWithOfflineFallback();
     expect((second.data as unknown as { ventasHoy: number }).ventasHoy).toBe(9);
   });
 
   it("rethrows HTTP errors instead of serving stale data", async () => {
-    api.dashboard.mockResolvedValue({ businessName: "A", ventasHoy: 1 } as unknown as DashboardSnapshot);
+    api.dashboardResult.mockResolvedValue(snap(1));
     await loadDashboardWithOfflineFallback();
     const err = new ApiError("INTERNAL", "Falla.", 500);
-    api.dashboard.mockRejectedValue(err);
+    api.dashboardResult.mockRejectedValue(err);
     await expect(loadDashboardWithOfflineFallback()).rejects.toBe(err);
   });
 
-  it("rejects malformed payloads without caching them", async () => {
-    api.dashboard.mockResolvedValue(null);
-    await expect(loadDashboardWithOfflineFallback()).rejects.toThrow();
-    expect(await getLocalDb().snapshots.count()).toBe(0);
+  it("never replaces a complete snapshot with a partial one", async () => {
+    api.dashboardResult.mockResolvedValue(snap(5));
+    const first = await loadDashboardWithOfflineFallback();
+    // Partial result from a real server error: throws, previous intact.
+    api.dashboardResult.mockResolvedValue({
+      snapshot: { businessName: "Tienda", ventasHoy: 0 } as unknown as DashboardSnapshot,
+      complete: false,
+      networkFailure: false,
+    });
+    await expect(loadDashboardWithOfflineFallback()).rejects.toThrow(
+      "Respuesta incompleta del servidor.",
+    );
+    const cached = await loadDashboardWithOfflineFallback().catch(() => null);
+    expect(cached).toBeNull();
+    const row = await getLocalDb().snapshots.get(`${BIZ}::dashboard`);
+    expect((row?.payload as unknown as { ventasHoy: number }).ventasHoy).toBe(5);
+    expect(row?.capturedAt).toBe(first.capturedAt);
+  });
+
+  it("partial result from transport serves the previous snapshot", async () => {
+    api.dashboardResult.mockResolvedValue(snap(5));
+    const first = await loadDashboardWithOfflineFallback();
+    api.dashboardResult.mockResolvedValue({
+      snapshot: { businessName: "Tienda", ventasHoy: 0 } as unknown as DashboardSnapshot,
+      complete: false,
+      networkFailure: true,
+    });
+    const cached = await loadDashboardWithOfflineFallback();
+    expect(cached.source).toBe("cache");
+    expect(cached.capturedAt).toBe(first.capturedAt);
+  });
+
+  it("validates dashboard and stats shapes structurally", async () => {
+    const { isDashboardSnapshot, isRemoteStats } = await import("./offline-snapshots");
+    expect(isDashboardSnapshot(null)).toBe(false);
+    expect(isDashboardSnapshot([])).toBe(false);
+    expect(isDashboardSnapshot({})).toBe(false);
+    expect(
+      isDashboardSnapshot({
+        greeting: "x", dateLabel: "y", todaySalesTotal: 0, todaySalesCount: 0,
+        debtTotal: 0, debtorCount: 0, debtors: [], productCount: 0,
+        lowStockCount: 0, lowStock: [], activity: [], cajaState: "open",
+        emptyDb: false, actions: [],
+      }),
+    ).toBe(true);
+    expect(isDashboardSnapshot({ greeting: "x" })).toBe(false);
+    expect(isRemoteStats({ period: "hoy", ventas: 1, emptyPeriod: false })).toBe(true);
+    expect(isRemoteStats({ period: "hoy", ventas: 1 })).toBe(false);
+    expect(isRemoteStats(null)).toBe(false);
   });
 
   it("caches stats per period", async () => {
