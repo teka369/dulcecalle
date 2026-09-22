@@ -1,4 +1,4 @@
-import type { INestApplication } from "@nestjs/common";
+import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
@@ -41,8 +41,21 @@ describe("media routes wiring (AppModule)", () => {
       findFirst: async () => null,
       findMany: async () => [],
       findUnique: async () => null,
+      count: async () => 0,
+      updateMany: async () => ({}),
     },
-    $transaction: async () => ({}),
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        productImage: {
+          count: async () => 0,
+          updateMany: async () => ({}),
+          create: async ({ data }: { data: Record<string, unknown> }) => ({
+            ...data,
+            id: "44444444-4444-4333-8333-444444444444",
+            createdAt: new Date("2026-09-22T12:00:00.000Z"),
+          }),
+        },
+      }),
   };
 
   let app: INestApplication;
@@ -62,6 +75,16 @@ describe("media routes wiring (AppModule)", () => {
     jwt = moduleRef.get(JwtService, { strict: false });
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("v1");
+    // Same validation as production main.ts: without this pipe the DTO
+    // contract below would not be enforced in these tests.
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+      }),
+    );
     app.useGlobalFilters(new HttpErrorFilter());
     await app.init();
   }, 60000);
@@ -105,6 +128,53 @@ describe("media routes wiring (AppModule)", () => {
     expect(res.body).toEqual({
       error: { code: "NOT_FOUND", message: "No encontramos eso." },
     });
+  });
+
+  it("register without body.requestId is rejected: the exact production 400", async () => {
+    // Production incident 2026-09-22: the frontend sent requestId only as
+    // Idempotency-Key header. The DTO requires it in the body, so every
+    // register answered 400 "requestId must be a UUID" and the UI showed
+    // "0 de 1 fotos cargadas". This pins the contract on both sides.
+    const res = await request(app.getHttpServer())
+      .post(`/v1/products/${PROD}/images`)
+      .set("Authorization", `Bearer ${token()}`)
+      .set("X-Business-Id", BIZ)
+      .set("Idempotency-Key", REQ)
+      .send({
+        publicId: `dulcecalle/${BIZ}/products/${PROD}/${REQ}`,
+        secureUrl: `https://res.cloudinary.com/demo/image/upload/v1/dulcecalle/${BIZ}/products/${PROD}/${REQ}.jpg`,
+        resourceType: "image",
+      });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("requestId must be a UUID");
+  });
+
+  it("register with body.requestId matching the header succeeds", async () => {
+    const OLD = { ...process.env };
+    process.env.CLOUDINARY_CLOUD_NAME = "demo";
+    process.env.CLOUDINARY_API_KEY = "key123";
+    process.env.CLOUDINARY_API_SECRET = "shhh-test-only";
+    prismaMock.product.findFirst = async () => ({ id: PROD }) as never;
+    try {
+      const publicId = `dulcecalle/${BIZ}/products/${PROD}/${REQ}`;
+      const res = await request(app.getHttpServer())
+        .post(`/v1/products/${PROD}/images`)
+        .set("Authorization", `Bearer ${token()}`)
+        .set("X-Business-Id", BIZ)
+        .set("Idempotency-Key", REQ)
+        .send({
+          requestId: REQ,
+          publicId,
+          secureUrl: `https://res.cloudinary.com/demo/image/upload/v1/${publicId}.jpg`,
+          resourceType: "image",
+        });
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({ productId: PROD, publicId });
+      expect(JSON.stringify(res.body)).not.toContain("shhh-test-only");
+    } finally {
+      process.env = { ...OLD };
+      prismaMock.product.findFirst = async () => null;
+    }
   });
 
   it("authenticated signature for an existing product returns a grant without secrets", async () => {

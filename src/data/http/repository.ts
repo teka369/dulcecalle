@@ -244,7 +244,11 @@ export class HttpRepository {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         `/products/${productId}/images`,
-        { body: input, idempotencyKey: requestId },
+        // The backend contract requires requestId in BOTH places: the DTO
+        // validates body.requestId (@IsUUID) and resolveIdempotencyKey
+        // matches it against the Idempotency-Key header. Omitting the body
+        // field answers 400 "requestId must be a UUID".
+        { body: { ...input, requestId }, idempotencyKey: requestId },
       );
       return mapProductImage(row);
     },
