@@ -22,13 +22,27 @@ const api = {
 vi.mock("@/data/pwa/api", () => ({ getPwaApi: () => api }));
 
 function installStubs(online = true) {
+  const stored = new Map<string, Response>();
   vi.stubGlobal("fetch", async () => new Response("x", { status: 200 }));
   vi.stubGlobal("window", {
     navigator: { serviceWorker: { controller: {} } },
-    caches: { open: async () => ({ put: async () => {} }) },
+    caches: {
+      open: async () => ({
+        put: async (key: string, res: Response) => {
+          stored.set(key, res);
+        },
+        match: async (key: string) => stored.get(key) ?? undefined,
+      }),
+    },
     dispatchEvent: () => true,
   });
-  vi.stubGlobal("navigator", { onLine: online });
+  vi.stubGlobal("navigator", {
+    onLine: online,
+    storage: {
+      estimate: async () => ({ usage: 1048576, quota: 536870912 }),
+      persist: async () => true,
+    },
+  });
 }
 
 describe("prepStore evaluate/start", () => {
@@ -61,7 +75,8 @@ describe("prepStore evaluate/start", () => {
     expect(snap.phase).toBe("ready");
     expect(snap.modalOpen).toBe(true);
     expect(snap.completed).toBe(snap.total);
-    expect(snap.total).toBeGreaterThan(0);
+    // 11 static docs + 3 catalogs + 3 sistema (sw, storage, verify)
+    expect(snap.total).toBe(17);
     expect(snap.lastReadyAt).toBeGreaterThan(0);
   });
 

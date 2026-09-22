@@ -22,7 +22,7 @@ import {
 export const PREP_VERSION = 1;
 export const PREP_DOCUMENT_CACHE = "documents";
 
-export type PrepTaskGroup = "app" | "catalogos";
+export type PrepTaskGroup = "app" | "catalogos" | "sistema";
 
 export type PrepTaskDef = {
   key: string;
@@ -106,6 +106,65 @@ export function prepTaskDefs(): PrepTaskDef[] {
   ];
 }
 
+/**
+ * Dynamic documents for entities that actually exist in Dexie. Only
+ * detail/action pages whose flows work offline are included; online-only
+ * pages (devolver, deuda-inicial) are deliberately excluded.
+ */
+export async function dynamicDocumentTasks(businessId: string): Promise<PrepTaskDef[]> {
+  const db = getLocalDb();
+  const tasks: PrepTaskDef[] = [];
+  const customers = await db.customers.where("businessId").equals(businessId).toArray();
+  for (const c of customers) {
+    tasks.push({
+      key: `doc:/clientes/${c.id}`,
+      group: "app" as const,
+      label: `Documento cliente ${c.name}`,
+      run: () => warmDocument(`/clientes/${c.id}`),
+    });
+    tasks.push({
+      key: `doc:/clientes/${c.id}/abono`,
+      group: "app" as const,
+      label: `Documento abono ${c.name}`,
+      run: () => warmDocument(`/clientes/${c.id}/abono`),
+    });
+  }
+  const suppliers = await db.suppliers.where("businessId").equals(businessId).toArray();
+  for (const s of suppliers) {
+    tasks.push({
+      key: `doc:/inventario/proveedores/${s.id}`,
+      group: "app" as const,
+      label: `Documento proveedor ${s.name}`,
+      run: () => warmDocument(`/inventario/proveedores/${s.id}`),
+    });
+  }
+  const products = await db.products.where("businessId").equals(businessId).toArray();
+  for (const p of products) {
+    tasks.push({
+      key: `doc:/inventario/${p.id}`,
+      group: "app" as const,
+      label: `Documento producto ${p.name}`,
+      run: () => warmDocument(`/inventario/${p.id}`),
+    });
+    tasks.push({
+      key: `doc:/inventario/${p.id}/surtir`,
+      group: "app" as const,
+      label: `Documento surtir ${p.name}`,
+      run: () => warmDocument(`/inventario/${p.id}/surtir`),
+    });
+  }
+  const sales = await db.sales.where("businessId").equals(businessId).toArray();
+  for (const s of sales) {
+    tasks.push({
+      key: `doc:/ventas/${s.id}`,
+      group: "app" as const,
+      label: `Documento venta ${s.id.slice(0, 8)}`,
+      run: () => warmDocument(`/ventas/${s.id}`),
+    });
+  }
+  return tasks;
+}
+
 export type ReadinessStatus = "ready" | "not_ready" | "stale" | "failed";
 
 export async function checkReadiness(
@@ -131,9 +190,105 @@ export type PrepProgress = {
   key: string;
   status: PrepTaskStatus;
   error: string | null;
+  detail?: string | null;
   completed: number;
   total: number;
 };
+
+function swControlling(): boolean {
+  if (typeof window === "undefined") return false;
+  const sw = (
+    window as unknown as {
+      navigator?: Navigator & { serviceWorker?: { controller: unknown } };
+    }
+  ).navigator?.serviceWorker;
+  return !!sw?.controller;
+}
+
+async function checkServiceWorker(): Promise<string> {
+  if (!swControlling()) {
+    throw new Error("Service Worker aún no controla esta página. Recarga e inténtalo de nuevo.");
+  }
+  return "Service Worker activo";
+}
+
+async function checkStorage(): Promise<string> {
+  const storage = (
+    globalThis as unknown as {
+      navigator?: Navigator & {
+        storage?: {
+          estimate?: () => Promise<{ usage?: number; quota?: number }>;
+          persist?: () => Promise<boolean>;
+        };
+      };
+    }
+  ).navigator?.storage;
+  if (!storage?.estimate) throw new Error("Este navegador no expone uso de almacenamiento.");
+  const { usage = 0, quota = 0 } = await storage.estimate();
+  let persisted: boolean | null = null;
+  try {
+    if (storage.persist) persisted = await storage.persist();
+  } catch {
+    persisted = null;
+  }
+  const mb = (n: number) => `${(n / 1048576).toFixed(1)} MB`;
+  const base = quota > 0 ? `${mb(usage)} de ${mb(quota)}` : `${mb(usage)} usados`;
+  return persisted == null ? base : `${base} · persistente: ${persisted ? "sí" : "no"}`;
+}
+
+async function verifyPreparation(businessId: string, warmedPaths: string[]): Promise<string> {
+  const scope = window as unknown as { caches?: CacheStorage };
+  if (!scope.caches) throw new Error("Cache Storage no disponible.");
+  const cache = await scope.caches.open(PREP_DOCUMENT_CACHE);
+  const missing: string[] = [];
+  for (const path of warmedPaths) {
+    if (!(await cache.match(path))) missing.push(path);
+  }
+  if (missing.length > 0) {
+    throw new Error(`Sin documento cacheado: ${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}`);
+  }
+  const db = getLocalDb();
+  for (const resource of ["products", "customers", "suppliers"] as const) {
+    if (!(await db.cacheMeta.get(`${businessId}::${resource}`))) {
+      throw new Error(`Sin snapshot de ${resource}.`);
+    }
+  }
+  return `${warmedPaths.length} documentos verificados`;
+}
+
+/**
+ * Full ordered task list for one run: sistema check, static documents,
+ * dynamic entity documents, catalogs, storage check, final verification.
+ * Shared by the runner and the UI so progress always covers every task.
+ */
+export async function buildPrepTaskDefs(
+  businessId: string,
+  details: Map<string, string> = new Map(),
+): Promise<{ defs: PrepTaskDef[]; details: Map<string, string> }> {
+  const dynamicDocs = await dynamicDocumentTasks(businessId);
+  const wrap = (key: string, run: () => Promise<string | void>) => async () => {
+    const detail = await run();
+    if (typeof detail === "string") details.set(key, detail);
+  };
+  const defs: PrepTaskDef[] = [
+    { key: "sys:sw", group: "sistema", label: "Service Worker", run: wrap("sys:sw", checkServiceWorker) },
+    ...prepTaskDefs(),
+    ...dynamicDocs,
+    { key: "sys:storage", group: "sistema", label: "Almacenamiento", run: wrap("sys:storage", checkStorage) },
+    {
+      key: "sys:verify",
+      group: "sistema",
+      label: "Verificación",
+      run: async () => {
+        const warmed = defs
+          .filter((d) => d.key.startsWith("doc:"))
+          .map((d) => d.key.slice(4));
+        details.set("sys:verify", await verifyPreparation(businessId, warmed));
+      },
+    },
+  ];
+  return { defs, details };
+}
 
 const activeRuns = new Map<string, Promise<PrepReadiness>>();
 
@@ -162,16 +317,18 @@ async function runPreparationInternal(
   onProgress?: (progress: PrepProgress) => void,
 ): Promise<PrepReadiness> {
   const db = getLocalDb();
-  const defs = prepTaskDefs();
+  const { defs, details } = await buildPrepTaskDefs(businessId);
   const records: PrepTaskRecord[] = [];
   let completed = 0;
+  const detailOf = (key: string): string | null => details.get(key) ?? null;
   for (const def of defs) {
     onProgress?.({ key: def.key, status: "running", error: null, completed, total: defs.length });
     try {
       await def.run();
       completed += 1;
-      records.push({ key: def.key, status: "done", error: null, finishedAt: Date.now() });
-      onProgress?.({ key: def.key, status: "done", error: null, completed, total: defs.length });
+      const detail = detailOf(def.key);
+      records.push({ key: def.key, status: "done", error: null, finishedAt: Date.now(), detail });
+      onProgress?.({ key: def.key, status: "done", error: null, detail, completed, total: defs.length });
     } catch (e) {
       const message = e instanceof Error && e.message ? e.message : "No se pudo preparar.";
       records.push({ key: def.key, status: "failed", error: message, finishedAt: Date.now() });

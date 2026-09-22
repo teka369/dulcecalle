@@ -3,8 +3,8 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
 import {
+  buildPrepTaskDefs,
   checkReadiness,
-  prepTaskDefs,
   runPreparation,
   type PrepTaskGroup,
 } from "@/data/pwa/offline-prep";
@@ -17,6 +17,7 @@ export type PrepUiTask = {
   group: PrepTaskGroup;
   status: "pending" | "running" | "done" | "failed";
   error: string | null;
+  detail: string | null;
 };
 
 type PrepUiState = {
@@ -71,11 +72,11 @@ function isOnline(): boolean {
 let starting: Promise<void> | null = null;
 
 async function startInternal(businessId: string): Promise<void> {
-  const defs = prepTaskDefs();
+  const { defs } = await buildPrepTaskDefs(businessId);
   setState({
     phase: "preparing",
     businessId,
-    tasks: defs.map((d) => ({ key: d.key, label: d.label, group: d.group, status: "pending" as const, error: null })),
+    tasks: defs.map((d) => ({ key: d.key, label: d.label, group: d.group, status: "pending" as const, error: null, detail: null })),
     completed: 0,
     total: defs.length,
     modalOpen: true,
@@ -85,7 +86,7 @@ async function startInternal(businessId: string): Promise<void> {
     setState({
       tasks: state.tasks.map((t) =>
         t.key === progress.key
-          ? { ...t, status: progress.status, error: progress.error }
+          ? { ...t, status: progress.status, error: progress.error, detail: progress.detail ?? null }
           : t,
       ),
       completed: progress.completed,

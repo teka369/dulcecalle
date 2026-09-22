@@ -35,6 +35,7 @@ function installCacheStubs(failPaths: string[] = []) {
       put: async (key: string, res: Response) => {
         stored.set(key, res);
       },
+      match: async (key: string) => stored.get(key) ?? undefined,
     }),
   };
   vi.stubGlobal("fetch", async (input: string) => {
@@ -52,6 +53,10 @@ function installCacheStubs(failPaths: string[] = []) {
   vi.stubGlobal("navigator", {
     onLine: true,
     serviceWorker: { controller: {} },
+    storage: {
+      estimate: async () => ({ usage: 1048576, quota: 536870912 }),
+      persist: async () => true,
+    },
   });
   return stored;
 }
@@ -82,10 +87,11 @@ describe("offline preparation", () => {
     const seen: PrepProgress[] = [];
     const row = await runPreparation(BIZ, (p) => seen.push({ ...p }));
     expect(row.status).toBe("ready");
-    expect(row.tasks).toHaveLength(14);
+    // 11 static docs + 3 catalogs + 3 sistema (sw, storage, verify)
+    expect(row.tasks).toHaveLength(17);
     expect(row.tasks.every((t) => t.status === "done")).toBe(true);
-    expect(seen.length).toBeGreaterThan(14);
-    expect(seen[seen.length - 1]?.completed).toBe(14);
+    expect(seen.length).toBeGreaterThan(17);
+    expect(seen[seen.length - 1]?.completed).toBe(17);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
   });
 
@@ -167,6 +173,44 @@ await runPreparation(BIZ);
     expect(row.status).toBe("ready");
     const rows = await getLocalDb().customers.where("businessId").equals(BIZ).toArray();
     expect(rows.map((r) => r.id)).toContain("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  });
+
+  it("generates dynamic documents only for existing Dexie entities", async () => {
+    const { dynamicDocumentTasks } = await import("./offline-prep");
+    expect(await dynamicDocumentTasks(BIZ)).toEqual([]);
+    const now = Date.now();
+    await getLocalDb().customers.put({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      businessId: BIZ, code: null, name: "Rosa", phone: null, debt: 0,
+      archivedAt: null, createdAt: now, updatedAt: now,
+    });
+    await getLocalDb().products.put({
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      businessId: BIZ, name: "Gomitas", category: "General", price: 500,
+      avgCost: 100, stock: 5, lowStockAt: 5, archivedAt: null,
+      createdAt: now, updatedAt: now,
+    });
+    const tasks = await dynamicDocumentTasks(BIZ);
+    const keys = tasks.map((t) => t.key);
+    expect(keys).toContain("doc:/clientes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    expect(keys).toContain("doc:/clientes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/abono");
+    expect(keys).toContain("doc:/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+    expect(keys).toContain("doc:/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/surtir");
+    expect(keys.some((k) => k.includes("22222222"))).toBe(false);
+  });
+
+  it("fails document tasks clearly when the SW does not control the page", async () => {
+    vi.stubGlobal("window", {
+      navigator: {},
+      caches: { open: async () => ({ put: async () => {} }) },
+      dispatchEvent: () => true,
+    });
+    const row = await runPreparation(BIZ);
+    expect(row.status).toBe("failed");
+    const sw = row.tasks.find((t) => t.key === "sys:sw");
+    expect(sw?.status).toBe("failed");
+    expect(sw?.error).toContain("Service Worker");
+    expect(row.tasks.find((t) => t.key === "catalog:products")?.status).toBe("done");
   });
 
   it("task list covers documents and the three catalogs", () => {

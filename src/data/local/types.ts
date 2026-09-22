@@ -34,6 +34,8 @@ export type PrepTaskRecord = {
   status: PrepTaskStatus;
   error: string | null;
   finishedAt: number | null;
+  /** Optional human diagnostic (e.g. storage figures). Never required. */
+  detail?: string | null;
 };
 
 /**

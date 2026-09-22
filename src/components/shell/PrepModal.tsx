@@ -7,6 +7,7 @@ import { usePrep } from "@/store/prepStore";
 const GROUP_TITLES = {
   app: "Aplicación",
   catalogos: "Catálogos",
+  sistema: "Sistema",
 } as const;
 
 function TaskIcon({ status }: { status: string }) {
@@ -88,7 +89,7 @@ export function PrepModal() {
               </div>
             </div>
 
-            {(["app", "catalogos"] as const).map((group) => {
+            {(["app", "catalogos", "sistema"] as const).map((group) => {
               const groupTasks = tasks.filter((t) => t.group === group);
               if (groupTasks.length === 0) return null;
               return (
@@ -105,10 +106,14 @@ export function PrepModal() {
                         <span className="min-w-0 truncate">
                           <TaskIcon status={task.status} /> {task.label}
                         </span>
-                        {task.status === "failed" && (
+                        {task.status === "failed" ? (
                           <span className="shrink-0 text-xs font-semibold text-danger">
                             Error
                           </span>
+                        ) : (
+                          task.detail && (
+                            <span className="shrink-0 text-xs text-ink/55">{task.detail}</span>
+                          )
                         )}
                       </li>
                     ))}
