@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
@@ -114,7 +115,7 @@ export default function InventarioPage() {
               const agotado = p.stock <= 0;
               return (
                 <li key={p.id}>
-                  <Link
+                  <OfflineLink
                     href={`/inventario/${p.id}`}
                     className="flex min-h-11 items-start justify-between gap-2 rounded-2xl border border-ink/[0.08] bg-surface p-4"
                   >
@@ -146,7 +147,7 @@ export default function InventarioPage() {
                     >
                       Stock {p.stock}
                     </p>
-                  </Link>
+                  </OfflineLink>
                 </li>
               );
             })}
@@ -164,7 +165,7 @@ export default function InventarioPage() {
         <ul className="flex flex-col gap-2">
           {filteredSuppliers.map((s) => (
             <li key={s.id}>
-              <Link
+              <OfflineLink
                 href={`/inventario/proveedores/${s.id}`}
                 className="flex min-h-11 flex-col justify-center rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
@@ -179,7 +180,7 @@ export default function InventarioPage() {
                 {s.phone && (
                   <span className="text-sm text-ink/50">{s.phone}</span>
                 )}
-              </Link>
+              </OfflineLink>
             </li>
           ))}
         </ul>

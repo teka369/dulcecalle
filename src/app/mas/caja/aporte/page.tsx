@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useMemo, useRef, useState } from "react";
 import { CASH_COPY, validateCashAmount } from "@/domain/cash";
 import { newRequestId } from "@/domain/requestId";
@@ -41,7 +42,7 @@ export default function AportePage() {
         requestId: requestIdRef.current,
       });
       setToast(CASH_COPY.toastAporte);
-      setTimeout(() => router.push("/mas/caja"), 700);
+      setTimeout(() => navigateOfflineAware(router, "/mas/caja"), 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
       setBusy(false);

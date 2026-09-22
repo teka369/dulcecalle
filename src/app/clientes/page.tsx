@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
@@ -67,7 +68,7 @@ export default function ClientesPage() {
         <ul className="flex flex-col gap-2">
           {filtered.map((c) => (
             <li key={c.id}>
-              <Link
+              <OfflineLink
                 href={`/clientes/${c.id}`}
                 className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
@@ -100,7 +101,7 @@ export default function ClientesPage() {
                     {c.debt > 0 ? "Pendiente" : "Al día"}
                   </span>
                 </span>
-              </Link>
+              </OfflineLink>
             </li>
           ))}
         </ul>

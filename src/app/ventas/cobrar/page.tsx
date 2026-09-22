@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCop, mulCop, addCop, subCop } from "@/domain/money";
 import type { PaymentKind } from "@/domain/types";
@@ -50,7 +51,7 @@ export default function CobrarPage() {
 
   useEffect(() => {
     if (items.length === 0) {
-      router.replace("/ventas/nueva");
+      navigateOfflineAware(router, "/ventas/nueva", { replace: true });
     }
   }, [items.length, router]);
 
@@ -149,7 +150,7 @@ export default function CobrarPage() {
           : "Venta registrada",
       );
       setTimeout(() => {
-        router.push("/");
+        navigateOfflineAware(router, "/");
       }, 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar venta");

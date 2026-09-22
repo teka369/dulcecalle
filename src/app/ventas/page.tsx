@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { OfflineLink } from "@/components/shell/OfflineLink";
 import { formatCop } from "@/domain/money";
 import { listSalesWithOfflineFallback, type LocalSaleRow } from "@/data/pwa/offline-sales";
 
@@ -57,7 +58,7 @@ export default function VentasPage() {
         <ul className="flex flex-col gap-2">
           {sales.map((s) => (
             <li key={s.id}>
-              <Link
+              <OfflineLink
                 href={`/ventas/${s.id}`}
                 className="block rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
@@ -78,7 +79,7 @@ export default function VentasPage() {
                   Recibido {formatCop(s.amountReceived)} · Fiado{" "}
                   {formatCop(s.credit)}
                 </p>
-              </Link>
+              </OfflineLink>
             </li>
           ))}
         </ul>

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { OfflineLink } from "./OfflineLink";
 
 const items = [
   { href: "/", label: "Inicio" },
@@ -27,7 +27,7 @@ export function BottomNav() {
               : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <li key={item.href} className="flex-1">
-              <Link
+              <OfflineLink
                 href={item.href}
                 className={`flex min-h-11 flex-col items-center justify-center gap-0.5 px-1 py-2 text-xs font-medium ${
                   active ? "text-ink" : "text-ink/55"
@@ -37,7 +37,7 @@ export function BottomNav() {
                   className={`h-1 w-1 rounded-full ${active ? "bg-cta" : "bg-transparent"}`}
                 />
                 {item.label}
-              </Link>
+              </OfflineLink>
             </li>
           );
         })}

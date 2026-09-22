@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
@@ -138,7 +139,7 @@ export default function SurtirPage() {
           : "Stock actualizado",
       );
       setTimeout(() => {
-        router.push(`/inventario/${product.id}`);
+        navigateOfflineAware(router, `/inventario/${product.id}`);
       }, 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al surtir");

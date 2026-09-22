@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   abonoRemainingHelper,
@@ -99,7 +100,7 @@ export default function RegistrarAbonoPage() {
           : "Abono registrado",
       );
       setTimeout(() => {
-        router.push(`/clientes/${customer.id}`);
+        navigateOfflineAware(router, `/clientes/${customer.id}`);
       }, 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar abono");

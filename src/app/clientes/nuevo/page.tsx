@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useState } from "react";
 import { CUSTOMER_ERRORS } from "@/domain/abono";
 import { useCustomers } from "@/store/customerStore";
@@ -27,7 +28,7 @@ export default function AgregarClientePage() {
       await createCustomer(trimmed);
       setToast("Cliente guardado");
       setTimeout(() => {
-        router.push("/clientes");
+        navigateOfflineAware(router, "/clientes");
       }, 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : CUSTOMER_ERRORS.emptyName);

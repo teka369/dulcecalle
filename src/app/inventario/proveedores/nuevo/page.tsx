@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
 import { useInventory } from "@/store/inventoryStore";
@@ -24,7 +25,7 @@ export default function AgregarProveedorPage() {
       const result = await createSupplier({ name, phone, notes });
       setToast(result.mode === "offline" ? "Proveedor guardado sin conexión" : "Proveedor guardado");
       setTimeout(() => {
-        router.push(result.mode === "offline" ? "/inventario" : `/inventario/proveedores/${result.id}`);
+        navigateOfflineAware(router, result.mode === "offline" ? "/inventario" : `/inventario/proveedores/${result.id}`);
       }, 700);
     } catch (e) {
       setError(

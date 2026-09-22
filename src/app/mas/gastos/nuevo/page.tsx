@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useMemo, useRef, useState } from "react";
 import { CASH_COPY } from "@/domain/cash";
 import { validateGasto } from "@/domain/cash";
@@ -45,7 +46,7 @@ export default function NuevoGastoPage() {
         requestId: requestIdRef.current,
       });
       setToast(CASH_COPY.toastGasto);
-      setTimeout(() => router.push("/mas/gastos"), 700);
+      setTimeout(() => navigateOfflineAware(router, "/mas/gastos"), 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
       setBusy(false);
