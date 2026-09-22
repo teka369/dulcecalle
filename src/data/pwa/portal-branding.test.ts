@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { __resetLocalDbForTests } from "@/data/local/db";
 import { PALETTE_IDS } from "@/theme/palettes";
 import { loadPalette, savePalette } from "@/theme/storage";
@@ -98,6 +98,44 @@ describe("tema del cliente reutiliza el sistema de la tienda", () => {
     expect(await loadPalette()).toBe("ocean");
     await savePalette("amber");
     expect(await loadPalette()).toBe("amber");
+  });
+});
+
+describe("total abonado sin doble conteo", () => {
+  function fullLedger(): CustomerLedger {
+    return {
+      customer: { id: "c1", code: "DC-0001", name: "Juan", debt: 15000, createdAt: 1 },
+      initials: [
+        { id: "d1", amount: 5000, note: null, occurredOn: "2026-09-01", createdAt: 1 },
+      ],
+      sales: [
+        {
+          id: "s-paid", paymentKind: "paid", method: "Efectivo", saleTotal: 10000,
+          amountReceived: 10000, credit: 0, note: null, occurredOn: "2026-09-10",
+          createdAt: 2, lines: [], returns: [],
+        },
+        {
+          id: "s-partial", paymentKind: "partial", method: "Efectivo", saleTotal: 20000,
+          amountReceived: 8000, credit: 12000, note: null, occurredOn: "2026-09-11",
+          createdAt: 3, lines: [], returns: [
+            {
+              id: "r1", refundAmount: 0, debtReduced: 2000, method: null,
+              note: null, occurredOn: "2026-09-12", createdAt: 4, lines: [],
+            },
+          ],
+        },
+      ],
+      payments: [
+        { id: "p1", amount: 3000, method: "Nequi", occurredOn: "2026-09-13", createdAt: 5 },
+      ],
+    };
+  }
+
+  it("suma pagos + abono parcial sin contar dos veces ni incluir contado", () => {
+    const totals = customerPortalTotals(fullLedger());
+    // Comprado: 10000 + 20000. Abonado: 3000 (pago) + 8000 (parcial).
+    // El contado (10000) no es abono; la inicial y la devolución tampoco.
+    expect(totals).toEqual({ totalComprado: 30000, totalAbonado: 11000, movimientos: 4 });
   });
 });
 

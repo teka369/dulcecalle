@@ -31,11 +31,23 @@ export function customerPortalSummary(ledger: CustomerLedger) {
   };
 }
 
-/** Ledger sums for the customer home. Derived only, never invented. */
+/**
+ * Ledger sums for the customer home. Derived only, never invented.
+ *
+ * A partial sale does NOT create a CustomerLedgerPayment (verified in
+ * sales.service.ts: only the pay endpoint writes customerPayment rows),
+ * so its amountReceived lives only on the sale. Counting it here cannot
+ * double-count: payments[] and partial amountReceived are disjoint by
+ * construction. Paid sales are purchases, not abonos, and stay out.
+ */
 export function customerPortalTotals(ledger: CustomerLedger) {
   return {
     totalComprado: ledger.sales.reduce((s, sale) => s + sale.saleTotal, 0),
-    totalAbonado: ledger.payments.reduce((s, p) => s + p.amount, 0),
+    totalAbonado:
+      ledger.payments.reduce((s, p) => s + p.amount, 0) +
+      ledger.sales
+        .filter((sale) => sale.paymentKind === "partial")
+        .reduce((s, sale) => s + sale.amountReceived, 0),
     movimientos:
       ledger.sales.length + ledger.payments.length + ledger.initials.length,
   };
