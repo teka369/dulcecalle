@@ -108,18 +108,24 @@ describe("customer portal routing", () => {
     expect(src).toContain("StoreLoginForm");
   });
 
-  it("customer login is a code+name form with volver", () => {
-    const src = readFileSync(
+  it("customer login is a shared code+name form with volver", () => {
+    const page = readFileSync(
       join(__dirname, "../../app/cliente/login/page.tsx"),
       "utf8",
     );
-    expect(src).toContain("Consulta como cliente");
-    expect(src).toContain("Código de cliente");
-    expect(src).toContain("Nombre");
-    expect(src).toContain("Consultar");
-    expect(src).toContain("Consultando…");
-    expect(src).toContain("← Volver");
-    expect(src).toContain("validateCustomerLoginInput");
+    expect(page).toContain("CustomerLoginForm");
+    expect(page).toContain("/DulceCalle.png");
+    const form = readFileSync(
+      join(__dirname, "../customer/CustomerLoginForm.tsx"),
+      "utf8",
+    );
+    expect(form).toContain("Consulta como cliente");
+    expect(form).toContain("Código de cliente");
+    expect(form).toContain("Nombre");
+    expect(form).toContain("Consultar");
+    expect(form).toContain("Consultando…");
+    expect(form).toContain("← Volver");
+    expect(form).toContain("validateCustomerLoginInput");
   });
 
   it("portal pages load ledger from the server and have empty/error copy", () => {
