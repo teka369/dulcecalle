@@ -70,7 +70,10 @@ export function ResetBusinessDataZone() {
       setDeleted(result.deleted);
       // Server wiped first; now mirror locally so nothing resurrects:
       // pending outbox ops included, so they can never re-create rows.
-      await clearLocalBusinessData(businessId);
+      // Only the wiped business' portal snapshots are invalidated.
+      await clearLocalBusinessData(businessId, {
+        customerIds: result.deletedCustomerIds ?? [],
+      });
       setStep("done");
     } catch (e) {
       if (e instanceof NetworkError) {

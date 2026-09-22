@@ -14,7 +14,10 @@ import type { BusinessContext } from "../identity/auth.types";
 export class BusinessDataService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async resetData(ctx: BusinessContext): Promise<{ deleted: Record<string, number> }> {
+  async resetData(ctx: BusinessContext): Promise<{
+    deleted: Record<string, number>;
+    deletedCustomerIds: string[];
+  }> {
     const deleted: Record<string, number> = {};
     const wipe = async (
       tx: Prisma.TransactionClient,
@@ -25,7 +28,13 @@ export class BusinessDataService {
       deleted[key] = result.count;
     };
 
-    await this.prisma.$transaction(async (tx) => {
+    const doomed = await this.prisma.$transaction(async (tx) => {
+      // Capture portal customer ids first: the frontend needs them to
+      // invalidate exactly these ledger snapshots (they carry no businessId).
+      const customers = await tx.customer.findMany({
+        where: { businessId: ctx.businessId },
+        select: { id: true },
+      });
       await wipe(tx, "saleReturnLines", (where) => tx.saleReturnLine.deleteMany({ where }));
       await wipe(tx, "saleReturns", (where) => tx.saleReturn.deleteMany({ where }));
       await wipe(tx, "saleLines", (where) => tx.saleLine.deleteMany({ where }));
@@ -41,8 +50,9 @@ export class BusinessDataService {
       await wipe(tx, "products", (where) => tx.product.deleteMany({ where }));
       await wipe(tx, "settings", (where) => tx.setting.deleteMany({ where }));
       await wipe(tx, "importIdMap", (where) => tx.importIdMap.deleteMany({ where }));
+      return customers.map((c) => c.id);
     });
 
-    return { deleted };
+    return { deleted, deletedCustomerIds: doomed };
   }
 }

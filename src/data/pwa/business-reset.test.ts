@@ -124,6 +124,30 @@ describe("business reset (local)", () => {
     expect(await getLocalDb().customerLedgers.count()).toBe(1);
   });
 
+  it("invalidates only the wiped business portal snapshots", async () => {
+    const db = getLocalDb();
+    const snapshot = (id: string) => ({
+      customerId: id,
+      ledger: {
+        customer: { id, code: "DC-1", name: "R", debt: 0, createdAt: 1 },
+        initials: [],
+        sales: [],
+        payments: [],
+      },
+      capturedAt: 1,
+    });
+    const wipedA1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const wipedA2 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const otherB = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    await db.customerLedgers.put(snapshot(wipedA1));
+    await db.customerLedgers.put(snapshot(wipedA2));
+    await db.customerLedgers.put(snapshot(otherB));
+    await clearLocalBusinessData(BIZ, { customerIds: [wipedA1, wipedA2] });
+    expect(await db.customerLedgers.get(wipedA1)).toBeUndefined();
+    expect(await db.customerLedgers.get(wipedA2)).toBeUndefined();
+    expect(await db.customerLedgers.get(otherB)).not.toBeUndefined();
+  });
+
   it("confirmation phrase and entity labels are exact", () => {
     expect(RESET_CONFIRM_PHRASE).toBe("ELIMINAR DATOS");
     expect(Object.keys(RESET_ENTITY_LABELS).sort()).toEqual(

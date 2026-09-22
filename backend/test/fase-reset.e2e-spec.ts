@@ -73,14 +73,14 @@ describe("Business data reset (owner-only, transactional, tenant-scoped)", () =>
   async function seedBusinessData(
     auth: Record<string, string>,
     name: string,
-  ): Promise<void> {
+  ): Promise<string> {
     await api()
       .post("/v1/products")
       .set(auth)
       .set("Idempotency-Key", randomUUID())
       .send({ name, price: 1000, stock: 5, avgCost: 100 })
       .expect(201);
-    await api()
+    const customer = await api()
       .post("/v1/customers")
       .set(auth)
       .set("Idempotency-Key", randomUUID())
@@ -92,6 +92,7 @@ describe("Business data reset (owner-only, transactional, tenant-scoped)", () =>
       .set("Idempotency-Key", randomUUID())
       .send({ amount: 500, category: "Luz", method: "Efectivo" })
       .expect(201);
+    return customer.body.id as string;
   }
 
   it("rejects unauthenticated reset", async () => {
@@ -99,10 +100,11 @@ describe("Business data reset (owner-only, transactional, tenant-scoped)", () =>
   });
 
   it("wipes only the current business and keeps user + membership", async () => {
-    await seedBusinessData(authA(), "ProdA");
+    const customerA = await seedBusinessData(authA(), "ProdA");
     await seedBusinessData(authB(), "ProdB");
 
     const res = await api().delete("/v1/business/data").set(authA()).expect(200);
+    expect(res.body.deletedCustomerIds).toEqual([customerA]);
     expect(res.body.deleted.products).toBe(1);
     expect(res.body.deleted.customers).toBe(1);
     expect(res.body.deleted.expenses).toBe(1);

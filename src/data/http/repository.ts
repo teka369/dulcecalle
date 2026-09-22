@@ -512,11 +512,14 @@ export class HttpRepository {
   };
 
   readonly business = {
-    resetData: async (): Promise<{ deleted: Record<string, number> }> => {
-      return this.http.request<{ deleted: Record<string, number> }>(
-        "DELETE",
-        "/business/data",
-      );
+    resetData: async (): Promise<{
+      deleted: Record<string, number>;
+      deletedCustomerIds: string[];
+    }> => {
+      return this.http.request<{
+        deleted: Record<string, number>;
+        deletedCustomerIds: string[];
+      }>("DELETE", "/business/data");
     },
   };
 }

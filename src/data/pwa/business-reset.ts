@@ -1,16 +1,29 @@
 import { getLocalDb } from "../local/db";
 import { assertUuid } from "../local/ids";
 
+export type ClearLocalBusinessDataOptions = {
+  /**
+   * Portal customer ids wiped on the server with this business. Their
+   * ledger snapshots (keyed by customerId, carrying no businessId) are
+   * removed so a stale ledger can never render offline again. Snapshots
+   * of any other customer stay untouched.
+   */
+  customerIds?: string[];
+};
+
 /**
  * Local counterpart of the server business-data reset. Removes every
  * business-scoped row of the given business: catalog, operations, outbox
  * (pending/in_flight/failed/synced — nothing may resurrect the wiped
  * server data), read-cache meta and preparation readiness.
  *
- * customerLedgers is intentionally kept: it belongs to portal sessions
- * (M6.10, keyed by customerId) and heals itself on the next online fetch.
+ * customerLedgers rows NOT listed in `customerIds` are intentionally kept:
+ * they belong to portal sessions (M6.10) and heal on the next online fetch.
  */
-export async function clearLocalBusinessData(businessId: string): Promise<void> {
+export async function clearLocalBusinessData(
+  businessId: string,
+  opts: ClearLocalBusinessDataOptions = {},
+): Promise<void> {
   assertUuid(businessId, "businessId");
   const db = getLocalDb();
   await db.transaction(
@@ -32,6 +45,7 @@ export async function clearLocalBusinessData(businessId: string): Promise<void> 
       db.outbox,
       db.cacheMeta,
       db.prepState,
+      db.customerLedgers,
     ],
     async () => {
       await db.products.where("businessId").equals(businessId).delete();
@@ -50,6 +64,9 @@ export async function clearLocalBusinessData(businessId: string): Promise<void> 
       await db.outbox.where("businessId").equals(businessId).delete();
       await db.cacheMeta.where("businessId").equals(businessId).delete();
       await db.prepState.where("businessId").equals(businessId).delete();
+      for (const customerId of opts.customerIds ?? []) {
+        await db.customerLedgers.delete(customerId);
+      }
     },
   );
 }
