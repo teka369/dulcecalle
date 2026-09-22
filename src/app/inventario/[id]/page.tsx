@@ -7,6 +7,7 @@ import { formatCop } from "@/domain/money";
 import type { RemoteProduct, RemoteStockMove } from "@/data/http/mappers";
 import { routeId } from "@/data/pwa/ids";
 import { inventoryStore } from "@/store/inventoryStore";
+import { ProductImageManager } from "@/components/product/ProductImageManager";
 
 const REASON_LABEL: Record<string, string> = {
   surtir: "Surtir",
@@ -111,6 +112,12 @@ export default function ProductoFichaPage() {
       >
         Surtir
       </Link>
+
+      <ProductImageManager
+        productId={product.id}
+        images={product.images}
+        onChanged={() => void load()}
+      />
 
       <button
         type="button"

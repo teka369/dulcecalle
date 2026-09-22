@@ -4,6 +4,7 @@ import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
+import { ProductImageView } from "@/components/product/ProductImageView";
 import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
 import { useInventory } from "@/store/inventoryStore";
 
@@ -113,13 +114,22 @@ export default function InventarioPage() {
             {filteredProducts.map((p) => {
               const low = p.stock <= p.lowStockAt;
               const agotado = p.stock <= 0;
+              const primary = [...(p.images ?? [])].find((img) => img.isPrimary)
+                ?? (p.images ?? [])[0];
               return (
                 <li key={p.id}>
                   <OfflineLink
                     href={`/inventario/${p.id}`}
                     className="flex min-h-11 items-start justify-between gap-2 rounded-2xl border border-ink/[0.08] bg-surface p-4"
                   >
-                    <div>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <ProductImageView
+                        secureUrl={primary?.secureUrl ?? null}
+                        alt={p.name}
+                        variant="thumb"
+                        className="h-14 w-14 shrink-0"
+                      />
+                      <div className="min-w-0">
                       <p className="font-medium">{p.name}</p>
                       <p className="mt-0.5 text-sm text-ink/60">
                         {formatCop(p.price)}
@@ -135,6 +145,7 @@ export default function InventarioPage() {
                           {agotado ? "Agotado" : "Stock bajo"}
                         </span>
                       )}
+                      </div>
                     </div>
                     <p
                       className={`text-sm font-semibold ${

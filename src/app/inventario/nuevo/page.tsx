@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
 import { useInventory } from "@/store/inventoryStore";
+import { ProductImageManager } from "@/components/product/ProductImageManager";
+import { getPwaApi } from "@/data/pwa/api";
+import type { RemoteProductImage } from "@/data/http/mappers";
 
 export default function AgregarProductoPage() {
   const router = useRouter();
@@ -17,6 +20,16 @@ export default function AgregarProductoPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [createdImages, setCreatedImages] = useState<RemoteProductImage[]>([]);
+
+  async function reloadCreatedImages(id: string) {
+    try {
+      setCreatedImages(await getPwaApi().products.listImages(id));
+    } catch {
+      /* offline: pending list inside the manager still shows */
+    }
+  }
 
   async function onSave() {
     if (busy) return;
@@ -31,15 +44,43 @@ export default function AgregarProductoPage() {
         gifted,
       });
       setToast("Producto guardado");
-      setTimeout(() => {
-        router.push(`/inventario/${id}`);
-      }, 700);
+      setCreatedId(id);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : INVENTORY_ERRORS.emptyProductName,
       );
       setBusy(false);
     }
+  }
+
+  if (createdId) {
+    return (
+      <div className="flex flex-col gap-4 pb-28">
+        <header className="flex items-center gap-2">
+          <h1 className="text-[22px] font-semibold">Fotos del producto</h1>
+        </header>
+        <p className="text-sm text-ink/60">
+          {toast} Agrega fotos ahora o termina y hazlo después desde el
+          producto.
+        </p>
+        <ProductImageManager
+          productId={createdId}
+          images={createdImages}
+          onChanged={() => void reloadCreatedImages(createdId)}
+        />
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+          <div className="mx-auto max-w-lg">
+            <button
+              type="button"
+              onClick={() => router.push(`/inventario/${createdId}`)}
+              className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white"
+            >
+              Terminar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
