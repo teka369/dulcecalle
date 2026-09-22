@@ -1,4 +1,4 @@
-export const ADMIN_PUBLIC = new Set(["/login", "/register", "/offline"]);
+export const ADMIN_PUBLIC = new Set(["/login", "/register", "/offline", "/acceso-tienda"]);
 
 export function isCustomerPath(pathname: string): boolean {
   return pathname === "/cliente" || pathname.startsWith("/cliente/");
