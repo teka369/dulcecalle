@@ -88,15 +88,16 @@ describe("customer portal routing", () => {
     ).toEqual({ kind: "redirect", to: "/login" });
   });
 
-  it("admin login offers Cliente first, tienda second", () => {
+  it("admin login keeps Cliente primary and hides store access behind the logo gesture", () => {
     const src = readFileSync(join(__dirname, "../../app/login/page.tsx"), "utf8");
-    const clienteAt = src.indexOf("Entrar como Cliente");
-    const tiendaAt = src.indexOf("Entrar a mi tienda");
-    expect(clienteAt).toBeGreaterThanOrEqual(0);
-    expect(tiendaAt).toBeGreaterThan(clienteAt);
+    expect(src).toContain("Entrar como Cliente");
     expect(src).toContain('href="/cliente/login"');
+    expect(src).toContain("storeAccessOpen");
+    expect(src).toContain("onLogoTap");
+    expect(src).toContain("Acceso de tienda");
     expect(src).toContain("Correo");
     expect(src).toContain("Contraseña");
+    expect(src).not.toContain("Entrar a mi tienda");
   });
 
   it("customer login is a code+name form with volver", () => {
