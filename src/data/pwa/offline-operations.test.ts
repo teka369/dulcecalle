@@ -95,10 +95,14 @@ describe("M6.8 offline operations", () => {
   });
 
   it("mirrors closed-day protection for offline shrink", async () => {
+    // Semantic "today": the closed session must match the day the code
+    // under test considers today, otherwise the guard legitimately passes.
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     await getLocalDb().cashSessions.put({
       id: "44444444-4444-4444-8444-444444444444",
       businessId,
-      localDate: "2026-09-20",
+      localDate: today,
       openedAt: Date.now() - 1000,
       closedAt: Date.now(),
       openingFloat: 5000,
