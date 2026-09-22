@@ -98,6 +98,7 @@ describe("offline readers: statement and surtidas", () => {
       archivedAt: null,
       createdAt: now,
       updatedAt: now,
+      images: [],
     });
     await getLocalDb().stockMoves.put({
       id: moveId,

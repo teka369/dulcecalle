@@ -28,6 +28,7 @@ async function seedBusiness(businessId: string, suffix: string) {
     archivedAt: null,
     createdAt: now,
     updatedAt: now,
+    images: [],
   });
   await db.customers.put({
     id: `bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb${suffix}`,
@@ -161,6 +162,48 @@ describe("business reset (local)", () => {
     expect(await db.customerLedgers.get(wipedA1)).toBeUndefined();
     expect(await db.customerLedgers.get(wipedA2)).toBeUndefined();
     expect(await db.customerLedgers.get(otherB)).not.toBeUndefined();
+  });
+
+  it("removes pending media blobs so orphan uploads cannot resurrect", async () => {
+    const db = getLocalDb();
+    const now = Date.now();
+    await db.pendingMedia.put({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      businessId: BIZ,
+      productId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      requestId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      fileName: "foto.jpg",
+      mime: "image/jpeg",
+      size: 100,
+      blob: new Blob([new Uint8Array(100)], { type: "image/jpeg" }),
+      position: null,
+      isPrimary: false,
+      altText: null,
+      status: "pending",
+      attempts: 0,
+      lastError: null,
+      createdAt: now,
+    });
+    await db.pendingMedia.put({
+      id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      businessId: OTHER,
+      productId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      requestId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      fileName: "otra.jpg",
+      mime: "image/jpeg",
+      size: 100,
+      blob: new Blob([new Uint8Array(100)], { type: "image/jpeg" }),
+      position: null,
+      isPrimary: false,
+      altText: null,
+      status: "pending",
+      attempts: 0,
+      lastError: null,
+      createdAt: now,
+    });
+    await clearLocalBusinessData(BIZ);
+    expect(await db.pendingMedia.where("businessId").equals(BIZ).count()).toBe(0);
+    expect(await db.pendingMedia.where("businessId").equals(OTHER).count()).toBe(1);
   });
 
   it("confirmation phrase and entity labels are exact", () => {

@@ -93,10 +93,10 @@ describe("offline preparation", () => {
     const row = await runPreparation(BIZ, (p) => seen.push({ ...p }));
     expect(row.status).toBe("ready");
     // 11 static docs + 3 catalogs + 4 snapshots + 3 sistema (sw, storage, verify)
-    expect(row.tasks).toHaveLength(21);
+    expect(row.tasks).toHaveLength(22);
     expect(row.tasks.every((t) => t.status === "done")).toBe(true);
     expect(seen.length).toBeGreaterThan(21);
-    expect(seen[seen.length - 1]?.completed).toBe(21);
+    expect(seen[seen.length - 1]?.completed).toBe(22);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
   });
 
@@ -189,7 +189,7 @@ await runPreparation(BIZ);
       id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       businessId: BIZ, name: "Gomitas", category: "General", price: 500,
       avgCost: 100, stock: 5, lowStockAt: 5, archivedAt: null,
-      createdAt: now, updatedAt: now,
+      createdAt: now, updatedAt: now, images: [],
     });
     const tasks = await dynamicDocumentTasks(BIZ);
     const keys = tasks.map((t) => t.key);
@@ -212,6 +212,43 @@ await runPreparation(BIZ);
     expect(sw?.status).toBe("failed");
     expect(sw?.error).toContain("Service Worker");
     expect(row.tasks.find((t) => t.key === "catalog:products")?.status).toBe("done");
+  });
+
+  it("prefetches primary thumbs best-effort and reports the count", async () => {
+    const now = Date.now();
+    const remote = {
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      name: "Gomitas",
+      category: "General",
+      price: 500,
+      avgCost: 100,
+      stock: 5,
+      lowStockAt: 5,
+      archivedAt: null,
+      createdAt: now,
+      images: [
+        {
+          id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          productId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          publicId: "dulcecalle/biz/products/prod/req",
+          secureUrl: "https://res.cloudinary.com/demo/image/upload/v1/x.jpg",
+          version: 1,
+          width: 100,
+          height: 100,
+          format: "jpg",
+          bytes: 500,
+          position: 0,
+          isPrimary: true,
+          altText: null,
+          createdAt: now,
+        },
+      ],
+    };
+    api.products.list.mockResolvedValue([remote]);
+    const row = await runPreparation(BIZ);
+    const thumbs = row.tasks.find((t) => t.key === "media:thumbs");
+    expect(thumbs?.status).toBe("done");
+    expect(thumbs?.detail).toBe("1/1 miniaturas");
   });
 
   it("task list covers documents, catalogs and summaries", () => {

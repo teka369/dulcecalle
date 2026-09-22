@@ -25,7 +25,7 @@ import {
   statsSnapshotKind,
 } from "./offline-snapshots";
 
-export const PREP_VERSION = 1;
+export const PREP_VERSION = 2;
 export const PREP_DOCUMENT_CACHE = "documents";
 
 export type PrepTaskGroup = "app" | "catalogos" | "resumen" | "sistema";
@@ -126,6 +126,50 @@ export function prepTaskDefs(): PrepTaskDef[] {
       },
     })),
   ];
+}
+
+/**
+ * Best-effort prefetch of primary product thumbnails into the SW image
+ * cache, so catalogs render offline even for never-viewed products.
+ * Only the small `thumb` variant; failures never fail preparation, the
+ * count is reported in the task detail instead. Scoped to the business
+ * being prepared — never warms another tenant's photos.
+ */
+async function warmPrimaryThumbs(businessId: string): Promise<string> {
+  if (typeof window === "undefined" || !("caches" in window)) {
+    return "0 miniaturas (sin Cache Storage)";
+  }
+  const scope = window as unknown as { caches?: CacheStorage };
+  if (!scope.caches) return "0 miniaturas (sin Cache Storage)";
+  const { getLocalDb } = await import("../local/db");
+  const { variantUrl } = await import("../media/urls");
+  const db = getLocalDb();
+  const products = await db.products
+    .where("businessId")
+    .equals(businessId)
+    .toArray();
+  const cache = await scope.caches.open("cloudinary-images");
+  let warmed = 0;
+  let total = 0;
+  for (const product of products) {
+    const primary =
+      product.images.find((img) => img.isPrimary) ?? product.images[0];
+    if (!primary) continue;
+    total += 1;
+    try {
+      const url = variantUrl(primary.secureUrl, "thumb");
+      const hit = await cache.match(url);
+      if (!hit) {
+        const res = await fetch(url, { credentials: "omit" });
+        if (res.ok) await cache.put(url, res);
+        else continue;
+      }
+      warmed += 1;
+    } catch {
+      /* best-effort per image */
+    }
+  }
+  return `${warmed}/${total} miniaturas`;
 }
 
 // Snapshot kinds the preparation guarantees. checkReadiness treats a
@@ -312,6 +356,7 @@ export async function buildPrepTaskDefs(
     { key: "sys:sw", group: "sistema", label: "Service Worker", run: wrap("sys:sw", checkServiceWorker) },
     ...prepTaskDefs(),
     ...dynamicDocs,
+    { key: "media:thumbs", group: "resumen", label: "Miniaturas de productos", run: wrap("media:thumbs", () => warmPrimaryThumbs(businessId)) },
     { key: "sys:storage", group: "sistema", label: "Almacenamiento", run: wrap("sys:storage", checkStorage) },
     {
       key: "sys:verify",

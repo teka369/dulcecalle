@@ -22,6 +22,7 @@ function product(businessId: string, name: string): LocalProduct {
     archivedAt: null,
     createdAt: now,
     updatedAt: now,
+    images: [],
   };
 }
 

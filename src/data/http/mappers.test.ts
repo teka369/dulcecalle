@@ -6,6 +6,7 @@ import {
   mapCustomer,
   mapPayment,
   mapProduct,
+  mapProductImage,
   mapSale,
 } from "./mappers";
 
@@ -97,5 +98,52 @@ describe("HTTP COP / date mappers", () => {
     };
     expect(mapPayment({ ...base, note: "abono semanal" }).note).toBe("abono semanal");
     expect(mapPayment({ ...base, note: null }).note).toBeNull();
+  });
+
+  it("maps product images, defaulting to []", () => {
+    const img = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      productId: "11111111-1111-4111-8111-111111111111",
+      publicId: "dulcecalle/biz/products/prod/req",
+      secureUrl: "https://res.cloudinary.com/demo/image/upload/v1/x.jpg",
+      version: 1,
+      width: 800,
+      height: 600,
+      format: "jpg",
+      bytes: 12345,
+      position: 0,
+      isPrimary: true,
+      altText: null,
+      createdAt: "2026-09-17T12:00:00.000Z",
+    };
+    const mapped = mapProductImage(img);
+    expect(mapped.position).toBe(0);
+    expect(mapped.isPrimary).toBe(true);
+    const without = mapProduct({
+      id: "11111111-1111-4111-8111-111111111111",
+      name: "Galleta",
+      category: "General",
+      price: 1000,
+      avgCost: 0,
+      stock: 15,
+      lowStockAt: 5,
+      archivedAt: null,
+      createdAt: "2026-09-17T12:00:00.000Z",
+    });
+    expect(without.images).toEqual([]);
+    const withImages = mapProduct({
+      id: "11111111-1111-4111-8111-111111111111",
+      name: "Galleta",
+      category: "General",
+      price: 1000,
+      avgCost: 0,
+      stock: 15,
+      lowStockAt: 5,
+      archivedAt: null,
+      createdAt: "2026-09-17T12:00:00.000Z",
+      images: [img],
+    });
+    expect(withImages.images).toHaveLength(1);
+    expect(withImages.images[0]?.secureUrl).toContain("res.cloudinary.com");
   });
 });

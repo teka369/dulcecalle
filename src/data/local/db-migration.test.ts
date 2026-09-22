@@ -51,7 +51,7 @@ describe("Dexie v3 → current migration (M6.10/M6.12/M6.13)", () => {
     await __resetLocalDbForTests();
   });
 
-  it("preserves v3 data and adds customerLedgers + prepState + snapshots", async () => {
+  it("preserves v3 data and adds customerLedgers + prepState + snapshots + pendingMedia", async () => {
     const old = await openAsV3();
     const now = Date.now();
     await old.table("products").put({
@@ -101,7 +101,7 @@ describe("Dexie v3 → current migration (M6.10/M6.12/M6.13)", () => {
     old.close();
 
     const db = getLocalDb();
-    expect(db.verno).toBe(6);
+    expect(db.verno).toBe(8);
     expect(await db.snapshots.count()).toBe(0);
     expect(
       (await db.products.get("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))?.stock,
@@ -145,6 +145,16 @@ describe("Dexie v3 → current migration (M6.10/M6.12/M6.13)", () => {
     });
     expect(
       (await db.customerLedgers.get("ffffffff-ffff-4fff-8fff-ffffffffffff"))?.capturedAt,
+    ).toBe(now);
+    expect(await db.pendingMedia.count()).toBe(0);
+    expect(await db.portalCatalogs.count()).toBe(0);
+    await db.portalCatalogs.put({
+      customerId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      products: [],
+      capturedAt: now,
+    });
+    expect(
+      (await db.portalCatalogs.get("ffffffff-ffff-4fff-8fff-ffffffffffff"))?.capturedAt,
     ).toBe(now);
   });
 });

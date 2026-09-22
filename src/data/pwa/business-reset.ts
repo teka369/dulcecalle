@@ -19,6 +19,8 @@ export type ClearLocalBusinessDataOptions = {
  *
  * customerLedgers rows NOT listed in `customerIds` are intentionally kept:
  * they belong to portal sessions (M6.10) and heal on the next online fetch.
+ * Pending media blobs are business-scoped and always wiped: they reference
+ * products that no longer exist after the reset.
  */
 export async function clearLocalBusinessData(
   businessId: string,
@@ -47,6 +49,8 @@ export async function clearLocalBusinessData(
       db.prepState,
       db.snapshots,
       db.customerLedgers,
+      db.portalCatalogs,
+      db.pendingMedia,
     ],
     async () => {
       await db.products.where("businessId").equals(businessId).delete();
@@ -66,8 +70,10 @@ export async function clearLocalBusinessData(
       await db.cacheMeta.where("businessId").equals(businessId).delete();
       await db.prepState.where("businessId").equals(businessId).delete();
       await db.snapshots.where("businessId").equals(businessId).delete();
+      await db.pendingMedia.where("businessId").equals(businessId).delete();
       for (const customerId of opts.customerIds ?? []) {
         await db.customerLedgers.delete(customerId);
+        await db.portalCatalogs.delete(customerId);
       }
     },
   );

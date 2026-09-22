@@ -20,6 +20,7 @@ const SID_A = "44444444-4444-4444-8444-444444444444";
 
 function product(over: Partial<RemoteProduct> = {}): RemoteProduct {
   return {
+    images: [],
     id: PID_A,
     name: "Galleta",
     category: "General",
@@ -173,6 +174,7 @@ describe("M6.3 catalog read cache", () => {
           archivedAt: null,
           createdAt: 1,
           updatedAt: 1,
+          images: [],
         },
       ]),
     ).rejects.toThrow(/another business/);
@@ -200,6 +202,32 @@ describe("M6.3 catalog read cache", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.businessId).toBe(BIZ_A);
     expect(rows.map((r) => r.id)).not.toContain(PID_B);
+  });
+
+  it("product images round-trip through the cache untouched", async () => {
+    const c = cache();
+    const img = {
+      id: "55555555-5555-4555-8555-555555555555",
+      productId: PID_A,
+      publicId: "dulcecalle/biz/products/prod/req",
+      secureUrl: "https://res.cloudinary.com/demo/image/upload/v1/x.jpg",
+      version: 1,
+      width: 100,
+      height: 100,
+      format: "jpg",
+      bytes: 500,
+      position: 0,
+      isPrimary: true,
+      altText: null,
+      createdAt: 1_700_000_000_000,
+    };
+    await c.listProducts(BIZ_A, async () => [product({ images: [img] })]);
+    const offline = await c.listProducts(BIZ_A, async () => {
+      throw new NetworkError("offline");
+    });
+    expect(offline.source).toBe("cache");
+    expect(offline.data[0]?.images).toHaveLength(1);
+    expect(offline.data[0]?.images[0]?.secureUrl).toContain("res.cloudinary.com");
   });
 
   it("empty server list is a real snapshot, not 'no cache'", async () => {

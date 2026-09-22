@@ -58,6 +58,7 @@ async function seedProduct() {
     archivedAt: null,
     createdAt: now,
     updatedAt: now,
+    images: [],
   });
 }
 

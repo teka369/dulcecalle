@@ -51,6 +51,7 @@ function productRow(stock = 10, avgCost = 100) {
     archivedAt: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    images: [],
   };
 }
 

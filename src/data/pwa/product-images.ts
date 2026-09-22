@@ -155,7 +155,13 @@ export async function addProductImages(
   const business = businessId();
   const api = getPwaApi();
   const db = getLocalDb();
-  const outbox = getOutboxStore();
+
+  // Defense in depth: the backend re-validates ownership, but never queue
+  // blobs against a product this business cannot even see locally.
+  const localProduct = await getLocalStore().products.get(business, productId);
+  if (!localProduct) {
+    throw new Error("El producto no está disponible sin conexión.");
+  }
 
   const existing = await db.pendingMedia.where("[businessId+productId]").equals([business, productId]).toArray();
   const remoteCount = await remoteImageCount(api, productId);
