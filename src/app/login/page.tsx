@@ -28,9 +28,9 @@ export default function LoginPage() {
 
   function onLogoTap() {
     const now = Date.now();
-    const taps = [...secretTaps.current, now].filter((at) => now - at <= 1800).slice(-5);
+    const taps = [...secretTaps.current, now].filter((at) => now - at <= 2500).slice(-10);
     secretTaps.current = taps;
-    if (taps.length === 5) {
+    if (taps.length === 10) {
       setStoreAccessOpen(true);
       secretTaps.current = [];
     }
