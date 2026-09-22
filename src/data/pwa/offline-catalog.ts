@@ -166,11 +166,19 @@ export async function syncPendingCustomers(businessId: string) {
   const result = await engine.flush(
     businessId,
     async (item) => {
-      const payload = item.payload as { name: string; phone?: string };
-      const remote = await api.customers.create(payload, item.requestId);
-      return { remoteId: remote.id };
+      if (item.entity === "customer" && item.operation === "create") {
+        const payload = item.payload as { name: string; phone?: string };
+        const remote = await api.customers.create(payload, item.requestId);
+        return { remoteId: remote.id };
+      }
+      if (item.entity === "customer" && item.operation === "patch") {
+        const payload = item.payload as { id: string; name?: string; phone?: string };
+        const remote = await api.customers.patch(payload.id, payload, item.requestId);
+        return { remoteId: remote.id };
+      }
+      throw new Error("Operación de outbox no compatible con clientes.");
     },
-    (item) => item.entity === "customer" && item.operation === "create",
+    (item) => item.entity === "customer" && (item.operation === "create" || item.operation === "patch"),
   );
 
   for (const operationId of operationIds) {
@@ -236,15 +244,28 @@ export async function syncPendingSuppliers(businessId: string) {
   const result = await engine.flush(
     businessId,
     async (item) => {
-      const payload = item.payload as {
-        name: string;
-        phone?: string;
-        notes?: string;
-      };
-      const remote = await api.suppliers.create(payload, item.requestId);
-      return { remoteId: remote.id };
+      if (item.entity === "supplier" && item.operation === "create") {
+        const payload = item.payload as {
+          name: string;
+          phone?: string;
+          notes?: string;
+        };
+        const remote = await api.suppliers.create(payload, item.requestId);
+        return { remoteId: remote.id };
+      }
+      if (item.entity === "supplier" && item.operation === "patch") {
+        const payload = item.payload as {
+          id: string;
+          name?: string;
+          phone?: string;
+          notes?: string;
+        };
+        const remote = await api.suppliers.patch(payload.id, payload, item.requestId);
+        return { remoteId: remote.id };
+      }
+      throw new Error("Operación de outbox no compatible con proveedores.");
     },
-    (item) => item.entity === "supplier" && item.operation === "create",
+    (item) => item.entity === "supplier" && (item.operation === "create" || item.operation === "patch"),
   );
 
   for (const operationId of operationIds) {
@@ -291,6 +312,252 @@ async function reconcileStrandedSuppliers(
       /* keep the local row; reconcile again next cycle */
     }
   }
+}
+
+export type CustomerPatchInput = { name?: string; phone?: string | null };
+export type SupplierPatchInput = { name?: string; phone?: string | null; notes?: string | null };
+export type ProductPatchInput = { name?: string; price?: number; lowStockAt?: number };
+
+export type PatchOfflineResult =
+  | { mode: "online" }
+  | { mode: "offline" };
+
+function assertPatchName(name: string | undefined): string | undefined {
+  if (name === undefined) return undefined;
+  const value = name.trim();
+  if (!value) throw new Error("El nombre es obligatorio.");
+  return value;
+}
+
+/** dependsOn the still-unsynced create operation of a locally-made row. */
+async function createDependency(
+  businessId: string,
+  requestId: string | undefined,
+  entity: "customer" | "supplier",
+): Promise<string[]> {
+  if (!requestId) return [];
+  const item = await getOutboxStore().getByRequestId(businessId, requestId);
+  if (item?.entity === entity && item.operation === "create" && item.status !== "synced") {
+    return [item.operationId];
+  }
+  return [];
+}
+
+export async function patchCustomerWithOfflineFallback(
+  id: string,
+  input: CustomerPatchInput,
+  requestId: string,
+): Promise<PatchOfflineResult> {
+  const name = assertPatchName(input.name);
+  const normalized = {
+    ...(name !== undefined ? { name } : {}),
+    ...(input.phone !== undefined ? { phone: input.phone } : {}),
+  };
+  try {
+    const remote = await getPwaApi().customers.patch(id, normalized, requestId);
+    const biz = businessId();
+    const local = await getLocalStore().customers.get(biz, id);
+    if (local) {
+      await getLocalStore().customers.put({ ...local, ...normalized, updatedAt: Date.now() });
+    } else {
+      await getLocalStore().customers.put(customerToLocal(remote, biz, Date.now()));
+    }
+    return { mode: "online" as const };
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
+    const biz = businessId();
+    const db = getLocalDb();
+    await db.transaction("rw", db.customers, db.outbox, async () => {
+      const local = await getLocalStore().customers.get(biz, id);
+      if (!local) throw new Error("El cliente no está disponible sin conexión.");
+      await getLocalStore().customers.put({ ...local, ...normalized, updatedAt: Date.now() });
+      await getOutboxStore().enqueue({
+        operationId: crypto.randomUUID(),
+        businessId: biz,
+        entity: "customer",
+        operation: "patch",
+        requestId,
+        payload: { id, ...normalized },
+        dependsOn: await createDependency(biz, local.requestId, "customer"),
+        localCreatedAt: Date.now(),
+      });
+    });
+    return { mode: "offline" as const };
+  }
+}
+
+export async function patchSupplierWithOfflineFallback(
+  id: string,
+  input: SupplierPatchInput,
+  requestId: string,
+): Promise<PatchOfflineResult> {
+  const name = assertPatchName(input.name);
+  const normalized = {
+    ...(name !== undefined ? { name } : {}),
+    ...(input.phone !== undefined ? { phone: input.phone } : {}),
+    ...(input.notes !== undefined ? { notes: input.notes } : {}),
+  };
+  try {
+    const remote = await getPwaApi().suppliers.patch(id, normalized, requestId);
+    const biz = businessId();
+    const local = await getLocalStore().suppliers.get(biz, id);
+    if (local) {
+      await getLocalStore().suppliers.put({ ...local, ...normalized, updatedAt: Date.now() });
+    } else {
+      await getLocalStore().suppliers.put(supplierToLocal(remote, biz, Date.now()));
+    }
+    return { mode: "online" as const };
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
+    const biz = businessId();
+    const db = getLocalDb();
+    await db.transaction("rw", db.suppliers, db.outbox, async () => {
+      const local = await getLocalStore().suppliers.get(biz, id);
+      if (!local) throw new Error("El proveedor no está disponible sin conexión.");
+      await getLocalStore().suppliers.put({ ...local, ...normalized, updatedAt: Date.now() });
+      await getOutboxStore().enqueue({
+        operationId: crypto.randomUUID(),
+        businessId: biz,
+        entity: "supplier",
+        operation: "patch",
+        requestId,
+        payload: { id, ...normalized },
+        dependsOn: await createDependency(biz, local.requestId, "supplier"),
+        localCreatedAt: Date.now(),
+      });
+    });
+    return { mode: "offline" as const };
+  }
+}
+
+function assertProductPatch(input: ProductPatchInput): void {
+  if (
+    input.price !== undefined &&
+    (!Number.isInteger(input.price) || input.price < 0)
+  ) {
+    throw new Error("El precio tiene que ser 0 o más.");
+  }
+  if (
+    input.lowStockAt !== undefined &&
+    (!Number.isInteger(input.lowStockAt) || input.lowStockAt < 0)
+  ) {
+    throw new Error("El aviso de stock no es válido.");
+  }
+}
+
+export async function patchProductWithOfflineFallback(
+  id: string,
+  input: ProductPatchInput,
+  requestId: string,
+): Promise<PatchOfflineResult> {
+  const name = assertPatchName(input.name);
+  assertProductPatch(input);
+  const normalized = {
+    ...(name !== undefined ? { name } : {}),
+    ...(input.price !== undefined ? { price: input.price } : {}),
+    ...(input.lowStockAt !== undefined ? { lowStockAt: input.lowStockAt } : {}),
+  };
+  try {
+    await getPwaApi().products.patch(id, normalized, requestId);
+    const biz = businessId();
+    const local = await getLocalStore().products.get(biz, id);
+    if (local) {
+      await getLocalStore().products.put({ ...local, ...normalized, updatedAt: Date.now() });
+    }
+    return { mode: "online" as const };
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
+    const biz = businessId();
+    const db = getLocalDb();
+    await db.transaction("rw", db.products, db.outbox, async () => {
+      const local = await getLocalStore().products.get(biz, id);
+      if (!local) throw new Error("El producto no está disponible sin conexión.");
+      await getLocalStore().products.put({ ...local, ...normalized, updatedAt: Date.now() });
+      await getOutboxStore().enqueue({
+        operationId: crypto.randomUUID(),
+        businessId: biz,
+        entity: "product",
+        operation: "patch",
+        requestId,
+        payload: { id, ...normalized },
+        dependsOn: [],
+        localCreatedAt: Date.now(),
+      });
+    });
+    return { mode: "offline" as const };
+  }
+}
+
+export async function archiveProductWithOfflineFallback(
+  id: string,
+  requestId: string,
+): Promise<PatchOfflineResult> {
+  try {
+    await getPwaApi().products.archive(id, requestId);
+    const biz = businessId();
+    const local = await getLocalStore().products.get(biz, id);
+    if (local && !local.archivedAt) {
+      await getLocalStore().products.put({
+        ...local,
+        archivedAt: new Date().toISOString(),
+        updatedAt: Date.now(),
+      });
+    }
+    return { mode: "online" as const };
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
+    const biz = businessId();
+    const db = getLocalDb();
+    await db.transaction("rw", db.products, db.outbox, async () => {
+      const local = await getLocalStore().products.get(biz, id);
+      if (!local) throw new Error("El producto no está disponible sin conexión.");
+      if (!local.archivedAt) {
+        await getLocalStore().products.put({
+          ...local,
+          archivedAt: new Date().toISOString(),
+          updatedAt: Date.now(),
+        });
+      }
+      await getOutboxStore().enqueue({
+        operationId: crypto.randomUUID(),
+        businessId: biz,
+        entity: "product",
+        operation: "archive",
+        requestId,
+        payload: { id },
+        dependsOn: [],
+        localCreatedAt: Date.now(),
+      });
+    });
+    return { mode: "offline" as const };
+  }
+}
+
+export async function syncPendingProducts(businessId: string) {
+  const api = getPwaApi();
+  const engine = getOutboxSyncEngine();
+  return engine.flush(
+    businessId,
+    async (item) => {
+      if (item.entity === "product" && item.operation === "patch") {
+        const payload = item.payload as {
+          id: string;
+          name?: string;
+          price?: number;
+          lowStockAt?: number;
+        };
+        const remote = await api.products.patch(payload.id, payload, item.requestId);
+        return { remoteId: remote.id };
+      }
+      if (item.entity === "product" && item.operation === "archive") {
+        const payload = item.payload as { id: string };
+        const remote = await api.products.archive(payload.id, item.requestId);
+        return { remoteId: remote.id };
+      }
+      throw new Error("Operación de outbox no compatible con productos.");
+    },
+    (item) => item.entity === "product" && (item.operation === "patch" || item.operation === "archive"),
+  );
 }
 
 export function startCatalogCreationSync() {

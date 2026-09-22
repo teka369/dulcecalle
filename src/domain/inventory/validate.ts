@@ -24,6 +24,8 @@ export const INVENTORY_TOASTS = {
   perdido: "Pérdida registrada",
   supplierSaved: "Proveedor guardado",
   productSaved: "Producto guardado",
+  productUpdated: "Producto actualizado",
+  productArchived: "Producto archivado",
 } as const;
 
 /** Note on the `inicial` stockMove when the opening units were a gift. */

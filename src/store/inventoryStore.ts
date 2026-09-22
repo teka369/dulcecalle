@@ -19,7 +19,12 @@ import {
   listCachedSuppliers,
 } from "@/data/pwa/catalog";
 import type { RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http/mappers";
-import { createSupplierWithOfflineFallback } from "@/data/pwa/offline-catalog";
+import {
+  archiveProductWithOfflineFallback,
+  createSupplierWithOfflineFallback,
+  patchProductWithOfflineFallback,
+  patchSupplierWithOfflineFallback,
+} from "@/data/pwa/offline-catalog";
 import {
   listLocalStockMoves,
   listLocalSurtidas,
@@ -223,6 +228,86 @@ export const inventoryStore = {
       fail(e);
     }
   },
+  async patchSupplier(input: {
+    supplierId: string;
+    name: string;
+    phone?: string | null;
+    notes?: string | null;
+    requestId?: string;
+  }): Promise<"online" | "offline"> {
+    const trimmed = input.name.trim();
+    if (!trimmed) throw new Error(INVENTORY_ERRORS.emptySupplierName);
+    try {
+      const result = await patchSupplierWithOfflineFallback(
+        input.supplierId,
+        { name: trimmed, phone: input.phone ?? null, notes: input.notes ?? null },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      await this.refreshSuppliers();
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Cambios guardados sin conexión"
+            : INVENTORY_TOASTS.supplierSaved,
+      });
+      return result.mode;
+    } catch (e) {
+      fail(e);
+    }
+  },
+  async patchProduct(input: {
+    productId: string;
+    name: string;
+    priceRaw: string;
+    lowStockAtRaw: string;
+    requestId?: string;
+  }): Promise<"online" | "offline"> {
+    const trimmed = input.name.trim();
+    if (!trimmed) throw new Error(INVENTORY_ERRORS.emptyProductName);
+    const price = Number.parseInt(input.priceRaw.trim() || "0", 10);
+    if (!Number.isInteger(price) || price < 0) {
+      throw new Error(INVENTORY_ERRORS.badCost);
+    }
+    const lowStockAt = Number.parseInt(input.lowStockAtRaw.trim() || "0", 10);
+    if (!Number.isInteger(lowStockAt) || lowStockAt < 0) {
+      throw new Error(INVENTORY_ERRORS.badCost);
+    }
+    try {
+      const result = await patchProductWithOfflineFallback(
+        input.productId,
+        { name: trimmed, price, lowStockAt },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      await this.refreshProducts();
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Cambios guardados sin conexión"
+            : INVENTORY_TOASTS.productUpdated,
+      });
+      return result.mode;
+    } catch (e) {
+      fail(e);
+    }
+  },
+  async archiveProduct(productId: string, requestId?: string): Promise<"online" | "offline"> {
+    try {
+      const result = await archiveProductWithOfflineFallback(
+        productId,
+        requestId ?? crypto.randomUUID(),
+      );
+      await this.refreshProducts();
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Archivado sin conexión"
+            : INVENTORY_TOASTS.productArchived,
+      });
+      return result.mode;
+    } catch (e) {
+      fail(e);
+    }
+  },
   async surtir(input: {
     productId: string;
     qtyRaw: string;
@@ -351,6 +436,9 @@ export function useInventory() {
     listSupplierSurtidas: inventoryStore.listSupplierSurtidas,
     createProduct: inventoryStore.createProduct.bind(inventoryStore),
     createSupplier: inventoryStore.createSupplier.bind(inventoryStore),
+    patchSupplier: inventoryStore.patchSupplier.bind(inventoryStore),
+    patchProduct: inventoryStore.patchProduct.bind(inventoryStore),
+    archiveProduct: inventoryStore.archiveProduct.bind(inventoryStore),
     surtir: inventoryStore.surtir.bind(inventoryStore),
     applyShrink: inventoryStore.applyShrink.bind(inventoryStore),
     todayLocalDateInput: inventoryStore.todayLocalDateInput,

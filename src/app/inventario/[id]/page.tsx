@@ -25,6 +25,13 @@ export default function ProductoFichaPage() {
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [moves, setMoves] = useState<RemoteStockMove[]>([]);
   const [ready, setReady] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editLow, setEditLow] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -33,6 +40,11 @@ export default function ProductoFichaPage() {
     }
     const p = await inventoryStore.getProduct(id);
     setProduct(p ?? null);
+    if (p) {
+      setEditName(p.name);
+      setEditPrice(String(p.price));
+      setEditLow(String(p.lowStockAt));
+    }
     if (p) {
       setMoves(await inventoryStore.listProductMoves(id));
     }
@@ -99,6 +111,143 @@ export default function ProductoFichaPage() {
       >
         Surtir
       </Link>
+
+      <button
+        type="button"
+        onClick={() => {
+          setEditing((v) => !v);
+          setEditError(null);
+        }}
+        className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface px-4 text-sm font-semibold"
+      >
+        {editing ? "Cerrar edición" : "Editar producto"}
+      </button>
+
+      {editing && (
+        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+          <label className="text-sm font-medium" htmlFor="editar-nombre-prod">
+            Nombre
+          </label>
+          <input
+            id="editar-nombre-prod"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          />
+          <label className="mt-3 block text-sm font-medium" htmlFor="editar-precio-prod">
+            Precio de venta
+          </label>
+          <input
+            id="editar-precio-prod"
+            inputMode="numeric"
+            value={editPrice}
+            onChange={(e) => setEditPrice(e.target.value.replace(/\D/g, ""))}
+            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          />
+          <label className="mt-3 block text-sm font-medium" htmlFor="editar-low-prod">
+            Avisar cuando el stock sea menor o igual a
+          </label>
+          <input
+            id="editar-low-prod"
+            inputMode="numeric"
+            value={editLow}
+            onChange={(e) => setEditLow(e.target.value.replace(/\D/g, ""))}
+            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          />
+          {editError && <p className="mt-2 text-sm text-danger">{editError}</p>}
+          <button
+            type="button"
+            disabled={editBusy}
+            onClick={() => {
+              if (editBusy) return;
+              setEditBusy(true);
+              setEditError(null);
+              void inventoryStore
+                .patchProduct({
+                  productId: product.id,
+                  name: editName,
+                  priceRaw: editPrice,
+                  lowStockAtRaw: editLow,
+                })
+                .then(() => inventoryStore.getProduct(product.id))
+                .then((updated) => {
+                  if (updated) {
+                    setProduct(updated);
+                    setEditName(updated.name);
+                    setEditPrice(String(updated.price));
+                    setEditLow(String(updated.lowStockAt));
+                  }
+                  setEditing(false);
+                })
+                .catch((e: unknown) => {
+                  setEditError(e instanceof Error ? e.message : "No se pudo guardar.");
+                })
+                .finally(() => setEditBusy(false));
+            }}
+            className="mt-3 min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+          >
+            Guardar cambios
+          </button>
+          <p className="mt-2 text-xs text-ink/60">
+            El stock y el costo solo cambian con movimientos. Las ventas
+            anteriores conservan el precio con el que se cobraron.
+          </p>
+        </section>
+      )}
+
+      {!product.archivedAt && !confirmArchive && (
+        <button
+          type="button"
+          onClick={() => setConfirmArchive(true)}
+          className="flex min-h-11 items-center justify-center rounded-[14px] border border-danger/30 bg-surface px-4 text-sm font-semibold text-danger"
+        >
+          Archivar producto
+        </button>
+      )}
+
+      {!product.archivedAt && confirmArchive && (
+        <section className="rounded-2xl border border-danger/20 bg-danger/5 p-4">
+          <p className="text-sm font-semibold">¿Archivar este producto?</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink/70">
+            Dejará de aparecer para vender o surtir, pero su historial se
+            conserva. Esta acción no se puede deshacer desde aquí.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={editBusy}
+              onClick={() => setConfirmArchive(false)}
+              className="min-h-11 rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold disabled:opacity-40"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={editBusy}
+              onClick={() => {
+                if (editBusy) return;
+                setEditBusy(true);
+                setEditError(null);
+                void inventoryStore
+                  .archiveProduct(product.id)
+                  .then(() => inventoryStore.getProduct(product.id))
+                  .then((updated) => {
+                    if (updated) setProduct(updated);
+                    setConfirmArchive(false);
+                  })
+                  .catch((e: unknown) => {
+                    setEditError(e instanceof Error ? e.message : "No se pudo archivar.");
+                  })
+                  .finally(() => setEditBusy(false));
+              }}
+              className="min-h-11 rounded-[14px] bg-danger text-sm font-semibold text-white disabled:opacity-40"
+            >
+              Archivar
+            </button>
+          </div>
+          {editError && <p className="mt-2 text-sm text-danger">{editError}</p>}
+        </section>
+      )}
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-ink/60">

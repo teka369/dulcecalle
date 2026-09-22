@@ -175,11 +175,24 @@ export class HttpRepository {
       return mapProduct(row);
     },
 
-    patch: async (id: string, input: PatchProductInput): Promise<RemoteProduct> => {
+    patch: async (
+      id: string,
+      input: PatchProductInput,
+      requestId?: string,
+    ): Promise<RemoteProduct> => {
       const row = await this.http.request<Record<string, unknown>>(
         "PATCH",
         `/products/${id}`,
-        { body: input },
+        requestId ? { body: input, idempotencyKey: requestId } : { body: input },
+      );
+      return mapProduct(row);
+    },
+
+    archive: async (id: string, requestId?: string): Promise<RemoteProduct> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        `/products/${id}/archive`,
+        requestId ? { idempotencyKey: requestId } : {},
       );
       return mapProduct(row);
     },
@@ -213,6 +226,19 @@ export class HttpRepository {
         "POST",
         "/customers",
         { body: input, idempotencyKey: requestId },
+      );
+      return mapCustomer(row);
+    },
+
+    patch: async (
+      id: string,
+      input: { name?: string; phone?: string | null },
+      requestId?: string,
+    ): Promise<RemoteCustomer> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "PATCH",
+        `/customers/${id}`,
+        requestId ? { body: input, idempotencyKey: requestId } : { body: input },
       );
       return mapCustomer(row);
     },
@@ -282,6 +308,19 @@ export class HttpRepository {
         "POST",
         "/suppliers",
         { body: input, idempotencyKey: requestId },
+      );
+      return mapSupplier(row);
+    },
+
+    patch: async (
+      id: string,
+      input: { name?: string; phone?: string | null; notes?: string | null },
+      requestId?: string,
+    ): Promise<RemoteSupplier> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "PATCH",
+        `/suppliers/${id}`,
+        requestId ? { body: input, idempotencyKey: requestId } : { body: input },
       );
       return mapSupplier(row);
     },

@@ -40,7 +40,11 @@ const OPERATION_NAMES: Record<string, string> = {
   "sale:create": "Venta",
   "customerPayment:pay": "Abono de cliente",
   "customer:create": "Cliente nuevo",
+  "customer:patch": "Edición de cliente",
   "supplier:create": "Proveedor nuevo",
+  "supplier:patch": "Edición de proveedor",
+  "product:patch": "Edición de producto",
+  "product:archive": "Archivo de producto",
 };
 
 export function describeOutboxOperation(

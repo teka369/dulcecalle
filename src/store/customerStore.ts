@@ -16,7 +16,10 @@ import { ApiError } from "@/data/errors";
 import { getPwaApi } from "@/data/pwa/api";
 import { getCachedCustomer, listCachedCustomers } from "@/data/pwa/catalog";
 import { createPaymentWithOfflineFallback } from "@/data/pwa/offline-payments";
-import { createCustomerWithOfflineFallback } from "@/data/pwa/offline-catalog";
+import {
+  createCustomerWithOfflineFallback,
+  patchCustomerWithOfflineFallback,
+} from "@/data/pwa/offline-catalog";
 import { getStatementWithOfflineFallback } from "@/data/pwa/offline-statement";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import type { DebtStatement } from "@/domain/debt/statement";
@@ -87,6 +90,32 @@ export const customerStore = {
             : "Cliente guardado",
       });
       return result.mode === "offline" ? result.customerId : result.customer.id;
+    } catch (e) {
+      fail(e);
+    }
+  },
+  async patchCustomer(input: {
+    customerId: string;
+    name: string;
+    phone?: string | null;
+    requestId?: string;
+  }): Promise<"online" | "offline"> {
+    const trimmed = input.name.trim();
+    if (!trimmed) throw new Error(CUSTOMER_ERRORS.emptyName);
+    try {
+      const result = await patchCustomerWithOfflineFallback(
+        input.customerId,
+        { name: trimmed, phone: input.phone ?? null },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      await this.refresh();
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Cambios guardados sin conexión"
+            : "Cliente actualizado",
+      });
+      return result.mode;
     } catch (e) {
       fail(e);
     }
@@ -190,6 +219,11 @@ export function useCustomers() {
     (name: string) => customerStore.createCustomer(name),
     [],
   );
+  const patchCustomer = useCallback(
+    (input: { customerId: string; name: string; phone?: string | null }) =>
+      customerStore.patchCustomer(input),
+    [],
+  );
   const recordAbono = useCallback(
     (input: {
       customerId: string;
@@ -212,6 +246,7 @@ export function useCustomers() {
     ...snap,
     refresh,
     createCustomer,
+    patchCustomer,
     recordAbono,
     recordInitialDebt,
     getCustomer: customerStore.getCustomer,
