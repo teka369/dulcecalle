@@ -17,7 +17,7 @@ import { getPwaApi } from "@/data/pwa/api";
 import { getCachedCustomer, listCachedCustomers } from "@/data/pwa/catalog";
 import { createPaymentWithOfflineFallback } from "@/data/pwa/offline-payments";
 import { createCustomerWithOfflineFallback } from "@/data/pwa/offline-catalog";
-import { loadHttpStatement } from "@/data/pwa/statement";
+import { getStatementWithOfflineFallback } from "@/data/pwa/offline-statement";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import type { DebtStatement } from "@/domain/debt/statement";
 
@@ -98,9 +98,11 @@ export const customerStore = {
       return undefined;
     }
   },
-  async getStatement(id: string): Promise<DebtStatement | null> {
+  async getStatement(
+    id: string,
+  ): Promise<{ statement: DebtStatement; source: "server" | "cache" } | null> {
     try {
-      return await loadHttpStatement(id);
+      return await getStatementWithOfflineFallback(id);
     } catch {
       return null;
     }

@@ -677,6 +677,52 @@ export async function listLocalStockMoves(productId: string): Promise<RemoteStoc
     }));
 }
 
+export type LocalSurtida = {
+  moveId: string;
+  createdAt: number;
+  productId: string;
+  productName: string;
+  qty: number;
+  unitCost: number;
+  totalCost: number;
+  method: string | null;
+};
+
+/**
+ * Supplier surtidas from Dexie, mirroring the server computation: surtir
+ * stock moves joined with their compra cash move (when it exists) for the
+ * cash total and method; otherwise unitCost x qty. Newest first, like the
+ * server (which caps at 50; local history is already bounded by device).
+ */
+export async function listLocalSurtidas(supplierId: string): Promise<LocalSurtida[]> {
+  const business = businessId();
+  const db = getLocalDb();
+  const moves = (await db.stockMoves.where("businessId").equals(business).toArray())
+    .filter((row) => row.supplierId === supplierId && row.reason === "surtir")
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const cashMoves = await db.cashMoves.where("businessId").equals(business).toArray();
+  const compraByRef = new Map(
+    cashMoves
+      .filter((m) => m.kind === "compra" && m.refType === "stockMove" && m.refId)
+      .map((m) => [m.refId as string, m]),
+  );
+  const products = await db.products.where("businessId").equals(business).toArray();
+  const names = new Map(products.map((p) => [p.id, p.name]));
+  return moves.map((m) => {
+    const cash = compraByRef.get(m.id);
+    return {
+      moveId: m.id,
+      createdAt: m.createdAt,
+      productId: m.productId,
+      productName: names.get(m.productId) ?? "",
+      qty: m.delta,
+      unitCost: m.unitCost,
+      totalCost: cash ? cash.amount : m.unitCost * m.delta,
+      method: cash ? cash.method : null,
+    };
+  });
+}
+
 export async function syncPendingOperations(business: string) {
   return getOutboxSyncEngine().flush(
     business,

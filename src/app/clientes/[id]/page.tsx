@@ -14,6 +14,7 @@ export default function ClienteFichaPage() {
   const id = routeId(params.id);
   const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [statement, setStatement] = useState<DebtStatement | null>(null);
+  const [fromCache, setFromCache] = useState(false);
   const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
@@ -24,7 +25,9 @@ export default function ClienteFichaPage() {
     const c = await customerStore.getCustomer(id);
     setCustomer(c ?? null);
     if (c) {
-      setStatement(await customerStore.getStatement(c.id));
+      const result = await customerStore.getStatement(c.id);
+      setStatement(result?.statement ?? null);
+      setFromCache(result?.source === "cache");
     }
     setReady(true);
   }, [id]);
@@ -66,6 +69,12 @@ export default function ClienteFichaPage() {
       </header>
       {customer.code && (
         <p className="text-sm text-ink/55">Código {customer.code}</p>
+      )}
+
+      {fromCache && (
+        <p className="text-xs text-ink/60">
+          Sin conexión · movimientos registrados en este dispositivo.
+        </p>
       )}
 
       {statement ? (

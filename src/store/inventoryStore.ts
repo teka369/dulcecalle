@@ -22,6 +22,7 @@ import type { RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http
 import { createSupplierWithOfflineFallback } from "@/data/pwa/offline-catalog";
 import {
   listLocalStockMoves,
+  listLocalSurtidas,
   shrinkWithOfflineFallback,
   surtirWithOfflineFallback,
 } from "@/data/pwa/offline-operations";
@@ -144,6 +145,14 @@ export const inventoryStore = {
     }
   },
   async listSupplierSurtidas(supplierId: string): Promise<PwaSupplierSurtir[]> {
+    try {
+      return await this.listSupplierSurtidasOnline(supplierId);
+    } catch (e) {
+      if (!(e instanceof NetworkError)) throw e;
+      return listLocalSurtidas(supplierId);
+    }
+  },
+  async listSupplierSurtidasOnline(supplierId: string): Promise<PwaSupplierSurtir[]> {
     const rows = await getPwaApi().suppliers.surtidas(supplierId);
     return rows.map((r) => ({
       ...r,
