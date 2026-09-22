@@ -119,8 +119,28 @@ export default function LoginPage() {
         className="h-20 w-20 rounded-2xl object-cover"
         priority
       />
-      <h1 className="text-[22px] font-semibold">Entrar</h1>
+      <h1 className="text-[22px] font-semibold">Dulce Calle</h1>
       <p className="text-sm text-ink/60">
+        Consulta tu saldo y tus movimientos.
+      </p>
+
+      <section className="rounded-2xl border border-cta/30 bg-surface p-4">
+        <p className="text-base font-semibold">Entrar como Cliente</p>
+        <p className="mt-1 text-sm text-ink/60">
+          Mira cuánto debes, tus compras y tus abonos.
+        </p>
+        <Link
+          href="/cliente/login"
+          className="mt-3 flex min-h-12 w-full items-center justify-center rounded-[14px] bg-cta px-4 text-base font-semibold text-white"
+        >
+          Entrar como Cliente
+        </Link>
+      </section>
+
+      <h2 className="mt-2 text-base font-semibold text-ink/70">
+        Entrar a mi tienda
+      </h2>
+      <p className="-mt-2 text-sm text-ink/60">
         Entras al negocio en el servidor. Los datos viven allá, no en este
         teléfono.
       </p>
@@ -182,12 +202,6 @@ export default function LoginPage() {
         </button>
       )}
 
-      <p className="text-center text-sm text-ink/60">
-        ¿Eres cliente?{" "}
-        <Link href="/cliente/login" className="font-semibold text-ink">
-          Consulta tu saldo
-        </Link>
-      </p>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -40,6 +41,14 @@ export default function CustomerLoginPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <Image
+        src="/DulceCalle.png"
+        alt="Dulce Calle"
+        width={72}
+        height={72}
+        className="h-[72px] w-[72px] rounded-2xl object-cover"
+        priority
+      />
       <h1 className="text-[22px] font-semibold">Consulta como cliente</h1>
       <p className="text-sm text-ink/60">
         Entras solo a ver tu saldo y tus movimientos. No es el panel del

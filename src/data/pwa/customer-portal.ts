@@ -31,6 +31,16 @@ export function customerPortalSummary(ledger: CustomerLedger) {
   };
 }
 
+/** Ledger sums for the customer home. Derived only, never invented. */
+export function customerPortalTotals(ledger: CustomerLedger) {
+  return {
+    totalComprado: ledger.sales.reduce((s, sale) => s + sale.saleTotal, 0),
+    totalAbonado: ledger.payments.reduce((s, p) => s + p.amount, 0),
+    movimientos:
+      ledger.sales.length + ledger.payments.length + ledger.initials.length,
+  };
+}
+
 export function customerStatementRows(
   ledger: CustomerLedger,
 ): CustomerStatementRow[] {

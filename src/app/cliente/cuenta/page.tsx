@@ -62,17 +62,29 @@ export default function CustomerStatementPage() {
       </article>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-ink/60">Aún no hay movimientos.</p>
+        <p className="text-sm text-ink/60">
+          Todavía no tienes movimientos registrados. Cuando compres o abones,
+          aparecerán aquí.
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {rows.map((row) => {
+            const lowers = row.kind === "pago" || row.kind === "devolucion";
             const body = (
               <span className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4">
                 <span className="min-w-0">
                   <span className="block font-medium">{row.title}</span>
-                  <span className="block text-xs text-ink/55">{row.occurredOn}</span>
+                  <span className="block text-xs text-ink/55">
+                    {row.occurredOn} ·{" "}
+                    {lowers ? "baja tu deuda" : "sube tu deuda"}
+                  </span>
                 </span>
-                <span className="shrink-0 text-sm font-semibold tabular-nums">
+                <span
+                  className={`shrink-0 text-sm font-semibold tabular-nums ${
+                    lowers ? "text-ok" : "text-accent"
+                  }`}
+                >
+                  {lowers ? "−" : "+"}
                   {formatCop(row.amount)}
                 </span>
               </span>

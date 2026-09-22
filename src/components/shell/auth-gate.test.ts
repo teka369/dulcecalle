@@ -88,10 +88,15 @@ describe("customer portal routing", () => {
     ).toEqual({ kind: "redirect", to: "/login" });
   });
 
-  it("admin login offers ¿Eres cliente? toward /cliente/login", () => {
+  it("admin login offers Cliente first, tienda second", () => {
     const src = readFileSync(join(__dirname, "../../app/login/page.tsx"), "utf8");
-    expect(src).toContain("¿Eres cliente?");
+    const clienteAt = src.indexOf("Entrar como Cliente");
+    const tiendaAt = src.indexOf("Entrar a mi tienda");
+    expect(clienteAt).toBeGreaterThanOrEqual(0);
+    expect(tiendaAt).toBeGreaterThan(clienteAt);
     expect(src).toContain('href="/cliente/login"');
+    expect(src).toContain("Correo");
+    expect(src).toContain("Contraseña");
   });
 
   it("customer login is a code+name form with volver", () => {
@@ -114,7 +119,7 @@ describe("customer portal routing", () => {
       "utf8",
     );
     expect(home).toContain("Hola, {summary.name}");
-    expect(home).toContain("Saldo pendiente");
+    expect(home).toContain("Por cobrar");
     expect(home).toContain("summary.debt");
     expect(home).toContain("Cargando…");
     expect(home).toContain("loadCachedCustomerLedger");

@@ -5,7 +5,10 @@ import { useEffect, useState } from "react";
 import { CustomerChrome, CustomerCacheNotice } from "@/components/customer/CustomerChrome";
 import type { CustomerLedger } from "@/data/http/customer-api";
 import { loadCachedCustomerLedger } from "@/data/pwa/customer-ledger-cache";
-import { customerPortalSummary } from "@/data/pwa/customer-portal";
+import {
+  customerPortalSummary,
+  customerPortalTotals,
+} from "@/data/pwa/customer-portal";
 import { formatCop } from "@/domain/money";
 
 export default function CustomerHomePage() {
@@ -43,6 +46,8 @@ export default function CustomerHomePage() {
   }
 
   const summary = customerPortalSummary(ledger);
+  const { totalComprado, totalAbonado, movimientos } =
+    customerPortalTotals(ledger);
 
   return (
     <CustomerChrome>
@@ -54,26 +59,39 @@ export default function CustomerHomePage() {
       </h1>
       <p className="text-sm text-ink/55">{summary.code}</p>
 
-      <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+      <article className="rounded-2xl border border-ink/[0.08] bg-surface p-5">
         <p className="text-[11px] font-medium uppercase tracking-wide text-ink/50">
-          Saldo pendiente
+          Por cobrar
         </p>
         <p
-          className={`mt-1 text-[28px] font-semibold tabular-nums ${
+          className={`mt-1 text-[34px] font-semibold tabular-nums ${
             summary.debt > 0 ? "text-accent" : "text-ok"
           }`}
         >
           {formatCop(summary.debt)}
         </p>
         <p className="mt-1 text-sm text-ink/55">
-          {summary.debt > 0 ? "Por pagar" : "Al día"}
+          {summary.debt > 0
+            ? "Esto es lo que debes en este momento."
+            : "Estás al día. No debes nada."}
         </p>
       </article>
 
-      <section className="grid grid-cols-3 gap-2">
-        <SummaryChip label="Compras" value={String(summary.purchases)} />
-        <SummaryChip label="Pagos" value={String(summary.payments)} />
-        <SummaryChip label="Fiados" value={String(summary.credits)} />
+      <section className="grid grid-cols-2 gap-2">
+        <SummaryChip label="Total comprado" value={formatCop(totalComprado)} />
+        <SummaryChip label="Total abonado" value={formatCop(totalAbonado)} />
+        <SummaryChip label="Movimientos" value={String(movimientos)} />
+        <SummaryChip
+          label="Última actualización"
+          value={
+            capturedAt
+              ? new Date(capturedAt).toLocaleDateString("es-CO", {
+                  day: "numeric",
+                  month: "short",
+                })
+              : "—"
+          }
+        />
       </section>
 
       <nav className="flex flex-col gap-2">

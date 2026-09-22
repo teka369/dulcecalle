@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getCustomerApi } from "@/data/http/customer-api";
@@ -9,6 +10,7 @@ const links = [
   { href: "/cliente/cuenta", label: "Cuenta" },
   { href: "/cliente/compras", label: "Compras" },
   { href: "/cliente/pagos", label: "Pagos" },
+  { href: "/cliente/perfil", label: "Perfil" },
 ] as const;
 
 export function CustomerChrome({
@@ -32,6 +34,16 @@ export function CustomerChrome({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <Image
+          src="/DulceCalle.png"
+          alt="Dulce Calle"
+          width={36}
+          height={36}
+          className="h-9 w-9 rounded-xl object-cover"
+        />
+        <span className="text-sm font-semibold text-ink/70">Dulce Calle</span>
+      </div>
       {title && (
         <h1 className="text-[22px] font-semibold tracking-tight">{title}</h1>
       )}
