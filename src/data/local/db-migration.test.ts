@@ -46,12 +46,12 @@ async function openAsV3(): Promise<Dexie> {
   return old;
 }
 
-describe("Dexie v3 → current migration (M6.10/M6.12)", () => {
+describe("Dexie v3 → current migration (M6.10/M6.12/M6.13)", () => {
   beforeEach(async () => {
     await __resetLocalDbForTests();
   });
 
-  it("preserves v3 data and adds customerLedgers + prepState", async () => {
+  it("preserves v3 data and adds customerLedgers + prepState + snapshots", async () => {
     const old = await openAsV3();
     const now = Date.now();
     await old.table("products").put({
@@ -101,7 +101,8 @@ describe("Dexie v3 → current migration (M6.10/M6.12)", () => {
     old.close();
 
     const db = getLocalDb();
-    expect(db.verno).toBe(5);
+    expect(db.verno).toBe(6);
+    expect(await db.snapshots.count()).toBe(0);
     expect(
       (await db.products.get("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))?.stock,
     ).toBe(10);

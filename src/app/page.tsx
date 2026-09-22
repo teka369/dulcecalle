@@ -7,7 +7,7 @@ import {
   InicioSkeleton,
 } from "@/components/dashboard/InicioDashboard";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
-import { loadHttpDashboard } from "@/data/pwa/dashboard";
+import { loadDashboardWithOfflineFallback } from "@/data/pwa/offline-snapshots";
 
 export default function InicioPage() {
   const pathname = usePathname();
@@ -15,9 +15,15 @@ export default function InicioPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
+  const [capturedAt, setCapturedAt] = useState<number | null>(null);
+  const [fromCache, setFromCache] = useState(false);
+
   const refresh = useCallback(async () => {
     setFailed(false);
-    setSnap(await loadHttpDashboard());
+    const result = await loadDashboardWithOfflineFallback();
+    setSnap(result.data);
+    setCapturedAt(result.capturedAt);
+    setFromCache(result.source === "cache");
   }, []);
 
   useEffect(() => {
@@ -58,5 +64,14 @@ export default function InicioPage() {
     return <InicioSkeleton />;
   }
 
-  return <InicioDashboard snap={snap} toast={toast} />;
+  return (
+    <>
+      {fromCache && capturedAt != null && (
+        <p className="mb-3 text-xs text-ink/60">
+          Sin conexión · última actualización: {new Date(capturedAt).toLocaleString()}.
+        </p>
+      )}
+      <InicioDashboard snap={snap} toast={toast} />
+    </>
+  );
 }

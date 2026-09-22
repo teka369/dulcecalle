@@ -45,6 +45,7 @@ export async function clearLocalBusinessData(
       db.outbox,
       db.cacheMeta,
       db.prepState,
+      db.snapshots,
       db.customerLedgers,
     ],
     async () => {
@@ -64,6 +65,7 @@ export async function clearLocalBusinessData(
       await db.outbox.where("businessId").equals(businessId).delete();
       await db.cacheMeta.where("businessId").equals(businessId).delete();
       await db.prepState.where("businessId").equals(businessId).delete();
+      await db.snapshots.where("businessId").equals(businessId).delete();
       for (const customerId of opts.customerIds ?? []) {
         await db.customerLedgers.delete(customerId);
       }

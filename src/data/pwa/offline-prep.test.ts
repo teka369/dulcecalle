@@ -22,8 +22,13 @@ const OTHER_BIZ = "22222222-2222-4222-8222-222222222222";
 const api = {
   session: { businessId: BIZ },
   products: { list: vi.fn() },
-  customers: { list: vi.fn() },
+  customers: { list: vi.fn(), ledger: vi.fn() },
   suppliers: { list: vi.fn() },
+  sales: { list: vi.fn(async () => []) },
+  cash: { today: vi.fn(async () => ({ moves: [] })), expenses: vi.fn(async () => []) },
+  inventory: { moves: vi.fn(async () => []) },
+  auth: { me: vi.fn(async () => null) },
+  stats: { get: vi.fn(async (period: string) => ({ period, ventas: 0, emptyPeriod: true })) },
 };
 
 vi.mock("./api", () => ({ getPwaApi: () => api }));
@@ -87,11 +92,11 @@ describe("offline preparation", () => {
     const seen: PrepProgress[] = [];
     const row = await runPreparation(BIZ, (p) => seen.push({ ...p }));
     expect(row.status).toBe("ready");
-    // 11 static docs + 3 catalogs + 3 sistema (sw, storage, verify)
-    expect(row.tasks).toHaveLength(17);
+    // 11 static docs + 3 catalogs + 4 snapshots + 3 sistema (sw, storage, verify)
+    expect(row.tasks).toHaveLength(21);
     expect(row.tasks.every((t) => t.status === "done")).toBe(true);
-    expect(seen.length).toBeGreaterThan(17);
-    expect(seen[seen.length - 1]?.completed).toBe(17);
+    expect(seen.length).toBeGreaterThan(21);
+    expect(seen[seen.length - 1]?.completed).toBe(21);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
   });
 
@@ -128,13 +133,9 @@ await runPreparation(BIZ);
   });
 
   it("concurrent callers share a single run", async () => {
-    let calls = 0;
-    api.products.list.mockImplementation(async () => {
-      calls += 1;
-      return [];
-    });
-    await Promise.all([runPreparation(BIZ), runPreparation(BIZ)]);
-    expect(calls).toBe(1);
+    const [first, second] = await Promise.all([runPreparation(BIZ), runPreparation(BIZ)]);
+    expect(second).toBe(first);
+    expect(first.status).toBe("ready");
   });
 
   it("creates no outbox operations and no business rows", async () => {
@@ -213,12 +214,14 @@ await runPreparation(BIZ);
     expect(row.tasks.find((t) => t.key === "catalog:products")?.status).toBe("done");
   });
 
-  it("task list covers documents and the three catalogs", () => {
+  it("task list covers documents, catalogs and summaries", () => {
     const defs = prepTaskDefs();
-    expect(defs).toHaveLength(14);
+    expect(defs).toHaveLength(18);
     expect(defs.filter((d) => d.group === "app")).toHaveLength(11);
     expect(defs.filter((d) => d.group === "catalogos")).toHaveLength(3);
+    expect(defs.filter((d) => d.group === "resumen")).toHaveLength(4);
     expect(defs.map((d) => d.key)).toContain("catalog:products");
+    expect(defs.map((d) => d.key)).toContain("snapshot:dashboard");
   });
 
   it("offline mid-run fails honestly instead of claiming ready", async () => {

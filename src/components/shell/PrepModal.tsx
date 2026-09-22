@@ -7,6 +7,7 @@ import { usePrep } from "@/store/prepStore";
 const GROUP_TITLES = {
   app: "Aplicación",
   catalogos: "Catálogos",
+  resumen: "Resumen",
   sistema: "Sistema",
 } as const;
 
@@ -89,7 +90,7 @@ export function PrepModal() {
               </div>
             </div>
 
-            {(["app", "catalogos", "sistema"] as const).map((group) => {
+            {(["app", "catalogos", "resumen", "sistema"] as const).map((group) => {
               const groupTasks = tasks.filter((t) => t.group === group);
               if (groupTasks.length === 0) return null;
               return (

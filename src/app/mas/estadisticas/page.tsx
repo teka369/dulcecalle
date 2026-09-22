@@ -5,13 +5,15 @@ import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { STATS_COPY, type StatsPeriod } from "@/domain/stats";
 import type { RemoteStats } from "@/data/http/mappers";
-import { getPwaApi } from "@/data/pwa/api";
+import { loadStatsWithOfflineFallback } from "@/data/pwa/offline-snapshots";
 
 const PERIODS: StatsPeriod[] = ["hoy", "semana", "mes"];
 
 export default function EstadisticasPage() {
   const [period, setPeriod] = useState<StatsPeriod>("hoy");
   const [stats, setStats] = useState<RemoteStats | null>(null);
+  const [capturedAt, setCapturedAt] = useState<number | null>(null);
+  const [fromCache, setFromCache] = useState(false);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -19,8 +21,10 @@ export default function EstadisticasPage() {
     setLoading(true);
     setError(false);
     try {
-      const snap = await getPwaApi().stats.get(p);
-      setStats(snap);
+      const result = await loadStatsWithOfflineFallback(p);
+      setStats(result.data);
+      setCapturedAt(result.capturedAt);
+      setFromCache(result.source === "cache");
     } catch {
       setError(true);
       setStats(null);
@@ -110,6 +114,11 @@ export default function EstadisticasPage() {
 
       {!loading && !error && stats && (
         <>
+          {fromCache && capturedAt != null && (
+            <p className="text-xs text-ink/60">
+              Sin conexión · última actualización: {new Date(capturedAt).toLocaleString()}.
+            </p>
+          )}
           {stats.emptyPeriod && (
             <div className="rounded-2xl border border-ink/10 bg-surface p-4">
               <p className="text-sm text-ink/70">{STATS_COPY.emptyPeriodo}</p>

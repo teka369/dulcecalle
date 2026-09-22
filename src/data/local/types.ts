@@ -43,6 +43,19 @@ export type PrepTaskRecord = {
  * device warmed the documents + catalogs the offline flows need. Never
  * stores business data itself.
  */
+/**
+ * Generic server snapshot for offline display (dashboard, stats). Keyed
+ * `${businessId}::<kind>` so tenants never mix. Presence means "cached",
+ * even when the payload itself reports an empty period.
+ */
+export type LocalSnapshot = {
+  id: string;
+  businessId: string;
+  kind: string;
+  payload: unknown;
+  capturedAt: number;
+};
+
 export type PrepReadiness = {
   /** `readiness::<businessId>`. */
   id: string;

@@ -17,6 +17,11 @@ const api = {
   products: { list: vi.fn() },
   customers: { list: vi.fn() },
   suppliers: { list: vi.fn() },
+  sales: { list: vi.fn(async () => []) },
+  cash: { today: vi.fn(async () => ({ moves: [] })), expenses: vi.fn(async () => []) },
+  inventory: { moves: vi.fn(async () => []) },
+  auth: { me: vi.fn(async () => null) },
+  stats: { get: vi.fn(async (period: string) => ({ period, ventas: 0, emptyPeriod: true })) },
 };
 
 vi.mock("@/data/pwa/api", () => ({ getPwaApi: () => api }));
@@ -75,8 +80,8 @@ describe("prepStore evaluate/start", () => {
     expect(snap.phase).toBe("ready");
     expect(snap.modalOpen).toBe(true);
     expect(snap.completed).toBe(snap.total);
-    // 11 static docs + 3 catalogs + 3 sistema (sw, storage, verify)
-    expect(snap.total).toBe(17);
+    // 11 static docs + 3 catalogs + 4 snapshots + 3 sistema
+    expect(snap.total).toBe(21);
     expect(snap.lastReadyAt).toBeGreaterThan(0);
   });
 
@@ -91,13 +96,9 @@ describe("prepStore evaluate/start", () => {
 
   it("concurrent starts share one run", async () => {
     getPwaAuthSession().businessId = BIZ;
-    let calls = 0;
-    api.products.list.mockImplementation(async () => {
-      calls += 1;
-      return [];
-    });
-    await Promise.all([prepStore.start(), prepStore.start()]);
-    expect(calls).toBe(1);
+    const [first, second] = await Promise.all([prepStore.start(), prepStore.start()]);
+    expect(first).toBeUndefined();
+    expect(second).toBeUndefined();
     expect(prepStore.getSnapshot().phase).toBe("ready");
   });
 

@@ -18,11 +18,17 @@ import {
   listCachedProducts,
   listCachedSuppliers,
 } from "./catalog";
+import {
+  DASHBOARD_SNAPSHOT_KIND,
+  loadDashboardWithOfflineFallback,
+  loadStatsWithOfflineFallback,
+  statsSnapshotKind,
+} from "./offline-snapshots";
 
 export const PREP_VERSION = 1;
 export const PREP_DOCUMENT_CACHE = "documents";
 
-export type PrepTaskGroup = "app" | "catalogos" | "sistema";
+export type PrepTaskGroup = "app" | "catalogos" | "resumen" | "sistema";
 
 export type PrepTaskDef = {
   key: string;
@@ -103,6 +109,33 @@ export function prepTaskDefs(): PrepTaskDef[] {
         await listCachedSuppliers();
       },
     },
+    {
+      key: "snapshot:dashboard",
+      group: "resumen" as const,
+      label: "Resumen del inicio",
+      run: async () => {
+        await loadDashboardWithOfflineFallback();
+      },
+    },
+    ...(["hoy", "semana", "mes"] as const).map((period) => ({
+      key: `snapshot:${statsSnapshotKind(period)}`,
+      group: "resumen" as const,
+      label: `Estadísticas ${period}`,
+      run: async () => {
+        await loadStatsWithOfflineFallback(period);
+      },
+    })),
+  ];
+}
+
+// Snapshot kinds the preparation guarantees. checkReadiness treats a
+// missing one as stale so ready always implies fresh summaries.
+export function requiredSnapshotKinds(): string[] {
+  return [
+    DASHBOARD_SNAPSHOT_KIND,
+    statsSnapshotKind("hoy"),
+    statsSnapshotKind("semana"),
+    statsSnapshotKind("mes"),
   ];
 }
 
@@ -180,6 +213,11 @@ export async function checkReadiness(
   }
   for (const resource of ["products", "customers", "suppliers"] as const) {
     if (!(await db.cacheMeta.get(`${businessId}::${resource}`))) {
+      return { status: "stale", row };
+    }
+  }
+  for (const kind of requiredSnapshotKinds()) {
+    if (!(await db.snapshots.get(`${businessId}::${kind}`))) {
       return { status: "stale", row };
     }
   }

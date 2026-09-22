@@ -80,6 +80,21 @@ describe("business reset (local)", () => {
     await __resetLocalDbForTests();
   });
 
+  it("clears snapshots of the business too", async () => {
+    const db = getLocalDb();
+    await db.snapshots.put({
+      id: `${BIZ}::dashboard`, businessId: BIZ, kind: "dashboard",
+      payload: { ok: true }, capturedAt: 1,
+    });
+    await db.snapshots.put({
+      id: `${OTHER}::dashboard`, businessId: OTHER, kind: "dashboard",
+      payload: { ok: true }, capturedAt: 1,
+    });
+    await clearLocalBusinessData(BIZ);
+    expect(await db.snapshots.where("businessId").equals(BIZ).count()).toBe(0);
+    expect(await db.snapshots.where("businessId").equals(OTHER).count()).toBe(1);
+  });
+
   it("clears every business row but keeps other tenants", async () => {
     await seedBusiness(BIZ, "a1");
     await seedBusiness(OTHER, "b2");

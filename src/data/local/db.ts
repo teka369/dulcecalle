@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from "dexie";
 import type {
   CustomerLedgerSnapshot,
   LocalCacheMeta,
+  LocalSnapshot,
   PrepReadiness,
   LocalCashMove,
   LocalCashSession,
@@ -42,6 +43,7 @@ export class DulceCalleLocalDB extends Dexie {
   cacheMeta!: EntityTable<LocalCacheMeta, "id">;
   customerLedgers!: EntityTable<CustomerLedgerSnapshot, "customerId">;
   prepState!: EntityTable<PrepReadiness, "id">;
+  snapshots!: EntityTable<LocalSnapshot, "id">;
   outbox!: EntityTable<OutboxItem, "operationId">;
 
   constructor() {
@@ -78,6 +80,11 @@ export class DulceCalleLocalDB extends Dexie {
     // v5: offline preparation readiness (per business, metadata only).
     this.version(5).stores({
       prepState: "id, businessId",
+    });
+    // v6 (M6.13): generic server snapshots for offline display
+    // (dashboard, stats). Tenant-keyed; presence means "cached".
+    this.version(6).stores({
+      snapshots: "id, businessId, kind, [businessId+kind]",
     });
   }
 }
