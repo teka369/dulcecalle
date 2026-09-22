@@ -55,7 +55,6 @@ export function CustomerLoginForm({ showBack = false }: { showBack?: boolean }) 
           value={code}
           onChange={(e) => setCode(e.target.value)}
           className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
-          placeholder="DC-0001"
           autoComplete="off"
           autoFocus
         />
