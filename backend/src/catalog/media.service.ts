@@ -159,10 +159,10 @@ export class MediaService {
   async signUpload(
     ctx: BusinessContext,
     productId: string,
+    requestId: string,
   ): Promise<UploadSignature> {
     const config = this.config();
     await this.requireProduct(ctx, productId);
-    const requestId = randomUUID();
     const timestamp = Math.floor(Date.now() / 1000);
     const publicId = imagePublicId(ctx.businessId, productId, requestId);
     const signature = signUploadParams(

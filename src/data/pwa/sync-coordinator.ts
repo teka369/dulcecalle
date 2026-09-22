@@ -1,6 +1,7 @@
 import { getPwaAuthSession } from "../http/session";
 import { ConnectivityMonitor, type SyncFlushResult } from "../local/outbox";
 import { syncPendingCustomers, syncPendingProducts, syncPendingSuppliers } from "./offline-catalog";
+import { syncPendingProductImages } from "./product-images";
 import { syncPendingOperations } from "./offline-operations";
 import { syncPendingPayments } from "./offline-payments";
 import { syncPendingSales } from "./offline-sales";
@@ -11,6 +12,7 @@ export type SyncAllResult = {
   customers: SyncFlushResult;
   suppliers: SyncFlushResult;
   products: SyncFlushResult;
+  images: SyncFlushResult;
   operations: SyncFlushResult;
 };
 
@@ -31,8 +33,9 @@ export async function syncAllPending(businessId: string): Promise<SyncAllResult>
   const customers = await syncPendingCustomers(businessId);
   const suppliers = await syncPendingSuppliers(businessId);
   const products = await syncPendingProducts(businessId);
+  const images = await syncPendingProductImages(businessId);
   const operations = await syncPendingOperations(businessId);
-  return { sales, payments, customers, suppliers, products, operations };
+  return { sales, payments, customers, suppliers, products, images, operations };
 }
 
 let stopOutboxSync: (() => void) | null = null;

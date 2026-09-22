@@ -1,6 +1,7 @@
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import {
+  CacheFirst,
   CacheableResponsePlugin,
   ExpirationPlugin,
   NavigationRoute,
@@ -26,6 +27,21 @@ const runtimeCaching = [
     matcher: ({ sameOrigin, url }: { sameOrigin: boolean; url: URL }) =>
       sameOrigin && url.pathname.startsWith("/api/"),
     handler: new NetworkOnly(),
+  },
+  {
+    // Product photos live on Cloudinary (never business data in the
+    // PWA cache, only bytes). Cache-first with tight bounds so catalogs
+    // and the customer portal render offline after first view.
+    matcher: ({ url }: { sameOrigin: boolean; url: URL }) =>
+      url.hostname === "res.cloudinary.com",
+    handler: new CacheFirst({
+      cacheName: "cloudinary-images",
+      plugins: [
+        new CacheableResponsePlugin({ statuses: [0, 200] }),
+        // ~100 photos, 30 days max. Eviction is LRU by last use.
+        new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 }),
+      ],
+    }),
   },
   ...defaultCache,
 ];

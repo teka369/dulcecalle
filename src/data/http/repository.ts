@@ -8,6 +8,7 @@ import {
   mapCustomer,
   mapPayment,
   mapProduct,
+  mapProductImage,
   mapSale,
   mapSession,
   mapToday,
@@ -20,6 +21,7 @@ import {
   type RemoteCustomer,
   type RemotePayment,
   type RemoteProduct,
+  type RemoteProductImage,
   type RemoteSale,
   type RemoteSession,
   type RemoteToday,
@@ -195,6 +197,99 @@ export class HttpRepository {
         requestId ? { idempotencyKey: requestId } : {},
       );
       return mapProduct(row);
+    },
+
+    imageSignature: async (
+      id: string,
+      requestId: string,
+    ): Promise<{
+      cloudName: string;
+      apiKey: string;
+      uploadUrl: string;
+      timestamp: number;
+      signature: string;
+      publicId: string;
+      requestId: string;
+    }> => {
+      return this.http.request<{
+        cloudName: string;
+        apiKey: string;
+        uploadUrl: string;
+        timestamp: number;
+        signature: string;
+        publicId: string;
+        requestId: string;
+      }>("POST", `/products/${id}/image-signature`, {
+        body: { requestId },
+        idempotencyKey: requestId,
+      });
+    },
+
+    registerImage: async (
+      productId: string,
+      input: {
+        publicId: string;
+        secureUrl: string;
+        resourceType?: string;
+        version?: number;
+        width?: number;
+        height?: number;
+        format?: string;
+        bytes?: number;
+        isPrimary?: boolean;
+        altText?: string;
+      },
+      requestId: string,
+    ): Promise<RemoteProductImage> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        `/products/${productId}/images`,
+        { body: input, idempotencyKey: requestId },
+      );
+      return mapProductImage(row);
+    },
+
+    listImages: async (productId: string): Promise<RemoteProductImage[]> => {
+      const rows = await this.http.request<Record<string, unknown>[]>(
+        "GET",
+        `/products/${productId}/images`,
+      );
+      return rows.map(mapProductImage);
+    },
+
+    patchImage: async (
+      productId: string,
+      imageId: string,
+      input: { isPrimary?: boolean; altText?: string },
+    ): Promise<RemoteProductImage> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "PATCH",
+        `/products/${productId}/images/${imageId}`,
+        { body: input },
+      );
+      return mapProductImage(row);
+    },
+
+    reorderImages: async (
+      productId: string,
+      imageIds: string[],
+    ): Promise<RemoteProductImage[]> => {
+      const rows = await this.http.request<Record<string, unknown>[]>(
+        "PATCH",
+        `/products/${productId}/images/reorder`,
+        { body: { imageIds } },
+      );
+      return rows.map(mapProductImage);
+    },
+
+    removeImage: async (
+      productId: string,
+      imageId: string,
+    ): Promise<{ deleted: boolean; id: string }> => {
+      return this.http.request<{ deleted: boolean; id: string }>(
+        "DELETE",
+        `/products/${productId}/images/${imageId}`,
+      );
     },
   };
 

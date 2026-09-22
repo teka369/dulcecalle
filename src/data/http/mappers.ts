@@ -40,6 +40,22 @@ export function asUuid(value: unknown, field: string): string {
   return value;
 }
 
+export type RemoteProductImage = {
+  id: string;
+  productId: string;
+  publicId: string;
+  secureUrl: string;
+  version: number | null;
+  width: number | null;
+  height: number | null;
+  format: string | null;
+  bytes: number | null;
+  position: number;
+  isPrimary: boolean;
+  altText: string | null;
+  createdAt: number;
+};
+
 export type RemoteProduct = {
   id: string;
   name: string;
@@ -50,7 +66,33 @@ export type RemoteProduct = {
   lowStockAt: number;
   archivedAt: string | null;
   createdAt: number;
+  images: RemoteProductImage[];
 };
+
+function asPositiveIntOrNull(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    return null;
+  }
+  return value;
+}
+
+export function mapProductImage(raw: Record<string, unknown>): RemoteProductImage {
+  return {
+    id: asUuid(raw.id, "productImage.id"),
+    productId: asUuid(raw.productId, "productImage.productId"),
+    publicId: String(raw.publicId ?? ""),
+    secureUrl: String(raw.secureUrl ?? ""),
+    version: asPositiveIntOrNull(raw.version),
+    width: raw.width == null ? null : Number(raw.width),
+    height: raw.height == null ? null : Number(raw.height),
+    format: raw.format == null ? null : String(raw.format),
+    bytes: raw.bytes == null ? null : Number(raw.bytes),
+    position: typeof raw.position === "number" ? raw.position : 0,
+    isPrimary: raw.isPrimary === true,
+    altText: raw.altText == null ? null : String(raw.altText),
+    createdAt: asIsoEpoch(raw.createdAt),
+  };
+}
 
 export function mapProduct(raw: Record<string, unknown>): RemoteProduct {
   return {
@@ -63,6 +105,9 @@ export function mapProduct(raw: Record<string, unknown>): RemoteProduct {
     lowStockAt: Number(raw.lowStockAt),
     archivedAt: raw.archivedAt == null ? null : String(raw.archivedAt),
     createdAt: asIsoEpoch(raw.createdAt),
+    images: Array.isArray(raw.images)
+      ? (raw.images as Record<string, unknown>[]).map(mapProductImage)
+      : [],
   };
 }
 

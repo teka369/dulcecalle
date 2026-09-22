@@ -14,6 +14,22 @@ export type CustomerMe = {
   createdAt: string | number;
 };
 
+export type CustomerCatalogImage = {
+  id: string;
+  secureUrl: string;
+  position: number;
+  isPrimary: boolean;
+  altText: string | null;
+};
+
+export type CustomerCatalogProduct = {
+  id: string;
+  name: string;
+  price: number;
+  available: boolean;
+  images: CustomerCatalogImage[];
+};
+
 export type CustomerLedgerLine = {
   id: string;
   productName: string;
@@ -118,6 +134,14 @@ export class CustomerApi {
     });
   }
 
+  products() {
+    return this.http.request<CustomerCatalogProduct[]>(
+      "GET",
+      "/customer/products",
+      { skipBusiness: true },
+    );
+  }
+
   async logout() {
     const customerId = this.session.customer?.id;
     try {
@@ -134,7 +158,9 @@ export class CustomerApi {
     // Only the closing customer's snapshot is removed.
     if (customerId) {
       try {
-        await getLocalDb().customerLedgers.delete(customerId);
+        const db = getLocalDb();
+        await db.customerLedgers.delete(customerId);
+        await db.portalCatalogs.delete(customerId);
       } catch {
         /* local-only cleanup; session is already cleared */
       }

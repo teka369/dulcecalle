@@ -124,6 +124,33 @@ export class CustomerAccessService {
     };
   }
 
+  /**
+   * Public storefront catalog for the customer portal. Only what a
+   * customer may see: no cost, no supplier, no internal ids beyond the
+   * product id needed for detail navigation. Business comes from the
+   * customer token, never from the client.
+   */
+  async products(auth: CustomerAuth) {
+    const rows = await this.prisma.product.findMany({
+      where: { businessId: auth.businessId, archivedAt: null },
+      orderBy: { name: "asc" },
+      include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
+    });
+    return rows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: copToJson(p.price),
+      available: p.stock > 0,
+      images: p.images.map((img) => ({
+        id: img.id,
+        secureUrl: img.secureUrl,
+        position: img.position,
+        isPrimary: img.isPrimary,
+        altText: img.altText,
+      })),
+    }));
+  }
+
   async ledger(auth: CustomerAuth) {
     const raw = await this.catalog.customerLedger(
       {

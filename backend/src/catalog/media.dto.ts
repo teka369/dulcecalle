@@ -62,6 +62,11 @@ export class RegisterProductImageDto {
   altText?: string;
 }
 
+export class SignUploadDto {
+  @IsUUID()
+  requestId!: string;
+}
+
 export class PatchProductImageDto {
   @IsOptional()
   @IsBoolean()

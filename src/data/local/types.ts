@@ -3,7 +3,7 @@
  * stock / debt / avgCost / expected* are CACHE / OPTIMISTIC — PostgreSQL is
  * the financial authority. Do not treat these as source of truth.
  */
-import type { CustomerLedger } from "../http/customer-api";
+import type { CustomerCatalogProduct, CustomerLedger } from "../http/customer-api";
 
 export type CatalogResource = "products" | "customers" | "suppliers";
 
@@ -24,6 +24,17 @@ export type LocalCacheMeta = {
 export type CustomerLedgerSnapshot = {
   customerId: string;
   ledger: CustomerLedger;
+  capturedAt: number;
+};
+
+/**
+ * Portal product catalog snapshot. Same keying and honesty rules as the
+ * ledger cache: presence means "cached", products carry only the public
+ * storefront fields (no cost, no supplier, no internal ids).
+ */
+export type PortalCatalogSnapshot = {
+  customerId: string;
+  products: CustomerCatalogProduct[];
   capturedAt: number;
 };
 
@@ -73,6 +84,7 @@ export type OutboxStatus = "pending" | "in_flight" | "synced" | "failed";
 
 export type OutboxEntity =
   | "product"
+  | "productImage"
   | "customer"
   | "supplier"
   | "sale"
@@ -95,7 +107,24 @@ export type OutboxOperation =
   | "open"
   | "close"
   | "pay"
+  | "remove"
   | "return";
+
+export type LocalProductImage = {
+  id: string;
+  productId: string;
+  publicId: string;
+  secureUrl: string;
+  version: number | null;
+  width: number | null;
+  height: number | null;
+  format: string | null;
+  bytes: number | null;
+  position: number;
+  isPrimary: boolean;
+  altText: string | null;
+  createdAt: number;
+};
 
 export type LocalProduct = {
   id: string;
@@ -111,6 +140,27 @@ export type LocalProduct = {
   archivedAt: string | null;
   createdAt: number;
   updatedAt: number;
+  /** Mirror of the server gallery (position order). Managed by sync. */
+  images: LocalProductImage[];
+};
+
+/** Offline-selected photo waiting for upload. Blob is deleted after sync. */
+export type LocalPendingMedia = {
+  id: string;
+  businessId: string;
+  productId: string;
+  requestId: string;
+  fileName: string;
+  mime: string;
+  size: number;
+  blob: Blob;
+  position: number | null;
+  isPrimary: boolean;
+  altText: string | null;
+  status: "pending" | "uploading" | "failed";
+  attempts: number;
+  lastError: string | null;
+  createdAt: number;
 };
 
 export type LocalCustomer = {

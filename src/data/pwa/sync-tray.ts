@@ -45,6 +45,9 @@ const OPERATION_NAMES: Record<string, string> = {
   "supplier:patch": "Edición de proveedor",
   "product:patch": "Edición de producto",
   "product:archive": "Archivo de producto",
+  "productImage:create": "Foto de producto",
+  "productImage:patch": "Foto de producto",
+  "productImage:remove": "Foto de producto",
 };
 
 export function describeOutboxOperation(
@@ -185,6 +188,11 @@ export function describeOutboxDetail(item: Pick<TrayItem, "entity" | "operation"
     }
     if ((item.entity === "customer" || item.entity === "supplier") && item.operation === "create") {
       return asText(payload.name);
+    }
+    if (item.entity === "productImage") {
+      if (item.operation === "create") return "Subiendo foto";
+      if (item.operation === "remove") return "Eliminando foto";
+      return "Actualizando foto";
     }
     return null;
   } catch {

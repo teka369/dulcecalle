@@ -44,4 +44,11 @@ export class CustomerAccessController {
   ledger(@CurrentCustomer() customer: CustomerAuth) {
     return this.access.ledger(customer);
   }
+
+  @Public()
+  @UseGuards(CustomerJwtGuard)
+  @Get("customer/products")
+  products(@CurrentCustomer() customer: CustomerAuth) {
+    return this.access.products(customer);
+  }
 }

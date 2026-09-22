@@ -3,6 +3,7 @@ import type {
   CustomerLedgerSnapshot,
   LocalCacheMeta,
   LocalSnapshot,
+  PortalCatalogSnapshot,
   PrepReadiness,
   LocalCashMove,
   LocalCashSession,
@@ -10,6 +11,7 @@ import type {
   LocalCustomerPayment,
   LocalExpense,
   LocalInitialDebt,
+  LocalPendingMedia,
   LocalProduct,
   LocalSale,
   LocalSaleLine,
@@ -44,6 +46,8 @@ export class DulceCalleLocalDB extends Dexie {
   customerLedgers!: EntityTable<CustomerLedgerSnapshot, "customerId">;
   prepState!: EntityTable<PrepReadiness, "id">;
   snapshots!: EntityTable<LocalSnapshot, "id">;
+  portalCatalogs!: EntityTable<PortalCatalogSnapshot, "customerId">;
+  pendingMedia!: EntityTable<LocalPendingMedia, "id">;
   outbox!: EntityTable<OutboxItem, "operationId">;
 
   constructor() {
@@ -85,6 +89,17 @@ export class DulceCalleLocalDB extends Dexie {
     // (dashboard, stats). Tenant-keyed; presence means "cached".
     this.version(6).stores({
       snapshots: "id, businessId, kind, [businessId+kind]",
+    });
+    // v7: pending product media. Blobs live here (never in the outbox
+    // payload) until each upload registers server-side, then are deleted.
+    this.version(7).stores({
+      pendingMedia:
+        "id, businessId, productId, requestId, status, [businessId+productId], [businessId+status]",
+    });
+    // v8: portal product catalog snapshot, keyed by customerId like the
+    // M6.10 ledger cache. No businessId on the portal by design.
+    this.version(8).stores({
+      portalCatalogs: "customerId, capturedAt",
     });
   }
 }

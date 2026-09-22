@@ -46,6 +46,7 @@ export function productToLocal(
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: cachedAt,
+    images: row.images.map((img) => ({ ...img })),
   };
 }
 
@@ -60,6 +61,7 @@ export function productToRemote(row: LocalProduct): RemoteProduct {
     lowStockAt: row.lowStockAt,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
+    images: row.images.map((img) => ({ ...img })),
   };
 }
 

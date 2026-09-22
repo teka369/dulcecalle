@@ -14,6 +14,7 @@ import {
   PatchProductImageDto,
   RegisterProductImageDto,
   ReorderProductImagesDto,
+  SignUploadDto,
 } from "./media.dto";
 import { CurrentBusiness } from "../tenancy/business.decorator";
 import type { BusinessContext } from "../identity/auth.types";
@@ -28,8 +29,14 @@ export class MediaController {
   signUpload(
     @CurrentBusiness() ctx: BusinessContext,
     @Param("id") id: string,
+    @Body() dto: SignUploadDto,
+    @Headers("idempotency-key") key?: string,
   ) {
-    return this.media.signUpload(ctx, id);
+    return this.media.signUpload(
+      ctx,
+      id,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
   }
 
   @Throttle({ default: { limit: 30, ttl: 60000 } })
