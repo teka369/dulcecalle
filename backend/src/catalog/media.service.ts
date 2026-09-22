@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
@@ -125,11 +125,20 @@ export function imageJson(img: {
 
 type FetchImpl = typeof fetch;
 
+/**
+ * Explicit DI token for the Cloudinary HTTP transport. Nest cannot resolve
+ * a bare `Function` constructor parameter, so the implementation is bound
+ * here and registered in `CatalogModule`. Tests keep injecting fakes either
+ * by overriding this token in a TestingModule or by passing the second
+ * constructor argument directly.
+ */
+export const CLOUDINARY_FETCH = "CLOUDINARY_FETCH";
+
 @Injectable()
 export class MediaService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly fetchImpl: FetchImpl = fetch,
+    @Inject(CLOUDINARY_FETCH) private readonly fetchImpl: FetchImpl = fetch,
   ) {}
 
   private config(): CloudinaryConfig {
