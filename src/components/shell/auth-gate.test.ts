@@ -25,6 +25,7 @@ describe("customer portal routing", () => {
   it("keeps admin login/register public and customer login public", () => {
     expect(ADMIN_PUBLIC.has("/login")).toBe(true);
     expect(ADMIN_PUBLIC.has("/register")).toBe(true);
+    expect(ADMIN_PUBLIC.has("/acceso-tienda")).toBe(true);
     expect(ADMIN_PUBLIC.has("/cliente")).toBe(false);
     expect(ADMIN_PUBLIC.has("/cliente/login")).toBe(false);
   });
@@ -88,17 +89,23 @@ describe("customer portal routing", () => {
     ).toEqual({ kind: "redirect", to: "/login" });
   });
 
-  it("admin login keeps Cliente primary and hides store access behind the logo gesture", () => {
+  it("login shows customer access directly and hides store access behind ten logo taps", () => {
     const src = readFileSync(join(__dirname, "../../app/login/page.tsx"), "utf8");
-    expect(src).toContain("Entrar como Cliente");
-    expect(src).toContain('href="/cliente/login"');
-    expect(src).toContain("storeAccessOpen");
+    expect(src).toContain("CustomerLoginForm");
     expect(src).toContain("onLogoTap");
     expect(src).toContain("taps.length === 10");
-    expect(src).toContain("Acceso de tienda");
-    expect(src).toContain("Correo");
-    expect(src).toContain("Contraseña");
+    expect(src).toContain('router.push("/acceso-tienda")');
+    expect(src).not.toContain("Entrar como Cliente");
     expect(src).not.toContain("Entrar a mi tienda");
+  });
+
+  it("private store login page exists separately from the customer login", () => {
+    const src = readFileSync(
+      join(__dirname, "../../app/acceso-tienda/page.tsx"),
+      "utf8",
+    );
+    expect(src).toContain("Acceso de tienda");
+    expect(src).toContain("StoreLoginForm");
   });
 
   it("customer login is a code+name form with volver", () => {
