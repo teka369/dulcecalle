@@ -12,6 +12,9 @@ import {
   getHttpReturnable,
   type HttpReturnable,
 } from "@/data/pwa/sales";
+import { getPwaAuthSession } from "@/data/http/session";
+import { useProductImageMap } from "@/data/pwa/product-image-map";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 
 export default function DevolverVentaPage() {
   const params = useParams();
@@ -24,6 +27,7 @@ export default function DevolverVentaPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const requestIdRef = useRef<string | null>(null);
+  const imageMap = useProductImageMap(getPwaAuthSession().businessId);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -150,10 +154,19 @@ export default function DevolverVentaPage() {
                 key={l.id}
                 className="rounded-2xl border border-ink/[0.08] bg-surface p-4"
               >
-                <p className="font-medium">{l.productName}</p>
-                <p className="text-sm text-ink/60">
-                  Quedan {l.remaining} · {formatCop(l.unitPrice)} c/u
-                </p>
+                <div className="flex items-start gap-2">
+                  <ProductThumbnail
+                    secureUrl={imageMap.get(l.productId) ?? null}
+                    alt={l.productName}
+                    size="sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{l.productName}</p>
+                    <p className="text-sm text-ink/60">
+                      Quedan {l.remaining} · {formatCop(l.unitPrice)} c/u
+                    </p>
+                  </div>
+                </div>
                 <label
                   className="mt-3 block text-sm font-medium"
                   htmlFor={`qty-${l.id}`}

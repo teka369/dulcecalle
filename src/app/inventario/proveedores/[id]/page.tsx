@@ -10,6 +10,9 @@ import {
   inventoryStore,
   type PwaSupplierSurtir,
 } from "@/store/inventoryStore";
+import { getPwaAuthSession } from "@/data/http/session";
+import { useProductImageMap } from "@/data/pwa/product-image-map";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 
 export default function ProveedorFichaPage() {
   const params = useParams();
@@ -17,6 +20,7 @@ export default function ProveedorFichaPage() {
   const [supplier, setSupplier] = useState<RemoteSupplier | null>(null);
   const [historial, setHistorial] = useState<PwaSupplierSurtir[]>([]);
   const [ready, setReady] = useState(false);
+  const imageMap = useProductImageMap(getPwaAuthSession().businessId);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -189,8 +193,15 @@ export default function ProveedorFichaPage() {
                 className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{h.productName}</span>
-                  <span className="font-semibold">{formatCop(h.totalCost)}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <ProductThumbnail
+                      secureUrl={imageMap.get(h.productId) ?? null}
+                      alt={h.productName}
+                      size="xs"
+                    />
+                    <span className="min-w-0 font-medium">{h.productName}</span>
+                  </span>
+                  <span className="shrink-0 font-semibold">{formatCop(h.totalCost)}</span>
                 </div>
                 <p className="mt-1 text-ink/60">
                   ×{h.qty}

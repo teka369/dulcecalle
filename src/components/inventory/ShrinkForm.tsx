@@ -13,6 +13,8 @@ import {
 import { newRequestId } from "@/domain/requestId";
 import { routeId } from "@/data/pwa/ids";
 import { inventoryStore } from "@/store/inventoryStore";
+import { primaryImageUrl } from "@/data/media/urls";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 
 export function ShrinkForm({
   title,
@@ -128,11 +130,20 @@ export function ShrinkForm({
       </header>
 
       <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
-          Producto
-        </p>
-        <p className="mt-1 font-semibold">{product.name}</p>
-        <p className="mt-1 text-sm text-ink/60">Stock {product.stock}</p>
+        <div className="flex items-start gap-3">
+          <ProductThumbnail
+            secureUrl={primaryImageUrl(product.images)}
+            alt={product.name}
+            size="md"
+          />
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+              Producto
+            </p>
+            <p className="mt-1 font-semibold">{product.name}</p>
+            <p className="mt-1 text-sm text-ink/60">Stock {product.stock}</p>
+          </div>
+        </div>
 
         <label className="mt-4 block text-sm font-medium" htmlFor="cantidad">
           Cantidad

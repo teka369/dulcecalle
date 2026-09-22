@@ -9,6 +9,9 @@ import {
   getSaleDetailWithOfflineFallback,
   type SaleDetailResult,
 } from "@/data/pwa/offline-sales";
+import { getPwaAuthSession } from "@/data/http/session";
+import { useProductImageMap } from "@/data/pwa/product-image-map";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 
 const kindLabel: Record<string, string> = {
   paid: "Pagada",
@@ -21,6 +24,7 @@ export default function VentaDetallePage() {
   const id = routeId(params.id);
   const [data, setData] = useState<SaleDetailResult | null>(null);
   const [ready, setReady] = useState(false);
+  const imageMap = useProductImageMap(getPwaAuthSession().businessId);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -97,9 +101,16 @@ export default function VentaDetallePage() {
               key={l.id}
               className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
             >
-              <div className="flex justify-between gap-2">
-                <span className="font-medium">{l.productName}</span>
-                <span className="font-semibold">{formatCop(l.lineTotal)}</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2">
+                  <ProductThumbnail
+                    secureUrl={imageMap.get(l.productId) ?? null}
+                    alt={l.productName}
+                    size="xs"
+                  />
+                  <span className="min-w-0 font-medium">{l.productName}</span>
+                </span>
+                <span className="shrink-0 font-semibold">{formatCop(l.lineTotal)}</span>
               </div>
               <p className="mt-1 text-xs text-ink/50">
                 {l.qty} × {formatCop(l.unitPrice)}

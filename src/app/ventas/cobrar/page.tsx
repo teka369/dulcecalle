@@ -8,6 +8,8 @@ import { formatCop, mulCop, addCop, subCop } from "@/domain/money";
 import type { PaymentKind } from "@/domain/types";
 import type { RemoteCustomer, RemoteProduct } from "@/data/http/mappers";
 import { createSaleWithOfflineFallback } from "@/data/pwa/offline-sales";
+import { primaryImageUrl } from "@/data/media/urls";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { listCachedCustomers, listCachedProducts } from "@/data/pwa/catalog";
 import { useCart } from "@/store/cartStore";
@@ -64,6 +66,7 @@ export default function CobrarPage() {
         return {
           productId: p.id,
           name: p.name,
+          imageUrl: primaryImageUrl(p.images),
           qty: item.qty,
           unitPrice,
           catalogPrice: p.price,
@@ -73,6 +76,7 @@ export default function CobrarPage() {
       .filter(Boolean) as Array<{
       productId: string;
       name: string;
+      imageUrl: string | null;
       qty: number;
       unitPrice: number;
       catalogPrice: number;
@@ -182,16 +186,19 @@ export default function CobrarPage() {
         <h2 className="text-sm font-semibold text-ink/60">Resumen</h2>
         <ul className="mt-2 flex flex-col gap-1">
           {lines.map((l) => (
-            <li key={l.productId} className="flex justify-between text-sm">
-              <span>
-                {l.name} ×{l.qty}
-                {l.unitPrice !== l.catalogPrice && (
-                  <span className="ml-1 text-ink/45">
-                    ({formatCop(l.unitPrice)})
-                  </span>
-                )}
+            <li key={l.productId} className="flex items-center justify-between gap-2 text-sm">
+              <span className="flex min-w-0 items-center gap-2">
+                <ProductThumbnail secureUrl={l.imageUrl} alt={l.name} size="xs" />
+                <span className="min-w-0">
+                  {l.name} ×{l.qty}
+                  {l.unitPrice !== l.catalogPrice && (
+                    <span className="ml-1 text-ink/45">
+                      ({formatCop(l.unitPrice)})
+                    </span>
+                  )}
+                </span>
               </span>
-              <span className="font-medium">{formatCop(l.lineTotal)}</span>
+              <span className="shrink-0 font-medium">{formatCop(l.lineTotal)}</span>
             </li>
           ))}
         </ul>

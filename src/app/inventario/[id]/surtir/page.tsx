@@ -9,6 +9,8 @@ import { newRequestId } from "@/domain/requestId";
 import type { PayMethod } from "@/domain/types";
 import type { RemoteProduct, RemoteSupplier } from "@/data/http/mappers";
 import { validateSurtirForm } from "@/domain/inventory";
+import { primaryImageUrl } from "@/data/media/urls";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { routeId } from "@/data/pwa/ids";
 import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
 import { inventoryStore } from "@/store/inventoryStore";
@@ -176,11 +178,18 @@ export default function SurtirPage() {
       </header>
 
       <section className="flex flex-col gap-4 rounded-2xl border border-ink/[0.08] bg-surface p-4">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
-            Producto
-          </p>
-          <p className="mt-1 font-semibold">{product.name}</p>
+        <div className="flex items-start gap-3">
+          <ProductThumbnail
+            secureUrl={primaryImageUrl(product.images)}
+            alt={product.name}
+            size="md"
+          />
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+              Producto
+            </p>
+            <p className="mt-1 font-semibold">{product.name}</p>
+          </div>
         </div>
 
         <div>

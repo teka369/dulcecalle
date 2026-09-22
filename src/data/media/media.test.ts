@@ -84,4 +84,25 @@ describe("delivery urls", () => {
     expect(primaryImage(rows)).toEqual({ isPrimary: true, position: 5 });
     expect(primaryImage([])).toBeNull();
   });
+
+  it("resolves the primary secureUrl or null", async () => {
+    const { primaryImageUrl } = await import("./urls");
+    expect(primaryImageUrl(null)).toBeNull();
+    expect(primaryImageUrl(undefined)).toBeNull();
+    expect(primaryImageUrl([])).toBeNull();
+    expect(
+      primaryImageUrl([
+        { isPrimary: false, position: 1, secureUrl: "https://cdn/a.jpg" },
+        { isPrimary: true, position: 5, secureUrl: "https://cdn/b.jpg" },
+        { isPrimary: false, position: 0, secureUrl: "https://cdn/c.jpg" },
+      ]),
+    ).toBe("https://cdn/b.jpg");
+    // No primary: lowest position wins, same rule as the gallery.
+    expect(
+      primaryImageUrl([
+        { isPrimary: false, position: 1, secureUrl: "https://cdn/a.jpg" },
+        { isPrimary: false, position: 0, secureUrl: "https://cdn/c.jpg" },
+      ]),
+    ).toBe("https://cdn/c.jpg");
+  });
 });

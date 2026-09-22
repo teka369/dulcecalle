@@ -4,7 +4,7 @@ import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
-import { ProductImageView } from "@/components/product/ProductImageView";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
 import { useInventory } from "@/store/inventoryStore";
 
@@ -123,11 +123,10 @@ export default function InventarioPage() {
                     className="flex min-h-11 items-start justify-between gap-2 rounded-2xl border border-ink/[0.08] bg-surface p-4"
                   >
                     <div className="flex min-w-0 items-start gap-3">
-                      <ProductImageView
+                      <ProductThumbnail
                         secureUrl={primary?.secureUrl ?? null}
                         alt={p.name}
-                        variant="thumb"
-                        className="h-14 w-14 shrink-0"
+                        size="md"
                       />
                       <div className="min-w-0">
                       <p className="font-medium">{p.name}</p>

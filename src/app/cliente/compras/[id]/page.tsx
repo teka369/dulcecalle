@@ -7,6 +7,8 @@ import { CustomerChrome, CustomerCacheNotice } from "@/components/customer/Custo
 import type { CustomerLedger } from "@/data/http/customer-api";
 import { loadCachedCustomerLedger } from "@/data/pwa/customer-ledger-cache";
 import { findCustomerSale } from "@/data/pwa/customer-portal";
+import { usePortalImageMap } from "@/data/pwa/product-image-map";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { routeId } from "@/data/pwa/ids";
 import { formatCop } from "@/domain/money";
 
@@ -17,6 +19,7 @@ export default function CustomerPurchaseDetailPage() {
   const [capturedAt, setCapturedAt] = useState<number | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const imageMap = usePortalImageMap();
 
   useEffect(() => {
     void loadCachedCustomerLedger()
@@ -73,13 +76,24 @@ export default function CustomerPurchaseDetailPage() {
             key={l.id}
             className="flex items-start justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4"
           >
-            <span className="min-w-0">
-              <span className="block font-medium">{l.productName}</span>
-              <span className="block text-xs text-ink/55">
-                {l.qty} × {formatCop(l.unitPrice)}
+            <span className="flex min-w-0 items-start gap-2">
+              <ProductThumbnail
+                secureUrl={
+                  typeof l.productId === "string"
+                    ? (imageMap.get(l.productId) ?? null)
+                    : null
+                }
+                alt={l.productName}
+                size="sm"
+              />
+              <span className="min-w-0">
+                <span className="block font-medium">{l.productName}</span>
+                <span className="block text-xs text-ink/55">
+                  {l.qty} × {formatCop(l.unitPrice)}
+                </span>
               </span>
             </span>
-            <span className="text-sm font-semibold tabular-nums">
+            <span className="shrink-0 text-sm font-semibold tabular-nums">
               {formatCop(l.lineTotal)}
             </span>
           </li>

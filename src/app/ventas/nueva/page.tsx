@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { formatCop, mulCop, addCop } from "@/domain/money";
 import { parseSaleUnitPrice } from "@/domain/sale/validate";
 import type { RemoteProduct } from "@/data/http/mappers";
+import { primaryImageUrl } from "@/data/media/urls";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getPwaApi } from "@/data/pwa/api";
 import { useCart } from "@/store/cartStore";
 
@@ -140,9 +142,16 @@ export default function NuevaVentaPage() {
                 key={p.id}
                 className="flex flex-col rounded-2xl border border-ink/[0.08] bg-surface p-3"
               >
-                <p className="line-clamp-2 min-h-10 text-sm font-medium">
-                  {p.name}
-                </p>
+                <div className="flex items-start gap-2">
+                  <ProductThumbnail
+                    secureUrl={primaryImageUrl(p.images)}
+                    alt={p.name}
+                    size="md"
+                  />
+                  <p className="line-clamp-2 min-h-10 flex-1 text-sm font-medium">
+                    {p.name}
+                  </p>
+                </div>
                 <label className="mt-1 text-[11px] font-medium uppercase tracking-wide text-ink/45">
                   Precio de esta venta
                 </label>

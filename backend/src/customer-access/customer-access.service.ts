@@ -197,6 +197,7 @@ export function publicCustomerLedger(raw: AdminLedger) {
       createdAt: s.createdAt,
       lines: s.lines.map((l) => ({
         id: l.id,
+        productId: l.productId,
         productName: l.productName,
         qty: l.qty,
         unitPrice: l.unitPrice,

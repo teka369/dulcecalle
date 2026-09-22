@@ -47,3 +47,11 @@ export function primaryImage<T extends { isPrimary: boolean; position: number }>
   if (images.length === 0) return null;
   return sortImages(images)[0] ?? null;
 }
+
+/** secureUrl of the primary image, or null when the gallery is empty. */
+export function primaryImageUrl(
+  images: readonly { isPrimary: boolean; position: number; secureUrl: string }[] | null | undefined,
+): string | null {
+  if (!images || images.length === 0) return null;
+  return primaryImage(images)?.secureUrl ?? null;
+}

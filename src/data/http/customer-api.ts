@@ -32,6 +32,8 @@ export type CustomerCatalogProduct = {
 
 export type CustomerLedgerLine = {
   id: string;
+  /** Lets the portal match the line with the cached catalog for its photo. */
+  productId: string;
   productName: string;
   qty: number;
   unitPrice: number;
