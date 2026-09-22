@@ -94,6 +94,7 @@ describe("customer portal routing", () => {
     expect(src).toContain('href="/cliente/login"');
     expect(src).toContain("storeAccessOpen");
     expect(src).toContain("onLogoTap");
+    expect(src).toContain("taps.length === 10");
     expect(src).toContain("Acceso de tienda");
     expect(src).toContain("Correo");
     expect(src).toContain("Contraseña");
