@@ -376,8 +376,28 @@ export class MediaService {
     } catch {
       throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
     }
-    if (destroyRes.status !== 200 && destroyRes.status !== 404) {
+    // Cloudinary answers 200 with a JSON body even when the asset is
+    // already gone ({ result: "not found" }). Only that case converges
+    // with the row delete; any other non-ok result keeps the row so a
+    // retry can reconcile instead of silently losing the association.
+    if (destroyRes.status === 404) {
+      // No-op: fall through to the row delete below.
+    } else if (destroyRes.status !== 200) {
       throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
+    } else {
+      let destroyBody: unknown = null;
+      try {
+        destroyBody = await destroyRes.json();
+      } catch {
+        throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
+      }
+      const result =
+        typeof destroyBody === "object" && destroyBody !== null
+          ? String((destroyBody as Record<string, unknown>).result ?? "")
+          : "";
+      if (result !== "ok" && result !== "not found") {
+        throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
+      }
     }
 
     await this.prisma.$transaction(async (tx) => {
