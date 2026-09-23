@@ -104,7 +104,81 @@ describe("S5 stats — separate metrics & period ranges", () => {
   it("Semana is last 7 local days inclusive", () => {
     const now = new Date(2026, 8, 17, 12, 0, 0).getTime();
     const r = rangeSemana(now);
+    const spanDays = Math.round((r.endMs - r.startMs) / 86_400_000);
+    expect(spanDays).toBe(7);
     expect(r.period).toBe("semana");
+  });
+
+  it("period filters isolate Hoy vs Mes", async () => {
+    const productId = await productRepository.create({
+      name: "Gomitas",
+      category: "Dulce",
+      price: 2000,
+      avgCost: 800,
+      stock: 10,
+      lowStockAt: 2,
+    });
+    await cashRepository.openSession(0);
+    await saleRepository.createSale({
+      lines: [{ productId, qty: 1 }],
+      paymentKind: "paid",
+      amountReceived: 2000,
+      method: "Nequi",
+    });
+
+    const hoy = await loadStats("hoy");
+    expect(hoy.ventas).toBe(2000);
+    expect(hoy.recibidoNequi).toBe(2000);
+    expect(hoy.recibidoEfectivo).toBe(0);
+
+    const mes = await loadStats("mes");
+    expect(mes.ventas).toBe(2000);
+  });
+
+  it("persists stats across simulated reload (Dexie)", async () => {
+    const productId = await productRepository.create({
+      name: "Chicle",
+      category: "Dulce",
+      price: 500,
+      avgCost: 200,
+      stock: 20,
+      lowStockAt: 3,
+    });
+    await cashRepository.openSession(0);
+    await saleRepository.createSale({
+      lines: [{ productId, qty: 2 }],
+      paymentKind: "paid",
+      amountReceived: 1000,
+      method: "Efectivo",
+    });
+
+    const before = await loadStats("hoy");
+    expect(before.ventas).toBe(1000);
+
+    __reopenDbForTests();
+    const after = await loadStats("hoy");
+    expect(after.ventas).toBe(1000);
+    expect(after.recibido).toBe(1000);
+    expect(after.ganancia).toBe(600);
+  });
+
+  it("LOCKED copy has no Vendí/Recibí/Me deben and no Esperado in Stats", () => {
+    expect(STATS_COPY.ventas).toBe("Ventas");
+    expect(STATS_COPY.recibido).toBe("Recibido");
+    expect(STATS_COPY.porCobrar).toBe("Por cobrar");
+    expect(STATS_COPY.gaste).toBe("Gasté");
+    expect(STATS_COPY.inverti).toBe("Invertí");
+    expect(STATS_COPY.ganancia).toBe("Ganancia aprox");
+    expect(STATS_COPY.irACaja).toBe("Ir a Caja");
+    const blob = JSON.stringify(STATS_COPY);
+    expect(blob).not.toContain("Vendí");
+    expect(blob).not.toContain("Recibí");
+    expect(blob).not.toContain("Me deben");
+    expect(blob).not.toContain("Esperado");
+    expect(blob).not.toContain("Contado");
+    expect(blob).not.toContain("Diferencia");
+    expect(blob).not.toContain("Top productos");
+    expect(rangeForPeriod("hoy").period).toBe("hoy");
   });
 
   it("valorInventario uses unit average for sellable and lot pool for combos", async () => {
