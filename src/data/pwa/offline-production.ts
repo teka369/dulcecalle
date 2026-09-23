@@ -162,21 +162,6 @@ export async function prepararWithOfflineFallback(
           occurredOn: todayLocal(),
           createdAt: now,
         });
-        await db.stockMoves.put({
-          id: newEntityId(),
-          businessId: business,
-          productId: source.id,
-          delta: 0,
-          reason: "preparacion",
-          unitCost: 0,
-          supplierId: null,
-          refType: "preparation",
-          refId: preparationId,
-          note: `Preparación de ${input.qty} × ${target.name}. Asignados ${transfer}; restante ${source.avgCost - transfer}.`,
-          requestId: null,
-          occurredOn: todayLocal(),
-          createdAt: now,
-        });
         await getOutboxStore().enqueue({
           operationId: preparationId,
           businessId: business,

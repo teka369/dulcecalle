@@ -173,11 +173,10 @@ describe("prepararWithOfflineFallback", () => {
     });
 
     const moves = await getLocalDb().stockMoves.toArray();
-    expect(moves).toHaveLength(2);
+    expect(moves).toHaveLength(1);
     const target = moves.find((m) => m.productId === TARGET_ID);
-    const source = moves.find((m) => m.productId === COMBO_ID);
     expect(target).toMatchObject({ delta: 10, reason: "preparacion", refType: "preparation" });
-    expect(source).toMatchObject({ delta: 0, reason: "preparacion", refType: "preparation" });
+    expect(moves.find((m) => m.productId === COMBO_ID)).toBeUndefined();
     expect(target?.refId).toBe(rows[0]?.id);
 
     // Target stock/avg updated with the SAME weighted formula as the server.
