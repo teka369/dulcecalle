@@ -38,7 +38,7 @@ const api = {
 vi.mock("@/data/pwa/api", () => ({ getPwaApi: () => api }));
 vi.mock("@/data/http/session", () => ({ getPwaAuthSession: () => api.session }));
 
-function productRow(stock = 10, avgCost = 100) {
+function productRow(stock = 10, avgCost = 100, sellable = true) {
   return {
     id: productId,
     businessId,
@@ -365,7 +365,7 @@ describe("M6.8 offline operations", () => {
     );
   });
 
-  it("surtir waits for an offline supplier creation instead of referencing it", async () => {
+  it("surtir on a combo adds totalCost to the lot pool instead of reweighting units", async () => {\n    api.inventory.surtir.mockRejectedValue(new NetworkError("offline"));\n    await getLocalDb().products.put({\n      ...productRow(1, 50_000, false),\n      name: "Combo enchiladas",\n    });\n    await surtirWithOfflineFallback(\n      { productId, qty: 1, unitCost: 50_000, totalCost: 50_000, method: "Efectivo", supplierId: null },\n      "21212121-2121-4212-8212-212121212122",\n    );\n    const combo = await getLocalDb().products.get(productId);\n    expect(combo?.stock).toBe(2);\n    expect(combo?.avgCost).toBe(100_000);\n  });\n\n  it("surtir waits for an offline supplier creation instead of referencing it", async () => {
     api.inventory.surtir.mockRejectedValue(new NetworkError("offline"));
     await getLocalDb().products.put(productRow());
     await getLocalDb().suppliers.put({
