@@ -165,6 +165,9 @@ async function createLocalSale(
         const product = productById.get(line.productId);
         if (!product) throw new Error("El producto no está disponible sin conexión.");
         if (product.archivedAt) throw new Error(`El producto "${product.name}" está archivado.`);
+        if (product.sellable === false) {
+          throw new Error(`El producto "${product.name}" es un insumo y no se puede vender.`);
+        }
         if (product.stock < line.qty) throw new Error(`Stock insuficiente para "${product.name}".`);
         const unitPrice = line.unitPrice ?? product.price;
         if (!Number.isInteger(unitPrice) || unitPrice < 0) {

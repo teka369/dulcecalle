@@ -168,6 +168,12 @@ export class SalesService {
           if (!product) {
             throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
           }
+          if (product.sellable === false) {
+            throw new AppError(
+              ERROR_CODES.VALIDATION,
+              `El producto "${product.name}" es un insumo y no se puede vender.`,
+            );
+          }
           const unitPrice = resolveUnitPrice(product.price, line.unitPrice);
           const unitCost = asCop(product.avgCost);
           const lineTotal = mulCop(unitPrice, line.qty);

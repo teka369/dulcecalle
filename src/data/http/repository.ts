@@ -505,7 +505,9 @@ export class HttpRepository {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         "/preparations",
-        { body: input, idempotencyKey: requestId },
+        // requestId travels in both places (same UUID): the DTO accepts it
+        // and resolveIdempotencyKey cross-checks it against the header.
+        { body: { ...input, requestId }, idempotencyKey: requestId },
       );
       return mapPreparation(row);
     },

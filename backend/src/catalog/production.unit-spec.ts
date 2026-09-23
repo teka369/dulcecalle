@@ -36,7 +36,15 @@ describe("preparations (AppModule)", () => {
   const tx = {
     $executeRaw: async () => 0,
     $queryRaw: async () => [],
+    sale: { create: async ({ data }: { data: unknown }) => data },
+    saleLine: { create: async ({ data }: { data: unknown }) => data },
+    cashMove: { create: async ({ data }: { data: unknown }) => data },
+    cashSession: { findFirst: async () => null },
     product: {
+      findMany: async ({ where }: { where: { id: { in: string[] }; businessId: string } }) =>
+        [...products.values()].filter(
+          (p) => where.id.in.includes(p.id) && p.businessId === where.businessId && !p.archivedAt,
+        ),
       findFirst: async ({ where }: { where: { id: string; businessId: string } }) => {
         const p = products.get(where.id);
         return p && p.businessId === where.businessId && !p.archivedAt ? p : null;
@@ -68,6 +76,7 @@ describe("preparations (AppModule)", () => {
       findUnique: async () => ({ role: "owner", business: { timezone: "America/Bogota" } }),
     },
     cashSession: { findUnique: async () => null },
+    sale: { findUnique: async () => null },
     product: {
       findFirst: async ({ where }: { where: { id: string; businessId: string } }) => {
         const p = products.get(where.id);
@@ -439,6 +448,23 @@ describe("preparations (AppModule)", () => {
       .set("Authorization", `Bearer ${token()}`)
       .set("X-Business-Id", BIZ);
     expect(bad.status).toBe(400);
+  });
+
+  it("cannot sell an insumo: backend enforces what the UI filters", async () => {
+    const res = await request(app.getHttpServer())
+      .post("/v1/sales")
+      .set(auth(BIZ, newRequestKey()))
+      .send({
+        lines: [{ productId: COMBO, qty: 1 }],
+        paymentKind: "paid",
+        amountReceived: 105000,
+        method: "Efectivo",
+      });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("insumo");
+    // Nothing moved: combo stock intact, no sale rows.
+    expect(products.get(COMBO)?.stock).toBe(1);
+    expect(preparations).toHaveLength(0);
   });
 
   it("portal catalog excludes insumos", async () => {
