@@ -112,7 +112,10 @@ export class StatsService {
     let valorInventario = 0n;
     let stockBajo = 0;
     for (const p of products) {
-      valorInventario = addCop(valorInventario, mulCop(p.avgCost, p.stock));
+      valorInventario = addCop(
+        valorInventario,
+        p.sellable === false ? p.avgCost : mulCop(p.avgCost, p.stock),
+      );
       if (p.stock <= p.lowStockAt) stockBajo += 1;
     }
 
