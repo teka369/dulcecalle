@@ -15,7 +15,7 @@ import type {
   ShrinkDto,
   SurtirDto,
 } from "./catalog.dto";
-import { reconcileSurtirCost, weightedAvgCost } from "../shared/inventory";
+import {\n  nextAvgCostAfterSurtir,\n  openingStoredAvgCost,\n  reconcileSurtirCost,\n  weightedAvgCost,\n} from "../shared/inventory";
 import { asCop, copToJson, mulCop } from "../shared/money";
 import { occurredOnDate, dateKey } from "../shared/clock";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
@@ -104,7 +104,7 @@ export class CatalogService {
     if (!name) throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.emptyName);
     const stock = dto.stock ?? 0;
     const gifted = Boolean(dto.gifted);
-    const avgCost = gifted ? 0n : asCop(dto.avgCost ?? 0);
+    const unitCost = gifted ? 0n : asCop(dto.avgCost ?? 0);\n    const sellable = dto.sellable ?? true;\n    const avgCost = openingStoredAvgCost({ sellable, stock, unitCost });
     if (stock > 0 && avgCost <= 0n && !gifted) {
       throw new AppError(ERROR_CODES.NEED_COST, MESSAGES.needCost);
     }
@@ -125,7 +125,7 @@ export class CatalogService {
             avgCost,
             stock,
             lowStockAt: dto.lowStockAt ?? 5,
-            sellable: dto.sellable ?? true,
+            sellable,
             requestId,
           },
         });
@@ -137,7 +137,7 @@ export class CatalogService {
               productId: id,
               delta: stock,
               reason: "inicial",
-              unitCost: avgCost,
+              unitCost,
               refType: "product",
               refId: id,
               note: gifted ? MESSAGES.giftedNote : null,
@@ -721,12 +721,7 @@ export class CatalogService {
         });
         if (!product) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
 
-        const nextAvg = weightedAvgCost(
-          product.stock,
-          product.avgCost,
-          dto.qty,
-          unitCost,
-        );
+        const nextAvg = nextAvgCostAfterSurtir({\n          sellable: product.sellable,\n          stock: product.stock,\n          avgCost: product.avgCost,\n          qty: dto.qty,\n          unitCost,\n          totalCost,\n        });
         const nextStock = product.stock + dto.qty;
         await tx.product.update({
           where: { id: productId },
