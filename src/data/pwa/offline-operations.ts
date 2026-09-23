@@ -466,7 +466,19 @@ export function roundedAvg(oldStock: number, oldAvg: number, qty: number, unitCo
   return next <= 0 ? oldAvg : Math.round((oldAvg * oldStock + unitCost * qty) / next);
 }
 
-export function nextAvgCostAfterSurtir(input: {\n  sellable: boolean;\n  stock: number;\n  avgCost: number;\n  qty: number;\n  unitCost: number;\n  totalCost: number;\n}): number {\n  if (!input.sellable) return input.avgCost + input.totalCost;\n  return roundedAvg(input.stock, input.avgCost, input.qty, input.unitCost);\n}\n\nfunction reconcileCost(qty: number, unitCost: number, totalCost: number) {
+export function nextAvgCostAfterSurtir(input: {
+  sellable: boolean;
+  stock: number;
+  avgCost: number;
+  qty: number;
+  unitCost: number;
+  totalCost: number;
+}): number {
+  if (!input.sellable) return input.avgCost + input.totalCost;
+  return roundedAvg(input.stock, input.avgCost, input.qty, input.unitCost);
+}
+
+function reconcileCost(qty: number, unitCost: number, totalCost: number) {
   if (unitCost * qty === totalCost) return { unitCost, totalCost };
   if (totalCost > 0) return { unitCost: Math.round(totalCost / qty), totalCost };
   return { unitCost, totalCost: 0 };
@@ -533,7 +545,14 @@ export async function surtirWithOfflineFallback(
       await db.products.put({
         ...product,
         stock: product.stock + input.qty,
-        avgCost: nextAvgCostAfterSurtir({\n          sellable: product.sellable !== false,\n          stock: product.stock,\n          avgCost: product.avgCost,\n          qty: input.qty,\n          unitCost: cost.unitCost,\n          totalCost: cost.totalCost,\n        }),
+        avgCost: nextAvgCostAfterSurtir({
+          sellable: product.sellable !== false,
+          stock: product.stock,
+          avgCost: product.avgCost,
+          qty: input.qty,
+          unitCost: cost.unitCost,
+          totalCost: cost.totalCost,
+        }),
         updatedAt: now,
       });
       await db.stockMoves.put({
