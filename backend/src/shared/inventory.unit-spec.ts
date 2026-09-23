@@ -39,4 +39,13 @@ describe("combo lot pool vs sellable unit average", () => {
       openingStoredAvgCost({ sellable: true, stock: 2, unitCost: 50_000n }),
     ).toBe(50_000n);
   });
+
+  it("opening combo with no stock does not store a phantom lot", () => {
+    expect(
+      openingStoredAvgCost({ sellable: false, stock: 0, unitCost: 0n }),
+    ).toBe(0n);
+    expect(
+      openingStoredAvgCost({ sellable: false, stock: 0, unitCost: 50_000n }),
+    ).toBe(0n);
+  });
 });

@@ -19,14 +19,22 @@ export function nextAvgCostAfterSurtir(input: {
   return weightedAvgCost(input.stock, input.avgCost, input.qty, input.unitCost);
 }
 
-/** Opening avgCost: unit cost for sellable; unit×stock lot pool for combos. */
+/**
+ * Opening avgCost.
+ * Sellable: unit cost (including stock = 0, cost typed ahead of first surtir).
+ * Combo with stock: unit×stock lot pool.
+ * Combo with no stock: 0 — a typed cost is not a lot; Surtir opens the pool.
+ */
 export function openingStoredAvgCost(input: {
   sellable: boolean;
   stock: number;
   unitCost: bigint;
 }): bigint {
   const unit = asCop(input.unitCost);
-  if (!input.sellable && input.stock > 0) return unit * BigInt(input.stock);
+  if (!input.sellable) {
+    if (input.stock <= 0) return 0n;
+    return unit * BigInt(input.stock);
+  }
   return unit;
 }
 
