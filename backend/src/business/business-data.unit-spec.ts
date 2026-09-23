@@ -24,6 +24,7 @@ function fkError(): Error {
 function fakePrisma(seedImages: Row[] = [{ businessId: BIZ, productId: "p1", publicId: `dulcecalle/${BIZ}/products/p1/r1` }]) {
   const images = [...seedImages];
   const products = [{ businessId: BIZ, id: "p1" }];
+  const preparations: Row[] = [{ businessId: BIZ, sourceId: "p0", targetId: "p1" }];
   const calls: string[] = [];
   const table = (name: string, extra?: { onDeleteProducts?: () => void }) => ({
     findMany: async (args: { where: { businessId: string }; select?: Record<string, boolean> }) => {
@@ -49,7 +50,12 @@ function fakePrisma(seedImages: Row[] = [{ businessId: BIZ, productId: "p1", pub
         const blocking = images.filter(
           (img) => img.businessId === biz && removed.includes(img.productId),
         );
-        if (blocking.length > 0) throw fkError();
+        const blockingPrep = preparations.filter(
+          (r) =>
+            r.businessId === biz &&
+            (removed.includes(r.sourceId ?? "") || removed.includes(r.targetId ?? "")),
+        );
+        if (blocking.length > 0 || blockingPrep.length > 0) throw fkError();
         for (let i = products.length - 1; i >= 0; i--) {
           if (products[i]?.businessId === biz) products.splice(i, 1);
         }
@@ -60,6 +66,16 @@ function fakePrisma(seedImages: Row[] = [{ businessId: BIZ, productId: "p1", pub
         for (let i = images.length - 1; i >= 0; i--) {
           if (images[i]?.businessId === biz) {
             images.splice(i, 1);
+            count += 1;
+          }
+        }
+        return { count };
+      }
+      if (name === "preparation") {
+        let count = 0;
+        for (let i = preparations.length - 1; i >= 0; i--) {
+          if (preparations[i]?.businessId === biz) {
+            preparations.splice(i, 1);
             count += 1;
           }
         }
@@ -83,12 +99,14 @@ function fakePrisma(seedImages: Row[] = [{ businessId: BIZ, productId: "p1", pub
     supplier: table("supplier"),
     product: table("product"),
     productImage: table("productImage"),
+    preparation: table("preparation"),
     setting: table("setting"),
     importIdMap: table("importIdMap"),
   };
   return {
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(tx),
-    __state: { images, products, calls },
+    __preparations: preparations,
+    __state: { images, products, preparations, calls },
   };
 }
 
@@ -138,16 +156,23 @@ describe("BusinessDataService.resetData", () => {
     const svc = service(prisma, media);
     const result = await svc.resetData(ctx());
     expect(result.deleted.productImages).toBe(1);
+    expect(result.deleted.preparations).toBe(1);
     expect(result.deleted.products).toBe(1);
     expect(result.deletedCustomerIds).toEqual([]);
     expect(result.cloudinary).toEqual({ destroyed: 1, failed: 0 });
     expect(prisma.__state.images).toHaveLength(0);
+    expect(prisma.__state.preparations).toHaveLength(0);
     expect(prisma.__state.products).toHaveLength(0);
-    // FK-safe order: images deleted before products.
+    // FK-safe order: images and preparations deleted before products.
     const order = prisma.__state.calls.filter((c) =>
-      c.startsWith("product"),
+      c.startsWith("product") || c.startsWith("preparation"),
     );
-    expect(order).toEqual(["productImage.findMany", "productImage.deleteMany", "product.deleteMany"]);
+    expect(order).toEqual([
+      "productImage.findMany",
+      "productImage.deleteMany",
+      "preparation.deleteMany",
+      "product.deleteMany",
+    ]);
   });
 
   it("succeeds on a business without images", async () => {

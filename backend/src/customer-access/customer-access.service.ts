@@ -132,7 +132,7 @@ export class CustomerAccessService {
    */
   async products(auth: CustomerAuth) {
     const rows = await this.prisma.product.findMany({
-      where: { businessId: auth.businessId, archivedAt: null },
+      where: { businessId: auth.businessId, archivedAt: null, sellable: true },
       orderBy: { name: "asc" },
       include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
     });

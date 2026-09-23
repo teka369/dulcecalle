@@ -52,7 +52,7 @@ export const MESSAGES = {
   returnEmpty: "Elige qué se devuelve.",
   returnLineNotFound: "Ese producto no está en la venta.",
   stockViaMoves:
-    "El stock solo cambia con surtir, ventas, mermas, devoluciones o el alta inicial.",
+    "El stock solo cambia con surtir, ventas, mermas, devoluciones, preparaciones o el alta inicial.",
   emptySale: "Agrega al menos un producto.",
   badQty: "La cantidad tiene que ser mayor a 0.",
   badPrice: "El precio tiene que ser 0 o más.",

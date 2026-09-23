@@ -36,6 +36,7 @@ enum StockMoveReason {
   perdido
   devolucion
   adjust
+  preparacion
 }
 
 enum CashDirection {
@@ -87,6 +88,7 @@ model Business {
   initialDebts       InitialDebt[]
   importIdMap        ImportIdMap[]
   productImages      ProductImage[]
+  preparations       Preparation[]
 
   @@map("businesses")
 }
@@ -114,6 +116,8 @@ model Product {
   avgCost       BigInt    @map("avg_cost")
   stock         Int
   lowStockAt    Int       @map("low_stock_at")
+  /** False = supply/combo: purchasable and preparable, never sold directly. */
+  sellable      Boolean   @default(true)
   archivedAt    DateTime? @map("archived_at") @db.Timestamptz(3)
   legacyDexieId Int?      @map("legacy_dexie_id")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -125,6 +129,8 @@ model Product {
   stockMoves StockMove[]
   returnLines SaleReturnLine[]
   images     ProductImage[]
+  preparedFrom Preparation[] @relation("PreparationSource")
+  preparedInto Preparation[] @relation("PreparationTarget")
 
   @@unique([businessId, requestId])
   @@unique([businessId, legacyDexieId])
@@ -458,4 +464,35 @@ model ProductImage {
   @@unique([businessId, requestId])
   @@index([businessId, productId, position])
   @@map("product_images")
+}
+
+/**
+ * Preparation (Producción): one transformation of a supply/combo product
+ * into finished units of another product. Immutable history — errors are
+ * compensated with existing tools (shrink on finished stock), never by
+ * deleting. The source lot is NOT decremented (its total yield is unknown
+ * at purchase); the record itself is the consumption trace. Assigned cost
+ * is explicit per preparation (0 = pending, gifted semantics); the source
+ * lot keeps its own value. No cash moves: money left at purchase (surtir).
+ */
+model Preparation {
+  id         String   @id @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  sourceId   String   @map("source_id") @db.Uuid
+  targetId   String   @map("target_id") @db.Uuid
+  qty        Int
+  unitCost   BigInt   @map("unit_cost")
+  note       String?
+  requestId  String?  @map("request_id") @db.Uuid
+  occurredOn DateTime @map("occurred_on") @db.Date
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  business Business @relation(fields: [businessId], references: [id])
+  source   Product  @relation("PreparationSource", fields: [sourceId], references: [id])
+  target   Product  @relation("PreparationTarget", fields: [targetId], references: [id])
+
+  @@unique([businessId, requestId])
+  @@index([businessId, sourceId, createdAt])
+  @@index([businessId, targetId, createdAt])
+  @@map("preparations")
 }

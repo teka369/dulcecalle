@@ -9,8 +9,9 @@ import type { BusinessContext } from "../identity/auth.types";
  * operational row of the current business inside one transaction.
  * Never touches users, memberships, the business itself, or other tenants.
  * The schema has no ON DELETE cascades, so children are removed first in
- * FK-safe order (productImages before products: the FK is RESTRICT to
- * protect history, and the reset honors it instead of weakening it).
+ * FK-safe order (productImages and preparations before products: the FKs
+ * are RESTRICT to protect history, and the reset honors them instead of
+ * weakening them).
  * Re-running on an empty business is a harmless no-op.
  *
  * Cloudinary is NOT part of the DB transaction (no distributed
@@ -68,6 +69,7 @@ export class BusinessDataService {
         select: { publicId: true },
       });
       await wipe(tx, "productImages", (where) => tx.productImage.deleteMany({ where }));
+      await wipe(tx, "preparations", (where) => tx.preparation.deleteMany({ where }));
       await wipe(tx, "products", (where) => tx.product.deleteMany({ where }));
       await wipe(tx, "settings", (where) => tx.setting.deleteMany({ where }));
       await wipe(tx, "importIdMap", (where) => tx.importIdMap.deleteMany({ where }));

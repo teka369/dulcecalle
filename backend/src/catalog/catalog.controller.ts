@@ -6,12 +6,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { CatalogService } from "./catalog.service";
 import {
   CreateCustomerDto,
   CreateInitialDebtDto,
+  CreatePreparationDto,
   CreateProductDto,
   CreateSupplierDto,
   PatchCustomerDto,
@@ -67,6 +69,29 @@ export class CatalogController {
     @Body() dto: PatchProductDto,
   ) {
     return this.catalog.patchProduct(ctx, id, dto);
+  }
+
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post("preparations")
+  createPreparation(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Body() dto: CreatePreparationDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.catalog.createPreparation(
+      ctx,
+      dto,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
+  }
+
+  @Get("preparations")
+  listPreparations(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Query("sourceId") sourceId?: string,
+    @Query("targetId") targetId?: string,
+  ) {
+    return this.catalog.listPreparations(ctx, { sourceId, targetId });
   }
 
   @Roles("owner")

@@ -38,6 +38,10 @@ export class CreateProductDto {
   gifted?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  sellable?: boolean;
+
+  @IsOptional()
   @IsUUID()
   requestId?: string;
 }
@@ -64,6 +68,10 @@ export class PatchProductDto {
 
   @IsOptional()
   avgCost?: unknown;
+
+  @IsOptional()
+  @IsBoolean()
+  sellable?: boolean;
 }
 
 export class CreateCustomerDto {
@@ -204,4 +212,30 @@ export class PatchSupplierDto {
   @IsOptional()
   @IsString()
   notes?: string;
+}
+
+export class CreatePreparationDto {
+  @IsUUID()
+  sourceId!: string;
+
+  @IsUUID()
+  targetId!: string;
+
+  @IsInt()
+  @Min(1)
+  qty!: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  unitCost?: number;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  note?: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 }

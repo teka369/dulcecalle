@@ -6,6 +6,7 @@ import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import type {
   CreateCustomerDto,
   CreateInitialDebtDto,
+  CreatePreparationDto,
   CreateProductDto,
   CreateSupplierDto,
   PatchCustomerDto,
@@ -30,6 +31,7 @@ function productJson(p: {
   avgCost: bigint;
   stock: number;
   lowStockAt: number;
+  sellable: boolean;
   archivedAt: Date | null;
   createdAt: Date;
   images?: Array<{
@@ -56,6 +58,7 @@ function productJson(p: {
     avgCost: copToJson(p.avgCost),
     stock: p.stock,
     lowStockAt: p.lowStockAt,
+    sellable: p.sellable,
     archivedAt: p.archivedAt,
     createdAt: p.createdAt,
     images: (p.images ?? []).map(imageJson),
@@ -122,6 +125,7 @@ export class CatalogService {
             avgCost,
             stock,
             lowStockAt: dto.lowStockAt ?? 5,
+            sellable: dto.sellable ?? true,
             requestId,
           },
         });
@@ -204,6 +208,7 @@ export class CatalogService {
         ...(dto.name != null ? { name: dto.name.trim() } : {}),
         ...(dto.price != null ? { price: asCop(dto.price) } : {}),
         ...(dto.lowStockAt != null ? { lowStockAt: dto.lowStockAt } : {}),
+        ...(dto.sellable != null ? { sellable: dto.sellable } : {}),
       },
       include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
     });
@@ -221,6 +226,189 @@ export class CatalogService {
       include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
     });
     return productJson(updated);
+  }
+
+  private preparationJson(p: {
+    id: string;
+    sourceId: string;
+    targetId: string;
+    qty: number;
+    unitCost: bigint;
+    note: string | null;
+    occurredOn: Date;
+    createdAt: Date;
+    source: { name: string };
+    target: { name: string };
+  }) {
+    return {
+      id: p.id,
+      sourceId: p.sourceId,
+      targetId: p.targetId,
+      sourceName: p.source.name,
+      targetName: p.target.name,
+      qty: p.qty,
+      unitCost: copToJson(p.unitCost),
+      note: p.note,
+      occurredOn: dateKey(p.occurredOn),
+      createdAt: p.createdAt,
+    };
+  }
+
+  /**
+   * Preparation (Producción): transform a supply/combo product into finished
+   * units of another product. Atomic: target stock/avg + preparation row +
+   * both trace moves commit together. The source lot is NOT decremented
+   * (its total yield is unknown); the record is the consumption trace.
+   * Assigned cost is explicit per preparation (0 = pending, gifted
+   * semantics); no auto-proration of the lot value. No cash moves: money
+   * left the business at purchase (surtir). Idempotent on
+   * (businessId, requestId).
+   */
+  async createPreparation(
+    ctx: BusinessContext,
+    dto: CreatePreparationDto,
+    requestId: string,
+  ) {
+    const existing = await this.prisma.preparation.findUnique({
+      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+      include: { source: { select: { name: true } }, target: { select: { name: true } } },
+    });
+    if (existing) return this.preparationJson(existing);
+
+    if (dto.sourceId === dto.targetId) {
+      throw new AppError(
+        ERROR_CODES.VALIDATION,
+        "El origen y el producto deben ser distintos.",
+      );
+    }
+    const unitCost = asCop(dto.unitCost ?? 0);
+    const now = new Date();
+    const occurredOn = occurredOnDate(ctx.timezone, now);
+    await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
+
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        const source = await tx.product.findFirst({
+          where: { id: dto.sourceId, businessId: ctx.businessId, archivedAt: null },
+        });
+        if (!source) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+        const target = await tx.product.findFirst({
+          where: { id: dto.targetId, businessId: ctx.businessId, archivedAt: null },
+        });
+        if (!target) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+        if (source.stock <= 0) {
+          throw new AppError(
+            ERROR_CODES.INSUFFICIENT_STOCK,
+            "El combo no tiene material disponible. Súrtelo primero.",
+          );
+        }
+
+        const nextAvg = weightedAvgCost(target.stock, target.avgCost, dto.qty, unitCost);
+        await tx.product.update({
+          where: { id: target.id },
+          data: { stock: target.stock + dto.qty, avgCost: nextAvg },
+        });
+
+        const preparationId = randomUUID();
+        const note = dto.note?.trim() || null;
+        const preparation = await tx.preparation.create({
+          data: {
+            id: preparationId,
+            businessId: ctx.businessId,
+            sourceId: source.id,
+            targetId: target.id,
+            qty: dto.qty,
+            unitCost,
+            note,
+            requestId,
+            occurredOn,
+            createdAt: now,
+          },
+          include: {
+            source: { select: { name: true } },
+            target: { select: { name: true } },
+          },
+        });
+        await tx.stockMove.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            productId: target.id,
+            delta: dto.qty,
+            reason: "preparacion",
+            unitCost,
+            refType: "preparation",
+            refId: preparationId,
+            note,
+            requestId: null,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+        await tx.stockMove.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            productId: source.id,
+            delta: 0,
+            reason: "preparacion",
+            unitCost: 0n,
+            refType: "preparation",
+            refId: preparationId,
+            note: `Preparación de ${dto.qty} × ${target.name}`,
+            requestId: null,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+        return preparation;
+      });
+      return this.preparationJson(created);
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const again = await this.prisma.preparation.findUnique({
+          where: {
+            businessId_requestId: { businessId: ctx.businessId, requestId },
+          },
+          include: {
+            source: { select: { name: true } },
+            target: { select: { name: true } },
+          },
+        });
+        if (again) return this.preparationJson(again);
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Preparation history, newest first. Optional owner-scoped filters; a
+   * foreign id simply matches nothing, never another tenant's rows.
+   */
+  async listPreparations(
+    ctx: BusinessContext,
+    filter: { sourceId?: string; targetId?: string },
+  ) {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    for (const value of [filter.sourceId, filter.targetId]) {
+      if (value !== undefined && !uuid.test(value)) {
+        throw new AppError(ERROR_CODES.VALIDATION, "Revisa el producto.");
+      }
+    }
+    const rows = await this.prisma.preparation.findMany({
+      where: {
+        businessId: ctx.businessId,
+        ...(filter.sourceId ? { sourceId: filter.sourceId } : {}),
+        ...(filter.targetId ? { targetId: filter.targetId } : {}),
+      },
+      include: {
+        source: { select: { name: true } },
+        target: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((p) => this.preparationJson(p));
   }
 
   async createCustomer(
