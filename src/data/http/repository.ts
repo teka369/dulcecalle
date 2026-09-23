@@ -64,6 +64,23 @@ export type CreateSaleInput = {
   note?: string;
 };
 
+/**
+ * Pick only DTO-whitelisted fields. Outbox payloads often carry path ids
+ * (`productId`, `id`) or routing keys (`kind`) that Nest rejects with
+ * forbidNonWhitelisted ("property X should not exist").
+ */
+function dtoBody<T extends Record<string, unknown>>(
+  source: T,
+  keys: ReadonlyArray<keyof T>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  for (const key of keys) {
+    const value = source[key];
+    if (value !== undefined) body[String(key)] = value;
+  }
+  return body;
+}
+
 export class HttpRepository {
   readonly session: HttpSession;
   private readonly http: HttpClient;
@@ -183,13 +200,21 @@ export class HttpRepository {
 
     patch: async (
       id: string,
-      input: PatchProductInput,
+      input: PatchProductInput & { id?: string },
       requestId?: string,
     ): Promise<RemoteProduct> => {
+      const body = dtoBody(input as Record<string, unknown>, [
+        "name",
+        "price",
+        "lowStockAt",
+        "sellable",
+        "stock",
+        "avgCost",
+      ]);
       const row = await this.http.request<Record<string, unknown>>(
         "PATCH",
         `/products/${id}`,
-        requestId ? { body: input, idempotencyKey: requestId } : { body: input },
+        requestId ? { body, idempotencyKey: requestId } : { body },
       );
       return mapProduct(row);
     },
@@ -335,13 +360,14 @@ export class HttpRepository {
 
     patch: async (
       id: string,
-      input: { name?: string; phone?: string | null },
+      input: { id?: string; name?: string; phone?: string | null },
       requestId?: string,
     ): Promise<RemoteCustomer> => {
+      const body = dtoBody(input as Record<string, unknown>, ["name", "phone"]);
       const row = await this.http.request<Record<string, unknown>>(
         "PATCH",
         `/customers/${id}`,
-        requestId ? { body: input, idempotencyKey: requestId } : { body: input },
+        requestId ? { body, idempotencyKey: requestId } : { body },
       );
       return mapCustomer(row);
     },
@@ -417,13 +443,23 @@ export class HttpRepository {
 
     patch: async (
       id: string,
-      input: { name?: string; phone?: string | null; notes?: string | null },
+      input: {
+        id?: string;
+        name?: string;
+        phone?: string | null;
+        notes?: string | null;
+      },
       requestId?: string,
     ): Promise<RemoteSupplier> => {
+      const body = dtoBody(input as Record<string, unknown>, [
+        "name",
+        "phone",
+        "notes",
+      ]);
       const row = await this.http.request<Record<string, unknown>>(
         "PATCH",
         `/suppliers/${id}`,
-        requestId ? { body: input, idempotencyKey: requestId } : { body: input },
+        requestId ? { body, idempotencyKey: requestId } : { body },
       );
       return mapSupplier(row);
     },
@@ -448,6 +484,7 @@ export class HttpRepository {
     surtir: async (
       productId: string,
       input: {
+        productId?: string;
         qty: number;
         unitCost: number;
         totalCost: number;
@@ -460,7 +497,17 @@ export class HttpRepository {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         `/products/${productId}/surtir`,
-        { body: input, idempotencyKey: requestId },
+        {
+          body: dtoBody(input as Record<string, unknown>, [
+            "qty",
+            "unitCost",
+            "totalCost",
+            "method",
+            "supplierId",
+            "note",
+          ]),
+          idempotencyKey: requestId,
+        },
       );
       return mapStockMove(row);
     },
@@ -468,6 +515,7 @@ export class HttpRepository {
     shrink: async (
       productId: string,
       input: {
+        productId?: string;
         qty: number;
         reason: "me_lo_comi" | "regalar" | "perdido";
         note?: string;
@@ -477,7 +525,14 @@ export class HttpRepository {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         `/products/${productId}/shrink`,
-        { body: input, idempotencyKey: requestId },
+        {
+          body: dtoBody(input as Record<string, unknown>, [
+            "qty",
+            "reason",
+            "note",
+          ]),
+          idempotencyKey: requestId,
+        },
       );
       return mapStockMove(row);
     },
@@ -628,25 +683,49 @@ export class HttpRepository {
     },
 
     aporte: async (
-      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string },
+      input: {
+        kind?: string;
+        amount: number;
+        method: "Efectivo" | "Nequi";
+        note?: string;
+      },
       requestId: string,
     ): Promise<RemoteCashMove> => {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         "/cash/aportes",
-        { body: input, idempotencyKey: requestId },
+        {
+          body: dtoBody(input as Record<string, unknown>, [
+            "amount",
+            "method",
+            "note",
+          ]),
+          idempotencyKey: requestId,
+        },
       );
       return mapCashMove(row);
     },
 
     retiro: async (
-      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string },
+      input: {
+        kind?: string;
+        amount: number;
+        method: "Efectivo" | "Nequi";
+        note?: string;
+      },
       requestId: string,
     ): Promise<RemoteCashMove> => {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         "/cash/retiros",
-        { body: input, idempotencyKey: requestId },
+        {
+          body: dtoBody(input as Record<string, unknown>, [
+            "amount",
+            "method",
+            "note",
+          ]),
+          idempotencyKey: requestId,
+        },
       );
       return mapCashMove(row);
     },
