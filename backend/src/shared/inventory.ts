@@ -1,5 +1,35 @@
 import { asCop } from "./money";
 
+/**
+ * Combo/insumo (`sellable: false`) stores remaining LOT VALUE in avgCost,
+ * not a per-unit average. Surtir must add the cash outlay to that pool.
+ * Sellable products keep the historical weighted unit average.
+ */
+export function nextAvgCostAfterSurtir(input: {
+  sellable: boolean;
+  stock: number;
+  avgCost: bigint;
+  qty: number;
+  unitCost: bigint;
+  totalCost: bigint;
+}): bigint {
+  if (!input.sellable) {
+    return asCop(input.avgCost) + asCop(input.totalCost);
+  }
+  return weightedAvgCost(input.stock, input.avgCost, input.qty, input.unitCost);
+}
+
+/** Opening avgCost: unit cost for sellable; unit×stock lot pool for combos. */
+export function openingStoredAvgCost(input: {
+  sellable: boolean;
+  stock: number;
+  unitCost: bigint;
+}): bigint {
+  const unit = asCop(input.unitCost);
+  if (!input.sellable && input.stock > 0) return unit * BigInt(input.stock);
+  return unit;
+}
+
 /** Integer weighted avg. Matches PWA Math.round for non-negative COP. */
 export function weightedAvgCost(
   oldStock: number,
