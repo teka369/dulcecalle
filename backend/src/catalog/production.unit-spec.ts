@@ -178,7 +178,8 @@ describe("preparations (AppModule)", () => {
     expect(res.status).toBe(401);
   });
 
-  it("creates with weighted cost and trace data", async () => {
+  it("creates with weighted cost and transfers lot value (no double count)", async () => {
+    // Before: combo 1×105000 + target 10×400 → V = 109000.
     const res = await request(app.getHttpServer())
       .post("/v1/preparations")
       .set(auth(BIZ, REQ))
@@ -195,18 +196,66 @@ describe("preparations (AppModule)", () => {
     // Weighted avg absorbs the assigned cost: (10*400 + 10*200) / 20 = 300.
     expect(products.get(TARGET)?.stock).toBe(20);
     expect(products.get(TARGET)?.avgCost).toBe(300n);
-    // Source lot untouched: yield unknown, the record is the trace.
+    // The assigned 2000 TRANSFERS out of the lot: 105000 → 103000.
     expect(products.get(COMBO)?.stock).toBe(1);
+    expect(products.get(COMBO)?.avgCost).toBe(103000n);
+    // Value conservation: 103000 + 20*300 = 109000 = V before.
+    const after =
+      Number(products.get(COMBO)?.avgCost ?? 0n) +
+      (products.get(TARGET)?.stock ?? 0) * Number(products.get(TARGET)?.avgCost ?? 0n);
+    expect(after).toBe(109000);
   });
 
-  it("does not invent proration: pending cost dilutes honestly", async () => {
+  it("pending cost (null) leaves the average untouched and transfers nothing", async () => {
     const res = await request(app.getHttpServer())
       .post("/v1/preparations")
       .set(auth(BIZ, REQ))
       .send(prepareBody({ qty: 10 }));
     expect(res.status).toBe(201);
+    expect(res.body.unitCost).toBeNull();
+    expect(products.get(TARGET)?.stock).toBe(20);
+    expect(products.get(TARGET)?.avgCost).toBe(400n);
+    expect(products.get(COMBO)?.avgCost).toBe(105000n);
+  });
+
+  it("explicit zero dilutes (gifted batch), unlike pending", async () => {
+    const res = await request(app.getHttpServer())
+      .post("/v1/preparations")
+      .set(auth(BIZ, REQ))
+      .send(prepareBody({ qty: 10, unitCost: 0 }));
+    expect(res.status).toBe(201);
     expect(res.body.unitCost).toBe(0);
     expect(products.get(TARGET)?.avgCost).toBe(200n);
+    expect(products.get(COMBO)?.avgCost).toBe(105000n);
+  });
+
+  it("assigned cost beyond the remaining lot clamps at zero", async () => {
+    const combo = products.get(COMBO);
+    if (combo) combo.avgCost = 1000n;
+    const res = await request(app.getHttpServer())
+      .post("/v1/preparations")
+      .set(auth(BIZ, REQ))
+      .send(prepareBody({ qty: 10, unitCost: 200 }));
+    expect(res.status).toBe(201);
+    // Transfers min(2000, 1000); the batch keeps its explicit unit cost.
+    expect(products.get(COMBO)?.avgCost).toBe(0n);
+    expect(products.get(TARGET)?.avgCost).toBe(300n);
+  });
+
+  it("two purchases pool into one lot value before preparing", async () => {
+    // Second lot at 120000 merges by weighted average: (105000+120000)/2.
+    const combo = products.get(COMBO);
+    if (combo) {
+      combo.stock = 2;
+      combo.avgCost = 112500n;
+    }
+    const res = await request(app.getHttpServer())
+      .post("/v1/preparations")
+      .set(auth(BIZ, REQ))
+      .send(prepareBody({ qty: 10, unitCost: 200 }));
+    expect(res.status).toBe(201);
+    // Origin is the pooled product, not an individual purchase.
+    expect(products.get(COMBO)?.avgCost).toBe(112500n - 2000n);
   });
 
   it("rejects same source and target", async () => {
@@ -265,16 +314,18 @@ describe("preparations (AppModule)", () => {
     const first = await request(app.getHttpServer())
       .post("/v1/preparations")
       .set(auth(BIZ, REQ))
-      .send(prepareBody());
+      .send(prepareBody({ unitCost: 200 }));
     const second = await request(app.getHttpServer())
       .post("/v1/preparations")
       .set(auth(BIZ, REQ))
-      .send(prepareBody());
+      .send(prepareBody({ unitCost: 200 }));
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
     expect(second.body.id).toBe(first.body.id);
     expect(creates).toBe(1);
     expect(products.get(TARGET)?.stock).toBe(20);
+    // Retry transfers nothing twice: lot value reduced exactly once.
+    expect(products.get(COMBO)?.avgCost).toBe(103000n);
   });
 
   it("lists history filtered by source", async () => {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
+import { formatCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
 import type { RemoteProduct } from "@/data/http/mappers";
 import { primaryImageUrl } from "@/data/media/urls";
@@ -110,7 +111,10 @@ export default function PrepararPage() {
               Proviene de
             </p>
             <p className="mt-1 font-semibold">{source.name}</p>
-            <p className="mt-1 text-sm text-ink/60">Stock {source.stock}</p>
+            <p className="mt-1 text-sm text-ink/60">
+              Lotes disponibles: {source.stock} · Valor restante:{" "}
+              {formatCop(source.avgCost)}
+            </p>
           </div>
         </section>
       )}

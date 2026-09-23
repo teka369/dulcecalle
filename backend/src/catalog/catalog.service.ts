@@ -233,7 +233,7 @@ export class CatalogService {
     sourceId: string;
     targetId: string;
     qty: number;
-    unitCost: bigint;
+    unitCost: bigint | null;
     note: string | null;
     occurredOn: Date;
     createdAt: Date;
@@ -247,7 +247,7 @@ export class CatalogService {
       sourceName: p.source.name,
       targetName: p.target.name,
       qty: p.qty,
-      unitCost: copToJson(p.unitCost),
+      unitCost: p.unitCost === null ? null : copToJson(p.unitCost),
       note: p.note,
       occurredOn: dateKey(p.occurredOn),
       createdAt: p.createdAt,
@@ -281,7 +281,10 @@ export class CatalogService {
         "El origen y el producto deben ser distintos.",
       );
     }
-    const unitCost = asCop(dto.unitCost ?? 0);
+    // Assigned cost is explicit per preparation. null = pending/unknown:
+    // the finished average is left untouched. 0 = real zero (gifted batch).
+    // NEVER an auto-proration of the lot value.
+    const unitCost = dto.unitCost == null ? null : asCop(dto.unitCost);
     const now = new Date();
     const occurredOn = occurredOnDate(ctx.timezone, now);
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
@@ -304,10 +307,25 @@ export class CatalogService {
           );
         }
 
-        const nextAvg = weightedAvgCost(target.stock, target.avgCost, dto.qty, unitCost);
+        // Value conservation: the assigned cost TRANSFERS from the lot to
+        // the finished units (clamped at zero). Pending transfers nothing.
+        // Without this, every preparation would mint value from nowhere.
+        const assignedTotal =
+          unitCost === null ? 0n : unitCost * BigInt(dto.qty);
+        const transfer =
+          assignedTotal > source.avgCost ? source.avgCost : assignedTotal;
+        const nextSourceAvg = source.avgCost - transfer;
+        const nextAvg =
+          unitCost === null
+            ? target.avgCost
+            : weightedAvgCost(target.stock, target.avgCost, dto.qty, unitCost);
         await tx.product.update({
           where: { id: target.id },
           data: { stock: target.stock + dto.qty, avgCost: nextAvg },
+        });
+        await tx.product.update({
+          where: { id: source.id },
+          data: { avgCost: nextSourceAvg },
         });
 
         const preparationId = randomUUID();
@@ -337,10 +355,10 @@ export class CatalogService {
             productId: target.id,
             delta: dto.qty,
             reason: "preparacion",
-            unitCost,
+            unitCost: unitCost ?? 0n,
             refType: "preparation",
             refId: preparationId,
-            note,
+            note: unitCost === null ? `Costo pendiente. ${note ?? ""}`.trim() || null : note,
             requestId: null,
             occurredOn,
             createdAt: now,
@@ -356,7 +374,7 @@ export class CatalogService {
             unitCost: 0n,
             refType: "preparation",
             refId: preparationId,
-            note: `Preparación de ${dto.qty} × ${target.name}`,
+            note: `Preparación de ${dto.qty} × ${target.name}. Asignados ${copToJson(transfer)}; restante ${copToJson(nextSourceAvg)}.`,
             requestId: null,
             occurredOn,
             createdAt: now,

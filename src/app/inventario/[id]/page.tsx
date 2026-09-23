@@ -108,14 +108,18 @@ export default function ProductoFichaPage() {
 
       <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
-          Stock
+          {product.sellable === false ? "Lotes" : "Stock"}
         </p>
         <p className="mt-1 text-2xl font-semibold">{product.stock}</p>
         <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink/50">
-          Precio venta
+          {product.sellable === false ? "Valor restante del lote" : "Precio venta"}
         </p>
-        <p className="mt-1 text-lg font-semibold">{formatCop(product.price)}</p>
-        {product.avgCost > 0 ? (
+        {product.sellable === false ? (
+          <p className="mt-1 text-lg font-semibold">{formatCop(product.avgCost)}</p>
+        ) : (
+          <p className="mt-1 text-lg font-semibold">{formatCop(product.price)}</p>
+        )}
+        {product.sellable === false ? null : product.avgCost > 0 ? (
           <p className="mt-2 text-sm text-ink/50">
             Costo prom. {formatCop(product.avgCost)}
           </p>
@@ -337,7 +341,9 @@ export default function ProductoFichaPage() {
                     {r.qty} × {r.targetName}
                   </span>
                   <span className="font-semibold">
-                    {r.unitCost > 0 ? formatCop(r.unitCost * r.qty) : "Costo pendiente"}
+                    {r.unitCost == null
+                      ? "Costo pendiente"
+                      : formatCop(r.unitCost * r.qty)}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-ink/50">
@@ -356,7 +362,9 @@ export default function ProductoFichaPage() {
                     Desde {r.sourceName}: {r.qty} uds
                   </span>
                   <span className="font-semibold">
-                    {r.unitCost > 0 ? formatCop(r.unitCost * r.qty) : "Costo pendiente"}
+                    {r.unitCost == null
+                      ? "Costo pendiente"
+                      : formatCop(r.unitCost * r.qty)}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-ink/50">

@@ -79,8 +79,15 @@ describe("inventory validate (Tanda 3)", () => {
       qty: 10,
       unitCost: 200,
     });
-    // Empty cost = pending, never an invented proration.
-    expect(validatePreparationForm({ ...base, unitCostRaw: "" })).toMatchObject({
+    // Empty cost = pending (null): average untouched, nothing transferred.
+    expect(validatePreparationForm({ ...base, unitCostRaw: "" })).toEqual({
+      sourceId: base.sourceId,
+      targetId: base.targetId,
+      qty: 10,
+      unitCost: null,
+    });
+    // Explicit zero = real zero (gifted batch), distinct from pending.
+    expect(validatePreparationForm({ ...base, unitCostRaw: "0" })).toMatchObject({
       qty: 10,
       unitCost: 0,
     });

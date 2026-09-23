@@ -184,12 +184,33 @@ describe("prepararWithOfflineFallback", () => {
     const updated = await getLocalDb().products.get(TARGET_ID);
     expect(updated?.stock).toBe(20);
     expect(updated?.avgCost).toBe(300);
-    // Source lot untouched: yield unknown, the record is the trace.
-    expect((await getLocalDb().products.get(COMBO_ID))?.stock).toBe(1);
+    // Value transfers out of the lot: 105000 → 103000. Conservation:
+    // 103000 + 20*300 = 109000 = value before (1*105000 + 10*400).
+    const combo = await getLocalDb().products.get(COMBO_ID);
+    expect(combo?.stock).toBe(1);
+    expect(combo?.avgCost).toBe(103000);
+    expect(combo!.avgCost + updated!.stock * updated!.avgCost).toBe(109000);
 
     const ops = await getOutboxStore().listPending(businessId);
     expect(ops).toHaveLength(1);
     expect(ops[0]).toMatchObject({ entity: "preparation", operation: "create", requestId: REQUEST_ID });
+  });
+
+  it("pending cost leaves the average untouched and transfers nothing", async () => {
+    api.production.prepare.mockRejectedValue(new NetworkError("offline"));
+    await seedProduct(COMBO_ID, businessId, { stock: 1, avgCost: 105000 });
+    await seedProduct(TARGET_ID, businessId, { stock: 10, avgCost: 400 });
+    const result = await prepararWithOfflineFallback(
+      { sourceId: COMBO_ID, targetId: TARGET_ID, qty: 10, unitCost: null },
+      REQUEST_ID,
+    );
+    expect(result.mode).toBe("offline");
+    const rows = await getLocalDb().preparations.toArray();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.unitCost).toBeNull();
+    expect((await getLocalDb().products.get(TARGET_ID))?.avgCost).toBe(400);
+    expect((await getLocalDb().products.get(TARGET_ID))?.stock).toBe(20);
+    expect((await getLocalDb().products.get(COMBO_ID))?.avgCost).toBe(105000);
   });
 
   it("refuses a duplicated requestId (no double stock)", async () => {

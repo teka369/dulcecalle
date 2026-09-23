@@ -481,7 +481,8 @@ model Preparation {
   sourceId   String   @map("source_id") @db.Uuid
   targetId   String   @map("target_id") @db.Uuid
   qty        Int
-  unitCost   BigInt   @map("unit_cost")
+  /** Assigned cost per finished unit. null = pending/unknown (average untouched). 0 = real zero. */
+  unitCost   BigInt?  @map("unit_cost")
   note       String?
   requestId  String?  @map("request_id") @db.Uuid
   occurredOn DateTime @map("occurred_on") @db.Date

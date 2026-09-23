@@ -26,7 +26,8 @@ export type PrepareInput = {
   sourceId: string;
   targetId: string;
   qty: number;
-  unitCost: number;
+  /** null = pending: target average untouched, nothing transferred. */
+  unitCost: number | null;
   note?: string;
 };
 
@@ -57,7 +58,7 @@ export async function prepararWithOfflineFallback(
   if (!Number.isInteger(input.qty) || input.qty <= 0) {
     throw new Error(INVENTORY_ERRORS.notPositive);
   }
-  if (!Number.isInteger(input.unitCost) || input.unitCost < 0) {
+  if (input.unitCost !== null && (!Number.isInteger(input.unitCost) || input.unitCost < 0)) {
     throw new Error(INVENTORY_ERRORS.badCost);
   }
   try {
@@ -100,6 +101,11 @@ export async function prepararWithOfflineFallback(
     const dependsOn = await openDependency(db, business);
     const preparationId = newEntityId();
     const note = clean(input.note) ?? null;
+    // Same value-conservation rule as the server: assigned cost transfers
+    // from the lot (clamped at zero); pending transfers nothing and leaves
+    // the finished average untouched.
+    const assignedTotal = (input.unitCost ?? 0) * input.qty;
+    const transfer = Math.min(assignedTotal, source.avgCost);
     await db.transaction(
       "rw",
       [db.products, db.preparations, db.stockMoves, db.outbox],
@@ -107,7 +113,15 @@ export async function prepararWithOfflineFallback(
         await db.products.put({
           ...target,
           stock: target.stock + input.qty,
-          avgCost: roundedAvg(target.stock, target.avgCost, input.qty, input.unitCost),
+          avgCost:
+            input.unitCost === null
+              ? target.avgCost
+              : roundedAvg(target.stock, target.avgCost, input.qty, input.unitCost),
+          updatedAt: now,
+        });
+        await db.products.put({
+          ...source,
+          avgCost: source.avgCost - transfer,
           updatedAt: now,
         });
         await db.preparations.put({
@@ -130,11 +144,11 @@ export async function prepararWithOfflineFallback(
           productId: target.id,
           delta: input.qty,
           reason: "preparacion",
-          unitCost: input.unitCost,
+          unitCost: input.unitCost ?? 0,
           supplierId: null,
           refType: "preparation",
           refId: preparationId,
-          note,
+          note: input.unitCost === null ? `Costo pendiente. ${note ?? ""}`.trim() || null : note,
           requestId: null,
           occurredOn: todayLocal(),
           createdAt: now,
@@ -149,7 +163,7 @@ export async function prepararWithOfflineFallback(
           supplierId: null,
           refType: "preparation",
           refId: preparationId,
-          note: `Preparación de ${input.qty} × ${target.name}`,
+          note: `Preparación de ${input.qty} × ${target.name}. Asignados ${transfer}; restante ${source.avgCost - transfer}.`,
           requestId: null,
           occurredOn: todayLocal(),
           createdAt: now,
@@ -229,7 +243,7 @@ export async function syncPendingPreparations(business: string) {
         sourceId: string;
         targetId: string;
         qty: number;
-        unitCost: number;
+        unitCost: number | null;
         note?: string | null;
       };
       const remote = await api.production.prepare(

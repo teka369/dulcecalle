@@ -19,7 +19,7 @@ export const INVENTORY_ERRORS = {
   emptyCombo: "Elige de qué combo o insumo proviene.",
   emptyTarget: "Elige qué producto vas a preparar.",
   noMaterial: "El combo no tiene material disponible. Súrtelo primero.",
-  pendingCostHint: "Si lo dejas en 0, el costo queda pendiente.",
+  pendingCostHint: "Si lo dejas vacío, el costo queda pendiente. Escribe 0 solo si la tanda no tuvo costo.",
 } as const;
 
 export const INVENTORY_TOASTS = {
@@ -185,15 +185,16 @@ export function validateSurtirForm(input: {
 }
 
 /**
- * Preparation form validation. Cost is optional and explicit: omitted or 0
- * means pending (gifted semantics), never an auto-proration of the lot.
+ * Preparation form validation. Cost is optional and explicit: empty means
+ * pending (null, average untouched), 0 means real zero (gifted batch).
+ * Never an auto-proration of the lot.
  */
 export function validatePreparationForm(input: {
   sourceId: string | null | undefined;
   targetId: string | null | undefined;
   qtyRaw: string;
   unitCostRaw: string;
-}): { sourceId: string; targetId: string; qty: number; unitCost: number } | { error: string } {
+}): { sourceId: string; targetId: string; qty: number; unitCost: number | null } | { error: string } {
   if (!input.sourceId) return { error: INVENTORY_ERRORS.emptyCombo };
   if (!input.targetId) return { error: INVENTORY_ERRORS.emptyTarget };
   if (input.sourceId === input.targetId) {
@@ -203,9 +204,13 @@ export function validatePreparationForm(input: {
   if ("error" in qtyParsed) return qtyParsed;
   const raw = input.unitCostRaw.trim();
   if (raw === "") {
-    return { sourceId: input.sourceId, targetId: input.targetId, qty: qtyParsed.qty, unitCost: 0 };
+    return { sourceId: input.sourceId, targetId: input.targetId, qty: qtyParsed.qty, unitCost: null };
   }
-  const unitCost = Number.parseInt(raw.replace(/\D/g, ""), 10);
+  const digits = raw.replace(/\D/g, "");
+  if (digits === "") {
+    return { error: INVENTORY_ERRORS.badCost };
+  }
+  const unitCost = Number.parseInt(digits, 10);
   if (!Number.isInteger(unitCost) || unitCost < 0) {
     return { error: INVENTORY_ERRORS.badCost };
   }

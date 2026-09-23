@@ -121,7 +121,8 @@ export type RemotePreparation = {
   sourceName: string;
   targetName: string;
   qty: number;
-  unitCost: number;
+  /** null = pending/unknown (average untouched). 0 = real zero. */
+  unitCost: number | null;
   note: string | null;
   occurredOn: string;
   createdAt: number;
@@ -135,7 +136,7 @@ export function mapPreparation(raw: Record<string, unknown>): RemotePreparation 
     sourceName: String(raw.sourceName ?? ""),
     targetName: String(raw.targetName ?? ""),
     qty: Number(raw.qty),
-    unitCost: asCopJson(raw.unitCost, "unitCost"),
+    unitCost: raw.unitCost == null ? null : asCopJson(raw.unitCost, "unitCost"),
     note: raw.note == null ? null : String(raw.note),
     occurredOn: String(raw.occurredOn ?? ""),
     createdAt: asIsoEpoch(raw.createdAt),

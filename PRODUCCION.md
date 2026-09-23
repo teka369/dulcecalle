@@ -16,23 +16,42 @@ Compra → combo/insumo → preparación → producto terminado → venta/fi ado
   (>0 requerido) no puede originar preparaciones; un combo agotado se
   archiva con el flujo existente.
 
-## Movimientos
+## Movimientos y conservación de valor
 
 Cada preparación escribe, en la misma transacción:
 
 - destino: `delta +qty`, `reason preparacion`, `unitCost` asignado,
   `refType preparation`, `refId` = preparation id;
-- origen: `delta 0`, `reason preparacion`, nota
-  `Preparación de N × <destino>`, mismo `refType`/`refId`.
+- origen: `delta 0`, `reason preparacion`, nota con lo asignado y lo
+  restante, mismo `refType`/`refId`.
+
+**El costo asignado SE TRANSFIERE del lote a las unidades** (con tope en
+cero): `lote.avgCost -= qty*unitCost`. Sin esto, cada preparación crearía
+valor de la nada (lote $105.000 intacto + $20.000 nuevas = $125.000 de
+$105.000 reales). Verificación: `lote + stock×avg` antes == después.
 
 Sin movimientos de caja: el dinero salió en la compra (surtir).
 
 ## Costos
 
-El costo es **explícito por preparación** (`unitCost`, 0 = pendiente con
-semántica de regalo). El promedio ponderado lo absorbe con la fórmula
-existente. El lote conserva su propio valor. **Nunca** se prorratea
-automáticamente `$lote / N` (sería falso mientras quede material).
+El costo es **explícito por preparación**:
+
+- número > 0: se transfiere del lote y el promedio ponderado lo absorbe;
+- `0` real: tanda sin costo (regalo); diluye el promedio, no toca el lote
+  más allá de transferir 0;
+- `null` (vacío): **pendiente/desconocido**: el promedio NO se toca y no
+  se transfiere nada. Distinto de 0 a propósito.
+
+**Nunca** se prorratea automáticamente `$lote / N` (sería falso mientras
+quede material). El lote conserva su valor restante en `avgCost`
+(visible como "Valor restante del lote", no como costo).
+
+## Origen y límite de trazabilidad
+
+`origin` = producto origen (`sourceId`), NO un lote o surtida individual:
+dos compras del mismo combo se mezclan por promedio ponderado en un solo
+pozo de valor. El sistema distingue **qué producto** produjo cada tanda,
+no **qué compra** la financió. No se afirma trazabilidad por lote.
 
 ## Reglas
 
@@ -82,8 +101,14 @@ vendibles.
 
 ## Limitaciones honestas
 
-- Sin reversa de preparación: se compensa con merma/ajuste existente.
-- El "material restante" del combo es cualitativo (unidades ya
-  preparadas visibles en su historial), no una cantidad.
+- Sin reversa de preparación: la cantidad se corrige con merma sobre el
+  terminado; el promedio converge con movimientos futuros. No se borra
+  historial.
+- El "material restante" del combo es cualitativo: lotes en inventario +
+  valor restante. Nunca una cantidad de material (el sistema no la conoce
+  y la UI no la inventa: muestra "Lotes" y "Valor restante").
+- Un combo con valor totalmente asignado ($0) sigue permitiendo
+  preparaciones con costo pendiente o nuevo; el agotamiento físico lo
+  declara el usuario archivando el combo.
 - Costo 0 diluye el promedio: es intencional y visible ("Costo
-  pendiente").
+  pendiente" solo aparece con costo desconocido/null).

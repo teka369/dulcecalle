@@ -156,7 +156,8 @@ export type LocalPreparation = {
   targetId: string;
   targetName: string;
   qty: number;
-  unitCost: number;
+  /** null = pending/unknown. 0 = real zero (gifted batch). */
+  unitCost: number | null;
   note: string | null;
   /** Request id while this locally-created row is pending/syncing. */
   requestId?: string;

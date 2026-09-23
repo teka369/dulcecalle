@@ -497,7 +497,7 @@ export class HttpRepository {
         sourceId: string;
         targetId: string;
         qty: number;
-        unitCost?: number;
+        unitCost?: number | null;
         note?: string;
       },
       requestId: string,
