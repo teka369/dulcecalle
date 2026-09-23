@@ -19,7 +19,8 @@ import { customerRepository } from "./customerRepository";
  * - Por cobrar: sum(customer.debt) outstanding (point-in-time)
  * - Gasté: sum(expenses.amount) in period — operativos only (≠ retiro)
  * - Invertí: sum(cashMoves kind=compra) in period — surtir/purchase cash out
- * - Valor inventario: sum(stock × avgCost) current
+ * - Valor inventario: sellable (or missing flag) stock × avgCost;
+ *   combo/insumo (sellable === false) remaining lot pool = avgCost
  * - Stock bajo: count stock ≤ lowStockAt
  * - Ganancia aprox: sale margins in period − returned margins whose return is in period
  *
@@ -120,7 +121,10 @@ export async function loadStats(
   let valorInventario = 0;
   let stockBajo = 0;
   for (const p of products) {
-    valorInventario = addCop(valorInventario, mulCop(p.avgCost, p.stock));
+    valorInventario = addCop(
+      valorInventario,
+      p.sellable === false ? p.avgCost : mulCop(p.avgCost, p.stock),
+    );
     if (p.stock <= p.lowStockAt) stockBajo += 1;
   }
 

@@ -21,10 +21,12 @@ export interface Product {
   category: string;
   /** Selling price snapshot base (COP integer). */
   price: number;
-  /** Weighted average cost (COP integer). */
+  /** Weighted average cost (COP integer). Combo: remaining lot pool. */
   avgCost: number;
   stock: number;
   lowStockAt: number;
+  /** False = supply/combo. Missing = sellable (legacy Dexie rows). */
+  sellable?: boolean;
   createdAt: number;
   updatedAt: number;
 }
