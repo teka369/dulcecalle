@@ -1,6 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { MediaService } from "../catalog/media.service";
 import type { BusinessContext } from "../identity/auth.types";
 
 /**
@@ -8,15 +9,28 @@ import type { BusinessContext } from "../identity/auth.types";
  * operational row of the current business inside one transaction.
  * Never touches users, memberships, the business itself, or other tenants.
  * The schema has no ON DELETE cascades, so children are removed first in
- * FK-safe order. Re-running on an empty business is a harmless no-op.
+ * FK-safe order (productImages before products: the FK is RESTRICT to
+ * protect history, and the reset honors it instead of weakening it).
+ * Re-running on an empty business is a harmless no-op.
+ *
+ * Cloudinary is NOT part of the DB transaction (no distributed
+ * transactions): after a successful commit, assets are destroyed
+ * best-effort. A failed destroy leaves an inert orphan (no DB row
+ * references it), never a broken product, and never fails the reset.
  */
 @Injectable()
 export class BusinessDataService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly log = new Logger("BusinessData");
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly media: MediaService,
+  ) {}
 
   async resetData(ctx: BusinessContext): Promise<{
     deleted: Record<string, number>;
     deletedCustomerIds: string[];
+    cloudinary: { destroyed: number; failed: number };
   }> {
     const deleted: Record<string, number> = {};
     const wipe = async (
@@ -47,12 +61,38 @@ export class BusinessDataService {
       await wipe(tx, "expenses", (where) => tx.expense.deleteMany({ where }));
       await wipe(tx, "customers", (where) => tx.customer.deleteMany({ where }));
       await wipe(tx, "suppliers", (where) => tx.supplier.deleteMany({ where }));
+      // Collect asset ids BEFORE deleting: post-commit Cloudinary cleanup
+      // needs them and the rows will be gone. FK-safe order: images first.
+      const images = await tx.productImage.findMany({
+        where: { businessId: ctx.businessId },
+        select: { publicId: true },
+      });
+      await wipe(tx, "productImages", (where) => tx.productImage.deleteMany({ where }));
       await wipe(tx, "products", (where) => tx.product.deleteMany({ where }));
       await wipe(tx, "settings", (where) => tx.setting.deleteMany({ where }));
       await wipe(tx, "importIdMap", (where) => tx.importIdMap.deleteMany({ where }));
-      return customers.map((c) => c.id);
+      return {
+        customerIds: customers.map((c) => c.id),
+        publicIds: images.map((i) => i.publicId),
+      };
     });
 
-    return { deleted, deletedCustomerIds: doomed };
+    let cloudinary = { destroyed: 0, failed: 0 };
+    if (doomed.publicIds.length > 0) {
+      try {
+        cloudinary = await this.media.destroyAssets(ctx.businessId, doomed.publicIds);
+      } catch (e) {
+        this.log.warn(
+          `reset cloudinary cleanup failed: business=${ctx.businessId} assets=${doomed.publicIds.length} error=${e instanceof Error ? e.message : "unknown"}`,
+        );
+      }
+      if (cloudinary.failed > 0) {
+        this.log.warn(
+          `reset cloudinary orphans: business=${ctx.businessId} destroyed=${cloudinary.destroyed} failed=${cloudinary.failed}`,
+        );
+      }
+    }
+
+    return { deleted, deletedCustomerIds: doomed.customerIds, cloudinary };
   }
 }

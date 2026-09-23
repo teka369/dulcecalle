@@ -24,6 +24,7 @@ export const RESET_ENTITY_LABELS: Record<string, string> = {
   customers: "Clientes",
   suppliers: "Proveedores",
   products: "Productos",
+  productImages: "Imágenes de productos",
   settings: "Ajustes del negocio",
   importIdMap: "Mapa de importación",
 };

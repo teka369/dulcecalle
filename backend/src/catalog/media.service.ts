@@ -364,49 +364,9 @@ export class MediaService {
     });
     if (!existing) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
 
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signature = signUploadParams(
-      { public_id: existing.publicId, timestamp },
-      config.apiSecret,
-    );
-    const body = new URLSearchParams({
-      public_id: existing.publicId,
-      api_key: config.apiKey,
-      timestamp: String(timestamp),
-      signature,
-      invalidate: "true",
-    });
-    let destroyRes: Response;
-    try {
-      destroyRes = await this.fetchImpl(
-        `https://api.cloudinary.com/v1_1/${config.cloudName}/image/destroy`,
-        { method: "POST", body },
-      );
-    } catch {
+    const result = await this.destroyPublicId(config, existing.publicId);
+    if (result !== "ok" && result !== "not found") {
       throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
-    }
-    // Cloudinary answers 200 with a JSON body even when the asset is
-    // already gone ({ result: "not found" }). Only that case converges
-    // with the row delete; any other non-ok result keeps the row so a
-    // retry can reconcile instead of silently losing the association.
-    if (destroyRes.status === 404) {
-      // No-op: fall through to the row delete below.
-    } else if (destroyRes.status !== 200) {
-      throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
-    } else {
-      let destroyBody: unknown = null;
-      try {
-        destroyBody = await destroyRes.json();
-      } catch {
-        throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
-      }
-      const result =
-        typeof destroyBody === "object" && destroyBody !== null
-          ? String((destroyBody as Record<string, unknown>).result ?? "")
-          : "";
-      if (result !== "ok" && result !== "not found") {
-        throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
-      }
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -425,5 +385,86 @@ export class MediaService {
       }
     });
     return { deleted: true as const, id: imageId };
+  }
+
+  /**
+   * Low-level Cloudinary destroy. Returns the asset `result` string
+   * ("ok", "not found", ...). Transport/HTTP/parse failures THROW so
+   * single-image callers can keep the DB row for retry; callers that must
+   * never fail (business reset) catch per asset in destroyAssets.
+   */
+  private async destroyPublicId(
+    config: CloudinaryConfig,
+    publicId: string,
+  ): Promise<string> {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = signUploadParams(
+      { public_id: publicId, timestamp },
+      config.apiSecret,
+    );
+    const body = new URLSearchParams({
+      public_id: publicId,
+      api_key: config.apiKey,
+      timestamp: String(timestamp),
+      signature,
+      invalidate: "true",
+    });
+    let destroyRes: Response;
+    try {
+      destroyRes = await this.fetchImpl(
+        `https://api.cloudinary.com/v1_1/${config.cloudName}/image/destroy`,
+        { method: "POST", body },
+      );
+    } catch {
+      throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
+    }
+    if (destroyRes.status === 404) return "not found";
+    if (destroyRes.status !== 200) {
+      throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
+    }
+    let destroyBody: unknown = null;
+    try {
+      destroyBody = await destroyRes.json();
+    } catch {
+      throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
+    }
+    const result =
+      typeof destroyBody === "object" && destroyBody !== null
+        ? String((destroyBody as Record<string, unknown>).result ?? "")
+        : "";
+    if (result !== "ok" && result !== "not found") {
+      throw new AppError(ERROR_CODES.INTERNAL, "No se pudo eliminar la imagen.");
+    }
+    return result;
+  }
+
+  /**
+   * Best-effort bulk destroy for business reset. NEVER throws: the DB rows
+   * are already gone when this runs, so a failed destroy leaves an inert
+   * orphan (no references to it), never a broken product. Assets whose
+   * publicId does not belong to this business are skipped, never touched.
+   */
+  async destroyAssets(
+    businessId: string,
+    publicIds: string[],
+  ): Promise<{ destroyed: number; failed: number }> {
+    const config = readCloudinaryConfig();
+    if (!config) return { destroyed: 0, failed: 0 };
+    let destroyed = 0;
+    let failed = 0;
+    for (const publicId of publicIds) {
+      const parsed = parseImagePublicId(publicId);
+      if (!parsed || parsed.businessId !== businessId) {
+        failed += 1;
+        continue;
+      }
+      try {
+        await this.destroyPublicId(config, publicId);
+        destroyed += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    return { destroyed, failed };
   }
 }

@@ -212,7 +212,7 @@ describe("business reset (local)", () => {
       [
         "cashMoves", "cashSessions", "customerPayments", "customers",
         "expenses", "importIdMap", "initialDebts", "products",
-        "saleLines", "saleReturnLines", "saleReturns", "sales",
+        "productImages", "saleLines", "saleReturnLines", "saleReturns", "sales",
         "settings", "stockMoves", "suppliers",
       ].sort(),
     );
