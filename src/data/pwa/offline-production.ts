@@ -1,4 +1,5 @@
 import { NetworkError } from "../errors";
+import { formatCop } from "@/domain/money";
 import type { RemotePreparation } from "../http/mappers";
 import { getPwaApi } from "./api";
 import { getPwaAuthSession } from "../http/session";
@@ -98,14 +99,22 @@ export async function prepararWithOfflineFallback(
     if (source.stock <= 0) {
       throw new Error(INVENTORY_ERRORS.noMaterial);
     }
+    // Hard conservation rule, mirroring the server: assigned cost can never
+    // exceed the lot's remaining value. Overflow is rejected, never clamped,
+    // so requested == transferred == received on every path.
+    const assignedTotal = (input.unitCost ?? 0) * input.qty;
+    if (assignedTotal > source.avgCost) {
+      throw new Error(
+        `Este costo supera el valor restante del lote (${formatCop(source.avgCost)}).`,
+      );
+    }
     const dependsOn = await openDependency(db, business);
     const preparationId = newEntityId();
     const note = clean(input.note) ?? null;
     // Same value-conservation rule as the server: assigned cost transfers
-    // from the lot (clamped at zero); pending transfers nothing and leaves
-    // the finished average untouched.
-    const assignedTotal = (input.unitCost ?? 0) * input.qty;
-    const transfer = Math.min(assignedTotal, source.avgCost);
+    // from the lot; pending transfers nothing and leaves the finished
+    // average untouched.
+    const transfer = assignedTotal;
     await db.transaction(
       "rw",
       [db.products, db.preparations, db.stockMoves, db.outbox],

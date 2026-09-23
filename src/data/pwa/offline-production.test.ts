@@ -213,6 +213,72 @@ describe("prepararWithOfflineFallback", () => {
     expect((await getLocalDb().products.get(COMBO_ID))?.avgCost).toBe(105000);
   });
 
+  it("overflow is REJECTED offline: assigned above remaining mints nothing", async () => {
+    api.production.prepare.mockRejectedValue(new NetworkError("offline"));
+    await seedProduct(COMBO_ID, businessId, { stock: 1, avgCost: 10000 });
+    await seedProduct(TARGET_ID, businessId, { stock: 10, avgCost: 400 });
+    const before =
+      1 * 10000 + 10 * 400;
+    await expect(
+      prepararWithOfflineFallback(
+        { sourceId: COMBO_ID, targetId: TARGET_ID, qty: 10, unitCost: 1500 },
+        REQUEST_ID,
+      ),
+    ).rejects.toThrow("supera el valor restante");
+    expect(await getLocalDb().preparations.count()).toBe(0);
+    expect(await getOutboxStore().listPending(businessId)).toHaveLength(0);
+    const combo = await getLocalDb().products.get(COMBO_ID);
+    const target = await getLocalDb().products.get(TARGET_ID);
+    expect(combo!.stock * combo!.avgCost + target!.stock * target!.avgCost).toBe(before);
+  });
+
+  it("exact remaining is allowed offline and zeroes the lot", async () => {
+    api.production.prepare.mockRejectedValue(new NetworkError("offline"));
+    await seedProduct(COMBO_ID, businessId, { stock: 1, avgCost: 10000 });
+    await seedProduct(TARGET_ID, businessId, { stock: 10, avgCost: 400 });
+    const result = await prepararWithOfflineFallback(
+      { sourceId: COMBO_ID, targetId: TARGET_ID, qty: 10, unitCost: 1000 },
+      REQUEST_ID,
+    );
+    expect(result.mode).toBe("offline");
+    expect((await getLocalDb().products.get(COMBO_ID))?.avgCost).toBe(0);
+    const combo = await getLocalDb().products.get(COMBO_ID);
+    const target = await getLocalDb().products.get(TARGET_ID);
+    expect(combo!.stock * combo!.avgCost + target!.stock * target!.avgCost).toBe(14000);
+  });
+
+  it("progressive exhaustion conserves value offline at every step", async () => {
+    api.production.prepare.mockRejectedValue(new NetworkError("offline"));
+    await seedProduct(COMBO_ID, businessId, { stock: 1, avgCost: 105000 });
+    await seedProduct(TARGET_ID, businessId, { stock: 10, avgCost: 400 });
+    const valueOf = async () => {
+      const c = await getLocalDb().products.get(COMBO_ID);
+      const t = await getLocalDb().products.get(TARGET_ID);
+      return c!.stock * c!.avgCost + t!.stock * t!.avgCost;
+    };
+    expect(await valueOf()).toBe(109000);
+    const steps: Array<[number, number, string]> = [
+      [10, 2000, "11111111-1111-4111-8111-111111111111"],
+      [10, 1200, "22222222-2222-4222-8222-222222222222"],
+      [10, 7300, "33333333-3333-4333-8333-333333333333"],
+    ];
+    for (const [qty, unitCost, req] of steps) {
+      const r = await prepararWithOfflineFallback(
+        { sourceId: COMBO_ID, targetId: TARGET_ID, qty, unitCost },
+        req,
+      );
+      expect(r.mode).toBe("offline");
+      expect(await valueOf()).toBe(109000);
+    }
+    expect((await getLocalDb().products.get(COMBO_ID))?.avgCost).toBe(0);
+    await expect(
+      prepararWithOfflineFallback(
+        { sourceId: COMBO_ID, targetId: TARGET_ID, qty: 1, unitCost: 1 },
+        "44444444-4444-4333-8333-444444444444",
+      ),
+    ).rejects.toThrow("supera el valor restante");
+  });
+
   it("refuses a duplicated requestId (no double stock)", async () => {
     api.production.prepare.mockRejectedValue(new NetworkError("offline"));
     await seedProduct(COMBO_ID, businessId);
@@ -246,7 +312,7 @@ describe("prepararWithOfflineFallback", () => {
 describe("syncPendingPreparations", () => {
   it("registers, drops the local row, and never double-syncs", async () => {
     api.production.prepare.mockRejectedValue(new NetworkError("offline"));
-    await seedProduct(COMBO_ID, businessId);
+    await seedProduct(COMBO_ID, businessId, { stock: 1, avgCost: 105000 });
     await seedProduct(TARGET_ID, businessId);
     await prepararWithOfflineFallback(
       { sourceId: COMBO_ID, targetId: TARGET_ID, qty: 5, unitCost: 100 },

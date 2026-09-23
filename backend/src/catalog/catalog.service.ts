@@ -307,14 +307,19 @@ export class CatalogService {
           );
         }
 
-        // Value conservation: the assigned cost TRANSFERS from the lot to
-        // the finished units (clamped at zero). Pending transfers nothing.
-        // Without this, every preparation would mint value from nowhere.
+        // Value conservation as a hard rule: the assigned cost TRANSFERS
+        // from the lot, and it can never exceed what remains. Overflow is
+        // REJECTED (never clamped): requested == transferred == received,
+        // so no route can mint inventory value from a transformation.
         const assignedTotal =
           unitCost === null ? 0n : unitCost * BigInt(dto.qty);
-        const transfer =
-          assignedTotal > source.avgCost ? source.avgCost : assignedTotal;
-        const nextSourceAvg = source.avgCost - transfer;
+        if (assignedTotal > source.avgCost) {
+          throw new AppError(
+            ERROR_CODES.VALIDATION,
+            `Este costo supera el valor restante del lote ($${source.avgCost.toLocaleString("es-CO")}).`,
+          );
+        }
+        const nextSourceAvg = source.avgCost - assignedTotal;
         const nextAvg =
           unitCost === null
             ? target.avgCost
@@ -374,7 +379,7 @@ export class CatalogService {
             unitCost: 0n,
             refType: "preparation",
             refId: preparationId,
-            note: `Preparación de ${dto.qty} × ${target.name}. Asignados ${copToJson(transfer)}; restante ${copToJson(nextSourceAvg)}.`,
+            note: `Preparación de ${dto.qty} × ${target.name}. Asignados ${copToJson(assignedTotal)}; restante ${copToJson(nextSourceAvg)}.`,
             requestId: null,
             occurredOn,
             createdAt: now,

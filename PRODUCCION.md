@@ -25,10 +25,13 @@ Cada preparación escribe, en la misma transacción:
 - origen: `delta 0`, `reason preparacion`, nota con lo asignado y lo
   restante, mismo `refType`/`refId`.
 
-**El costo asignado SE TRANSFIERE del lote a las unidades** (con tope en
-cero): `lote.avgCost -= qty*unitCost`. Sin esto, cada preparación crearía
-valor de la nada (lote $105.000 intacto + $20.000 nuevas = $125.000 de
-$105.000 reales). Verificación: `lote + stock×avg` antes == después.
+**El costo asignado SE TRANSFIERE del lote a las unidades, y nunca puede
+superar el valor restante: el exceso se RECHAZA** (`Este costo supera el
+valor restante del lote ($X)`), jamás se recorta en silencio. Así
+solicitado == transferido == recibido en toda ruta, y
+`lote + stock×avg` antes == después (salvo redondeo a pesos enteros, igual
+que surtir desde siempre: fracciones irrepresentables con tope de medio
+peso por unidad).
 
 Sin movimientos de caja: el dinero salió en la compra (surtir).
 

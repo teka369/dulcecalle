@@ -39,6 +39,22 @@ export default function PrepararPage() {
     if (busy) return;
     if (!sourceId) return;
     setError(null);
+    if (source) {
+      const digits = qtyRaw.replace(/\D/g, "");
+      const costDigits = costRaw.replace(/\D/g, "");
+      const qty = digits ? Number.parseInt(digits, 10) : NaN;
+      const unitCost = costDigits ? Number.parseInt(costDigits, 10) : null;
+      if (
+        Number.isInteger(qty) &&
+        unitCost !== null &&
+        unitCost * (qty as number) > source.avgCost
+      ) {
+        setError(
+          `Este costo supera el valor restante del lote (${formatCop(source.avgCost)}).`,
+        );
+        return;
+      }
+    }
     setBusy(true);
     try {
       const id = await inventoryStore.preparar({
@@ -114,6 +130,9 @@ export default function PrepararPage() {
             <p className="mt-1 text-sm text-ink/60">
               Lotes disponibles: {source.stock} · Valor restante:{" "}
               {formatCop(source.avgCost)}
+            </p>
+            <p className="mt-1 text-sm text-ink/60">
+              Costo máximo asignable en total: {formatCop(source.avgCost)}
             </p>
           </div>
         </section>

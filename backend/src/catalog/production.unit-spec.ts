@@ -138,6 +138,20 @@ describe("preparations (AppModule)", () => {
     "X-Business-Id": biz,
     "Idempotency-Key": key,
   });
+  let keySeq = 0;
+  const newRequestKey = (): string => {
+    keySeq += 1;
+    const tail = String(keySeq).padStart(12, "0");
+    return `77777777-7777-4777-8777-${tail}`;
+  };
+  /** Total inventory value across both products (the conservation invariant). */
+  const inventoryValue = (): number => {
+    let total = 0;
+    for (const p of products.values()) {
+      total += p.stock * Number(p.avgCost);
+    }
+    return total;
+  };
   const prepareBody = (over: Record<string, unknown> = {}) => ({
     sourceId: COMBO,
     targetId: TARGET,
@@ -229,17 +243,94 @@ describe("preparations (AppModule)", () => {
     expect(products.get(COMBO)?.avgCost).toBe(105000n);
   });
 
-  it("assigned cost beyond the remaining lot clamps at zero", async () => {
+  it("assigned above remaining is REJECTED: 10000 vs 15000 mints nothing", async () => {
     const combo = products.get(COMBO);
-    if (combo) combo.avgCost = 1000n;
+    if (combo) combo.avgCost = 10000n;
+    const before = inventoryValue();
     const res = await request(app.getHttpServer())
       .post("/v1/preparations")
       .set(auth(BIZ, REQ))
-      .send(prepareBody({ qty: 10, unitCost: 200 }));
+      .send(prepareBody({ qty: 10, unitCost: 1500 }));
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("supera el valor restante");
+    expect(products.get(COMBO)?.avgCost).toBe(10000n);
+    expect(products.get(TARGET)?.stock).toBe(10);
+    expect(preparations).toHaveLength(0);
+    expect(inventoryValue()).toBe(before);
+  });
+
+  it("exact remaining is allowed: 10000 vs 10000 zeroes the lot", async () => {
+    const combo = products.get(COMBO);
+    if (combo) combo.avgCost = 10000n;
+    const before = inventoryValue();
+    const res = await request(app.getHttpServer())
+      .post("/v1/preparations")
+      .set(auth(BIZ, REQ))
+      .send(prepareBody({ qty: 10, unitCost: 1000 }));
     expect(res.status).toBe(201);
-    // Transfers min(2000, 1000); the batch keeps its explicit unit cost.
     expect(products.get(COMBO)?.avgCost).toBe(0n);
-    expect(products.get(TARGET)?.avgCost).toBe(300n);
+    expect(inventoryValue()).toBe(before);
+  });
+
+  it("just below remaining is allowed: rounding dust is bounded and pre-existing", async () => {
+    // Integer COP cannot represent 13999/13 exactly. Like surtir since
+    // forever, the average rounds (Math.round) and the dust stays bounded
+    // by half a peso per unit — it is NOT created value, just unrepresentable
+    // fractions. 13 units → |dust| <= 7.
+    const combo = products.get(COMBO);
+    if (combo) combo.avgCost = 10000n;
+    const before = inventoryValue();
+    const res = await request(app.getHttpServer())
+      .post("/v1/preparations")
+      .set(auth(BIZ, REQ))
+      .send(prepareBody({ qty: 3, unitCost: 3333 }));
+    expect(res.status).toBe(201);
+    expect(products.get(COMBO)?.avgCost).toBe(1n);
+    expect(Math.abs(inventoryValue() - before)).toBeLessThanOrEqual(7);
+  });
+
+  it("empty lot rejects any positive cost but allows pending", async () => {
+    const combo = products.get(COMBO);
+    if (combo) combo.avgCost = 0n;
+    const denied = await request(app.getHttpServer())
+      .post("/v1/preparations")
+      .set(auth(BIZ, REQ))
+      .send(prepareBody({ qty: 10, unitCost: 100 }));
+    expect(denied.status).toBe(400);
+    expect(preparations).toHaveLength(0);
+    const pending = await request(app.getHttpServer())
+      .post("/v1/preparations")
+      .set(auth(BIZ, "66666666-6666-4666-8666-666666666666"))
+      .send(prepareBody({ qty: 10 }));
+    expect(pending.status).toBe(201);
+    expect(pending.body.unitCost).toBeNull();
+  });
+
+  it("progressive exhaustion conserves value at every step", async () => {
+    // 105000 → 20000 → 12000 → 73000 = exact exhaustion, then rejection.
+    // All divisions here are exact, so conservation is asserted exactly;
+    // non-exact divisions are covered by the rounding-dust test above.
+    const steps: Array<[number, number]> = [
+      [10, 2000],
+      [10, 1200],
+      [10, 7300],
+    ];
+    for (const [qty, unitCost] of steps) {
+      const before = inventoryValue();
+      const res = await request(app.getHttpServer())
+        .post("/v1/preparations")
+        .set(auth(BIZ, newRequestKey()))
+        .send(prepareBody({ qty, unitCost }));
+      expect(res.status).toBe(201);
+      expect(inventoryValue()).toBe(before);
+    }
+    expect(products.get(COMBO)?.avgCost).toBe(0n);
+    const denied = await request(app.getHttpServer())
+      .post("/v1/preparations")
+      .set(auth(BIZ, newRequestKey()))
+      .send(prepareBody({ qty: 1, unitCost: 1 }));
+    expect(denied.status).toBe(400);
+    expect(preparations).toHaveLength(3);
   });
 
   it("two purchases pool into one lot value before preparing", async () => {
