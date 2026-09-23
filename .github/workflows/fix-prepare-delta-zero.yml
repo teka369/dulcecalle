@@ -1,0 +1,104 @@
+name: fix-prepare-delta-zero
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore catalog.service.ts from last good commit
+        run: |
+          git checkout abf53cc562ae42a1d7e547aa1762389fe668b101 -- backend/src/catalog/catalog.service.ts
+
+      - name: Remove zero-delta combo stock move
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path("backend/src/catalog/catalog.service.ts")
+          t = p.read_text()
+          old_comment = """   * units of another product. Atomic: target stock/avg + preparation row +
+   * both trace moves commit together. The source lot is NOT decremented
+   * (its total yield is unknown); the record is the consumption trace."""
+          new_comment = """   * units of another product. Atomic: target stock/avg + preparation row +
+   * the finished-unit stock move. No source stock_move (stock_moves_delta_nz
+   * forbids delta 0); the lot loses value only via avgCost. The source
+   * quantity is NOT decremented (its total yield is unknown)."""
+          if old_comment in t:
+              t = t.replace(old_comment, new_comment, 1)
+          old_block = '''        await tx.stockMove.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            productId: target.id,
+            delta: dto.qty,
+            reason: "preparacion",
+            unitCost: unitCost ?? 0n,
+            refType: "preparation",
+            refId: preparationId,
+            note: unitCost === null ? `Costo pendiente. ${note ?? ""}`.trim() || null : note,
+            requestId: null,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+        await tx.stockMove.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            productId: source.id,
+            delta: 0,
+            reason: "preparacion",
+            unitCost: 0n,
+            refType: "preparation",
+            refId: preparationId,
+            note: `Preparaci\u00f3n de ${dto.qty} \u00d7 ${target.name}. Asignados ${copToJson(assignedTotal)}; restante ${copToJson(nextSourceAvg)}.`,
+            requestId: null,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+        return preparation;'''
+          new_block = '''        await tx.stockMove.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            productId: target.id,
+            delta: dto.qty,
+            reason: "preparacion",
+            unitCost: unitCost ?? 0n,
+            refType: "preparation",
+            refId: preparationId,
+            note: unitCost === null ? `Costo pendiente. ${note ?? ""}`.trim() || null : note,
+            requestId: null,
+            occurredOn,
+            createdAt: now,
+          },
+        });
+        return preparation;'''
+          if old_block not in t:
+              raise SystemExit("expected source stockMove block not found")
+          t = t.replace(old_block, new_block, 1)
+          if "delta: 0" in t:
+              raise SystemExit("delta: 0 still present")
+          if "export class CatalogService" not in t:
+              raise SystemExit("catalog.service.ts looks incomplete")
+          p.write_text(t)
+          print("patched", len(t))
+          PY
+
+      - name: Commit and push main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/catalog/catalog.service.ts
+          git diff --cached --quiet && echo "No catalog change" && exit 0
+          git commit -m "fix(production): remove zero-delta combo stock move"
+          git push origin HEAD:main
