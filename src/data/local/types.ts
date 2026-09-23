@@ -85,6 +85,7 @@ export type OutboxStatus = "pending" | "in_flight" | "synced" | "failed";
 export type OutboxEntity =
   | "product"
   | "productImage"
+  | "preparation"
   | "customer"
   | "supplier"
   | "sale"
@@ -137,11 +138,30 @@ export type LocalProduct = {
   /** CACHE / OPTIMISTIC — server stock. */
   stock: number;
   lowStockAt: number;
+  /** False = supply/combo: purchasable, never sold directly. Missing = true. */
+  sellable?: boolean;
   archivedAt: string | null;
   createdAt: number;
   updatedAt: number;
   /** Mirror of the server gallery (position order). Managed by sync. */
   images: LocalProductImage[];
+};
+
+/** Preparation record: combo → finished units. Immutable history. */
+export type LocalPreparation = {
+  id: string;
+  businessId: string;
+  sourceId: string;
+  sourceName: string;
+  targetId: string;
+  targetName: string;
+  qty: number;
+  unitCost: number;
+  note: string | null;
+  /** Request id while this locally-created row is pending/syncing. */
+  requestId?: string;
+  occurredOn: string;
+  createdAt: number;
 };
 
 /** Offline-selected photo waiting for upload. Blob is deleted after sync. */

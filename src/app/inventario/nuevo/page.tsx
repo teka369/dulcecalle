@@ -17,6 +17,7 @@ export default function AgregarProductoPage() {
   const [stockRaw, setStockRaw] = useState("");
   const [costRaw, setCostRaw] = useState("");
   const [gifted, setGifted] = useState(false);
+  const [sellable, setSellable] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -42,6 +43,7 @@ export default function AgregarProductoPage() {
         stockRaw: stockRaw || "0",
         avgCostRaw: gifted ? "0" : costRaw || "0",
         gifted,
+        sellable,
       });
       setToast("Producto guardado");
       setCreatedId(id);
@@ -157,6 +159,22 @@ export default function AgregarProductoPage() {
               {gifted
                 ? "Entran a $0. No descuenta caja. La ganancia de estas unidades será casi todo el precio. Cuando compres más, el costo se llena en Surtir."
                 : "Si ya tienes unidades, pon lo que te costó cada una. Sin stock puede ir en 0 y se llena al surtir."}
+            </span>
+          </span>
+        </label>
+
+        <label className="mt-3 flex min-h-11 items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={!sellable}
+            onChange={(e) => setSellable(!e.target.checked)}
+            className="mt-1 h-5 w-5 shrink-0 rounded border-ink/20"
+          />
+          <span>
+            <span className="font-medium">Es insumo o combo para preparar</span>
+            <span className="mt-1 block text-ink/60">
+              No aparece para vender ni en el catálogo de clientes. Se compra
+              con proveedor y se transforma con Preparar.
             </span>
           </span>
         </label>

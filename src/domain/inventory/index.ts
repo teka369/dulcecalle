@@ -9,5 +9,6 @@ export {
   resolveSurtirCost,
   validatePayMethod,
   validateSurtirForm,
+  validatePreparationForm,
   type ShrinkReason,
 } from "./validate";

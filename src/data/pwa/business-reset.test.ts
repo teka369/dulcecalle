@@ -206,13 +206,47 @@ describe("business reset (local)", () => {
     expect(await db.pendingMedia.where("businessId").equals(OTHER).count()).toBe(1);
   });
 
+  it("wipes preparations of the business but keeps other tenants", async () => {
+    const db = getLocalDb();
+    const now = Date.now();
+    await db.preparations.put({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      businessId: BIZ,
+      sourceId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      sourceName: "Combo",
+      targetId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      targetName: "Terminada",
+      qty: 10,
+      unitCost: 200,
+      note: null,
+      occurredOn: "2026-09-23",
+      createdAt: now,
+    });
+    await db.preparations.put({
+      id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      businessId: OTHER,
+      sourceId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      sourceName: "Combo",
+      targetId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      targetName: "Terminada",
+      qty: 5,
+      unitCost: 0,
+      note: null,
+      occurredOn: "2026-09-23",
+      createdAt: now,
+    });
+    await clearLocalBusinessData(BIZ);
+    expect(await db.preparations.where("businessId").equals(BIZ).count()).toBe(0);
+    expect(await db.preparations.where("businessId").equals(OTHER).count()).toBe(1);
+  });
+
   it("confirmation phrase and entity labels are exact", () => {
     expect(RESET_CONFIRM_PHRASE).toBe("ELIMINAR DATOS");
     expect(Object.keys(RESET_ENTITY_LABELS).sort()).toEqual(
       [
         "cashMoves", "cashSessions", "customerPayments", "customers",
         "expenses", "importIdMap", "initialDebts", "products",
-        "productImages", "saleLines", "saleReturnLines", "saleReturns", "sales",
+        "productImages", "preparations", "saleLines", "saleReturnLines", "saleReturns", "sales",
         "settings", "stockMoves", "suppliers",
       ].sort(),
     );

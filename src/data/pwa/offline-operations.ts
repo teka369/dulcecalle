@@ -17,12 +17,12 @@ function businessId(): string {
   return id;
 }
 
-function todayLocal(): string {
+export function todayLocal(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function clean(value?: string): string | undefined {
+export function clean(value?: string): string | undefined {
   const trimmed = value?.trim();
   return trimmed || undefined;
 }
@@ -35,7 +35,7 @@ function assertPositiveMoney(value: number, message: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) throw new Error(message);
 }
 
-async function openDependency(db: DulceCalleLocalDB, business: string): Promise<string[]> {
+export async function openDependency(db: DulceCalleLocalDB, business: string): Promise<string[]> {
   const session = await db.cashSessions
     .where("[businessId+localDate]")
     .equals([business, todayLocal()])
@@ -155,7 +155,7 @@ export async function getLocalCashSnapshot(): Promise<{
   };
 }
 
-async function ensureOpenDayEditable(business: string) {
+export async function ensureOpenDayEditable(business: string) {
   const session = await getLocalDb().cashSessions
     .where("[businessId+localDate]")
     .equals([business, todayLocal()])
@@ -461,7 +461,7 @@ export async function recordExpenseWithOfflineFallback(
   }
 }
 
-function roundedAvg(oldStock: number, oldAvg: number, qty: number, unitCost: number) {
+export function roundedAvg(oldStock: number, oldAvg: number, qty: number, unitCost: number) {
   const next = oldStock + qty;
   return next <= 0 ? oldAvg : Math.round((oldAvg * oldStock + unitCost * qty) / next);
 }

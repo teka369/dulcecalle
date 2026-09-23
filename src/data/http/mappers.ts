@@ -64,6 +64,8 @@ export type RemoteProduct = {
   avgCost: number;
   stock: number;
   lowStockAt: number;
+  /** False = supply/combo. Absent in older payloads means true. */
+  sellable: boolean;
   archivedAt: string | null;
   createdAt: number;
   images: RemoteProductImage[];
@@ -103,11 +105,40 @@ export function mapProduct(raw: Record<string, unknown>): RemoteProduct {
     avgCost: asCopJson(raw.avgCost, "avgCost"),
     stock: Number(raw.stock),
     lowStockAt: Number(raw.lowStockAt),
+    sellable: raw.sellable === undefined ? true : raw.sellable === true,
     archivedAt: raw.archivedAt == null ? null : String(raw.archivedAt),
     createdAt: asIsoEpoch(raw.createdAt),
     images: Array.isArray(raw.images)
       ? (raw.images as Record<string, unknown>[]).map(mapProductImage)
       : [],
+  };
+}
+
+export type RemotePreparation = {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  sourceName: string;
+  targetName: string;
+  qty: number;
+  unitCost: number;
+  note: string | null;
+  occurredOn: string;
+  createdAt: number;
+};
+
+export function mapPreparation(raw: Record<string, unknown>): RemotePreparation {
+  return {
+    id: asUuid(raw.id, "preparation.id"),
+    sourceId: asUuid(raw.sourceId, "preparation.sourceId"),
+    targetId: asUuid(raw.targetId, "preparation.targetId"),
+    sourceName: String(raw.sourceName ?? ""),
+    targetName: String(raw.targetName ?? ""),
+    qty: Number(raw.qty),
+    unitCost: asCopJson(raw.unitCost, "unitCost"),
+    note: raw.note == null ? null : String(raw.note),
+    occurredOn: String(raw.occurredOn ?? ""),
+    createdAt: asIsoEpoch(raw.createdAt),
   };
 }
 

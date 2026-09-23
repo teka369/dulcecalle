@@ -4,6 +4,7 @@ import {
   parseQtyRaw,
   resolveSurtirCost,
   validateMotivo,
+  validatePreparationForm,
   validateShrinkQty,
   validateSurtirForm,
 } from "./validate";
@@ -63,5 +64,40 @@ describe("inventory validate (Tanda 3)", () => {
       method: null,
     });
     expect(r).toEqual({ error: INVENTORY_ERRORS.noMethod });
+  });
+
+  it("preparation form validates parties, qty and explicit cost", () => {
+    const base = {
+      sourceId: "11111111-1111-4111-8111-111111111111",
+      targetId: "22222222-2222-4222-8222-222222222222",
+      qtyRaw: "10",
+      unitCostRaw: "200",
+    };
+    expect(validatePreparationForm(base)).toEqual({
+      sourceId: base.sourceId,
+      targetId: base.targetId,
+      qty: 10,
+      unitCost: 200,
+    });
+    // Empty cost = pending, never an invented proration.
+    expect(validatePreparationForm({ ...base, unitCostRaw: "" })).toMatchObject({
+      qty: 10,
+      unitCost: 0,
+    });
+    expect(
+      validatePreparationForm({ ...base, sourceId: base.targetId }),
+    ).toEqual({ error: INVENTORY_ERRORS.sameProduct });
+    expect(validatePreparationForm({ ...base, targetId: "" })).toEqual({
+      error: INVENTORY_ERRORS.emptyTarget,
+    });
+    expect(validatePreparationForm({ ...base, sourceId: "" })).toEqual({
+      error: INVENTORY_ERRORS.emptyCombo,
+    });
+    expect(validatePreparationForm({ ...base, qtyRaw: "0" })).toEqual({
+      error: INVENTORY_ERRORS.notPositive,
+    });
+    expect(validatePreparationForm({ ...base, unitCostRaw: "abc" })).toEqual({
+      error: INVENTORY_ERRORS.badCost,
+    });
   });
 });

@@ -51,7 +51,7 @@ describe("Dexie v3 → current migration (M6.10/M6.12/M6.13)", () => {
     await __resetLocalDbForTests();
   });
 
-  it("preserves v3 data and adds customerLedgers + prepState + snapshots + pendingMedia", async () => {
+  it("preserves v3 data and adds customerLedgers + prepState + snapshots + pendingMedia + preparations", async () => {
     const old = await openAsV3();
     const now = Date.now();
     await old.table("products").put({
@@ -101,7 +101,7 @@ describe("Dexie v3 → current migration (M6.10/M6.12/M6.13)", () => {
     old.close();
 
     const db = getLocalDb();
-    expect(db.verno).toBe(8);
+    expect(db.verno).toBe(9);
     expect(await db.snapshots.count()).toBe(0);
     expect(
       (await db.products.get("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))?.stock,
@@ -156,5 +156,22 @@ describe("Dexie v3 → current migration (M6.10/M6.12/M6.13)", () => {
     expect(
       (await db.portalCatalogs.get("ffffffff-ffff-4fff-8fff-ffffffffffff"))?.capturedAt,
     ).toBe(now);
+    expect(await db.preparations.count()).toBe(0);
+    await db.preparations.put({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      businessId: BIZ,
+      sourceId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      sourceName: "Combo",
+      targetId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      targetName: "Terminada",
+      qty: 10,
+      unitCost: 200,
+      note: null,
+      occurredOn: "2026-09-23",
+      createdAt: now,
+    });
+    expect(
+      (await db.preparations.get("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))?.qty,
+    ).toBe(10);
   });
 });

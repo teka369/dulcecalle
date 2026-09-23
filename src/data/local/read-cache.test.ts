@@ -28,6 +28,7 @@ function product(over: Partial<RemoteProduct> = {}): RemoteProduct {
     avgCost: 400,
     stock: 10,
     lowStockAt: 5,
+    sellable: true,
     archivedAt: null,
     createdAt: 1_700_000_000_000,
     ...over,

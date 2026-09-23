@@ -12,7 +12,8 @@ export type StockMoveReason =
   | "perdido"
   | "adjust"
   | "inicial"
-  | "devolucion";
+  | "devolucion"
+  | "preparacion";
 
 export interface Product {
   id?: number;

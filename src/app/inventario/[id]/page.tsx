@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
-import type { RemoteProduct, RemoteStockMove } from "@/data/http/mappers";
+import type {
+  RemotePreparation,
+  RemoteProduct,
+  RemoteStockMove,
+} from "@/data/http/mappers";
 import { routeId } from "@/data/pwa/ids";
 import { inventoryStore } from "@/store/inventoryStore";
 import { ProductImageManager } from "@/components/product/ProductImageManager";
@@ -18,6 +22,7 @@ const REASON_LABEL: Record<string, string> = {
   adjust: "Ajuste",
   inicial: "Stock inicial",
   devolucion: "Devolución",
+  preparacion: "Preparación",
 };
 
 export default function ProductoFichaPage() {
@@ -30,9 +35,12 @@ export default function ProductoFichaPage() {
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editLow, setEditLow] = useState("");
+  const [editSellable, setEditSellable] = useState(true);
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [fromPreparations, setFromPreparations] = useState<RemotePreparation[]>([]);
+  const [intoPreparations, setIntoPreparations] = useState<RemotePreparation[]>([]);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -45,9 +53,16 @@ export default function ProductoFichaPage() {
       setEditName(p.name);
       setEditPrice(String(p.price));
       setEditLow(String(p.lowStockAt));
+      setEditSellable(p.sellable);
     }
     if (p) {
       setMoves(await inventoryStore.listProductMoves(id));
+      const [from, into] = await Promise.all([
+        inventoryStore.listPreparations({ sourceId: id }).catch(() => [] as RemotePreparation[]),
+        inventoryStore.listPreparations({ targetId: id }).catch(() => [] as RemotePreparation[]),
+      ]);
+      setFromPreparations(from);
+      setIntoPreparations(into);
     }
     setReady(true);
   }, [id]);
@@ -84,6 +99,11 @@ export default function ProductoFichaPage() {
         <h1 className="text-[22px] font-semibold tracking-tight">
           {product.name}
         </h1>
+        {product.sellable === false && (
+          <span className="shrink-0 rounded-full bg-primary/40 px-2 py-0.5 text-xs font-semibold text-ink">
+            Insumo
+          </span>
+        )}
       </header>
 
       <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
@@ -106,12 +126,20 @@ export default function ProductoFichaPage() {
         ) : null}
       </section>
 
-      <Link
-        href={`/inventario/${product.id}/surtir`}
-        className="flex min-h-11 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
-      >
-        Surtir
-      </Link>
+      <div className="flex gap-2">
+        <Link
+          href={`/inventario/${product.id}/surtir`}
+          className="flex min-h-11 flex-1 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
+        >
+          Surtir
+        </Link>
+        <Link
+          href={`/inventario/${product.id}/preparar`}
+          className="flex min-h-11 flex-1 items-center justify-center rounded-[14px] border border-ink/10 bg-surface px-4 text-sm font-semibold"
+        >
+          Preparar
+        </Link>
+      </div>
 
       <ProductImageManager
         productId={product.id}
@@ -161,6 +189,21 @@ export default function ProductoFichaPage() {
             onChange={(e) => setEditLow(e.target.value.replace(/\D/g, ""))}
             className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
           />
+          <label className="mt-3 flex min-h-11 items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={!editSellable}
+              onChange={(e) => setEditSellable(!e.target.checked)}
+              className="mt-1 h-5 w-5 shrink-0 rounded border-ink/20"
+            />
+            <span>
+              <span className="font-medium">Es insumo o combo</span>
+              <span className="mt-1 block text-ink/60">
+                No aparece para vender ni en el catálogo de clientes. Sirve
+                como origen de preparaciones.
+              </span>
+            </span>
+          </label>
           {editError && <p className="mt-2 text-sm text-danger">{editError}</p>}
           <button
             type="button"
@@ -175,6 +218,7 @@ export default function ProductoFichaPage() {
                   name: editName,
                   priceRaw: editPrice,
                   lowStockAtRaw: editLow,
+                  sellable: editSellable,
                 })
                 .then(() => inventoryStore.getProduct(product.id))
                 .then((updated) => {
@@ -183,6 +227,7 @@ export default function ProductoFichaPage() {
                     setEditName(updated.name);
                     setEditPrice(String(updated.price));
                     setEditLow(String(updated.lowStockAt));
+                    setEditSellable(updated.sellable);
                   }
                   setEditing(false);
                 })
@@ -275,6 +320,54 @@ export default function ProductoFichaPage() {
           />
         </div>
       </section>
+
+      {(fromPreparations.length > 0 || intoPreparations.length > 0) && (
+        <section>
+          <h2 className="mb-2 text-sm font-semibold text-ink/60">
+            Preparaciones
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {fromPreparations.map((r) => (
+              <li
+                key={r.id}
+                className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">
+                    {r.qty} × {r.targetName}
+                  </span>
+                  <span className="font-semibold">
+                    {r.unitCost > 0 ? formatCop(r.unitCost * r.qty) : "Costo pendiente"}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-ink/50">
+                  {r.occurredOn}
+                  {r.note ? ` · ${r.note}` : ""}
+                </p>
+              </li>
+            ))}
+            {intoPreparations.map((r) => (
+              <li
+                key={r.id}
+                className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">
+                    Desde {r.sourceName}: {r.qty} uds
+                  </span>
+                  <span className="font-semibold">
+                    {r.unitCost > 0 ? formatCop(r.unitCost * r.qty) : "Costo pendiente"}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-ink/50">
+                  {r.occurredOn}
+                  {r.note ? ` · ${r.note}` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {moves.length > 0 && (
         <section>

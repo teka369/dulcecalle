@@ -12,6 +12,7 @@ import type {
   LocalExpense,
   LocalInitialDebt,
   LocalPendingMedia,
+  LocalPreparation,
   LocalProduct,
   LocalSale,
   LocalSaleLine,
@@ -47,6 +48,7 @@ export class DulceCalleLocalDB extends Dexie {
   prepState!: EntityTable<PrepReadiness, "id">;
   snapshots!: EntityTable<LocalSnapshot, "id">;
   portalCatalogs!: EntityTable<PortalCatalogSnapshot, "customerId">;
+  preparations!: EntityTable<LocalPreparation, "id">;
   pendingMedia!: EntityTable<LocalPendingMedia, "id">;
   outbox!: EntityTable<OutboxItem, "operationId">;
 
@@ -100,6 +102,12 @@ export class DulceCalleLocalDB extends Dexie {
     // M6.10 ledger cache. No businessId on the portal by design.
     this.version(8).stores({
       portalCatalogs: "customerId, capturedAt",
+    });
+    // v9: preparation records (combo → finished units). Immutable history;
+    // rows are created locally and reconciled by the sync engine.
+    this.version(9).stores({
+      preparations:
+        "id, businessId, sourceId, targetId, requestId, [businessId+sourceId], [businessId+targetId], [businessId+requestId]",
     });
   }
 }

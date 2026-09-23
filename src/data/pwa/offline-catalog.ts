@@ -316,7 +316,7 @@ async function reconcileStrandedSuppliers(
 
 export type CustomerPatchInput = { name?: string; phone?: string | null };
 export type SupplierPatchInput = { name?: string; phone?: string | null; notes?: string | null };
-export type ProductPatchInput = { name?: string; price?: number; lowStockAt?: number };
+export type ProductPatchInput = { name?: string; price?: number; lowStockAt?: number; sellable?: boolean };
 
 export type PatchOfflineResult =
   | { mode: "online" }
@@ -456,6 +456,7 @@ export async function patchProductWithOfflineFallback(
     ...(name !== undefined ? { name } : {}),
     ...(input.price !== undefined ? { price: input.price } : {}),
     ...(input.lowStockAt !== undefined ? { lowStockAt: input.lowStockAt } : {}),
+    ...(input.sellable !== undefined ? { sellable: input.sellable } : {}),
   };
   try {
     await getPwaApi().products.patch(id, normalized, requestId);
@@ -545,6 +546,7 @@ export async function syncPendingProducts(businessId: string) {
           name?: string;
           price?: number;
           lowStockAt?: number;
+          sellable?: boolean;
         };
         const remote = await api.products.patch(payload.id, payload, item.requestId);
         return { remoteId: remote.id };

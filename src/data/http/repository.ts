@@ -7,6 +7,7 @@ import { HttpSession } from "./session";
 import {
   mapCustomer,
   mapPayment,
+  mapPreparation,
   mapProduct,
   mapProductImage,
   mapSale,
@@ -21,6 +22,7 @@ import {
   type RemoteCustomer,
   type RemotePayment,
   type RemoteProduct,
+  type RemotePreparation,
   type RemoteProductImage,
   type RemoteSale,
   type RemoteSession,
@@ -41,12 +43,14 @@ export type CreateProductInput = {
   avgCost?: number;
   lowStockAt?: number;
   gifted?: boolean;
+  sellable?: boolean;
 };
 
 export type PatchProductInput = {
   name?: string;
   price?: number;
   lowStockAt?: number;
+  sellable?: boolean;
   stock?: unknown;
   avgCost?: unknown;
 };
@@ -484,6 +488,41 @@ export class HttpRepository {
         `/products/${productId}/moves`,
       );
       return rows.map(mapStockMove);
+    },
+  };
+
+  readonly production = {
+    prepare: async (
+      input: {
+        sourceId: string;
+        targetId: string;
+        qty: number;
+        unitCost?: number;
+        note?: string;
+      },
+      requestId: string,
+    ): Promise<RemotePreparation> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        "/preparations",
+        { body: input, idempotencyKey: requestId },
+      );
+      return mapPreparation(row);
+    },
+
+    list: async (filter?: {
+      sourceId?: string;
+      targetId?: string;
+    }): Promise<RemotePreparation[]> => {
+      const q = new URLSearchParams();
+      if (filter?.sourceId) q.set("sourceId", filter.sourceId);
+      if (filter?.targetId) q.set("targetId", filter.targetId);
+      const suffix = q.size ? `?${q.toString()}` : "";
+      const rows = await this.http.request<Record<string, unknown>[]>(
+        "GET",
+        `/preparations${suffix}`,
+      );
+      return rows.map(mapPreparation);
     },
   };
 

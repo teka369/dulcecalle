@@ -34,6 +34,7 @@ export default function NuevaVentaPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products.filter((p) => {
+      if (p.sellable === false) return false;
       const matchCat = !category || p.category === category;
       const matchQ =
         !q ||

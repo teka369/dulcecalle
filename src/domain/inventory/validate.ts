@@ -11,10 +11,15 @@ export const INVENTORY_ERRORS = {
   emptyProductName: "Ponle un nombre al producto.",
   emptySupplierName: "Ponle un nombre al proveedor.",
   stockViaMoves:
-    "El stock solo cambia con surtir, ventas, mermas, devoluciones o el alta inicial.",
+    "El stock solo cambia con surtir, ventas, mermas, devoluciones, preparaciones o el alta inicial.",
   inicialViaCreate: "El stock inicial solo se registra al crear el producto.",
   needCost: "Si hay stock, ponle lo que te costó.",
   surtirTodayOnly: "El surtido queda en el día de hoy.",
+  sameProduct: "El origen y el producto deben ser distintos.",
+  emptyCombo: "Elige de qué combo o insumo proviene.",
+  emptyTarget: "Elige qué producto vas a preparar.",
+  noMaterial: "El combo no tiene material disponible. Súrtelo primero.",
+  pendingCostHint: "Si lo dejas en 0, el costo queda pendiente.",
 } as const;
 
 export const INVENTORY_TOASTS = {
@@ -177,4 +182,32 @@ export function validateSurtirForm(input: {
     totalCost: cost.totalCost,
     method: input.method as PayMethod,
   };
+}
+
+/**
+ * Preparation form validation. Cost is optional and explicit: omitted or 0
+ * means pending (gifted semantics), never an auto-proration of the lot.
+ */
+export function validatePreparationForm(input: {
+  sourceId: string | null | undefined;
+  targetId: string | null | undefined;
+  qtyRaw: string;
+  unitCostRaw: string;
+}): { sourceId: string; targetId: string; qty: number; unitCost: number } | { error: string } {
+  if (!input.sourceId) return { error: INVENTORY_ERRORS.emptyCombo };
+  if (!input.targetId) return { error: INVENTORY_ERRORS.emptyTarget };
+  if (input.sourceId === input.targetId) {
+    return { error: INVENTORY_ERRORS.sameProduct };
+  }
+  const qtyParsed = parseQtyRaw(input.qtyRaw);
+  if ("error" in qtyParsed) return qtyParsed;
+  const raw = input.unitCostRaw.trim();
+  if (raw === "") {
+    return { sourceId: input.sourceId, targetId: input.targetId, qty: qtyParsed.qty, unitCost: 0 };
+  }
+  const unitCost = Number.parseInt(raw.replace(/\D/g, ""), 10);
+  if (!Number.isInteger(unitCost) || unitCost < 0) {
+    return { error: INVENTORY_ERRORS.badCost };
+  }
+  return { sourceId: input.sourceId, targetId: input.targetId, qty: qtyParsed.qty, unitCost };
 }

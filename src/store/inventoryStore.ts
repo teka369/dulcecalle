@@ -6,6 +6,7 @@ import {
   INVENTORY_ERRORS,
   INVENTORY_TOASTS,
   validateMotivo,
+  validatePreparationForm,
   validateShrinkQty,
   validateSurtirForm,
   type ShrinkReason,
@@ -13,12 +14,16 @@ import {
 import { ApiError } from "@/data/errors";
 import { getPwaApi } from "@/data/pwa/api";
 import {
+  listPreparationsWithOfflineFallback,
+  prepararWithOfflineFallback,
+} from "@/data/pwa/offline-production";
+import {
   getCachedProduct,
   getCachedSupplier,
   listCachedProducts,
   listCachedSuppliers,
 } from "@/data/pwa/catalog";
-import type { RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http/mappers";
+import type { RemotePreparation, RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http/mappers";
 import {
   archiveProductWithOfflineFallback,
   createSupplierWithOfflineFallback,
@@ -173,6 +178,7 @@ export const inventoryStore = {
     stockRaw?: string;
     avgCostRaw?: string;
     gifted?: boolean;
+    sellable?: boolean;
   }): Promise<string> {
     const name = input.name.trim();
     if (!name) throw new Error(INVENTORY_ERRORS.emptyProductName);
@@ -193,7 +199,7 @@ export const inventoryStore = {
     }
     try {
       const created = await getPwaApi().products.create(
-        { name, price, stock, avgCost, lowStockAt: 5, gifted },
+        { name, price, stock, avgCost, lowStockAt: 5, gifted, sellable: input.sellable },
         crypto.randomUUID(),
       );
       await this.refreshProducts();
@@ -260,6 +266,7 @@ export const inventoryStore = {
     name: string;
     priceRaw: string;
     lowStockAtRaw: string;
+    sellable?: boolean;
     requestId?: string;
   }): Promise<"online" | "offline"> {
     const trimmed = input.name.trim();
@@ -275,7 +282,7 @@ export const inventoryStore = {
     try {
       const result = await patchProductWithOfflineFallback(
         input.productId,
-        { name: trimmed, price, lowStockAt },
+        { name: trimmed, price, lowStockAt, sellable: input.sellable },
         input.requestId ?? crypto.randomUUID(),
       );
       await this.refreshProducts();
@@ -402,6 +409,51 @@ export const inventoryStore = {
     } catch (e) {
       fail(e);
     }
+  },
+  async preparar(input: {
+    sourceId: string;
+    targetId: string;
+    qtyRaw: string;
+    unitCostRaw: string;
+    note?: string;
+    requestId?: string;
+  }): Promise<string> {
+    const parsed = validatePreparationForm({
+      sourceId: input.sourceId,
+      targetId: input.targetId,
+      qtyRaw: input.qtyRaw,
+      unitCostRaw: input.unitCostRaw,
+    });
+    if ("error" in parsed) throw new Error(parsed.error);
+    try {
+      const result = await prepararWithOfflineFallback(
+        {
+          sourceId: parsed.sourceId,
+          targetId: parsed.targetId,
+          qty: parsed.qty,
+          unitCost: parsed.unitCost,
+          note: input.note?.trim() || undefined,
+        },
+        input.requestId ?? crypto.randomUUID(),
+      );
+      await this.refreshProducts();
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Preparación guardada sin conexión"
+            : `Preparadas ${parsed.qty} unidades`,
+      });
+      return result.mode === "offline" ? result.id : result.value.id;
+    } catch (e) {
+      fail(e);
+    }
+  },
+  async listPreparations(filter?: {
+    sourceId?: string;
+    targetId?: string;
+  }): Promise<RemotePreparation[]> {
+    const { rows } = await listPreparationsWithOfflineFallback(filter);
+    return rows;
   },
   clearToast() {
     setState({ lastToast: null });

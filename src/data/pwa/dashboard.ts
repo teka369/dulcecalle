@@ -260,9 +260,11 @@ export async function loadDashboardResult(): Promise<{
               ? "Regalo"
               : move.reason === "perdido"
                 ? "Perdido"
-                : move.reason === "adjust"
-                  ? "Ajuste"
-                  : null;
+                : move.reason === "preparacion"
+                  ? "Preparación"
+                  : move.reason === "adjust"
+                    ? "Ajuste"
+                    : null;
       if (!label) continue;
       const product = products.find((p) => p.id === move.productId);
       pushActivity({

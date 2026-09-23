@@ -48,6 +48,7 @@ const OPERATION_NAMES: Record<string, string> = {
   "productImage:create": "Foto de producto",
   "productImage:patch": "Foto de producto",
   "productImage:remove": "Foto de producto",
+  "preparation:create": "Preparación",
 };
 
 export function describeOutboxOperation(

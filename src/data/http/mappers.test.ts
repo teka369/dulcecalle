@@ -44,6 +44,9 @@ describe("HTTP COP / date mappers", () => {
     });
     expect(p.price).toBe(1000);
     expect(p.avgCost).toBe(0);
+    // sellable defaults to true for payloads that predate the flag.
+    expect(p.sellable).toBe(true);
+    expect(mapProduct({ ...p, sellable: false }).sellable).toBe(false);
 
     const s = mapSale({
       id: "22222222-2222-4222-8222-222222222222",
