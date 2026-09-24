@@ -126,6 +126,18 @@ export class OutboxStore {
     });
   }
 
+  /**
+   * Auth pause: return an in-flight row to pending without recording a
+   * permanent failure. Payload, requestId and dependsOn stay intact.
+   */
+  async releaseInFlight(businessId: string, operationId: string): Promise<OutboxItem> {
+    return this.patchStatus(businessId, operationId, {
+      status: "pending",
+      lastError: null,
+      nextAttemptAt: null,
+    });
+  }
+
   async markSynced(businessId: string, operationId: string, remoteId: string): Promise<OutboxItem> {
     assertUuid(remoteId, "remoteId");
     return this.patchStatus(businessId, operationId, {
@@ -211,9 +223,11 @@ export class OutboxStore {
     const allowed =
       patch.status === "in_flight"
         ? row.status === "pending" || row.status === "failed"
-        : patch.status === "synced" || patch.status === "failed"
+        : patch.status === "pending"
           ? row.status === "in_flight"
-          : false;
+          : patch.status === "synced" || patch.status === "failed"
+            ? row.status === "in_flight"
+            : false;
     if (!allowed) {
       throw new Error(`invalid outbox transition: ${row.status} -> ${patch.status}`);
     }
@@ -240,7 +254,14 @@ export type SyncFlushResult = {
   failed: number;
   blocked: number;
   stopped: boolean;
+  /** 401: flush paused. Rows stay pending; caller must re-auth. */
+  authRequired?: boolean;
 };
+
+/** Expired / missing session. Not a business-rule failure. */
+export function isAuthRequiredError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401;
+}
 
 function isRetryableError(error: unknown): boolean {
   if (error instanceof NetworkError) return true;
@@ -347,6 +368,7 @@ export class OutboxSyncEngine {
     let failed = 0;
     let blocked = 0;
     let stopped = false;
+    let authRequired = false;
     const now = this.clock();
     // M6.9 — Permanent failures (failed + nextAttemptAt null) are excluded
     // from automatic flushes. They only run again via manual retry, which
@@ -415,6 +437,16 @@ export class OutboxSyncEngine {
             total: rows.length,
           });
         } catch (error) {
+          if (isAuthRequiredError(error)) {
+            await this.outbox.releaseInFlight(businessId, current.operationId);
+            stopped = true;
+            authRequired = true;
+            emitSyncEvent({
+              type: "auth-required",
+              businessId,
+            });
+            break;
+          }
           const retryable = isRetryableError(error);
           const message = error instanceof Error ? error.message : "Error de sincronización.";
           await this.outbox.markFailed(
@@ -434,7 +466,7 @@ export class OutboxSyncEngine {
             total: rows.length,
             message,
           });
-          if (retryable || (error instanceof ApiError && (error.status === 401 || error.status === 403))) {
+          if (retryable || (error instanceof ApiError && error.status === 403)) {
             stopped = true;
             break;
           }
@@ -448,7 +480,7 @@ export class OutboxSyncEngine {
       remaining = deferred;
     }
 
-    const result = { processed, synced, failed, blocked, stopped };
+    const result = { processed, synced, failed, blocked, stopped, authRequired };
     if (rows.length > 0) {
       emitSyncEvent({
         type: "done",
