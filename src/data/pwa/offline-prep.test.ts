@@ -92,11 +92,11 @@ describe("offline preparation", () => {
     const seen: PrepProgress[] = [];
     const row = await runPreparation(BIZ, (p) => seen.push({ ...p }));
     expect(row.status).toBe("ready");
-    // 12 static docs + 3 catalogs + 4 snapshots + 3 sistema (sw, storage, verify)
-    expect(row.tasks).toHaveLength(23);
+    // 13 static docs + 3 catalogs + 4 snapshots + 3 sistema (sw, storage, verify)
+    expect(row.tasks).toHaveLength(24);
     expect(row.tasks.every((t) => t.status === "done")).toBe(true);
-    expect(seen.length).toBeGreaterThan(22);
-    expect(seen[seen.length - 1]?.completed).toBe(23);
+    expect(seen.length).toBeGreaterThan(23);
+    expect(seen[seen.length - 1]?.completed).toBe(24);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
   });
 
@@ -253,8 +253,8 @@ await runPreparation(BIZ);
 
   it("task list covers documents, catalogs and summaries", () => {
     const defs = prepTaskDefs();
-    expect(defs).toHaveLength(19);
-    expect(defs.filter((d) => d.group === "app")).toHaveLength(12);
+    expect(defs).toHaveLength(20);
+    expect(defs.filter((d) => d.group === "app")).toHaveLength(13);
     expect(defs.filter((d) => d.group === "catalogos")).toHaveLength(3);
     expect(defs.filter((d) => d.group === "resumen")).toHaveLength(4);
     expect(defs.map((d) => d.key)).toContain("catalog:products");
