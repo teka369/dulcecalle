@@ -29,16 +29,42 @@ export type SyncAllResult = {
  * requestId. Tenant isolation is unchanged: everything is scoped to the
  * given businessId.
  */
+const AUTH_IDLE: SyncFlushResult = {
+  processed: 0,
+  synced: 0,
+  failed: 0,
+  blocked: 0,
+  stopped: true,
+  authRequired: true,
+};
+
 export async function syncAllPending(businessId: string): Promise<SyncAllResult> {
-  const sales = await syncPendingSales(businessId);
-  const payments = await syncPendingPayments(businessId);
-  const customers = await syncPendingCustomers(businessId);
-  const suppliers = await syncPendingSuppliers(businessId);
-  const products = await syncPendingProducts(businessId);
-  const images = await syncPendingProductImages(businessId);
-  const preparations = await syncPendingPreparations(businessId);
-  const operations = await syncPendingOperations(businessId);
-  return { sales, payments, customers, suppliers, products, images, preparations, operations };
+  const result: SyncAllResult = {
+    sales: AUTH_IDLE,
+    payments: AUTH_IDLE,
+    customers: AUTH_IDLE,
+    suppliers: AUTH_IDLE,
+    products: AUTH_IDLE,
+    images: AUTH_IDLE,
+    preparations: AUTH_IDLE,
+    operations: AUTH_IDLE,
+  };
+  const steps: Array<[keyof SyncAllResult, () => Promise<SyncFlushResult>]> = [
+    ["sales", () => syncPendingSales(businessId)],
+    ["payments", () => syncPendingPayments(businessId)],
+    ["customers", () => syncPendingCustomers(businessId)],
+    ["suppliers", () => syncPendingSuppliers(businessId)],
+    ["products", () => syncPendingProducts(businessId)],
+    ["images", () => syncPendingProductImages(businessId)],
+    ["preparations", () => syncPendingPreparations(businessId)],
+    ["operations", () => syncPendingOperations(businessId)],
+  ];
+  for (const [key, run] of steps) {
+    const flush = await run();
+    result[key] = flush;
+    if (flush.authRequired) break;
+  }
+  return result;
 }
 
 let stopOutboxSync: (() => void) | null = null;

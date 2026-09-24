@@ -9,9 +9,13 @@ export function syncPillLabel(
   online: boolean,
   counts: SyncCounts,
   flushing: { completed: number; total: number } | null,
+  authRequired = false,
 ): string {
   if (!online) {
     return counts.total > 0 ? `○ Sin conexión · ${counts.total} pendientes` : "○ Sin conexión";
+  }
+  if (authRequired) {
+    return "Inicia sesión para sincronizar";
   }
   if (flushing && flushing.total > 0) {
     return `↻ Sincronizando ${Math.min(flushing.completed, flushing.total)}/${flushing.total}`;
@@ -27,22 +31,24 @@ export function syncPillLabel(
 
 export function SyncPill() {
   const pathname = usePathname();
-  const { online, counts, flushing, openCenter } = useSync();
+  const { online, counts, flushing, authRequired, openCenter } = useSync();
 
   if (HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return null;
   }
 
-  const label = syncPillLabel(online, counts, flushing);
+  const label = syncPillLabel(online, counts, flushing, authRequired);
   const tone = !online
     ? "border-ink/10 bg-surface text-ink/70"
-    : flushing && flushing.total > 0
-      ? "border-primary/30 bg-surface text-ink"
-      : counts.permanent > 0
-        ? "border-danger/30 bg-surface text-danger"
-        : counts.total > 0
-          ? "border-ink/10 bg-surface text-ink/70"
-          : "border-ok/25 bg-surface text-ink/60";
+    : authRequired
+      ? "border-danger/30 bg-surface text-danger"
+      : flushing && flushing.total > 0
+        ? "border-primary/30 bg-surface text-ink"
+        : counts.permanent > 0
+          ? "border-danger/30 bg-surface text-danger"
+          : counts.total > 0
+            ? "border-ink/10 bg-surface text-ink/70"
+            : "border-ok/25 bg-surface text-ink/60";
 
   return (
     <button
