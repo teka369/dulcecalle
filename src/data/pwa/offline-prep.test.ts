@@ -92,11 +92,11 @@ describe("offline preparation", () => {
     const seen: PrepProgress[] = [];
     const row = await runPreparation(BIZ, (p) => seen.push({ ...p }));
     expect(row.status).toBe("ready");
-    // 13 static docs + 3 catalogs + 4 snapshots + 3 sistema (sw, storage, verify)
-    expect(row.tasks).toHaveLength(24);
+    // sys:sw + 16 static docs + 3 catalogs + 4 snapshots + media:thumbs + sys:storage + sys:verify
+    expect(row.tasks).toHaveLength(27);
     expect(row.tasks.every((t) => t.status === "done")).toBe(true);
-    expect(seen.length).toBeGreaterThan(23);
-    expect(seen[seen.length - 1]?.completed).toBe(24);
+    expect(seen.length).toBeGreaterThan(26);
+    expect(seen[seen.length - 1]?.completed).toBe(27);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
   });
 
@@ -197,6 +197,7 @@ await runPreparation(BIZ);
     expect(keys).toContain("doc:/clientes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/abono");
     expect(keys).toContain("doc:/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
     expect(keys).toContain("doc:/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/surtir");
+    expect(keys).toContain("doc:/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/preparar");
     expect(keys.some((k) => k.includes("22222222"))).toBe(false);
   });
 
@@ -253,12 +254,16 @@ await runPreparation(BIZ);
 
   it("task list covers documents, catalogs and summaries", () => {
     const defs = prepTaskDefs();
-    expect(defs).toHaveLength(20);
-    expect(defs.filter((d) => d.group === "app")).toHaveLength(13);
+    expect(defs).toHaveLength(23);
+    expect(defs.filter((d) => d.group === "app")).toHaveLength(16);
     expect(defs.filter((d) => d.group === "catalogos")).toHaveLength(3);
     expect(defs.filter((d) => d.group === "resumen")).toHaveLength(4);
-    expect(defs.map((d) => d.key)).toContain("catalog:products");
-    expect(defs.map((d) => d.key)).toContain("snapshot:dashboard");
+    const keys = defs.map((d) => d.key);
+    expect(keys).toContain("doc:/inventario/proveedores/nuevo");
+    expect(keys).toContain("doc:/mas/estadisticas");
+    expect(keys).toContain("doc:/mas/apariencia");
+    expect(keys).toContain("catalog:products");
+    expect(keys).toContain("snapshot:dashboard");
   });
 
   it("offline mid-run fails honestly instead of claiming ready", async () => {

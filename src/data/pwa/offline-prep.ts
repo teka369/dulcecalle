@@ -25,7 +25,7 @@ import {
   statsSnapshotKind,
 } from "./offline-snapshots";
 
-export const PREP_VERSION = 4;
+export const PREP_VERSION = 5;
 export const PREP_DOCUMENT_CACHE = "documents";
 
 export type PrepTaskGroup = "app" | "catalogos" | "resumen" | "sistema";
@@ -77,7 +77,10 @@ export function prepTaskDefs(): PrepTaskDef[] {
     { path: "/mas", label: "Documento Más" },
     { path: "/mas/caja", label: "Documento Caja" },
     { path: "/mas/gastos", label: "Documento Gastos" },
+    { path: "/mas/estadisticas", label: "Documento Estadísticas" },
+    { path: "/mas/apariencia", label: "Documento Apariencia" },
     { path: "/inventario/proveedores", label: "Documento Proveedores" },
+    { path: "/inventario/proveedores/nuevo", label: "Documento Nuevo proveedor" },
     { path: "/sincronizacion", label: "Documento Sincronización" },
   ];
   return [
@@ -230,6 +233,12 @@ export async function dynamicDocumentTasks(businessId: string): Promise<PrepTask
       group: "app" as const,
       label: `Documento surtir ${p.name}`,
       run: () => warmDocument(`/inventario/${p.id}/surtir`),
+    });
+    tasks.push({
+      key: `doc:/inventario/${p.id}/preparar`,
+      group: "app" as const,
+      label: `Documento preparar ${p.name}`,
+      run: () => warmDocument(`/inventario/${p.id}/preparar`),
     });
   }
   const sales = await db.sales.where("businessId").equals(businessId).toArray();
