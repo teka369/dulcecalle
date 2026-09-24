@@ -18,6 +18,7 @@ export function SyncCenter() {
     lastResult,
     recent,
     centerOpen,
+    authRequired,
     closeCenter,
     syncNow,
   } = useSync();
@@ -47,6 +48,11 @@ export function SyncCenter() {
               Sin conexión. Las operaciones nuevas se guardarán en este
               dispositivo y se sincronizarán automáticamente al volver
               internet.
+            </p>
+          ) : authRequired ? (
+            <p className="mt-1 text-sm leading-snug text-ink/60">
+              Inicia sesión para continuar la sincronización. Nada se perdió
+              en este dispositivo.
             </p>
           ) : (
             <p className="mt-1 text-sm leading-snug text-ink/60">
@@ -105,7 +111,16 @@ export function SyncCenter() {
         </div>
       )}
 
-      {online && counts.total > 0 && !flushing && (
+      {online && authRequired && (
+        <a
+          href="/login"
+          className="mt-4 flex min-h-11 w-full items-center justify-center rounded-[14px] bg-cta text-sm font-semibold text-white"
+        >
+          Inicia sesión para sincronizar
+        </a>
+      )}
+
+      {online && counts.total > 0 && !flushing && !authRequired && (
         <button
           type="button"
           onClick={() => void syncNow()}
