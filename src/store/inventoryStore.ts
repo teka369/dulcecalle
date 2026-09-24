@@ -26,6 +26,7 @@ import {
 import type { RemotePreparation, RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http/mappers";
 import {
   archiveProductWithOfflineFallback,
+  createProductWithOfflineFallback,
   createSupplierWithOfflineFallback,
   patchProductWithOfflineFallback,
   patchSupplierWithOfflineFallback,
@@ -179,7 +180,7 @@ export const inventoryStore = {
     avgCostRaw?: string;
     gifted?: boolean;
     sellable?: boolean;
-  }): Promise<string> {
+  }): Promise<{ id: string; mode: "online" | "offline" }> {
     const name = input.name.trim();
     if (!name) throw new Error(INVENTORY_ERRORS.emptyProductName);
     const price = Number.parseInt(input.priceRaw.trim() || "0", 10);
@@ -198,13 +199,29 @@ export const inventoryStore = {
       throw new Error(INVENTORY_ERRORS.needCost);
     }
     try {
-      const created = await getPwaApi().products.create(
-        { name, price, stock, avgCost, lowStockAt: 5, gifted, sellable: input.sellable },
+      const result = await createProductWithOfflineFallback(
+        {
+          name,
+          price,
+          stock,
+          avgCost,
+          lowStockAt: 5,
+          gifted,
+          sellable: input.sellable,
+        },
         crypto.randomUUID(),
       );
       await this.refreshProducts();
-      setState({ lastToast: INVENTORY_TOASTS.productSaved });
-      return created.id;
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Producto guardado sin conexión"
+            : INVENTORY_TOASTS.productSaved,
+      });
+      return {
+        id: result.mode === "offline" ? result.productId : result.product.id,
+        mode: result.mode,
+      };
     } catch (e) {
       fail(e);
     }

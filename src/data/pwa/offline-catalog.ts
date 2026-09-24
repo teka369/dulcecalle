@@ -1,14 +1,41 @@
 import { NetworkError } from "@/data/errors";
-import type { RemoteCustomer, RemoteSupplier } from "@/data/http/mappers";
+import type { RemoteCustomer, RemoteProduct, RemoteSupplier } from "@/data/http/mappers";
 import { getPwaApi } from "./api";
 import { getLocalDb } from "@/data/local/db";
 import { getLocalStore } from "@/data/local/store";
 import { ConnectivityMonitor, getOutboxStore, getOutboxSyncEngine } from "@/data/local/outbox";
 import { assertUuid } from "@/data/local/ids";
-import { customerToLocal, supplierToLocal } from "@/data/local/read-cache";
+import { customerToLocal, productToLocal, supplierToLocal } from "@/data/local/read-cache";
+import { INVENTORY_ERRORS } from "@/domain/inventory";
 
 export type CustomerInput = { name: string; phone?: string };
 export type SupplierInput = { name: string; phone?: string; notes?: string };
+export type ProductInput = {
+  name: string;
+  price: number;
+  stock?: number;
+  /** Unit cost as CreateProductDto.avgCost (server applies openingStoredAvgCost). */
+  avgCost?: number;
+  lowStockAt?: number;
+  gifted?: boolean;
+  sellable?: boolean;
+};
+
+/**
+ * Mirror of backend openingStoredAvgCost (number COP).
+ * Sellable: unit cost. Combo with stock: unit×stock lot pool. Combo empty: 0.
+ */
+export function openingStoredAvgCost(input: {
+  sellable: boolean;
+  stock: number;
+  unitCost: number;
+}): number {
+  if (!input.sellable) {
+    if (input.stock <= 0) return 0;
+    return input.unitCost * input.stock;
+  }
+  return input.unitCost;
+}
 
 export const PENDING_CUSTOMER_MESSAGE =
   "Este cliente aún se está sincronizando. Podrás usarlo en cuanto termine la sincronización.";
@@ -136,6 +163,149 @@ export async function createSupplierWithOfflineFallback(input: SupplierInput, re
   }
 }
 
+function normalizeProductInput(input: ProductInput): Required<
+  Pick<ProductInput, "name" | "price" | "stock" | "avgCost" | "lowStockAt" | "gifted" | "sellable">
+> {
+  const name = validateCatalogName(input.name);
+  const price = input.price;
+  if (!Number.isInteger(price) || price < 0) {
+    throw new Error(INVENTORY_ERRORS.badCost);
+  }
+  const stock = input.stock ?? 0;
+  if (!Number.isInteger(stock) || stock < 0) {
+    throw new Error(INVENTORY_ERRORS.notPositive);
+  }
+  const gifted = Boolean(input.gifted);
+  const unitCost = gifted ? 0 : (input.avgCost ?? 0);
+  if (!Number.isInteger(unitCost) || unitCost < 0) {
+    throw new Error(INVENTORY_ERRORS.badCost);
+  }
+  const sellable = input.sellable ?? true;
+  const storedAvg = openingStoredAvgCost({ sellable, stock, unitCost });
+  if (stock > 0 && storedAvg <= 0 && !gifted) {
+    throw new Error(INVENTORY_ERRORS.needCost);
+  }
+  const lowStockAt = input.lowStockAt ?? 5;
+  if (!Number.isInteger(lowStockAt) || lowStockAt < 0) {
+    throw new Error("El aviso de stock no es válido.");
+  }
+  return {
+    name,
+    price,
+    stock,
+    avgCost: unitCost,
+    lowStockAt,
+    gifted,
+    sellable,
+  };
+}
+
+/** Whitelist-only CreateProductDto body (no id / productId / kind). */
+function productCreatePayload(
+  normalized: ReturnType<typeof normalizeProductInput>,
+): Record<string, unknown> {
+  return {
+    name: normalized.name,
+    price: normalized.price,
+    stock: normalized.stock,
+    avgCost: normalized.avgCost,
+    lowStockAt: normalized.lowStockAt,
+    gifted: normalized.gifted,
+    sellable: normalized.sellable,
+  };
+}
+
+async function createLocalProduct(
+  input: ReturnType<typeof normalizeProductInput>,
+  requestId: string,
+): Promise<string> {
+  const biz = businessId();
+  const db = getLocalDb();
+  const store = getLocalStore();
+  const outbox = getOutboxStore();
+  const existing = await outbox.getByRequestId(biz, requestId);
+  if (existing) {
+    if (existing.entity !== "product" || existing.operation !== "create") {
+      throw new Error("requestId already used");
+    }
+    if (existing.remoteId) return existing.remoteId;
+    const rows = await store.products.list(biz);
+    const local = rows.find((row) => row.requestId === requestId);
+    if (local) return local.id;
+    throw new Error("local product not found");
+  }
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const sellable = input.sellable;
+  const row = {
+    id,
+    businessId: biz,
+    name: input.name,
+    category: "General",
+    price: input.price,
+    avgCost: openingStoredAvgCost({
+      sellable,
+      stock: input.stock,
+      unitCost: input.avgCost,
+    }),
+    stock: input.stock,
+    lowStockAt: input.lowStockAt,
+    sellable,
+    archivedAt: null,
+    requestId,
+    createdAt: now,
+    updatedAt: now,
+    images: [] as [],
+  };
+  const payload = productCreatePayload(input);
+  await db.transaction("rw", db.products, db.outbox, db.cacheMeta, async () => {
+    await store.products.put(row);
+    await outbox.enqueue({
+      operationId: crypto.randomUUID(),
+      businessId: biz,
+      entity: "product",
+      operation: "create",
+      requestId,
+      payload,
+      dependsOn: [],
+      localCreatedAt: now,
+    });
+    await db.cacheMeta.put({
+      id: `${biz}::products`,
+      businessId: biz,
+      resource: "products",
+      cachedAt: now,
+    });
+  });
+  return id;
+}
+
+export async function createProductWithOfflineFallback(
+  input: ProductInput,
+  requestId: string,
+) {
+  const normalized = normalizeProductInput(input);
+  try {
+    const product = await getPwaApi().products.create(
+      productCreatePayload(normalized) as {
+        name: string;
+        price: number;
+        stock?: number;
+        avgCost?: number;
+        lowStockAt?: number;
+        gifted?: boolean;
+        sellable?: boolean;
+      },
+      requestId,
+    );
+    return { mode: "online" as const, product };
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
+    const id = await createLocalProduct(normalized, requestId);
+    return { mode: "offline" as const, productId: id };
+  }
+}
+
 async function reconcileCustomer(businessId: string, localId: string, remote: RemoteCustomer) {
   const db = getLocalDb();
   await db.transaction("rw", db.customers, async () => {
@@ -152,6 +322,49 @@ async function reconcileSupplier(businessId: string, localId: string, remote: Re
     if (local && local.id !== remote.id) await db.suppliers.delete(local.id);
     await getLocalStore().suppliers.put(supplierToLocal(remote, businessId, Date.now()));
   });
+}
+
+/** Remap local product UUID → server UUID and rewrite pending FK refs. */
+async function reconcileProduct(businessId: string, localId: string, remote: RemoteProduct) {
+  const db = getLocalDb();
+  await db.transaction(
+    "rw",
+    db.products,
+    db.pendingMedia,
+    db.outbox,
+    async () => {
+      const local = await getLocalStore().products.get(businessId, localId);
+      if (local && local.id !== remote.id) {
+        const media = await db.pendingMedia
+          .where("[businessId+productId]")
+          .equals([businessId, localId])
+          .toArray();
+        for (const row of media) {
+          await db.pendingMedia.delete(row.id);
+          await db.pendingMedia.put({ ...row, productId: remote.id });
+        }
+        const ops = await db.outbox.where("businessId").equals(businessId).toArray();
+        for (const op of ops) {
+          if (op.status === "synced") continue;
+          const payload = op.payload;
+          if (!payload || typeof payload !== "object") continue;
+          const next = { ...(payload as Record<string, unknown>) };
+          let changed = false;
+          if (next.productId === localId) {
+            next.productId = remote.id;
+            changed = true;
+          }
+          if (op.entity === "product" && next.id === localId) {
+            next.id = remote.id;
+            changed = true;
+          }
+          if (changed) await db.outbox.put({ ...op, payload: next });
+        }
+        await db.products.delete(local.id);
+      }
+      await getLocalStore().products.put(productToLocal(remote, businessId, Date.now()));
+    },
+  );
 }
 
 export async function syncPendingCustomers(businessId: string) {
@@ -333,7 +546,7 @@ function assertPatchName(name: string | undefined): string | undefined {
 async function createDependency(
   businessId: string,
   requestId: string | undefined,
-  entity: "customer" | "supplier",
+  entity: "customer" | "supplier" | "product",
 ): Promise<string[]> {
   if (!requestId) return [];
   const item = await getOutboxStore().getByRequestId(businessId, requestId);
@@ -481,7 +694,7 @@ export async function patchProductWithOfflineFallback(
         operation: "patch",
         requestId,
         payload: { id, ...normalized },
-        dependsOn: [],
+        dependsOn: await createDependency(biz, local.requestId, "product"),
         localCreatedAt: Date.now(),
       });
     });
@@ -526,7 +739,7 @@ export async function archiveProductWithOfflineFallback(
         operation: "archive",
         requestId,
         payload: { id },
-        dependsOn: [],
+        dependsOn: await createDependency(biz, local.requestId, "product"),
         localCreatedAt: Date.now(),
       });
     });
@@ -534,12 +747,50 @@ export async function archiveProductWithOfflineFallback(
   }
 }
 
+async function resolveProductEntityId(
+  businessId: string,
+  item: { dependsOn: string[]; payload: unknown },
+  fallbackId: string,
+): Promise<string> {
+  for (const depId of item.dependsOn) {
+    const dep = await getOutboxStore().get(businessId, depId);
+    if (
+      dep?.entity === "product" &&
+      dep.operation === "create" &&
+      dep.status === "synced" &&
+      dep.remoteId
+    ) {
+      return dep.remoteId;
+    }
+  }
+  return fallbackId;
+}
+
 export async function syncPendingProducts(businessId: string) {
   const api = getPwaApi();
+  const outbox = getOutboxStore();
   const engine = getOutboxSyncEngine();
-  return engine.flush(
+  const candidates = await outbox.listByStatus(businessId, "pending");
+  const operationIds = candidates
+    .filter((item) => item.entity === "product" && item.operation === "create")
+    .map((item) => item.operationId);
+
+  const result = await engine.flush(
     businessId,
     async (item) => {
+      if (item.entity === "product" && item.operation === "create") {
+        const payload = item.payload as {
+          name: string;
+          price: number;
+          stock?: number;
+          avgCost?: number;
+          lowStockAt?: number;
+          gifted?: boolean;
+          sellable?: boolean;
+        };
+        const remote = await api.products.create(payload, item.requestId);
+        return { remoteId: remote.id };
+      }
       if (item.entity === "product" && item.operation === "patch") {
         const payload = item.payload as {
           id: string;
@@ -548,18 +799,67 @@ export async function syncPendingProducts(businessId: string) {
           lowStockAt?: number;
           sellable?: boolean;
         };
-        const remote = await api.products.patch(payload.id, payload, item.requestId);
+        const id = await resolveProductEntityId(businessId, item, payload.id);
+        const remote = await api.products.patch(id, payload, item.requestId);
         return { remoteId: remote.id };
       }
       if (item.entity === "product" && item.operation === "archive") {
         const payload = item.payload as { id: string };
-        const remote = await api.products.archive(payload.id, item.requestId);
+        const id = await resolveProductEntityId(businessId, item, payload.id);
+        const remote = await api.products.archive(id, item.requestId);
         return { remoteId: remote.id };
       }
       throw new Error("Operación de outbox no compatible con productos.");
     },
-    (item) => item.entity === "product" && (item.operation === "patch" || item.operation === "archive"),
+    (item) =>
+      item.entity === "product" &&
+      (item.operation === "create" ||
+        item.operation === "patch" ||
+        item.operation === "archive"),
   );
+
+  for (const operationId of operationIds) {
+    const item = await outbox.get(businessId, operationId);
+    if (!item || item.status !== "synced" || !item.remoteId) continue;
+    try {
+      const rows = await getLocalStore().products.list(businessId);
+      const local = rows.find((row) => row.requestId === item.requestId);
+      if (local) {
+        await reconcileProduct(
+          businessId,
+          local.id,
+          await api.products.get(item.remoteId),
+        );
+      }
+    } catch {
+      /* keep the local row; reconcile again next cycle */
+    }
+  }
+  await reconcileStrandedProducts(businessId, api);
+  return result;
+}
+
+async function reconcileStrandedProducts(
+  businessId: string,
+  api: ReturnType<typeof getPwaApi>,
+): Promise<void> {
+  const outbox = getOutboxStore();
+  const rows = await getLocalStore().products.list(businessId);
+  for (const row of rows) {
+    if (!row.requestId) continue;
+    try {
+      const item = await outbox.getByRequestId(businessId, row.requestId);
+      if (item?.entity !== "product" || item.operation !== "create") continue;
+      if (item.status !== "synced" || !item.remoteId) continue;
+      await reconcileProduct(
+        businessId,
+        row.id,
+        await api.products.get(item.remoteId),
+      );
+    } catch {
+      /* keep the local row; reconcile again next cycle */
+    }
+  }
 }
 
 export function startCatalogCreationSync() {
@@ -569,6 +869,7 @@ export function startCatalogCreationSync() {
     if (!id) return;
     await syncPendingCustomers(id);
     await syncPendingSuppliers(id);
+    await syncPendingProducts(id);
   };
   monitor.subscribe((online) => { if (online) run(); });
   monitor.start();

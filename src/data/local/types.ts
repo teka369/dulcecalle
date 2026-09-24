@@ -141,6 +141,8 @@ export type LocalProduct = {
   /** False = supply/combo: purchasable, never sold directly. Missing = true. */
   sellable?: boolean;
   archivedAt: string | null;
+  /** Request id while this locally-created row is pending/syncing. */
+  requestId?: string;
   createdAt: number;
   updatedAt: number;
   /** Mirror of the server gallery (position order). Managed by sync. */

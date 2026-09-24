@@ -190,10 +190,19 @@ export class HttpRepository {
       input: CreateProductInput,
       requestId: string,
     ): Promise<RemoteProduct> => {
+      const body = dtoBody(input as Record<string, unknown>, [
+        "name",
+        "price",
+        "stock",
+        "avgCost",
+        "lowStockAt",
+        "gifted",
+        "sellable",
+      ]);
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         "/products",
-        { body: input, idempotencyKey: requestId },
+        { body, idempotencyKey: requestId },
       );
       return mapProduct(row);
     },

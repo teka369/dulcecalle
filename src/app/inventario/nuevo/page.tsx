@@ -37,7 +37,7 @@ export default function AgregarProductoPage() {
     setError(null);
     setBusy(true);
     try {
-      const id = await createProduct({
+      const result = await createProduct({
         name,
         priceRaw: priceRaw || "0",
         stockRaw: stockRaw || "0",
@@ -45,8 +45,12 @@ export default function AgregarProductoPage() {
         gifted,
         sellable,
       });
-      setToast("Producto guardado");
-      setCreatedId(id);
+      setToast(
+        result.mode === "offline"
+          ? "Producto guardado sin conexión"
+          : "Producto guardado",
+      );
+      setCreatedId(result.id);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : INVENTORY_ERRORS.emptyProductName,
