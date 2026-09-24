@@ -4,7 +4,6 @@ import {
   CacheFirst,
   CacheableResponsePlugin,
   ExpirationPlugin,
-  NavigationRoute,
   NetworkFirst,
   NetworkOnly,
   Serwist,
@@ -21,6 +20,11 @@ declare const self: ServiceWorkerGlobalScope;
 /**
  * Cache Storage = app shell only.
  * Business data (Dexie / IndexedDB) and future /api traffic must never be cached here.
+ *
+ * Order matters: Serwist registers runtimeCaching during construction (first
+ * match wins). Navigate/documents MUST come before ...defaultCache so the
+ * production catch-all "others" does not steal document navigations and
+ * fall through to the /offline PrecacheFallbackPlugin.
  */
 const runtimeCaching = [
   {
@@ -40,6 +44,29 @@ const runtimeCaching = [
         new CacheableResponsePlugin({ statuses: [0, 200] }),
         // ~100 photos, 30 days max. Eviction is LRU by last use.
         new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 }),
+      ],
+    }),
+  },
+  {
+    // Offline document navigation: NetworkFirst into "documents" so an
+    // offline reload boots where the user was. Denylist matches the old
+    // NavigationRoute. Must register before ...defaultCache ("others").
+    matcher: ({ request, url }: { request: Request; url: URL }) => {
+      if (request.mode !== "navigate") return false;
+      const p = url.pathname;
+      return !(
+        p.startsWith("/api/") ||
+        p.startsWith("/_next/") ||
+        p === "/offline" ||
+        p === "/sw.js"
+      );
+    },
+    handler: new NetworkFirst({
+      cacheName: "documents",
+      plugins: [
+        new CacheableResponsePlugin({ statuses: [200] }),
+        // Small PWA: a couple of dozen documents, one week max.
+        new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 7 * 24 * 60 * 60 }),
       ],
     }),
   },
@@ -63,30 +90,5 @@ const serwist = new Serwist({
     ],
   },
 });
-
-/**
- * Offline document navigation: each business route is cached under its own
- * URL the first time it loads online (NetworkFirst). Offline reloads serve
- * that same document, so the URL, flight data and router state stay
- * consistent and the app boots where the user was, with local readers +
- * Sync UI. Routes never visited have no cached document and fall through
- * to the /offline fallback (last resort). No redirects: a 302 to "/" would
- * destroy the original route and trap back-button navigation.
- */
-serwist.registerRoute(
-  new NavigationRoute(
-    new NetworkFirst({
-      cacheName: "documents",
-      plugins: [
-        new CacheableResponsePlugin({ statuses: [200] }),
-        // Small PWA: a couple of dozen documents, one week max.
-        new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 7 * 24 * 60 * 60 }),
-      ],
-    }),
-    {
-      denylist: [/^\/api\//, /^\/_next\//, /^\/offline$/, /^\/sw\.js$/],
-    },
-  ),
-);
 
 serwist.addEventListeners();
