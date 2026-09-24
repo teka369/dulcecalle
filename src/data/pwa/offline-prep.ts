@@ -25,7 +25,7 @@ import {
   statsSnapshotKind,
 } from "./offline-snapshots";
 
-export const PREP_VERSION = 2;
+export const PREP_VERSION = 3;
 export const PREP_DOCUMENT_CACHE = "documents";
 
 export type PrepTaskGroup = "app" | "catalogos" | "resumen" | "sistema";
@@ -73,6 +73,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
     { path: "/clientes", label: "Documento Clientes" },
     { path: "/clientes/nuevo", label: "Documento Nuevo cliente" },
     { path: "/inventario", label: "Documento Inventario" },
+    { path: "/inventario/nuevo", label: "Documento Nuevo producto" },
     { path: "/mas/caja", label: "Documento Caja" },
     { path: "/mas/gastos", label: "Documento Gastos" },
     { path: "/inventario/proveedores", label: "Documento Proveedores" },
