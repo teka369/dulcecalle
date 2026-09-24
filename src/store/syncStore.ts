@@ -34,6 +34,8 @@ type SyncUiState = {
   centerOpen: boolean;
   /** Bumped whenever Dexie-derived data may have changed. */
   itemsVersion: number;
+  /** 401 during flush: outbox is intact; user must sign in again. */
+  authRequired: boolean;
 };
 
 const EMPTY_COUNTS: SyncCounts = { pending: 0, active: 0, failed: 0, permanent: 0, total: 0 };
@@ -49,6 +51,7 @@ let state: SyncUiState = {
   recent: [],
   centerOpen: false,
   itemsVersion: 0,
+  authRequired: false,
 };
 
 // Aggregates one connectivity cycle (the coordinator runs several
@@ -107,7 +110,7 @@ async function refreshCounts(): Promise<void> {
 }
 
 type SyncEventDetail = {
-  type: "start" | "item" | "done" | "queued";
+  type: "start" | "item" | "done" | "queued" | "auth-required";
   businessId?: string;
   total?: number;
   completed?: number;
@@ -124,6 +127,13 @@ function onSyncEvent(event: Event): void {
   const id = businessId();
   if (detail.businessId && id && detail.businessId !== id) return;
 
+  if (detail.type === "auth-required") {
+    setState({ authRequired: true, flushing: null });
+    activeFlushes = 0;
+    void refreshCounts();
+    return;
+  }
+
   if (detail.type === "start") {
     const now = Date.now();
     if (activeFlushes === 0 || now - lastStartAt > 3000) {
@@ -133,7 +143,10 @@ function onSyncEvent(event: Event): void {
     lastStartAt = now;
     activeFlushes += 1;
     cycleTotal += detail.total ?? 0;
-    setState({ flushing: { completed: cycleCompleted, total: cycleTotal } });
+    setState({
+      flushing: { completed: cycleCompleted, total: cycleTotal },
+      authRequired: false,
+    });
     return;
   }
 
@@ -164,6 +177,7 @@ function onSyncEvent(event: Event): void {
       lastDoneAt: Date.now(),
       lastResult: detail.result ?? null,
       flushing: activeFlushes > 0 ? { completed: cycleCompleted, total: cycleTotal } : null,
+      authRequired: detail.result?.authRequired ? true : state.authRequired,
     });
     void refreshCounts();
     return;
@@ -229,6 +243,7 @@ export const syncStore = {
   async syncNow(): Promise<void> {
     const id = businessId();
     if (!id || !state.online) return;
+    setState({ authRequired: false });
     await syncAllPending(id);
   },
 };
