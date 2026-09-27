@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import {
@@ -228,30 +229,30 @@ export default function CajaPage() {
           Retiro/Aporte are in-caja actions; NO Contar caja */}
       {open && (
         <section className="flex flex-col gap-2">
-          <Link
+          <OfflineLink
             href="/mas/caja/aporte"
             className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
           >
             {CASH_COPY.aporteCapital}
-          </Link>
-          <Link
+          </OfflineLink>
+          <OfflineLink
             href="/mas/caja/retiro"
             className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
           >
             {CASH_COPY.retiroPersonal}
-          </Link>
-          <Link
+          </OfflineLink>
+          <OfflineLink
             href="/mas/gastos/nuevo"
             className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
           >
             {CASH_COPY.registrarGasto}
-          </Link>
-          <Link
+          </OfflineLink>
+          <OfflineLink
             href="/mas/caja/cerrar"
             className="flex min-h-11 items-center justify-center rounded-[14px] bg-cta text-sm font-semibold text-white"
           >
             {CASH_COPY.cerrarCaja}
-          </Link>
+          </OfflineLink>
         </section>
       )}
 

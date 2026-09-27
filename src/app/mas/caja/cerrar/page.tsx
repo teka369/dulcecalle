@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
 import {
@@ -59,7 +60,7 @@ export default function CerrarCajaPage() {
     try {
       await cashStore.closeCaja(countedRaw);
       setToast(CASH_COPY.toastCajaCerrada);
-      setTimeout(() => router.push("/mas/caja"), 700);
+      setTimeout(() => navigateOfflineAware(router, "/mas/caja"), 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
       setBusy(false);

@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { OfflineLink } from "@/components/shell/OfflineLink";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useEffect, useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
 import { formatCop } from "@/domain/money";
@@ -83,17 +84,17 @@ export default function PrepararPage() {
         </p>
         <button
           type="button"
-          onClick={() => router.push(`/inventario/${done}`)}
+          onClick={() => navigateOfflineAware(router, `/inventario/${done}`)}
           className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white"
         >
           Ver producto
         </button>
-        <Link
+        <OfflineLink
           href={`/inventario/${sourceId}`}
           className="flex min-h-11 w-full items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
         >
           Volver al combo
-        </Link>
+        </OfflineLink>
       </div>
     );
   }
@@ -105,13 +106,13 @@ export default function PrepararPage() {
   return (
     <div className="flex flex-col gap-4 pb-28">
       <header className="flex items-center gap-2">
-        <Link
+        <OfflineLink
           href={`/inventario/${sourceId}`}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
-          aria-label="Volver"
+          ariaLabel="Volver"
         >
           ←
-        </Link>
+        </OfflineLink>
         <h1 className="text-[22px] font-semibold">Preparar</h1>
       </header>
 

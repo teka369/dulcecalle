@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { formatCop } from "@/domain/money";
 import { listSalesWithOfflineFallback, type LocalSaleRow } from "@/data/pwa/offline-sales";
@@ -32,12 +31,12 @@ export default function VentasPage() {
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between">
         <h1 className="text-[22px] font-semibold">Ventas</h1>
-        <Link
+        <OfflineLink
           href="/ventas/nueva"
           className="min-h-11 rounded-[14px] bg-cta px-3 text-sm font-semibold leading-[44px] text-white"
         >
           + Nueva venta
-        </Link>
+        </OfflineLink>
       </header>
 
       {error && <p className="text-sm text-danger">{error}</p>}

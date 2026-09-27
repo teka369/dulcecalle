@@ -8,7 +8,8 @@ import { parseSaleUnitPrice } from "@/domain/sale/validate";
 import type { RemoteProduct } from "@/data/http/mappers";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
-import { getPwaApi } from "@/data/pwa/api";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
+import { listCachedProducts } from "@/data/pwa/catalog";
 import { useCart } from "@/store/cartStore";
 
 export default function NuevaVentaPage() {
@@ -21,8 +22,7 @@ export default function NuevaVentaPage() {
   const [pendingPrices, setPendingPrices] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    void getPwaApi()
-      .products.list()
+    void listCachedProducts()
       .then(setProducts)
       .catch(() => setProducts([]));
   }, []);
@@ -207,7 +207,7 @@ export default function NuevaVentaPage() {
           <button
             type="button"
             disabled={total === 0}
-            onClick={() => router.push("/ventas/cobrar")}
+            onClick={() => navigateOfflineAware(router, "/ventas/cobrar")}
             className="min-h-11 rounded-[14px] bg-cta px-5 text-sm font-semibold text-white disabled:opacity-40"
           >
             Cobrar

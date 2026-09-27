@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { CASH_COPY } from "@/domain/cash";
@@ -77,12 +78,12 @@ export default function GastosPage() {
       {!closed && hasSession && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
           <div className="mx-auto max-w-lg">
-            <Link
+            <OfflineLink
               href="/mas/gastos/nuevo"
               className="flex min-h-11 w-full items-center justify-center rounded-[14px] bg-cta text-sm font-semibold text-white"
             >
               {CASH_COPY.registrarGasto}
-            </Link>
+            </OfflineLink>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { DebtStatementView } from "@/components/customers/DebtStatementView";
@@ -162,12 +163,12 @@ export default function ClienteFichaPage() {
       )}
 
       {hasDebt && (
-        <Link
+        <OfflineLink
           href={`/clientes/${customer.id}/abono`}
           className="flex min-h-11 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
         >
           Registrar abono
-        </Link>
+        </OfflineLink>
       )}
 
       <Link

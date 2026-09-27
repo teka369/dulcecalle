@@ -4,6 +4,26 @@ import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
 import { isOffline } from "@/data/pwa/offline-nav";
 
+type OfflineClick = {
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  button: number;
+  preventDefault: () => void;
+};
+
+/** Offline primary clicks become document navigations. Online clicks do not. */
+export function onOfflineLinkClick(event: OfflineClick, href: string): void {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+    return;
+  }
+  if (isOffline()) {
+    event.preventDefault();
+    window.location.assign(href);
+  }
+}
+
 /**
  * Link that degrades to a document navigation while offline, so the
  * Service Worker can serve the prepared document (or /offline) instead
@@ -21,11 +41,7 @@ export function OfflineLink({
   ariaLabel?: string;
 }) {
   function onClick(e: MouseEvent<HTMLAnchorElement>) {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-    if (isOffline()) {
-      e.preventDefault();
-      window.location.assign(href);
-    }
+    onOfflineLinkClick(e, href);
   }
 
   return (

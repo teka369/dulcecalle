@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OfflineLink } from "@/components/shell/OfflineLink";
 import { CASH_COPY } from "@/domain/cash";
 import { STATS_COPY } from "@/domain/stats";
 
@@ -17,20 +18,20 @@ export default function MasPage() {
           <span>{STATS_COPY.masItem}</span>
           <span className="text-ink/40">→</span>
         </Link>
-        <Link
+        <OfflineLink
           href="/mas/gastos"
           className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 text-base font-semibold shadow-sm"
         >
           <span>{CASH_COPY.masGastos}</span>
           <span className="text-ink/40">→</span>
-        </Link>
-        <Link
+        </OfflineLink>
+        <OfflineLink
           href="/mas/caja"
           className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 text-base font-semibold shadow-sm"
         >
           <span>{CASH_COPY.masCaja}</span>
           <span className="text-ink/40">→</span>
-        </Link>
+        </OfflineLink>
         <Link
           href="/mas/apariencia"
           className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 text-base font-semibold shadow-sm"

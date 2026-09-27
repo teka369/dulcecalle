@@ -25,7 +25,7 @@ import {
   statsSnapshotKind,
 } from "./offline-snapshots";
 
-export const PREP_VERSION = 5;
+export const PREP_VERSION = 6;
 export const PREP_DOCUMENT_CACHE = "documents";
 
 export type PrepTaskGroup = "app" | "catalogos" | "resumen" | "sistema";
@@ -77,6 +77,10 @@ export function prepTaskDefs(): PrepTaskDef[] {
     { path: "/mas", label: "Documento Más" },
     { path: "/mas/caja", label: "Documento Caja" },
     { path: "/mas/gastos", label: "Documento Gastos" },
+    { path: "/mas/gastos/nuevo", label: "Documento Nuevo gasto" },
+    { path: "/mas/caja/aporte", label: "Documento Aporte" },
+    { path: "/mas/caja/retiro", label: "Documento Retiro" },
+    { path: "/mas/caja/cerrar", label: "Documento Cerrar caja" },
     { path: "/mas/estadisticas", label: "Documento Estadísticas" },
     { path: "/mas/apariencia", label: "Documento Apariencia" },
     { path: "/inventario/proveedores", label: "Documento Proveedores" },
@@ -190,8 +194,8 @@ export function requiredSnapshotKinds(): string[] {
 
 /**
  * Dynamic documents for entities that actually exist in Dexie. Only
- * detail/action pages whose flows work offline are included; online-only
- * pages (devolver, deuda-inicial) are deliberately excluded.
+ * detail/action pages whose flows work offline are included. Online-only
+ * pages stay out: deuda-inicial and /mas/datos.
  */
 export async function dynamicDocumentTasks(businessId: string): Promise<PrepTaskDef[]> {
   const db = getLocalDb();
@@ -240,6 +244,24 @@ export async function dynamicDocumentTasks(businessId: string): Promise<PrepTask
       label: `Documento preparar ${p.name}`,
       run: () => warmDocument(`/inventario/${p.id}/preparar`),
     });
+    tasks.push({
+      key: `doc:/inventario/${p.id}/me-lo-comi`,
+      group: "app" as const,
+      label: `Documento merma ${p.name}`,
+      run: () => warmDocument(`/inventario/${p.id}/me-lo-comi`),
+    });
+    tasks.push({
+      key: `doc:/inventario/${p.id}/regalo`,
+      group: "app" as const,
+      label: `Documento regalo ${p.name}`,
+      run: () => warmDocument(`/inventario/${p.id}/regalo`),
+    });
+    tasks.push({
+      key: `doc:/inventario/${p.id}/perdido`,
+      group: "app" as const,
+      label: `Documento perdido ${p.name}`,
+      run: () => warmDocument(`/inventario/${p.id}/perdido`),
+    });
   }
   const sales = await db.sales.where("businessId").equals(businessId).toArray();
   for (const s of sales) {
@@ -248,6 +270,12 @@ export async function dynamicDocumentTasks(businessId: string): Promise<PrepTask
       group: "app" as const,
       label: `Documento venta ${s.id.slice(0, 8)}`,
       run: () => warmDocument(`/ventas/${s.id}`),
+    });
+    tasks.push({
+      key: `doc:/ventas/${s.id}/devolver`,
+      group: "app" as const,
+      label: `Documento devolver ${s.id.slice(0, 8)}`,
+      run: () => warmDocument(`/ventas/${s.id}/devolver`),
     });
   }
   return tasks;

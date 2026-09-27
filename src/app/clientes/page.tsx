@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
@@ -29,13 +28,13 @@ export default function ClientesPage() {
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-2">
         <h1 className="text-[22px] font-semibold tracking-tight">Clientes</h1>
-        <Link
+        <OfflineLink
           href="/clientes/nuevo"
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] bg-cta text-xl font-semibold text-white"
-          aria-label="Agregar cliente"
+          ariaLabel="Agregar cliente"
         >
           +
-        </Link>
+        </OfflineLink>
       </header>
 
       <label className="sr-only" htmlFor="buscar-cliente">
@@ -55,12 +54,12 @@ export default function ClientesPage() {
       ) : customers.length === 0 ? (
         <div className="rounded-2xl border border-ink/10 bg-surface p-6 text-center">
           <p className="text-base font-medium">Sin clientes aún.</p>
-          <Link
+          <OfflineLink
             href="/clientes/nuevo"
             className="mt-4 inline-flex min-h-11 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
           >
             Agregar cliente
-          </Link>
+          </OfflineLink>
         </div>
       ) : filtered.length === 0 && searching ? (
         <p className="text-sm text-ink/60">No encontramos ese cliente.</p>

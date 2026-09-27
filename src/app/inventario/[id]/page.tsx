@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
@@ -131,18 +132,18 @@ export default function ProductoFichaPage() {
       </section>
 
       <div className="flex gap-2">
-        <Link
+        <OfflineLink
           href={`/inventario/${product.id}/surtir`}
           className="flex min-h-11 flex-1 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
         >
           Surtir
-        </Link>
-        <Link
+        </OfflineLink>
+        <OfflineLink
           href={`/inventario/${product.id}/preparar`}
           className="flex min-h-11 flex-1 items-center justify-center rounded-[14px] border border-ink/10 bg-surface px-4 text-sm font-semibold"
         >
           Preparar
-        </Link>
+        </OfflineLink>
       </div>
 
       <ProductImageManager
@@ -408,11 +409,11 @@ export default function ProductoFichaPage() {
 
 function ActionLink({ href, label }: { href: string; label: string }) {
   return (
-    <Link
+    <OfflineLink
       href={href}
       className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface px-4 text-sm font-semibold"
     >
       {label}
-    </Link>
+    </OfflineLink>
   );
 }

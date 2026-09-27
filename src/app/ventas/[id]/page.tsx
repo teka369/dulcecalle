@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
@@ -124,12 +125,12 @@ export default function VentaDetallePage() {
       </section>
 
       {canReturn && (
-        <Link
+        <OfflineLink
           href={`/ventas/${sale.id}/devolver`}
           className="flex min-h-11 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
         >
           Devolver
-        </Link>
+        </OfflineLink>
       )}
 
       {data.returnPending && (

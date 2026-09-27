@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
@@ -48,19 +47,19 @@ export default function InventarioPage() {
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-2">
         <h1 className="text-[22px] font-semibold tracking-tight">Inventario</h1>
-        <Link
+        <OfflineLink
           href={
             segment === "productos"
               ? "/inventario/nuevo"
               : "/inventario/proveedores/nuevo"
           }
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] bg-cta text-xl font-semibold text-white"
-          aria-label={
+          ariaLabel={
             segment === "productos" ? "Agregar producto" : "Agregar proveedor"
           }
         >
           +
-        </Link>
+        </OfflineLink>
       </header>
 
       <div className="grid grid-cols-2 gap-2 rounded-[14px] border border-ink/10 bg-surface p-1">
@@ -233,12 +232,12 @@ function EmptyBlock({
   return (
     <div className="rounded-2xl border border-ink/10 bg-surface p-6 text-center">
       <p className="text-base font-medium">{message}</p>
-      <Link
+      <OfflineLink
         href={href}
         className="mt-4 inline-flex min-h-11 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
       >
         {cta}
-      </Link>
+      </OfflineLink>
     </div>
   );
 }

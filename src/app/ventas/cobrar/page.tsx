@@ -18,6 +18,7 @@ export default function CobrarPage() {
   const router = useRouter();
   const {
     items,
+    hydrated,
     paymentKind,
     customerId,
     amountReceived,
@@ -52,10 +53,11 @@ export default function CobrarPage() {
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     if (items.length === 0) {
       navigateOfflineAware(router, "/ventas/nueva", { replace: true });
     }
-  }, [items.length, router]);
+  }, [hydrated, items.length, router]);
 
   const lines = useMemo(() => {
     return items

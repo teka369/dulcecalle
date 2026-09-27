@@ -9,6 +9,7 @@ import {
 import { resetLocalStoreSingleton } from "@/data/local/store";
 import { getPwaAuthSession } from "@/data/http/session";
 import {
+  PREP_VERSION,
   checkReadiness,
   prepTaskDefs,
   runPreparation,
@@ -92,11 +93,12 @@ describe("offline preparation", () => {
     const seen: PrepProgress[] = [];
     const row = await runPreparation(BIZ, (p) => seen.push({ ...p }));
     expect(row.status).toBe("ready");
-    // sys:sw + 16 static docs + 3 catalogs + 4 snapshots + media:thumbs + sys:storage + sys:verify
-    expect(row.tasks).toHaveLength(27);
+    // sys:sw + static/catalog/snapshot defs + media:thumbs + sys:storage + sys:verify
+    const expected = prepTaskDefs().length + 4;
+    expect(row.tasks).toHaveLength(expected);
     expect(row.tasks.every((t) => t.status === "done")).toBe(true);
-    expect(seen.length).toBeGreaterThan(26);
-    expect(seen[seen.length - 1]?.completed).toBe(27);
+    expect(seen.length).toBeGreaterThan(expected - 1);
+    expect(seen[seen.length - 1]?.completed).toBe(expected);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
   });
 
@@ -193,11 +195,17 @@ await runPreparation(BIZ);
     });
     const tasks = await dynamicDocumentTasks(BIZ);
     const keys = tasks.map((t) => t.key);
+    const product = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
     expect(keys).toContain("doc:/clientes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     expect(keys).toContain("doc:/clientes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/abono");
-    expect(keys).toContain("doc:/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
-    expect(keys).toContain("doc:/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/surtir");
-    expect(keys).toContain("doc:/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/preparar");
+    expect(keys).toContain(`doc:/inventario/${product}`);
+    expect(keys).toContain(`doc:/inventario/${product}/surtir`);
+    expect(keys).toContain(`doc:/inventario/${product}/preparar`);
+    expect(keys).toContain(`doc:/inventario/${product}/me-lo-comi`);
+    expect(keys).toContain(`doc:/inventario/${product}/regalo`);
+    expect(keys).toContain(`doc:/inventario/${product}/perdido`);
+    expect(keys.some((k) => k.includes("deuda-inicial"))).toBe(false);
+    expect(keys.some((k) => k.includes("/mas/datos"))).toBe(false);
     expect(keys.some((k) => k.includes("22222222"))).toBe(false);
   });
 
@@ -254,16 +262,73 @@ await runPreparation(BIZ);
 
   it("task list covers documents, catalogs and summaries", () => {
     const defs = prepTaskDefs();
-    expect(defs).toHaveLength(23);
-    expect(defs.filter((d) => d.group === "app")).toHaveLength(16);
+    expect(defs.filter((d) => d.group === "app")).toHaveLength(20);
     expect(defs.filter((d) => d.group === "catalogos")).toHaveLength(3);
     expect(defs.filter((d) => d.group === "resumen")).toHaveLength(4);
+    expect(defs).toHaveLength(27);
     const keys = defs.map((d) => d.key);
     expect(keys).toContain("doc:/inventario/proveedores/nuevo");
     expect(keys).toContain("doc:/mas/estadisticas");
     expect(keys).toContain("doc:/mas/apariencia");
+    expect(keys).toContain("doc:/mas/gastos/nuevo");
+    expect(keys).toContain("doc:/mas/caja/aporte");
+    expect(keys).toContain("doc:/mas/caja/retiro");
+    expect(keys).toContain("doc:/mas/caja/cerrar");
+    expect(keys).not.toContain("doc:/mas/datos");
+    expect(keys.some((k) => k.includes("deuda-inicial"))).toBe(false);
     expect(keys).toContain("catalog:products");
     expect(keys).toContain("snapshot:dashboard");
+  });
+
+  it("verifies the documents that preparation declared, including returns", async () => {
+    const saleId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const now = Date.now();
+    await getLocalDb().sales.put({
+      id: saleId,
+      businessId: BIZ,
+      customerId: null,
+      paymentKind: "paid",
+      method: "Efectivo",
+      saleTotal: 500,
+      amountReceived: 500,
+      credit: 0,
+      requestId: "req-sale",
+      note: null,
+      occurredOn: "2026-09-27",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await getLocalDb().products.put({
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      businessId: BIZ,
+      name: "Gomitas",
+      category: "General",
+      price: 500,
+      avgCost: 100,
+      stock: 5,
+      lowStockAt: 5,
+      archivedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      images: [],
+    });
+    const stored = installCacheStubs();
+    const row = await runPreparation(BIZ);
+    expect(row.status).toBe("ready");
+    expect(row.prepVersion).toBe(PREP_VERSION);
+    const declared = row.tasks
+      .filter((task) => task.key.startsWith("doc:"))
+      .map((task) => task.key.slice(4));
+    expect(declared).toContain(`/ventas/${saleId}/devolver`);
+    expect(declared).toContain("/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/perdido");
+    expect(declared.some((path) => path.includes("deuda-inicial"))).toBe(false);
+    expect(declared).not.toContain("/mas/datos");
+    for (const path of declared) {
+      expect(stored.has(path)).toBe(true);
+    }
+    const verify = row.tasks.find((task) => task.key === "sys:verify");
+    expect(verify?.status).toBe("done");
+    expect(verify?.detail).toBe(`${declared.length} documentos verificados`);
   });
 
   it("offline mid-run fails honestly instead of claiming ready", async () => {

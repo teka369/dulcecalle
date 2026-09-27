@@ -7,6 +7,7 @@ import { formatCop, mulCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
 import { RETURN_ERRORS, RETURN_TOAST } from "@/domain/sale/returns";
 import { routeId } from "@/data/pwa/ids";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { createReturnWithOfflineFallback } from "@/data/pwa/offline-returns";
 import { getSaleDetailWithOfflineFallback } from "@/data/pwa/offline-sales";
 import type { SaleDetailResult } from "@/data/pwa/offline-sales";
@@ -100,7 +101,7 @@ export default function DevolverVentaPage() {
           : RETURN_TOAST,
       );
       setTimeout(() => {
-        router.push(`/ventas/${data.sale.id}`);
+        navigateOfflineAware(router, `/ventas/${data.sale.id}`);
       }, 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al devolver");
