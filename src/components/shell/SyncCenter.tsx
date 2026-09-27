@@ -77,11 +77,13 @@ export function SyncCenter() {
         <p className="mt-1">
           {flushing ? `↻ Sincronizando ${flushing.completed}/${flushing.total}` : `○ ${counts.pending + counts.active} pendiente${counts.pending + counts.active === 1 ? "" : "s"}`}
         </p>
-        <p className="mt-1">
-          {counts.permanent > 0
-            ? `! ${counts.permanent} necesita${counts.permanent === 1 ? "" : "n"} atención`
-            : "! 0 necesitan atención"}
-        </p>
+        {!authRequired && (
+          <p className="mt-1">
+            {counts.permanent > 0
+              ? `! ${counts.permanent} necesita${counts.permanent === 1 ? "" : "n"} atención`
+              : "! 0 necesitan atención"}
+          </p>
+        )}
         {lastDoneAt && (
           <p className="mt-2 text-xs text-ink-muted">
             Última sincronización: {formatDateTime(lastDoneAt)}
