@@ -15,7 +15,7 @@ export const PALETTE_META: Record<
   PaletteId,
   { label: string; swatch: string }
 > = {
-  amber: { label: "Amber", swatch: "#FF8C42" },
+  amber: { label: "DulceCalle", swatch: "#FF8C42" },
   ocean: { label: "Ocean", swatch: "#2B6F8A" },
   emerald: { label: "Emerald", swatch: "#2F6F4E" },
   violet: { label: "Violet", swatch: "#6B4C9A" },

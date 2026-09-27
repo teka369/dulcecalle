@@ -1,88 +1,200 @@
 @import "tailwindcss";
 
+/* Shared light semantics + space / radii / shadow (Spec §2.5) */
+:root {
+  --ok: #15803d;
+  --ok-soft: #d8f3e7;
+  --warning: #d97706;
+  --warning-soft: #fde8c8;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --info: #6b5b95;
+  --info-soft: #ede7f6;
+  --cta-fg: #ffffff;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(59, 36, 28, 0.06);
+  --shadow-md: 0 4px 12px rgba(59, 36, 28, 0.08);
+  --shadow-lg: 0 12px 32px rgba(59, 36, 28, 0.12);
+}
+
+/* Amber (default) — logo toldito: crema / chocolate / amarillo-naranja */
 :root,
 [data-theme="amber"] {
   --bg: #fff9f2;
   --surface: #ffffff;
+  --surface-2: #f3ebe3;
+  --border: #e8dfd4;
   --ink: #3b241c;
+  --ink-muted: #7a6a60;
   --primary: #ffc857;
   --cta: #ff8c42;
   --accent: #ff6b8a;
-  --ok: #15803d;
-  --danger: #dc2626;
 }
 
 [data-theme="ocean"] {
   --bg: #f3f8fc;
   --surface: #ffffff;
+  --surface-2: #e8f0f6;
+  --border: #d5e0e8;
   --ink: #1c2e3b;
+  --ink-muted: #5a6f7d;
   --primary: #8fbfd4;
   --cta: #2b6f8a;
   --accent: #c45c4a;
-  --ok: #15803d;
-  --danger: #dc2626;
 }
 
 [data-theme="emerald"] {
   --bg: #f3f8f4;
   --surface: #ffffff;
+  --surface-2: #e6f0ea;
+  --border: #d4e0d8;
   --ink: #1e3328;
+  --ink-muted: #5a6f64;
   --primary: #9dcca8;
   --cta: #2f6f4e;
   --accent: #c45c4a;
-  --ok: #15803d;
-  --danger: #dc2626;
 }
 
 [data-theme="violet"] {
   --bg: #f7f4fb;
   --surface: #ffffff;
+  --surface-2: #eee8f5;
+  --border: #ddd4e8;
   --ink: #2c2438;
+  --ink-muted: #6a6178;
   --primary: #c4b0dc;
   --cta: #6b4c9a;
   --accent: #c45c4a;
-  --ok: #15803d;
-  --danger: #dc2626;
 }
 
 [data-theme="rose"] {
   --bg: #fdf6f6;
   --surface: #ffffff;
+  --surface-2: #f5e8ea;
+  --border: #e8d6d9;
   --ink: #3a2428;
+  --ink-muted: #7a6568;
   --primary: #e8b4ba;
   --cta: #9f3d4a;
   --accent: #c45c4a;
-  --ok: #15803d;
-  --danger: #dc2626;
 }
 
 [data-theme="slate"] {
   --bg: #f4f6f8;
   --surface: #ffffff;
+  --surface-2: #e8ecf0;
+  --border: #d5dbe2;
   --ink: #1f2933;
+  --ink-muted: #5a6570;
   --primary: #c5ced8;
   --cta: #334155;
   --accent: #c45c4a;
-  --ok: #15803d;
-  --danger: #dc2626;
+}
+
+/* Dark mode: shared neutrals + semantics; primary/cta/accent stay per-theme */
+[data-mode="dark"] {
+  --bg: #0f1117;
+  --surface: #1a1d26;
+  --surface-2: #242833;
+  --border: #2e3340;
+  --ink: #f3eee8;
+  --ink-muted: #a1a6b0;
+  --ok: #34d399;
+  --ok-soft: #14352a;
+  --warning: #fbbf24;
+  --warning-soft: #3a2e14;
+  --danger: #f87171;
+  --danger-soft: #3f1d1d;
+  --info: #c4b5e8;
+  --info-soft: #2a2438;
+  --cta-fg: #1a0f12;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+[data-mode="dark"][data-theme="amber"],
+[data-mode="dark"]:not([data-theme]) {
+  --primary: #ffc857;
+  --cta: #ff8c42;
+  --accent: #ff6b8a;
+}
+
+[data-mode="dark"][data-theme="ocean"] {
+  --primary: #8fbfd4;
+  --cta: #2b6f8a;
+  --accent: #c45c4a;
+}
+
+[data-mode="dark"][data-theme="emerald"] {
+  --primary: #9dcca8;
+  --cta: #2f6f4e;
+  --accent: #c45c4a;
+}
+
+[data-mode="dark"][data-theme="violet"] {
+  --primary: #c4b0dc;
+  --cta: #6b4c9a;
+  --accent: #c45c4a;
+}
+
+[data-mode="dark"][data-theme="rose"] {
+  --primary: #e8b4ba;
+  --cta: #9f3d4a;
+  --accent: #c45c4a;
+}
+
+[data-mode="dark"][data-theme="slate"] {
+  --primary: #c5ced8;
+  --cta: #334155;
+  --accent: #c45c4a;
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
   --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
   --color-primary: var(--primary);
   --color-cta: var(--cta);
+  --color-cta-fg: var(--cta-fg);
   --color-accent: var(--accent);
   --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
   --color-danger: var(--danger);
-  --font-sans: var(--font-geist-sans);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: "Satoshi", var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
 }
 
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 * {

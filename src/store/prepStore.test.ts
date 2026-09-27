@@ -80,8 +80,8 @@ describe("prepStore evaluate/start", () => {
     expect(snap.phase).toBe("ready");
     expect(snap.modalOpen).toBe(true);
     expect(snap.completed).toBe(snap.total);
-    // 11 static docs + 3 catalogs + 4 snapshots + 3 sistema
-    expect(snap.total).toBe(22);
+    // 20 static docs + 3 catalogs + 4 snapshots + 1 thumbs + 3 sistema (+ 0 dynamic in empty mock)
+    expect(snap.total).toBe(31);
     expect(snap.lastReadyAt).toBeGreaterThan(0);
   });
 

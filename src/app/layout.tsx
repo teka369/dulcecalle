@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreviewHostBridge } from "@/components/shell/PreviewHostBridge";
 import { SalesSyncBridge } from "@/components/shell/SalesSyncBridge";
@@ -9,9 +9,10 @@ import { SyncPill } from "@/components/shell/SyncPill";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -46,8 +47,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" data-theme="amber" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full bg-bg text-ink">
+    <html
+      lang="es"
+      data-theme="amber"
+      data-mode="light"
+      className={`${jakarta.variable} h-full antialiased`}
+    >
+      <link
+        href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap"
+        rel="stylesheet"
+      />
+      <body className="min-h-full bg-bg font-sans text-ink">
         <PreviewHostBridge />
         <SalesSyncBridge />
         <PrepModal />
