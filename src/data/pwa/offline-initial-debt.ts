@@ -5,6 +5,7 @@ import { getLocalDb } from "../local/db";
 import { getLocalStore } from "../local/store";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
 import { newEntityId } from "../local/ids";
+import { customerToLocal } from "../local/read-cache";
 import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
 import { addCop } from "@/domain/money";
 import type { RemoteInitialDebt } from "../http/mappers";
@@ -167,10 +168,9 @@ async function reconcileInitialDebt(
   });
   try {
     const customer = await getPwaApi().customers.get(remote.customerId);
-    await getLocalStore().customers.put({
-      ...customer,
-      requestId: undefined,
-    } as never);
+    await getLocalStore().customers.put(
+      customerToLocal(customer, businessId, Date.now()),
+    );
   } catch {
     // The outbox remains synced; a later customer refresh can reconcile the cache.
   }
