@@ -58,7 +58,7 @@ export default function VentaDetallePage() {
   const { sale, lines, remainingValue, returns } = data;
   const pending = sale.pending;
   const fromCache = data.source === "cache";
-  const canReturn = remainingValue > 0 && !pending;
+  const canReturn = remainingValue > 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -132,14 +132,20 @@ export default function VentaDetallePage() {
         </Link>
       )}
 
-      {pending ? (
+      {data.returnPending && (
         <p className="text-xs text-ink/60">
-          Las devoluciones estarán disponibles cuando la venta se sincronice.
+          Devolución pendiente de confirmación. El inventario no sube hasta que el servidor la acepte.
         </p>
-      ) : (
-        !canReturn && (
-          <p className="text-sm text-ink/60">Esta venta ya se devolvió.</p>
-        )
+      )}
+
+      {pending && canReturn && (
+        <p className="text-xs text-ink/60">
+          La venta se sincroniza primero. Puedes dejar la devolución lista en este dispositivo.
+        </p>
+      )}
+
+      {!canReturn && !data.returnPending && (
+        <p className="text-sm text-ink/60">Esta venta ya se devolvió.</p>
       )}
 
       {fromCache && (

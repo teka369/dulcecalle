@@ -56,7 +56,7 @@ export type PatchProductInput = {
 };
 
 export type CreateSaleInput = {
-  lines: Array<{ productId: string; qty: number; unitPrice?: number }>;
+  lines: Array<{ id?: string; productId: string; qty: number; unitPrice?: number }>;
   paymentKind: "paid" | "partial" | "credit";
   customerId?: string;
   amountReceived: number;

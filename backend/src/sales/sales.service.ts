@@ -152,6 +152,7 @@ export class SalesService {
 
         let saleTotal = 0n;
         const prepared: Array<{
+          id?: string;
           productId: string;
           productName: string;
           qty: number;
@@ -159,10 +160,17 @@ export class SalesService {
           unitCost: bigint;
           lineTotal: bigint;
         }> = [];
+        const seenLineIds = new Set<string>();
 
         for (const line of dto.lines) {
           if (!Number.isInteger(line.qty) || line.qty <= 0) {
             throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.badQty);
+          }
+          if (line.id) {
+            if (seenLineIds.has(line.id)) {
+              throw new AppError(ERROR_CODES.VALIDATION, "Hay dos líneas con el mismo id.");
+            }
+            seenLineIds.add(line.id);
           }
           const product = byId.get(line.productId);
           if (!product) {
@@ -179,6 +187,7 @@ export class SalesService {
           const lineTotal = mulCop(unitPrice, line.qty);
           saleTotal = addCop(saleTotal, lineTotal);
           prepared.push({
+            id: line.id,
             productId: product.id,
             productName: product.name,
             qty: line.qty,
@@ -215,7 +224,7 @@ export class SalesService {
         for (const line of prepared) {
           await tx.saleLine.create({
             data: {
-              id: randomUUID(),
+              id: line.id ?? randomUUID(),
               businessId: ctx.businessId,
               saleId,
               productId: line.productId,

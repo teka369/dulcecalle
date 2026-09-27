@@ -12,6 +12,10 @@ import {
 } from "class-validator";
 
 export class SaleLineDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
   @IsUUID()
   productId!: string;
 

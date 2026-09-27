@@ -7,11 +7,9 @@ import { formatCop, mulCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
 import { RETURN_ERRORS, RETURN_TOAST } from "@/domain/sale/returns";
 import { routeId } from "@/data/pwa/ids";
-import { getPwaApi } from "@/data/pwa/api";
-import {
-  getHttpReturnable,
-  type HttpReturnable,
-} from "@/data/pwa/sales";
+import { createReturnWithOfflineFallback } from "@/data/pwa/offline-returns";
+import { getSaleDetailWithOfflineFallback } from "@/data/pwa/offline-sales";
+import type { SaleDetailResult } from "@/data/pwa/offline-sales";
 import { getPwaAuthSession } from "@/data/http/session";
 import { useProductImageMap } from "@/data/pwa/product-image-map";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
@@ -20,7 +18,7 @@ export default function DevolverVentaPage() {
   const params = useParams();
   const router = useRouter();
   const id = routeId(params.id);
-  const [data, setData] = useState<HttpReturnable | null>(null);
+  const [data, setData] = useState<SaleDetailResult | null>(null);
   const [qtyByLine, setQtyByLine] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,7 +32,7 @@ export default function DevolverVentaPage() {
       setReady(true);
       return;
     }
-    const row = await getHttpReturnable(id);
+    const row = await getSaleDetailWithOfflineFallback(id);
     setData(row);
     if (row) {
       const next: Record<string, string> = {};
@@ -91,14 +89,16 @@ export default function DevolverVentaPage() {
     setBusy(true);
     try {
       if (!requestIdRef.current) requestIdRef.current = newRequestId("dev");
-      await getPwaApi().sales.createReturn(
+      const result = await createReturnWithOfflineFallback(
         data.sale.id,
-        {
-          lines: selected.map((x) => ({ saleLineId: x.line.id, qty: x.qty })),
-        },
+        selected.map((x) => ({ saleLineId: x.line.id, qty: x.qty })),
         requestIdRef.current,
       );
-      setToast(RETURN_TOAST);
+      setToast(
+        result.mode === "offline"
+          ? "Devolución guardada en este dispositivo · se sincronizará automáticamente."
+          : RETURN_TOAST,
+      );
       setTimeout(() => {
         router.push(`/ventas/${data.sale.id}`);
       }, 700);
@@ -144,8 +144,18 @@ export default function DevolverVentaPage() {
         borra.
       </p>
 
+      {data.returnPending && (
+        <p className="text-xs text-ink/60">
+          Hay una devolución pendiente. El inventario todavía no cambió.
+        </p>
+      )}
+
       {remainingLines.length === 0 ? (
-        <p className="text-sm text-ink/60">Esta venta ya se devolvió.</p>
+        <p className="text-sm text-ink/60">
+          {data.returnPending
+            ? "La devolución está pendiente de confirmación."
+            : "Esta venta ya se devolvió."}
+        </p>
       ) : (
         <>
           <section className="flex flex-col gap-3">
@@ -200,8 +210,7 @@ export default function DevolverVentaPage() {
 
           {previewValue > 0 && (
             <p className="text-sm text-ink/70">
-              Se ajustan {formatCop(previewValue)}. El inventario sube con esas
-              unidades.
+              Se ajustan {formatCop(previewValue)}. El inventario sube cuando el servidor confirme la devolución.
             </p>
           )}
 

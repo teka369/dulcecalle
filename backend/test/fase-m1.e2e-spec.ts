@@ -753,6 +753,68 @@ describe("Fase M1 domain endpoints", () => {
       .expect(400);
   });
 
+  it("persists a client sale line id and still mints one when omitted", async () => {
+    const lineId = randomUUID();
+    const product = await api()
+      .post("/v1/products")
+      .set(auth(tokenA, bizA))
+      .set("Idempotency-Key", randomUUID())
+      .send({ name: "Linea cliente", price: 1500, stock: 5, avgCost: 400 })
+      .expect(201);
+
+    const created = await api()
+      .post("/v1/sales")
+      .set(auth(tokenA, bizA))
+      .set("Idempotency-Key", randomUUID())
+      .send({
+        lines: [{ id: lineId, productId: product.body.id, qty: 1 }],
+        paymentKind: "paid",
+        amountReceived: 1500,
+        method: "Efectivo",
+      })
+      .expect(201);
+    expect(created.body.id).not.toBe(lineId);
+    expect(created.body.lines[0].id).toBe(lineId);
+
+    const plain = await api()
+      .post("/v1/sales")
+      .set(auth(tokenA, bizA))
+      .set("Idempotency-Key", randomUUID())
+      .send({
+        lines: [{ productId: product.body.id, qty: 1 }],
+        paymentKind: "paid",
+        amountReceived: 1500,
+        method: "Efectivo",
+      })
+      .expect(201);
+    expect(plain.body.lines[0].id).not.toBe(lineId);
+    expect(plain.body.id).not.toBe(created.body.id);
+
+    const dup = randomUUID();
+    await api()
+      .post("/v1/sales")
+      .set(auth(tokenA, bizA))
+      .set("Idempotency-Key", randomUUID())
+      .send({
+        lines: [
+          { id: dup, productId: product.body.id, qty: 1 },
+          { id: dup, productId: product.body.id, qty: 1 },
+        ],
+        paymentKind: "paid",
+        amountReceived: 3000,
+        method: "Efectivo",
+      })
+      .expect(400);
+
+    const returned = await api()
+      .post(`/v1/sales/${created.body.id}/returns`)
+      .set(auth(tokenA, bizA))
+      .set("Idempotency-Key", randomUUID())
+      .send({ lines: [{ saleLineId: lineId, qty: 1 }] })
+      .expect(201);
+    expect(returned.body.lines[0].saleLineId).toBe(lineId);
+  });
+
   it("closed day blocks economic writes; initial debt stays allowed", async () => {
     const today = await api()
       .get("/v1/cash/today")

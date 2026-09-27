@@ -6,9 +6,11 @@ import { syncPendingPreparations } from "./offline-production";
 import { syncPendingOperations } from "./offline-operations";
 import { syncPendingPayments } from "./offline-payments";
 import { syncPendingSales } from "./offline-sales";
+import { syncPendingReturns } from "./offline-returns";
 
 export type SyncAllResult = {
   sales: SyncFlushResult;
+  returns: SyncFlushResult;
   payments: SyncFlushResult;
   customers: SyncFlushResult;
   suppliers: SyncFlushResult;
@@ -41,6 +43,7 @@ const AUTH_IDLE: SyncFlushResult = {
 export async function syncAllPending(businessId: string): Promise<SyncAllResult> {
   const result: SyncAllResult = {
     sales: AUTH_IDLE,
+    returns: AUTH_IDLE,
     payments: AUTH_IDLE,
     customers: AUTH_IDLE,
     suppliers: AUTH_IDLE,
@@ -51,6 +54,7 @@ export async function syncAllPending(businessId: string): Promise<SyncAllResult>
   };
   const steps: Array<[keyof SyncAllResult, () => Promise<SyncFlushResult>]> = [
     ["sales", () => syncPendingSales(businessId)],
+    ["returns", () => syncPendingReturns(businessId)],
     ["payments", () => syncPendingPayments(businessId)],
     ["customers", () => syncPendingCustomers(businessId)],
     ["suppliers", () => syncPendingSuppliers(businessId)],

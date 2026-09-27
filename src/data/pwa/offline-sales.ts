@@ -4,6 +4,7 @@ import type { RemoteReturn, RemoteSaleLine } from "../http/mappers";
 import type { RemoteSale } from "../http/mappers";
 import { getPwaApi } from "./api";
 import { getHttpReturnable } from "./sales";
+import { persistServerSale, loadLocalReturnable } from "./offline-returns";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
@@ -153,6 +154,7 @@ async function createLocalSale(
       let total = 0;
       const prepared: Array<{
         product: LocalProduct;
+        lineId: string;
         qty: number;
         unitPrice: number;
         lineTotal: number;
@@ -175,7 +177,13 @@ async function createLocalSale(
         }
         const lineTotal = mulCop(unitPrice, line.qty);
         total = addCop(total, lineTotal);
-        prepared.push({ product, qty: line.qty, unitPrice, lineTotal });
+        prepared.push({
+          product,
+          lineId: line.id ?? newEntityId(),
+          qty: line.qty,
+          unitPrice,
+          lineTotal,
+        });
       }
 
       const { received, credit } = paymentValues(input, total);
@@ -199,8 +207,9 @@ async function createLocalSale(
       await db.sales.put(sale);
 
       for (const row of prepared) {
+        const lineId = row.lineId;
         const line: LocalSaleLine = {
-          id: newEntityId(),
+          id: lineId,
           businessId,
           saleId,
           productId: row.product.id,
@@ -212,7 +221,9 @@ async function createLocalSale(
           createdAt: now,
         };
         await db.saleLines.put(line);
-        await db.products.put({ ...row.product, stock: row.product.stock - row.qty, updatedAt: now });
+        const nextStock = row.product.stock - row.qty;
+        await db.products.put({ ...row.product, stock: nextStock, updatedAt: now });
+        row.product.stock = nextStock;
         const move: LocalStockMove = {
           id: newEntityId(),
           businessId,
@@ -274,7 +285,15 @@ async function createLocalSale(
         entity: "sale",
         operation: "create",
         requestId,
-        payload: input,
+        payload: {
+          ...input,
+          lines: prepared.map((row) => ({
+            id: row.lineId,
+            productId: row.product.id,
+            qty: row.qty,
+            unitPrice: row.unitPrice,
+          })),
+        },
         dependsOn: [],
         localCreatedAt: now,
         status: "pending",
@@ -293,13 +312,23 @@ export async function createSaleWithOfflineFallback(
   input: CreateSaleInput,
   requestId: string,
 ): Promise<CreateSaleResult> {
+  const stamped: CreateSaleInput = {
+    ...input,
+    lines: input.lines.map((line) => ({
+      ...line,
+      id: line.id ?? newEntityId(),
+    })),
+  };
   try {
-    return { mode: "online", sale: await getPwaApi().sales.create(input, requestId) };
+    const sale = await getPwaApi().sales.create(stamped, requestId);
+    const businessId = getPwaAuthSession().businessId;
+    if (businessId) await persistServerSale(businessId, sale);
+    return { mode: "online", sale };
   } catch (error) {
     if (!(error instanceof NetworkError)) throw error;
     const businessId = getPwaAuthSession().businessId;
     if (!businessId) throw new Error("Selecciona el negocio antes de vender.");
-    const saleId = await createLocalSale(input, businessId, requestId);
+    const saleId = await createLocalSale(stamped, businessId, requestId);
     return { mode: "offline", saleId };
   }
 }
@@ -336,6 +365,7 @@ export type SaleDetailResult = {
   remainingValue: number;
   returns: RemoteReturn[];
   source: "server" | "cache";
+  returnPending: boolean;
 };
 
 /**
@@ -346,27 +376,26 @@ export type SaleDetailResult = {
 export async function getSaleDetailWithOfflineFallback(
   saleId: string,
 ): Promise<SaleDetailResult | null> {
-  const found = await getHttpReturnable(saleId);
-  if (found) {
-    return {
-      sale: { ...found.sale, pending: false },
-      lines: found.lines,
-      remainingValue: found.remainingValue,
-      returns: found.returns,
-      source: "server",
-    };
+  try {
+    const found = await getHttpReturnable(saleId);
+    if (found) {
+      const businessId = getPwaAuthSession().businessId;
+      if (businessId) await persistServerSale(businessId, found.sale, found.returns);
+      return {
+        sale: { ...found.sale, pending: false },
+        lines: found.lines,
+        remainingValue: found.remainingValue,
+        returns: found.returns,
+        source: "server",
+        returnPending: false,
+      };
+    }
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
   }
   const businessId = getPwaAuthSession().businessId;
   if (!businessId) return null;
-  const local = await getLocalSale(businessId, saleId);
-  if (!local) return null;
-  return {
-    sale: local,
-    lines: local.lines.map((l) => ({ ...l, returnedQty: 0, remaining: l.qty })),
-    remainingValue: local.saleTotal,
-    returns: [],
-    source: "cache",
-  };
+  return loadLocalReturnable(businessId, saleId);
 }
 
 export async function syncPendingSales(businessId: string) {
