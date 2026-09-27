@@ -204,7 +204,7 @@ await runPreparation(BIZ);
     expect(keys).toContain(`doc:/inventario/${product}/me-lo-comi`);
     expect(keys).toContain(`doc:/inventario/${product}/regalo`);
     expect(keys).toContain(`doc:/inventario/${product}/perdido`);
-    expect(keys.some((k) => k.includes("deuda-inicial"))).toBe(false);
+    expect(keys).toContain("doc:/clientes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/deuda-inicial");
     expect(keys.some((k) => k.includes("/mas/datos"))).toBe(false);
     expect(keys.some((k) => k.includes("22222222"))).toBe(false);
   });

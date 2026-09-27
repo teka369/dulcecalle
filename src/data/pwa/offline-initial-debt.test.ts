@@ -66,6 +66,7 @@ describe("M7 offline initial debt", () => {
       requestId,
     );
     expect(result.mode).toBe("offline");
+    if (result.mode !== "offline") throw new Error("expected offline initial debt");
 
     const db = getLocalDb();
     expect(await db.customers.get(customerId)).toMatchObject({ debt: 15_000 });
@@ -122,6 +123,7 @@ describe("M7 offline initial debt", () => {
     api.customers.initialDebt.mockRejectedValueOnce(new NetworkError("offline"));
     await seedCustomer();
     const local = await createInitialDebtWithOfflineFallback({ customerId, amount: 5_000 }, requestId);
+    if (local.mode !== "offline") throw new Error("expected offline initial debt");
     api.customers.initialDebt.mockResolvedValue({
       id: "77777777-7777-4777-8777-777777777777",
       customerId: remoteCustomerId,

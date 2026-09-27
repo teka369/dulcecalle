@@ -194,8 +194,8 @@ export function requiredSnapshotKinds(): string[] {
 
 /**
  * Dynamic documents for entities that actually exist in Dexie. Only
- * detail/action pages whose flows work offline are included. Online-only
- * pages stay out: deuda-inicial and /mas/datos.
+ * detail/action pages whose flows work offline are included.
+ * /mas/datos stays out.
  */
 export async function dynamicDocumentTasks(businessId: string): Promise<PrepTaskDef[]> {
   const db = getLocalDb();

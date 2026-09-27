@@ -2,6 +2,8 @@
  * M6.3 catalog read cache. GET online writes a tenant snapshot; NetworkError
  * reads it back. Not an outbox, not a sync engine. PostgreSQL is the authority.
  */
+import { addCop } from "@/domain/money";
+import { pendingDebtAdjustment } from "../pwa/pending-debt";
 import { ApiError, isNetworkError } from "../errors";
 import type {
   RemoteCustomer,
@@ -156,6 +158,7 @@ export class CatalogReadCache {
       toRemote: customerToRemote,
       replaceAll: (biz, rows) => this.store.customers.replaceAll(biz, rows),
       list: (biz) => this.store.customers.list(biz),
+      projectStored: (rows) => this.projectCustomerDebts(businessId, rows),
     });
   }
 
@@ -203,6 +206,7 @@ export class CatalogReadCache {
       toRemote: customerToRemote,
       put: (row) => this.store.customers.put(row),
       get: (biz, rowId) => this.store.customers.get(biz, rowId),
+      projectStored: (row) => this.projectCustomerDebt(businessId, row),
     });
   }
 
@@ -239,6 +243,8 @@ export class CatalogReadCache {
     toRemote: (row: TLocal) => TRemote;
     replaceAll: (businessId: string, rows: TLocal[]) => Promise<void>;
     list: (businessId: string) => Promise<TLocal[]>;
+    /** Server snapshot only. Pending local creates are appended afterwards. */
+    projectStored?: (rows: TLocal[]) => Promise<TLocal[]>;
   }): Promise<CachedList<TRemote>> {
     assertUuid(opts.businessId, "businessId");
     try {
@@ -247,12 +253,17 @@ export class CatalogReadCache {
       const locals = data.map((row) =>
         opts.toLocal(row, opts.businessId, cachedAt),
       );
+      const stored = opts.projectStored ? await opts.projectStored(locals) : locals;
       await opts.replaceAll(opts.businessId, [
-        ...locals,
+        ...stored,
         ...(await this.pendingLocalRows(opts)),
       ]);
       await this.writeMeta(opts.businessId, opts.resource, cachedAt);
-      return { data, source: "server", cachedAt };
+      return {
+        data: opts.projectStored ? stored.map(opts.toRemote) : data,
+        source: "server",
+        cachedAt,
+      };
     } catch (e) {
       this.rethrowUnlessNetwork(e);
       const meta = await this.db.cacheMeta.get(
@@ -276,13 +287,16 @@ export class CatalogReadCache {
     toRemote: (row: TLocal) => TRemote;
     put: (row: TLocal) => Promise<void>;
     get: (businessId: string, id: string) => Promise<TLocal | undefined>;
+    projectStored?: (row: TLocal) => Promise<TLocal>;
   }): Promise<TRemote> {
     assertUuid(opts.businessId, "businessId");
     assertUuid(opts.id, "id");
     try {
       const row = await opts.fetch();
-      await opts.put(opts.toLocal(row, opts.businessId, Date.now()));
-      return row;
+      const local = opts.toLocal(row, opts.businessId, Date.now());
+      const stored = opts.projectStored ? await opts.projectStored(local) : local;
+      await opts.put(stored);
+      return opts.projectStored ? opts.toRemote(stored) : row;
     } catch (e) {
       this.rethrowUnlessNetwork(e);
       const cached = await opts.get(opts.businessId, opts.id);
@@ -316,6 +330,27 @@ export class CatalogReadCache {
       const requestId = (row as { requestId?: unknown }).requestId;
       return typeof requestId === "string" && pendingRequestIds.has(requestId);
     });
+  }
+
+  /** Confirmed debt plus still-active intents. Not applied to pending creates. */
+  private async projectCustomerDebts(
+    businessId: string,
+    rows: LocalCustomer[],
+  ): Promise<LocalCustomer[]> {
+    const projected: LocalCustomer[] = [];
+    for (const row of rows) {
+      projected.push(await this.projectCustomerDebt(businessId, row));
+    }
+    return projected;
+  }
+
+  private async projectCustomerDebt(
+    businessId: string,
+    row: LocalCustomer,
+  ): Promise<LocalCustomer> {
+    const pending = await pendingDebtAdjustment(businessId, row.id);
+    if (pending === 0) return row;
+    return { ...row, debt: addCop(row.debt, pending) };
   }
 
   private rethrowUnlessNetwork(e: unknown): void {
