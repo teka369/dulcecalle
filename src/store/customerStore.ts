@@ -21,6 +21,7 @@ import {
   patchCustomerWithOfflineFallback,
 } from "@/data/pwa/offline-catalog";
 import { getStatementWithOfflineFallback } from "@/data/pwa/offline-statement";
+import { createInitialDebtWithOfflineFallback } from "@/data/pwa/offline-initial-debt";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import type { DebtStatement } from "@/domain/debt/statement";
 
@@ -190,14 +191,18 @@ export const customerStore = {
 
     const amount = parseInitialDebtAmount(input.amountRaw);
     try {
-      const row = await getPwaApi().customers.initialDebt(
-        input.customerId,
-        { amount },
+      const result = await createInitialDebtWithOfflineFallback(
+        { customerId: input.customerId, amount },
         input.requestId ?? crypto.randomUUID(),
       );
       await this.refresh();
-      setState({ lastToast: INITIAL_DEBT_TOAST });
-      return row.id;
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Deuda anterior guardada sin conexión"
+            : INITIAL_DEBT_TOAST,
+      });
+      return result.mode === "offline" ? result.debtId : result.debt.id;
     } catch (e) {
       fail(e);
     }
