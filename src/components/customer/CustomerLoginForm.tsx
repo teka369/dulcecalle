@@ -5,6 +5,9 @@ import { useState } from "react";
 import { ApiError } from "@/data/errors";
 import { getCustomerApi } from "@/data/http/customer-api";
 import { validateCustomerLoginInput } from "@/domain/customer-code";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 
 export function CustomerLoginForm({ showBack = false }: { showBack?: boolean }) {
   const router = useRouter();
@@ -41,53 +44,55 @@ export function CustomerLoginForm({ showBack = false }: { showBack?: boolean }) 
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="text-[22px] font-semibold">Consulta como cliente</h1>
-        <p className="mt-1 text-sm text-ink/60">
+        <p className="mt-1 text-sm text-ink-muted">
           Consulta tu saldo, compras y abonos.
         </p>
       </div>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+      <Card>
         <label className="text-sm font-medium" htmlFor="codigo-cliente">
           Código de cliente
         </label>
-        <input
+        <Input
           id="codigo-cliente"
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           autoComplete="off"
           autoFocus
         />
         <label className="mt-4 block text-sm font-medium" htmlFor="nombre-cliente">
           Nombre
         </label>
-        <input
+        <Input
           id="nombre-cliente"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           autoComplete="name"
         />
         {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-      </section>
+      </Card>
 
-      <button
+      <Button
         type="button"
+        variant="primary"
         disabled={busy}
         onClick={() => void onSubmit()}
-        className="min-h-12 w-full rounded-[14px] bg-cta px-4 text-sm font-semibold text-white disabled:opacity-40"
+        className="min-h-12 w-full"
       >
         {busy ? "Consultando…" : "Consultar saldo"}
-      </button>
+      </Button>
 
       {showBack && (
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={() => router.push("/login")}
-          className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
+          className="w-full"
         >
           ← Volver
-        </button>
+        </Button>
       )}
     </div>
   );

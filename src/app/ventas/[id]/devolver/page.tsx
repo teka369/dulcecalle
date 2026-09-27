@@ -14,6 +14,10 @@ import type { SaleDetailResult } from "@/data/pwa/offline-sales";
 import { getPwaAuthSession } from "@/data/http/session";
 import { useProductImageMap } from "@/data/pwa/product-image-map";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function DevolverVentaPage() {
   const params = useParams();
@@ -110,16 +114,20 @@ export default function DevolverVentaPage() {
   }
 
   if (!ready) {
-    return <p className="text-sm text-ink/60">Cargando…</p>;
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
+    );
   }
 
   if (!data) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/ventas" className="text-sm text-ink/70">
+        <Link href="/ventas" className="text-sm text-ink-muted">
           ← Ventas
         </Link>
-        <p className="text-sm text-ink/60">No encontramos esa venta.</p>
+        <p className="text-sm text-ink-muted">No encontramos esa venta.</p>
       </div>
     );
   }
@@ -131,7 +139,7 @@ export default function DevolverVentaPage() {
       <header className="flex items-center gap-2">
         <Link
           href={`/ventas/${data.sale.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -139,20 +147,20 @@ export default function DevolverVentaPage() {
         <h1 className="text-[22px] font-semibold">Devolver</h1>
       </header>
 
-      <p className="text-sm text-ink/70">
+      <p className="text-sm text-ink-muted">
         Los productos vuelven al inventario. Si la venta fue pagada, sale plata
         de caja o Nequi. Si fue fiada, baja la deuda. La venta original no se
         borra.
       </p>
 
       {data.returnPending && (
-        <p className="text-xs text-ink/60">
+        <p className="text-xs text-ink-muted">
           Hay una devolución pendiente. El inventario todavía no cambió.
         </p>
       )}
 
       {remainingLines.length === 0 ? (
-        <p className="text-sm text-ink/60">
+        <p className="text-sm text-ink-muted">
           {data.returnPending
             ? "La devolución está pendiente de confirmación."
             : "Esta venta ya se devolvió."}
@@ -161,10 +169,7 @@ export default function DevolverVentaPage() {
         <>
           <section className="flex flex-col gap-3">
             {remainingLines.map((l) => (
-              <div
-                key={l.id}
-                className="rounded-2xl border border-ink/[0.08] bg-surface p-4"
-              >
+              <Card key={l.id}>
                 <div className="flex items-start gap-2">
                   <ProductThumbnail
                     secureUrl={imageMap.get(l.productId) ?? null}
@@ -173,7 +178,7 @@ export default function DevolverVentaPage() {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{l.productName}</p>
-                    <p className="text-sm text-ink/60">
+                    <p className="text-sm text-ink-muted">
                       Quedan {l.remaining} · {formatCop(l.unitPrice)} c/u
                     </p>
                   </div>
@@ -184,7 +189,7 @@ export default function DevolverVentaPage() {
                 >
                   Cantidad a devolver
                 </label>
-                <input
+                <Input
                   id={`qty-${l.id}`}
                   inputMode="numeric"
                   value={qtyByLine[l.id] ?? ""}
@@ -194,23 +199,19 @@ export default function DevolverVentaPage() {
                       [l.id]: e.target.value.replace(/\D/g, ""),
                     }))
                   }
-                  className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+                  className="mt-2"
                   placeholder="0"
                 />
-              </div>
+              </Card>
             ))}
           </section>
 
-          <button
-            type="button"
-            onClick={fillAll}
-            className="min-h-11 rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
-          >
+          <Button type="button" variant="secondary" onClick={fillAll} className="w-full">
             Devolver todo
-          </button>
+          </Button>
 
           {previewValue > 0 && (
-            <p className="text-sm text-ink/70">
+            <p className="text-sm text-ink-muted">
               Se ajustan {formatCop(previewValue)}. El inventario sube cuando el servidor confirme la devolución.
             </p>
           )}
@@ -220,16 +221,17 @@ export default function DevolverVentaPage() {
       )}
 
       {remainingLines.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
           <div className="mx-auto max-w-lg">
-            <button
+            <Button
               type="button"
+              variant="primary"
               disabled={!canSubmit || busy}
               onClick={() => void confirm()}
-              className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+              className="w-full"
             >
               Confirmar devolución
-            </button>
+            </Button>
           </div>
         </div>
       )}

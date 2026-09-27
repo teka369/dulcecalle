@@ -6,6 +6,9 @@ import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
 import { useInventory } from "@/store/inventoryStore";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 
 export default function AgregarProveedorPage() {
   const router = useRouter();
@@ -40,7 +43,7 @@ export default function AgregarProveedorPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/inventario"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -48,52 +51,53 @@ export default function AgregarProveedorPage() {
         <h1 className="text-[22px] font-semibold">Agregar proveedor</h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+      <Card>
         <label className="text-sm font-medium" htmlFor="nombre">
           Nombre
         </label>
-        <input
+        <Input
           id="nombre"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           autoFocus
         />
 
         <label className="mt-4 block text-sm font-medium" htmlFor="tel">
           Teléfono
         </label>
-        <input
+        <Input
           id="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           inputMode="tel"
         />
 
         <label className="mt-4 block text-sm font-medium" htmlFor="notas">
           Notas
         </label>
-        <input
+        <Input
           id="notas"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
         />
 
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      </section>
+      </Card>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={busy}
             onClick={() => void onSave()}
-            className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+            className="w-full"
           >
             Guardar proveedor
-          </button>
+          </Button>
         </div>
       </div>
 

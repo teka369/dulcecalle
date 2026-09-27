@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useSync } from "@/store/syncStore";
 import { SyncOperationList, formatDateTime, useSyncItems } from "@/components/shell/sync-items";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Empty } from "@/components/ui/Empty";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function SincronizacionPage() {
   const { online, counts, flushing, lastDoneAt, syncNow } = useSync();
@@ -13,7 +17,7 @@ export default function SincronizacionPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg shadow-[var(--shadow-sm)]"
           aria-label="Volver"
         >
           ←
@@ -22,16 +26,16 @@ export default function SincronizacionPage() {
       </header>
 
       {!online && (
-        <div className="rounded-2xl border border-ink/10 bg-surface px-4 py-3 text-sm">
+        <Card className="px-4 py-3 text-sm">
           <p className="font-semibold">Sin conexión</p>
-          <p className="mt-1 text-ink/60">
+          <p className="mt-1 text-ink-muted">
             Las operaciones nuevas se guardarán en este dispositivo y se
             sincronizarán automáticamente al volver internet.
           </p>
-        </div>
+        </Card>
       )}
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4 text-sm">
+      <Card className="text-sm">
         <p>
           ○ {counts.pending + counts.active} pendiente{(counts.pending + counts.active) === 1 ? "" : "s"}
         </p>
@@ -41,37 +45,33 @@ export default function SincronizacionPage() {
             : "! 0 necesitan atención"}
         </p>
         {lastDoneAt && (
-          <p className="mt-2 text-xs text-ink/55">
+          <p className="mt-2 text-xs text-ink-muted">
             Última sincronización: {formatDateTime(lastDoneAt)}
           </p>
         )}
-      </section>
+      </Card>
 
       {online && counts.total > 0 && (
-        <button
-          type="button"
-          onClick={() => void syncNow()}
-          className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white"
-        >
+        <Button type="button" variant="primary" onClick={() => void syncNow()} className="w-full">
           Sincronizar ahora
-        </button>
+        </Button>
       )}
 
       {loading ? (
-        <p className="text-sm text-ink/60">Cargando…</p>
+        <div className="flex justify-center py-10">
+          <Spinner />
+        </div>
       ) : items.length === 0 ? (
-        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
-          <p className="text-sm font-semibold">Todo al día</p>
-          <p className="mt-1 text-sm text-ink/60">
-            No hay operaciones pendientes ni errores de sincronización.
-          </p>
-        </section>
+        <Empty
+          title="Todo al día"
+          description="No hay operaciones pendientes ni errores de sincronización."
+        />
       ) : (
         <SyncOperationList items={items} flushing={flushing != null} />
       )}
 
       {items.length > 0 && (
-        <p className="text-xs leading-relaxed text-ink/60">
+        <p className="text-xs leading-relaxed text-ink-muted">
           Descartar elimina el pendiente de este dispositivo. No deshace nada
           que ya esté guardado en el servidor.
         </p>

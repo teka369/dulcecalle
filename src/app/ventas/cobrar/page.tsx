@@ -333,23 +333,22 @@ function ModeButton({
   color: "ok" | "primary" | "accent";
   onClick: () => void;
 }) {
-  const activeBg =
+  const activeClass =
     color === "ok"
-      ? "bg-ok text-white"
+      ? "border-ok bg-ok text-white hover:opacity-[0.92]"
       : color === "primary"
-        ? "bg-primary text-ink"
-        : "bg-accent text-white";
+        ? "border-primary bg-primary text-ink hover:opacity-[0.92]"
+        : "border-accent bg-accent text-white hover:opacity-[0.92]";
 
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
       onClick={onClick}
-      className={`min-h-11 rounded-[var(--r-md)] border px-2 text-sm font-semibold ${
-        active ? activeBg : "border-border bg-surface text-ink-muted"
-      }`}
+      className={`w-full px-2 ${active ? activeClass : "text-ink-muted"}`}
     >
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -363,17 +362,18 @@ function MethodButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
       onClick={onClick}
-      className={`min-h-11 rounded-[var(--r-md)] border px-2 text-sm font-semibold ${
+      className={`w-full px-2 ${
         active
-          ? "border-primary bg-primary text-ink"
-          : "border-border bg-surface text-ink-muted"
+          ? "border-primary bg-primary text-ink hover:opacity-[0.92]"
+          : "text-ink-muted"
       }`}
     >
       {label}
-    </button>
+    </Button>
   );
 }
 

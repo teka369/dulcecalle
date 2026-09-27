@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { getPwaAuthSession } from "@/data/http/session";
 import { ResetBusinessDataZone } from "@/components/account/ResetBusinessDataZone";
 import { CustomerLoginForm } from "@/components/customer/CustomerLoginForm";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -39,28 +41,24 @@ export default function LoginPage() {
           alt="Dulce Calle"
           width={80}
           height={80}
-          className="h-20 w-20 rounded-2xl object-cover"
+          className="h-20 w-20 rounded-[var(--r-lg)] object-cover"
           priority
         />
         <h1 className="text-[22px] font-semibold">Cuenta</h1>
-        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
-          <p className="text-sm text-ink/70">Sesión en el servidor</p>
+        <Card>
+          <p className="text-sm text-ink-muted">Sesión en el servidor</p>
           <p className="mt-1 text-base font-semibold">
             {session.user?.email ?? "Sesión activa"}
           </p>
           {session.businessId && (
-            <p className="mt-2 text-sm text-ink/60">Negocio seleccionado</p>
+            <p className="mt-2 text-sm text-ink-muted">Negocio seleccionado</p>
           )}
-        </section>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
-        >
+        </Card>
+        <Button type="button" variant="secondary" onClick={onLogout} className="w-full">
           Cerrar sesión
-        </button>
+        </Button>
         <ResetBusinessDataZone />
-        <Link href="/" className="text-center text-sm text-ink/60">
+        <Link href="/" className="text-center text-sm text-ink-muted">
           Volver al inicio
         </Link>
       </div>
@@ -73,21 +71,21 @@ export default function LoginPage() {
         type="button"
         onClick={onLogoTap}
         aria-label="Dulce Calle"
-        className="w-fit rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-cta/50"
+        className="w-fit rounded-[var(--r-lg)] outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <Image
           src="/DulceCalle.png"
           alt="Dulce Calle"
           width={80}
           height={80}
-          className="h-20 w-20 rounded-2xl object-cover"
+          className="h-20 w-20 rounded-[var(--r-lg)] object-cover"
           priority
         />
       </button>
 
       <div>
         <h1 className="text-[22px] font-semibold">Dulce Calle</h1>
-        <p className="mt-1 text-sm text-ink/60">
+        <p className="mt-1 text-sm text-ink-muted">
           Consulta tu saldo y tus movimientos.
         </p>
       </div>

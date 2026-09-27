@@ -15,6 +15,10 @@ import { routeId } from "@/data/pwa/ids";
 import { inventoryStore } from "@/store/inventoryStore";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 
 export function ShrinkForm({
   title,
@@ -102,16 +106,20 @@ export function ShrinkForm({
   }
 
   if (!ready) {
-    return <p className="text-sm text-ink/60">Cargando…</p>;
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
+    );
   }
 
   if (!product) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/inventario" className="text-sm text-ink/70">
+        <Link href="/inventario" className="text-sm text-ink-muted">
           ← Inventario
         </Link>
-        <p className="text-sm text-ink/60">No encontramos ese producto.</p>
+        <p className="text-sm text-ink-muted">No encontramos ese producto.</p>
       </div>
     );
   }
@@ -121,7 +129,7 @@ export function ShrinkForm({
       <header className="flex items-center gap-2">
         <Link
           href={`/inventario/${product.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -129,7 +137,7 @@ export function ShrinkForm({
         <h1 className="text-[22px] font-semibold">{title}</h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+      <Card>
         <div className="flex items-start gap-3">
           <ProductThumbnail
             secureUrl={primaryImageUrl(product.images)}
@@ -137,23 +145,23 @@ export function ShrinkForm({
             size="md"
           />
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
               Producto
             </p>
             <p className="mt-1 font-semibold">{product.name}</p>
-            <p className="mt-1 text-sm text-ink/60">Stock {product.stock}</p>
+            <p className="mt-1 text-sm text-ink-muted">Stock {product.stock}</p>
           </div>
         </div>
 
         <label className="mt-4 block text-sm font-medium" htmlFor="cantidad">
           Cantidad
         </label>
-        <input
+        <Input
           id="cantidad"
           inputMode="numeric"
           value={qtyRaw}
           onChange={(e) => setQtyRaw(e.target.value.replace(/\D/g, ""))}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           placeholder="0"
         />
 
@@ -162,28 +170,29 @@ export function ShrinkForm({
             <label className="mt-4 block text-sm font-medium" htmlFor="nota">
               {requireMotivo ? "Motivo" : "Nota"}
             </label>
-            <input
+            <Input
               id="nota"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+              className="mt-2"
             />
           </>
         )}
 
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      </section>
+      </Card>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={!valid || busy}
             onClick={() => void confirm()}
-            className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+            className="w-full"
           >
             {cta}
-          </button>
+          </Button>
         </div>
       </div>
 

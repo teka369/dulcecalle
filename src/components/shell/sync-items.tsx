@@ -14,6 +14,8 @@ import {
   type EnrichedTrayItem,
 } from "@/data/pwa/sync-tray";
 import { syncStore } from "@/store/syncStore";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 
 export function formatDateTime(at: number): string {
   const d = new Date(at);
@@ -76,33 +78,17 @@ export function useSyncItems() {
 
 function StatusChip({ item, flushing }: { item: EnrichedTrayItem; flushing: boolean }) {
   if (item.status === "failed" && item.permanent) {
-    return (
-      <span className="shrink-0 rounded-full bg-danger/10 px-2 py-1 text-xs font-semibold text-danger">
-        ! Necesita atención
-      </span>
-    );
+    return <Badge tone="danger" className="shrink-0">! Necesita atención</Badge>;
   }
   if (item.status === "failed") {
-    return (
-      <span className="shrink-0 rounded-full bg-danger/10 px-2 py-1 text-xs font-semibold text-danger">
-        ! Reintentando
-      </span>
-    );
+    return <Badge tone="danger" className="shrink-0">! Reintentando</Badge>;
   }
   // in_flight rows with no active flush (e.g. after a reload while
   // offline) resume on the next cycle; never show them as stuck.
   if (item.status === "in_flight" && flushing) {
-    return (
-      <span className="shrink-0 rounded-full bg-primary/20 px-2 py-1 text-xs font-semibold text-ink">
-        ↻ Sincronizando
-      </span>
-    );
+    return <Badge tone="warning" className="shrink-0">↻ Sincronizando</Badge>;
   }
-  return (
-    <span className="shrink-0 rounded-full bg-ink/10 px-2 py-1 text-xs font-semibold text-ink/70">
-      ○ Pendiente
-    </span>
-  );
+  return <Badge tone="info" className="shrink-0">○ Pendiente</Badge>;
 }
 
 export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; flushing: boolean }) {
@@ -146,7 +132,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
   }
 
   return (
-    <li className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+    <li className="rounded-[var(--r-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)]">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -158,10 +144,10 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
             {describeOutboxOperation(item.entity, item.operation)}
           </span>
           {detail && (
-            <span className="mt-0.5 block truncate text-xs text-ink/60">{detail}</span>
+            <span className="mt-0.5 block truncate text-xs text-ink-muted">{detail}</span>
           )}
           {item.blockedBy && (
-            <span className="mt-1 block text-xs font-medium text-ink/70">
+            <span className="mt-1 block text-xs font-medium text-ink-muted">
               ⏳ {item.blockedBy}
             </span>
           )}
@@ -177,7 +163,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
       )}
 
       {expanded && (
-        <div className="mt-3 space-y-1 border-t border-ink/10 pt-3 text-xs text-ink/60">
+        <div className="mt-3 space-y-1 border-t border-border pt-3 text-xs text-ink-muted">
           <p>Estado: {describeTrayStatus(item.status)}</p>
           <p>Creada: {formatDateTime(item.localCreatedAt)}</p>
           <p>Intentos: {item.attempts}</p>
@@ -196,49 +182,29 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
 
       {item.status === "failed" && !confirming && (
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void retry()}
-            className="min-h-11 rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
-          >
+          <Button type="button" variant="primary" disabled={busy} onClick={() => void retry()} className="w-full">
             Reintentar
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setConfirming(true)}
-            className="min-h-11 rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold text-ink/70 disabled:opacity-40"
-          >
+          </Button>
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(true)} className="w-full text-ink-muted">
             Descartar
-          </button>
+          </Button>
         </div>
       )}
 
       {item.status === "failed" && confirming && (
-        <div className="mt-3 rounded-2xl border border-danger/20 bg-danger/5 p-3">
+        <div className="mt-3 rounded-[var(--r-lg)] border border-danger/20 bg-danger/5 p-3">
           <p className="text-sm font-semibold">¿Descartar esta operación?</p>
-          <p className="mt-1 text-xs leading-relaxed text-ink/70">
+          <p className="mt-1 text-xs leading-relaxed text-ink-muted">
             Se eliminará la intención pendiente de este dispositivo. Esto no
             revierte una operación que ya hubiera llegado al servidor.
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setConfirming(false)}
-              className="min-h-11 rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold disabled:opacity-40"
-            >
+            <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(false)} className="w-full">
               Cancelar
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void discard()}
-              className="min-h-11 rounded-[14px] bg-danger text-sm font-semibold text-white disabled:opacity-40"
-            >
+            </Button>
+            <Button type="button" variant="danger" disabled={busy} onClick={() => void discard()} className="w-full">
               Descartar
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -251,7 +217,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
 export function SyncOperationList({ items, flushing }: { items: EnrichedTrayItem[]; flushing: boolean }) {
   if (items.length === 0) {
     return (
-      <p className="text-sm text-ink/60">No hay operaciones pendientes.</p>
+      <p className="text-sm text-ink-muted">No hay operaciones pendientes.</p>
     );
   }
   return (

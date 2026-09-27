@@ -15,6 +15,10 @@ import type { RemoteCustomer } from "@/data/http/mappers";
 import { routeId } from "@/data/pwa/ids";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { customerStore } from "@/store/customerStore";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function RegistrarAbonoPage() {
   const params = useParams();
@@ -109,16 +113,20 @@ export default function RegistrarAbonoPage() {
   }
 
   if (!ready) {
-    return <p className="text-sm text-ink/60">Cargando…</p>;
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
+    );
   }
 
   if (!customer) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/clientes" className="text-sm text-ink/70">
+        <Link href="/clientes" className="text-sm text-ink-muted">
           ← Clientes
         </Link>
-        <p className="text-sm text-ink/60">No encontramos ese cliente.</p>
+        <p className="text-sm text-ink-muted">No encontramos ese cliente.</p>
       </div>
     );
   }
@@ -128,7 +136,7 @@ export default function RegistrarAbonoPage() {
       <header className="flex items-center gap-2">
         <Link
           href={`/clientes/${customer.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -136,13 +144,13 @@ export default function RegistrarAbonoPage() {
         <h1 className="text-[22px] font-semibold">Registrar abono</h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+      <Card>
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
           Cliente
         </p>
         <p className="mt-1 text-base font-semibold">{customer.name}</p>
 
-        <p className="mt-4 text-xs font-medium uppercase tracking-wide text-ink/50">
+        <p className="mt-4 text-xs font-medium uppercase tracking-wide text-ink-muted">
           Saldo
         </p>
         <p className="mt-1 text-xl font-semibold text-accent">
@@ -152,12 +160,12 @@ export default function RegistrarAbonoPage() {
         <label className="mt-4 block text-sm font-medium" htmlFor="abono">
           Abono
         </label>
-        <input
+        <Input
           id="abono"
           inputMode="numeric"
           value={amountRaw}
           onChange={(e) => setAmountRaw(e.target.value.replace(/\D/g, ""))}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           placeholder="0"
         />
 
@@ -176,29 +184,30 @@ export default function RegistrarAbonoPage() {
         </div>
 
         {helper && (
-          <p className="mt-3 text-sm text-ink/70">{helper}</p>
+          <p className="mt-3 text-sm text-ink-muted">{helper}</p>
         )}
 
         {pendingSync && (
-          <p className="mt-3 text-sm text-ink/70">
+          <p className="mt-3 text-sm text-ink-muted">
             Este cliente aún se está sincronizando. Podrás registrar el abono
             en cuanto termine la sincronización.
           </p>
         )}
 
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      </section>
+      </Card>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={!canSubmit || busy || pendingSync}
             onClick={() => void confirm()}
-            className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+            className="w-full"
           >
             Confirmar abono
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -221,16 +230,17 @@ function MethodButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
       onClick={onClick}
-      className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
+      className={`w-full px-2 ${
         active
-          ? "border-primary bg-primary text-ink"
-          : "border-ink/10 bg-surface text-ink/70"
+          ? "border-primary bg-primary text-ink hover:opacity-[0.92]"
+          : "text-ink-muted"
       }`}
     >
       {label}
-    </button>
+    </Button>
   );
 }

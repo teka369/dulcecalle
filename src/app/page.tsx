@@ -8,6 +8,7 @@ import {
 } from "@/components/dashboard/InicioDashboard";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import { loadDashboardWithOfflineFallback } from "@/data/pwa/offline-snapshots";
+import { Button } from "@/components/ui/Button";
 
 export default function InicioPage() {
   const pathname = usePathname();
@@ -48,16 +49,17 @@ export default function InicioPage() {
           <p className="text-base font-medium">
             No se pudo consultar el servidor.
           </p>
-          <p className="text-sm text-ink/60">
+          <p className="text-sm text-ink-muted">
             El inicio estará disponible cuando haya conexión.
           </p>
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={() => void refresh().catch(() => setFailed(true))}
-            className="inline-flex min-h-11 w-fit items-center rounded-xl bg-cta px-4 text-sm font-semibold text-white"
+            className="w-fit"
           >
             Reintentar
-          </button>
+          </Button>
         </div>
       );
     }
@@ -67,7 +69,7 @@ export default function InicioPage() {
   return (
     <>
       {fromCache && capturedAt != null && (
-        <p className="mb-3 text-xs text-ink/60">
+        <p className="mb-3 text-xs text-ink-muted">
           Sin conexión · última actualización: {new Date(capturedAt).toLocaleString()}.
         </p>
       )}

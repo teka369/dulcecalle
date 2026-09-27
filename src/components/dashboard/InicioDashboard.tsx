@@ -3,6 +3,8 @@ import { formatCop } from "@/domain/money";
 import { formatBogotaDateTime } from "@/domain/debt/statement";
 import { CASH_COPY } from "@/domain/cash";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
 
 function MetricCard({
   label,
@@ -26,8 +28,8 @@ function MetricCard({
           ? "text-danger"
           : "text-ink";
   const body = (
-    <article className="rounded-2xl border border-ink/[0.08] bg-surface p-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-ink/50">
+    <Card className="p-3">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
         {label}
       </p>
       <p
@@ -35,8 +37,8 @@ function MetricCard({
       >
         {value}
       </p>
-      <p className="mt-0.5 text-xs leading-snug text-ink/55">{caption}</p>
-    </article>
+      <p className="mt-0.5 text-xs leading-snug text-ink-muted">{caption}</p>
+    </Card>
   );
   if (href) {
     return (
@@ -103,8 +105,8 @@ export function InicioDashboard({
     <div className="flex flex-col gap-4">
       <header>
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-sm text-ink/60">{snap.greeting}</p>
-          <p className="min-w-0 text-right text-xs leading-tight text-ink/45">
+          <p className="text-sm text-ink-muted">{snap.greeting}</p>
+          <p className="min-w-0 text-right text-xs leading-tight text-ink-muted">
             {snap.dateLabel}
           </p>
         </div>
@@ -112,7 +114,7 @@ export function InicioDashboard({
           Resumen de hoy
         </h1>
         {snap.businessLabel ? (
-          <p className="text-xs text-ink/45">{snap.businessLabel}</p>
+          <p className="text-xs text-ink-muted">{snap.businessLabel}</p>
         ) : null}
       </header>
 
@@ -151,10 +153,10 @@ export function InicioDashboard({
             <Link
               key={action.href}
               href={action.href}
-              className={`flex min-h-11 items-center justify-center rounded-[14px] px-3 text-center text-sm font-semibold ${
+              className={`flex min-h-11 items-center justify-center rounded-[var(--r-md)] px-3 text-center text-sm font-semibold ${
                 action.primary
-                  ? "bg-cta text-white"
-                  : "border border-ink/10 bg-surface"
+                  ? "bg-cta text-cta-fg"
+                  : "border border-border bg-surface text-ink"
               }`}
             >
               {action.label}
@@ -165,13 +167,13 @@ export function InicioDashboard({
 
       <section className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold text-ink/70">Fiados pendientes</h2>
+          <h2 className="text-sm font-semibold text-ink-muted">Fiados pendientes</h2>
           <Link href="/clientes" className="text-xs font-semibold text-cta underline underline-offset-2">
             Ver todos
           </Link>
         </div>
         {snap.debtorCount === 0 ? (
-          <p className="rounded-2xl border border-ink/[0.08] bg-surface px-3 py-2.5 text-sm text-ink/60">
+          <p className="rounded-[var(--r-lg)] border border-border bg-surface px-3 py-2.5 text-sm text-ink-muted shadow-[var(--shadow-sm)]">
             Nadie debe…
           </p>
         ) : (
@@ -180,16 +182,14 @@ export function InicioDashboard({
               <li key={c.id}>
                 <Link
                   href={`/clientes/${c.id}`}
-                  className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface px-3 py-2.5"
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--r-lg)] border border-border bg-surface px-3 py-2.5 shadow-[var(--shadow-sm)]"
                 >
                   <span className="min-w-0 truncate font-medium">{c.name}</span>
-                  <span className="flex shrink-0 flex-col items-end">
+                  <span className="flex shrink-0 flex-col items-end gap-1">
                     <span className="text-sm font-semibold tabular-nums text-accent">
                       {formatCop(c.debt)}
                     </span>
-                    <span className="text-[11px] font-medium text-accent/80">
-                      Pendiente
-                    </span>
+                    <Badge tone="info">Pendiente</Badge>
                   </span>
                 </Link>
               </li>
@@ -200,7 +200,7 @@ export function InicioDashboard({
 
       <section className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold text-ink/70">
+          <h2 className="text-sm font-semibold text-ink-muted">
             Atención en inventario
           </h2>
           <Link
@@ -211,7 +211,7 @@ export function InicioDashboard({
           </Link>
         </div>
         {snap.lowStockCount === 0 ? (
-          <p className="rounded-2xl border border-ink/[0.08] bg-surface px-3 py-2.5 text-sm text-ink/60">
+          <p className="rounded-[var(--r-lg)] border border-border bg-surface px-3 py-2.5 text-sm text-ink-muted shadow-[var(--shadow-sm)]">
             Nada en poco stock
           </p>
         ) : (
@@ -220,7 +220,7 @@ export function InicioDashboard({
               <li key={p.id}>
                 <Link
                   href={`/inventario/${p.id}`}
-                  className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface px-3 py-2.5"
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--r-lg)] border border-border bg-surface px-3 py-2.5 shadow-[var(--shadow-sm)]"
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-medium">{p.name}</span>
@@ -239,9 +239,9 @@ export function InicioDashboard({
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-ink/70">Actividad reciente</h2>
+        <h2 className="text-sm font-semibold text-ink-muted">Actividad reciente</h2>
         {snap.activity.length === 0 ? (
-          <p className="rounded-2xl border border-ink/[0.08] bg-surface px-3 py-2.5 text-sm text-ink/60">
+          <p className="rounded-[var(--r-lg)] border border-border bg-surface px-3 py-2.5 text-sm text-ink-muted shadow-[var(--shadow-sm)]">
             Todavía no hay actividad registrada.
           </p>
         ) : (
@@ -250,16 +250,16 @@ export function InicioDashboard({
               <li key={row.id}>
                 <Link
                   href={row.href ?? "/"}
-                  className="flex min-h-11 items-start justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface px-3 py-2.5"
+                  className="flex min-h-11 items-start justify-between gap-3 rounded-[var(--r-lg)] border border-border bg-surface px-3 py-2.5 shadow-[var(--shadow-sm)]"
                 >
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">{row.title}</span>
                     {row.detail ? (
-                      <span className="block truncate text-xs text-ink/60">
+                      <span className="block truncate text-xs text-ink-muted">
                         {row.detail}
                       </span>
                     ) : null}
-                    <span className="block text-xs text-ink/45">
+                    <span className="block text-xs text-ink-muted">
                       {formatBogotaDateTime(row.at)}
                     </span>
                   </span>
@@ -291,14 +291,14 @@ export function InicioDashboard({
           <button
             type="button"
             onClick={onLoadDemo}
-            className="min-h-11 rounded-[14px] bg-primary px-4 text-sm font-semibold text-ink"
+            className="min-h-11 rounded-[var(--r-md)] bg-primary px-4 text-sm font-semibold text-ink"
           >
             Cargar demo
           </button>
         ) : (
           <Link
             href="/inventario/nuevo"
-            className="flex min-h-11 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
+            className="flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
           >
             Agregar el primer producto
           </Link>
@@ -318,14 +318,14 @@ export function InicioSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-busy="true" aria-label="Cargando">
       <div>
-        <div className="h-4 w-28 rounded bg-ink/10" />
-        <div className="mt-2 h-6 w-40 rounded bg-ink/10" />
+        <div className="h-4 w-28 rounded bg-surface-2" />
+        <div className="mt-2 h-6 w-40 rounded bg-surface-2" />
       </div>
       <div className="grid grid-cols-2 gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="h-[5.25rem] rounded-2xl border border-ink/[0.08] bg-surface"
+            className="h-[5.25rem] rounded-[var(--r-lg)] border border-border bg-surface shadow-[var(--shadow-sm)]"
           />
         ))}
       </div>
@@ -333,7 +333,7 @@ export function InicioSkeleton() {
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={`a-${i}`}
-            className="h-11 rounded-[14px] border border-ink/10 bg-surface"
+            className="h-11 rounded-[var(--r-md)] border border-border bg-surface"
           />
         ))}
       </div>

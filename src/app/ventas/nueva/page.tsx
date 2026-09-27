@@ -11,6 +11,8 @@ import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { listCachedProducts } from "@/data/pwa/catalog";
 import { useCart } from "@/store/cartStore";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 export default function NuevaVentaPage() {
   const router = useRouter();
@@ -96,7 +98,7 @@ export default function NuevaVentaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -104,12 +106,11 @@ export default function NuevaVentaPage() {
         <h1 className="text-[22px] font-semibold">Nueva venta</h1>
       </header>
 
-      <input
+      <Input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Buscar dulce..."
-        className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base outline-none focus:border-primary"
       />
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
@@ -129,7 +130,7 @@ export default function NuevaVentaPage() {
       </div>
 
       {products.length === 0 ? (
-        <p className="text-sm text-ink/60">
+        <p className="text-sm text-ink-muted">
           No hay productos. Súbelos en Inventario.
         </p>
       ) : (
@@ -141,7 +142,7 @@ export default function NuevaVentaPage() {
             return (
               <article
                 key={p.id}
-                className="flex flex-col rounded-2xl border border-ink/[0.08] bg-surface p-3"
+                className="flex flex-col rounded-[var(--r-lg)] border border-border bg-surface p-3 shadow-[var(--shadow-sm)]"
               >
                 <div className="flex items-start gap-2">
                   <ProductThumbnail
@@ -153,41 +154,43 @@ export default function NuevaVentaPage() {
                     {p.name}
                   </p>
                 </div>
-                <label className="mt-1 text-[11px] font-medium uppercase tracking-wide text-ink/45">
+                <label className="mt-1 text-[11px] font-medium uppercase tracking-wide text-ink-muted">
                   Precio de esta venta
                 </label>
-                <input
+                <Input
                   inputMode="numeric"
                   aria-label={`Precio de ${p.name}`}
                   value={String(price)}
                   onChange={(e) => onPriceChange(p, e.target.value)}
-                  className="mt-1 min-h-11 w-full rounded-[14px] border border-ink/10 px-2 text-sm font-semibold outline-none focus:border-primary"
+                  className="mt-1 px-2 text-sm font-semibold"
                 />
                 {custom && (
-                  <p className="mt-1 text-[11px] text-ink/50">
+                  <p className="mt-1 text-[11px] text-ink-muted">
                     Normal {formatCop(p.price)}
                   </p>
                 )}
                 <div className="mt-auto flex items-center justify-between pt-3">
-                  <button
+                  <Button
                     type="button"
-                    className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] bg-bg text-lg font-semibold"
+                    variant="icon"
+                    className="bg-bg text-lg font-semibold"
                     onClick={() => bump(p, -1)}
                     aria-label="Menos"
                   >
                     −
-                  </button>
+                  </Button>
                   <span className="min-w-6 text-center text-sm font-semibold">
                     {qty}
                   </span>
-                  <button
+                  <Button
                     type="button"
-                    className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] bg-bg text-lg font-semibold"
+                    variant="icon"
+                    className="bg-bg text-lg font-semibold"
                     onClick={() => bump(p, 1)}
                     aria-label="Más"
                   >
                     +
-                  </button>
+                  </Button>
                 </div>
               </article>
             );
@@ -199,19 +202,20 @@ export default function NuevaVentaPage() {
         <p className="text-center text-sm text-danger">{stockError}</p>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
           <p className="text-sm font-medium">
             {totalQty} ítems · {formatCop(total)}
           </p>
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={total === 0}
             onClick={() => navigateOfflineAware(router, "/ventas/cobrar")}
-            className="min-h-11 rounded-[14px] bg-cta px-5 text-sm font-semibold text-white disabled:opacity-40"
+            className="px-5"
           >
             Cobrar
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -232,7 +236,9 @@ function Chip({
       type="button"
       onClick={onClick}
       className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-medium ${
-        active ? "bg-primary text-ink" : "bg-surface text-ink/70 border border-ink/10"
+        active
+          ? "bg-primary text-ink"
+          : "border border-border bg-surface text-ink-muted"
       }`}
     >
       {label}

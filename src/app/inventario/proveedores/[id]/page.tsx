@@ -13,6 +13,10 @@ import {
 import { getPwaAuthSession } from "@/data/http/session";
 import { useProductImageMap } from "@/data/pwa/product-image-map";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function ProveedorFichaPage() {
   const params = useParams();
@@ -49,16 +53,20 @@ export default function ProveedorFichaPage() {
   }, [load]);
 
   if (!ready) {
-    return <p className="text-sm text-ink/60">Cargando…</p>;
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
+    );
   }
 
   if (!supplier) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/inventario" className="text-sm text-ink/70">
+        <Link href="/inventario" className="text-sm text-ink-muted">
           ← Inventario
         </Link>
-        <p className="text-sm text-ink/60">No encontramos ese proveedor.</p>
+        <p className="text-sm text-ink-muted">No encontramos ese proveedor.</p>
       </div>
     );
   }
@@ -68,7 +76,7 @@ export default function ProveedorFichaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/inventario"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -78,10 +86,10 @@ export default function ProveedorFichaPage() {
         </h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+      <Card>
         {supplier.phone && (
           <>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
               Teléfono
             </p>
             <p className="mt-1 text-base">{supplier.phone}</p>
@@ -89,60 +97,62 @@ export default function ProveedorFichaPage() {
         )}
         {supplier.notes && (
           <>
-            <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink/50">
+            <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink-muted">
               Notas
             </p>
             <p className="mt-1 text-base">{supplier.notes}</p>
           </>
         )}
-        <p className="mt-4 text-sm text-ink/60">
+        <p className="mt-4 text-sm text-ink-muted">
           Aquí solo ves surtidos. No manejamos cuentas por pagar.
         </p>
-      </section>
+      </Card>
 
-      <button
+      <Button
         type="button"
+        variant="secondary"
         onClick={() => {
           setEditing((v) => !v);
           setEditError(null);
         }}
-        className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface px-4 text-sm font-semibold"
+        className="w-full"
       >
         {editing ? "Cerrar edición" : "Editar proveedor"}
-      </button>
+      </Button>
 
       {editing && (
-        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+        <Card>
           <label className="text-sm font-medium" htmlFor="editar-nombre-prov">
             Nombre
           </label>
-          <input
+          <Input
             id="editar-nombre-prov"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
           />
           <label className="mt-3 block text-sm font-medium" htmlFor="editar-tel-prov">
             Teléfono (opcional)
           </label>
-          <input
+          <Input
             id="editar-tel-prov"
             value={editPhone}
             onChange={(e) => setEditPhone(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
           />
           <label className="mt-3 block text-sm font-medium" htmlFor="editar-notas-prov">
             Notas (opcional)
           </label>
-          <input
+          <Input
             id="editar-notas-prov"
             value={editNotes}
             onChange={(e) => setEditNotes(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
           />
           {editError && <p className="mt-2 text-sm text-danger">{editError}</p>}
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={editBusy}
             onClick={() => {
               if (editBusy) return;
@@ -170,19 +180,19 @@ export default function ProveedorFichaPage() {
                 })
                 .finally(() => setEditBusy(false));
             }}
-            className="mt-3 min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+            className="mt-3 w-full"
           >
             Guardar cambios
-          </button>
-        </section>
+          </Button>
+        </Card>
       )}
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink/60">
+        <h2 className="mb-2 text-sm font-semibold text-ink-muted">
           Historial de surtidas
         </h2>
         {historial.length === 0 ? (
-          <p className="text-sm text-ink/60">
+          <p className="text-sm text-ink-muted">
             Aún no hay surtidas con este proveedor.
           </p>
         ) : (
@@ -190,7 +200,7 @@ export default function ProveedorFichaPage() {
             {historial.map((h) => (
               <li
                 key={h.moveId}
-                className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
+                className="rounded-[var(--r-lg)] border border-border bg-surface px-4 py-3 text-sm shadow-[var(--shadow-sm)]"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-2">
@@ -203,7 +213,7 @@ export default function ProveedorFichaPage() {
                   </span>
                   <span className="shrink-0 font-semibold">{formatCop(h.totalCost)}</span>
                 </div>
-                <p className="mt-1 text-ink/60">
+                <p className="mt-1 text-ink-muted">
                   ×{h.qty}
                   {h.method ? ` · ${h.method}` : ""} ·{" "}
                   {new Date(h.createdAt).toLocaleDateString("es-CO")}

@@ -6,6 +6,9 @@ import { NetworkError } from "@/data/errors";
 import { HttpRepository } from "@/data/http/repository";
 import { getPwaAuthSession } from "@/data/http/session";
 import { clearLocalBusinessData } from "@/data/pwa/business-reset";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 
 export const RESET_CONFIRM_PHRASE = "ELIMINAR DATOS";
 
@@ -91,20 +94,21 @@ export function ResetBusinessDataZone() {
 
   if (step === "idle") {
     return (
-      <section className="rounded-2xl border border-danger/20 bg-surface p-4">
+      <Card className="border border-danger/20">
         <p className="text-sm font-semibold text-danger">Zona peligrosa</p>
-        <p className="mt-1 text-sm text-ink/70">
+        <p className="mt-1 text-sm text-ink-muted">
           Elimina los datos de prueba del negocio actual. Tu cuenta no será
           eliminada.
         </p>
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={() => setStep("warn")}
-          className="mt-3 min-h-11 w-full rounded-[14px] border border-danger/30 bg-surface text-sm font-semibold text-danger"
+          className="mt-3 w-full border-danger/30 text-danger"
         >
           Eliminar datos del negocio
-        </button>
-      </section>
+        </Button>
+      </Card>
     );
   }
 
@@ -115,18 +119,18 @@ export function ResetBusinessDataZone() {
       aria-modal="true"
       aria-labelledby="reset-title"
     >
-      <div className="w-full max-w-sm rounded-[28px] border border-ink/10 bg-surface p-5 shadow-2xl">
+      <div className="w-full max-w-sm rounded-[var(--r-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-lg)]">
         {step === "warn" && (
           <>
             <h2 id="reset-title" className="text-base font-semibold">
               Eliminar datos del negocio
             </h2>
-            <p className="mt-1 text-sm leading-snug text-ink/70">
+            <p className="mt-1 text-sm leading-snug text-ink-muted">
               Esta acción eliminará los datos y operaciones del negocio
               actual.
             </p>
             <p className="mt-3 text-sm font-medium">Se eliminarán:</p>
-            <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto text-sm text-ink/70">
+            <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto text-sm text-ink-muted">
               {entityList().map((line) => (
                 <li key={line}>{line}</li>
               ))}
@@ -138,20 +142,12 @@ export function ResetBusinessDataZone() {
               Esta acción no se puede deshacer.
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={cancel}
-                className="min-h-11 rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
-              >
+              <Button type="button" variant="secondary" onClick={cancel} className="w-full">
                 Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep("confirm")}
-                className="min-h-11 rounded-[14px] bg-danger text-sm font-semibold text-white"
-              >
+              </Button>
+              <Button type="button" variant="danger" onClick={() => setStep("confirm")} className="w-full">
                 Continuar
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -161,40 +157,36 @@ export function ResetBusinessDataZone() {
             <h2 id="reset-title" className="text-base font-semibold">
               Confirmación final
             </h2>
-            <p className="mt-1 text-sm leading-snug text-ink/70">
+            <p className="mt-1 text-sm leading-snug text-ink-muted">
               Para continuar escribe exactamente:
             </p>
-            <p className="mt-2 rounded-[14px] bg-ink/5 px-3 py-2 text-center text-sm font-bold tracking-wide">
+            <p className="mt-2 rounded-[var(--r-md)] bg-surface-2 px-3 py-2 text-center text-sm font-bold tracking-wide">
               {RESET_CONFIRM_PHRASE}
             </p>
             <label className="mt-3 block text-sm font-medium" htmlFor="reset-phrase">
               Frase de confirmación
             </label>
-            <input
+            <Input
               id="reset-phrase"
               value={phrase}
               onChange={(e) => setPhrase(e.target.value)}
               placeholder={RESET_CONFIRM_PHRASE}
               autoComplete="off"
-              className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-danger"
+              className="mt-2 focus-visible:ring-danger"
             />
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={cancel}
-                disabled={busy}
-                className="min-h-11 rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold disabled:opacity-40"
-              >
+              <Button type="button" variant="secondary" onClick={cancel} disabled={busy} className="w-full">
                 Cancelar
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="danger"
                 onClick={() => void execute()}
                 disabled={busy || phrase.trim() !== RESET_CONFIRM_PHRASE}
-                className="min-h-11 rounded-[14px] bg-danger text-sm font-semibold text-white disabled:opacity-40"
+                className="w-full"
               >
                 Eliminar definitivamente
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -204,11 +196,11 @@ export function ResetBusinessDataZone() {
             <h2 id="reset-title" className="text-base font-semibold">
               Eliminando datos…
             </h2>
-            <p className="mt-1 text-sm text-ink/60">
+            <p className="mt-1 text-sm text-ink-muted">
               Borrando datos del negocio en el servidor y en este
               dispositivo. No cierres la aplicación.
             </p>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-ink/10">
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-2">
               <div className="h-full w-1/2 animate-pulse rounded-full bg-danger" />
             </div>
           </>
@@ -219,12 +211,12 @@ export function ResetBusinessDataZone() {
             <h2 id="reset-title" className="text-base font-semibold">
               ✓ Datos eliminados
             </h2>
-            <p className="mt-1 text-sm leading-snug text-ink/70">
+            <p className="mt-1 text-sm leading-snug text-ink-muted">
               Los datos de prueba del negocio fueron eliminados
               correctamente. Tu cuenta y acceso siguen intactos.
             </p>
             {deleted && (
-              <ul className="mt-3 max-h-40 space-y-0.5 overflow-y-auto text-xs text-ink/60">
+              <ul className="mt-3 max-h-40 space-y-0.5 overflow-y-auto text-xs text-ink-muted">
                 {Object.entries(deleted).map(([key, count]) => (
                   <li key={key}>
                     ✓ {RESET_ENTITY_LABELS[key] ?? key}: {count}
@@ -232,13 +224,14 @@ export function ResetBusinessDataZone() {
                 ))}
               </ul>
             )}
-            <button
+            <Button
               type="button"
+              variant="primary"
               onClick={() => window.location.replace("/")}
-              className="mt-4 min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white"
+              className="mt-4 w-full"
             >
               Volver al inicio
-            </button>
+            </Button>
           </>
         )}
 
@@ -247,29 +240,21 @@ export function ResetBusinessDataZone() {
             <h2 id="reset-title" className="text-base font-semibold">
               No se pudieron eliminar los datos
             </h2>
-            <p className="mt-1 text-sm leading-snug text-ink/70">
+            <p className="mt-1 text-sm leading-snug text-ink-muted">
               {error ?? "Ocurrió un error inesperado."}
             </p>
-            <p className="mt-2 text-xs leading-relaxed text-ink/60">
+            <p className="mt-2 text-xs leading-relaxed text-ink-muted">
               {serverDone
                 ? "El servidor ya quedó limpio, pero este dispositivo no terminó de actualizarse. Vuelve a intentarlo con conexión estable."
                 : "El servidor revierte la operación completa si algo falla a la mitad. No se aplicaron cambios. Vuelve a intentarlo con conexión estable."}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={cancel}
-                className="min-h-11 rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
-              >
+              <Button type="button" variant="secondary" onClick={cancel} className="w-full">
                 Cerrar
-              </button>
-              <button
-                type="button"
-                onClick={() => void execute()}
-                className="mt-0 min-h-11 rounded-[14px] bg-cta text-sm font-semibold text-white"
-              >
+              </Button>
+              <Button type="button" variant="primary" onClick={() => void execute()} className="w-full">
                 Reintentar
-              </button>
+              </Button>
             </div>
           </>
         )}

@@ -6,6 +6,8 @@ import { useMemo, useState } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
 import { StoreLoginForm } from "@/components/auth/StoreLoginForm";
 import { ResetBusinessDataZone } from "@/components/account/ResetBusinessDataZone";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 
 export default function StoreLoginPage() {
   const session = useMemo(() => getPwaAuthSession(), []);
@@ -24,28 +26,24 @@ export default function StoreLoginPage() {
           alt="Dulce Calle"
           width={72}
           height={72}
-          className="h-[72px] w-[72px] rounded-2xl object-cover"
+          className="h-[72px] w-[72px] rounded-[var(--r-lg)] object-cover"
           priority
         />
         <h1 className="text-[22px] font-semibold">Cuenta de tienda</h1>
-        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
-          <p className="text-sm text-ink/70">Sesión activa</p>
+        <Card>
+          <p className="text-sm text-ink-muted">Sesión activa</p>
           <p className="mt-1 text-base font-semibold">
             {session.user?.email ?? "Sesión activa"}
           </p>
           {session.businessId && (
-            <p className="mt-2 text-sm text-ink/60">Negocio seleccionado</p>
+            <p className="mt-2 text-sm text-ink-muted">Negocio seleccionado</p>
           )}
-        </section>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
-        >
+        </Card>
+        <Button type="button" variant="secondary" onClick={onLogout} className="w-full">
           Cerrar sesión
-        </button>
+        </Button>
         <ResetBusinessDataZone />
-        <Link href="/" className="text-center text-sm text-ink/60">
+        <Link href="/" className="text-center text-sm text-ink-muted">
           Volver al inicio
         </Link>
       </div>
@@ -59,12 +57,12 @@ export default function StoreLoginPage() {
         alt="Dulce Calle"
         width={72}
         height={72}
-        className="h-[72px] w-[72px] rounded-2xl object-cover"
+        className="h-[72px] w-[72px] rounded-[var(--r-lg)] object-cover"
         priority
       />
       <div>
         <h1 className="text-[22px] font-semibold">Acceso de tienda</h1>
-        <p className="mt-1 text-sm text-ink/60">
+        <p className="mt-1 text-sm text-ink-muted">
           Administración privada de tu negocio.
         </p>
       </div>

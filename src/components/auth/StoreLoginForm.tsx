@@ -6,6 +6,9 @@ import { ApiError } from "@/data/errors";
 import { HttpRepository } from "@/data/http/repository";
 import { getPwaAuthSession } from "@/data/http/session";
 import { apiBaseUrl } from "@/data/backend";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 
 export function StoreLoginForm() {
   const router = useRouter();
@@ -60,59 +63,61 @@ export function StoreLoginForm() {
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+      <Card>
         <label className="text-sm font-medium" htmlFor="store-email">
           Correo
         </label>
-        <input
+        <Input
           id="store-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           autoComplete="email"
           autoFocus
         />
         <label className="mt-4 block text-sm font-medium" htmlFor="store-password">
           Contraseña
         </label>
-        <input
+        <Input
           id="store-password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           autoComplete="current-password"
         />
         {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-      </section>
+      </Card>
 
       {memberships.length > 0 ? (
-        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+        <Card>
           <p className="text-sm font-medium">Elige un negocio</p>
           <ul className="mt-3 flex flex-col gap-2">
             {memberships.map((m) => (
               <li key={m.businessId}>
-                <button
+                <Button
                   type="button"
+                  variant="primary"
                   onClick={() => pickBusiness(m.businessId)}
-                  className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white"
+                  className="w-full"
                 >
                   {m.business.name}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       ) : (
-        <button
+        <Button
           type="button"
+          variant="primary"
           disabled={busy}
           onClick={() => void onSubmit()}
-          className="min-h-12 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+          className="min-h-12 w-full"
         >
           {busy ? "Entrando…" : "Entrar a la tienda"}
-        </button>
+        </Button>
       )}
     </div>
   );
