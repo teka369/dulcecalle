@@ -82,9 +82,6 @@ async function createLocalInitialDebt(
     if (!customer) throw new Error("El cliente no está disponible sin conexión.");
 
     const dependency = await customerDependency(businessId, input.customerId);
-    if (dependency.length > 0) {
-      // Keep the local customer usable optimistically; only the server id is deferred.
-    }
 
     const debtId = newEntityId();
     await db.initialDebts.put({
@@ -176,7 +173,6 @@ async function reconcileInitialDebt(
 }
 
 export async function syncPendingInitialDebts(businessId: string) {
-  const outbox = getOutboxStore();
   const api = getPwaApi();
   const result = await getOutboxSyncEngine().flush(
     businessId,
