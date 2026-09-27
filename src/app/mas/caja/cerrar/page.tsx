@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Spinner } from "@/components/ui/Spinner";
+import { Input } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -68,13 +72,17 @@ export default function CerrarCajaPage() {
   }
 
   if (!ready || !summary) {
-    return <p className="text-sm text-ink/60">Cargando…</p>;
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
+    );
   }
 
   if (summary.closed) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/mas/caja" className="text-sm text-ink/70">
+        <Link href="/mas/caja" className="text-sm text-ink-muted">
           ← Caja
         </Link>
         <p className="text-sm">{CASH_COPY.elDiaEstaCerrado}</p>
@@ -85,7 +93,7 @@ export default function CerrarCajaPage() {
   if (!summary.session) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/mas/caja" className="text-sm text-ink/70">
+        <Link href="/mas/caja" className="text-sm text-ink-muted">
           ← Caja
         </Link>
         <p className="text-sm">{CASH_COPY.emptyCerrada}</p>
@@ -98,7 +106,7 @@ export default function CerrarCajaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas/caja"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -106,13 +114,13 @@ export default function CerrarCajaPage() {
         <h1 className="text-[22px] font-semibold">{CASH_COPY.cerrarCaja}</h1>
       </header>
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4">
+      <Card className="flex flex-col gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
             {CASH_COPY.deberiaHaber} (Efectivo)
           </p>
           <p className="mt-1 text-2xl font-semibold">{formatCop(expectedEf)}</p>
-          <p className="mt-1 text-xs text-ink/50">
+          <p className="mt-1 text-xs text-ink-muted">
             {CASH_COPY.esperado} Nequi: {formatCop(summary.expected.nequi)}{" "}
             (no cuenta en billetes)
           </p>
@@ -122,7 +130,7 @@ export default function CerrarCajaPage() {
           <label className="text-sm font-medium" htmlFor="contado">
             {CASH_COPY.cuantoHay}
           </label>
-          <input
+          <Input
             id="contado"
             inputMode="numeric"
             value={countedRaw}
@@ -130,14 +138,14 @@ export default function CerrarCajaPage() {
               setConfirmDiff(false);
               setCountedRaw(e.target.value.replace(/\D/g, ""));
             }}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
             placeholder="0"
           />
         </div>
 
         {diff != null && (
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
               {CASH_COPY.diferencia}
             </p>
             <p className="mt-1 text-xl font-semibold">
@@ -153,21 +161,22 @@ export default function CerrarCajaPage() {
         )}
 
         {error && <p className="text-sm text-danger">{error}</p>}
-      </section>
+      </Card>
 
       {/* Sticky CTA above AppShell bottom nav (~64–80px) + safe-area */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={busy || countedRaw.trim() === ""}
             onClick={() => void confirm()}
-            className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+            className="w-full"
           >
             {confirmDiff && diff !== 0
               ? CASH_COPY.cerrarConDiferencia
               : CASH_COPY.confirmarCierre}
-          </button>
+          </Button>
         </div>
       </div>
 

@@ -9,7 +9,7 @@ export default function AparienciaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←

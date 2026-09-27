@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Spinner } from "@/components/ui/Spinner";
+import { Empty } from "@/components/ui/Empty";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { STATS_COPY, type StatsPeriod } from "@/domain/stats";
@@ -42,19 +46,19 @@ export default function EstadisticasPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
         </Link>
         <div>
           <h1 className="text-[22px] font-semibold">{STATS_COPY.title}</h1>
-          <p className="text-sm text-ink/60">{STATS_COPY.subtitle}</p>
+          <p className="text-sm text-ink-muted">{STATS_COPY.subtitle}</p>
         </div>
       </header>
 
       <div
-        className="flex gap-2 rounded-2xl border border-ink/[0.08] bg-surface p-1"
+        className="flex gap-2 rounded-[var(--r-lg)] border border-border bg-surface p-1"
         role="tablist"
         aria-label="Período"
       >
@@ -67,62 +71,57 @@ export default function EstadisticasPage() {
                 : STATS_COPY.periodMes;
           const active = period === p;
           return (
-            <button
+            <Button
               key={p}
               type="button"
+              variant="ghost"
               role="tab"
               aria-selected={active}
               onClick={() => setPeriod(p)}
-              className={`min-h-11 flex-1 rounded-[14px] text-sm font-semibold ${
-                active ? "bg-primary text-ink" : "text-ink/60"
+              className={`flex-1 ${
+                active ? "bg-primary text-ink hover:text-ink" : "text-ink-muted"
               }`}
             >
               {label}
-            </button>
+            </Button>
           );
         })}
       </div>
 
       {loading && (
         <div
-          className="flex flex-col gap-3"
+          className="flex flex-col items-center gap-3 py-6"
           aria-busy="true"
           aria-label={STATS_COPY.loadingAria}
         >
-          <p className="text-sm text-ink/60">{STATS_COPY.loading}</p>
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-24 animate-pulse rounded-2xl border border-ink/[0.08] bg-ink/[0.04]"
-            />
-          ))}
+          <Spinner />
+          <p className="text-sm text-ink-muted">{STATS_COPY.loading}</p>
         </div>
       )}
 
       {!loading && error && (
-        <div className="rounded-2xl border border-ink/10 bg-surface p-4">
+        <Card>
           <p className="font-medium">{STATS_COPY.errorLoad}</p>
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={() => void refresh(period)}
-            className="mt-3 min-h-11 rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
+            className="mt-3"
           >
             {STATS_COPY.reintentar}
-          </button>
-        </div>
+          </Button>
+        </Card>
       )}
 
       {!loading && !error && stats && (
         <>
           {fromCache && capturedAt != null && (
-            <p className="text-xs text-ink/60">
+            <p className="text-xs text-ink-muted">
               Sin conexión · última actualización: {new Date(capturedAt).toLocaleString()}.
             </p>
           )}
           {stats.emptyPeriod && (
-            <div className="rounded-2xl border border-ink/10 bg-surface p-4">
-              <p className="text-sm text-ink/70">{STATS_COPY.emptyPeriodo}</p>
-            </div>
+            <Empty title={STATS_COPY.emptyPeriodo} />
           )}
 
           <MetricCard
@@ -168,11 +167,11 @@ export default function EstadisticasPage() {
             value={formatCop(stats.inverti)}
           />
 
-          <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+          <Card as="article">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
               {STATS_COPY.inventario}
             </p>
-            <p className="mt-1 text-xs text-ink/55">{STATS_COPY.captionInventario}</p>
+            <p className="mt-1 text-xs text-ink-muted">{STATS_COPY.captionInventario}</p>
             <div className="mt-3 flex flex-col gap-2">
               <Row
                 label={STATS_COPY.valorInventario}
@@ -186,7 +185,7 @@ export default function EstadisticasPage() {
             >
               {STATS_COPY.verInventario}
             </Link>
-          </article>
+          </Card>
 
           <MetricCard
             title={STATS_COPY.ganancia}
@@ -197,7 +196,7 @@ export default function EstadisticasPage() {
 
           <Link
             href="/mas/caja"
-            className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold shadow-sm"
+            className="flex min-h-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-sm font-semibold shadow-sm"
           >
             {STATS_COPY.irACaja}
           </Link>
@@ -234,13 +233,13 @@ function MetricCard({
           : "text-ink";
 
   return (
-    <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+    <Card as="article">
+      <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
         {title}
       </p>
-      <p className="mt-1 text-xs text-ink/55">{caption}</p>
+      <p className="mt-1 text-xs text-ink-muted">{caption}</p>
       <p className={`mt-2 text-2xl font-semibold ${toneClass}`}>{value}</p>
-      {sub && <p className="mt-1 text-sm text-ink/55">{sub}</p>}
+      {sub && <p className="mt-1 text-sm text-ink-muted">{sub}</p>}
       {actionHref && actionLabel && (
         <Link
           href={actionHref}
@@ -249,14 +248,14 @@ function MetricCard({
           {actionLabel}
         </Link>
       )}
-    </article>
+    </Card>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-sm text-ink/70">{label}</span>
+      <span className="text-sm text-ink-muted">{label}</span>
       <span className="text-sm font-semibold">{value}</span>
     </div>
   );

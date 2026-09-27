@@ -2,6 +2,11 @@
 
 import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
@@ -73,16 +78,20 @@ export default function ProductoFichaPage() {
   }, [load]);
 
   if (!ready) {
-    return <p className="text-sm text-ink/60">Cargando…</p>;
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
+    );
   }
 
   if (!product) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/inventario" className="text-sm text-ink/70">
+        <Link href="/inventario" className="text-sm text-ink-muted">
           ← Inventario
         </Link>
-        <p className="text-sm text-ink/60">No encontramos ese producto.</p>
+        <p className="text-sm text-ink-muted">No encontramos ese producto.</p>
       </div>
     );
   }
@@ -92,7 +101,7 @@ export default function ProductoFichaPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/inventario"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -101,18 +110,16 @@ export default function ProductoFichaPage() {
           {product.name}
         </h1>
         {product.sellable === false && (
-          <span className="shrink-0 rounded-full bg-primary/40 px-2 py-0.5 text-xs font-semibold text-ink">
-            Insumo
-          </span>
+          <Badge tone="warning">Insumo</Badge>
         )}
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+      <Card>
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
           {product.sellable === false ? "Lotes" : "Stock"}
         </p>
         <p className="mt-1 text-2xl font-semibold">{product.stock}</p>
-        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink/50">
+        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink-muted">
           {product.sellable === false ? "Valor restante del lote" : "Precio venta"}
         </p>
         {product.sellable === false ? (
@@ -121,26 +128,26 @@ export default function ProductoFichaPage() {
           <p className="mt-1 text-lg font-semibold">{formatCop(product.price)}</p>
         )}
         {product.sellable === false ? null : product.avgCost > 0 ? (
-          <p className="mt-2 text-sm text-ink/50">
+          <p className="mt-2 text-sm text-ink-muted">
             Costo prom. {formatCop(product.avgCost)}
           </p>
         ) : product.stock > 0 ? (
-          <p className="mt-2 text-sm text-ink/50">
+          <p className="mt-2 text-sm text-ink-muted">
             Costo $0 (regalo o no se sabe). Se actualiza al surtir.
           </p>
         ) : null}
-      </section>
+      </Card>
 
       <div className="flex gap-2">
         <OfflineLink
           href={`/inventario/${product.id}/surtir`}
-          className="flex min-h-11 flex-1 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
+          className="flex min-h-11 flex-1 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
         >
           Surtir
         </OfflineLink>
         <OfflineLink
           href={`/inventario/${product.id}/preparar`}
-          className="flex min-h-11 flex-1 items-center justify-center rounded-[14px] border border-ink/10 bg-surface px-4 text-sm font-semibold"
+          className="flex min-h-11 flex-1 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold"
         >
           Preparar
         </OfflineLink>
@@ -152,66 +159,68 @@ export default function ProductoFichaPage() {
         onChanged={() => void load()}
       />
 
-      <button
+      <Button
         type="button"
+        variant="secondary"
         onClick={() => {
           setEditing((v) => !v);
           setEditError(null);
         }}
-        className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface px-4 text-sm font-semibold"
+        className="w-full"
       >
         {editing ? "Cerrar edición" : "Editar producto"}
-      </button>
+      </Button>
 
       {editing && (
-        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+        <Card>
           <label className="text-sm font-medium" htmlFor="editar-nombre-prod">
             Nombre
           </label>
-          <input
+          <Input
             id="editar-nombre-prod"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
           />
           <label className="mt-3 block text-sm font-medium" htmlFor="editar-precio-prod">
             Precio de venta
           </label>
-          <input
+          <Input
             id="editar-precio-prod"
             inputMode="numeric"
             value={editPrice}
             onChange={(e) => setEditPrice(e.target.value.replace(/\D/g, ""))}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
           />
           <label className="mt-3 block text-sm font-medium" htmlFor="editar-low-prod">
             Avisar cuando el stock sea menor o igual a
           </label>
-          <input
+          <Input
             id="editar-low-prod"
             inputMode="numeric"
             value={editLow}
             onChange={(e) => setEditLow(e.target.value.replace(/\D/g, ""))}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
           />
           <label className="mt-3 flex min-h-11 items-start gap-3 text-sm">
             <input
               type="checkbox"
               checked={!editSellable}
               onChange={(e) => setEditSellable(!e.target.checked)}
-              className="mt-1 h-5 w-5 shrink-0 rounded border-ink/20"
+              className="mt-1 h-5 w-5 shrink-0 rounded border-border"
             />
             <span>
               <span className="font-medium">Es insumo o combo</span>
-              <span className="mt-1 block text-ink/60">
+              <span className="mt-1 block text-ink-muted">
                 No aparece para vender ni en el catálogo de clientes. Sirve
                 como origen de preparaciones.
               </span>
             </span>
           </label>
           {editError && <p className="mt-2 text-sm text-danger">{editError}</p>}
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={editBusy}
             onClick={() => {
               if (editBusy) return;
@@ -241,45 +250,47 @@ export default function ProductoFichaPage() {
                 })
                 .finally(() => setEditBusy(false));
             }}
-            className="mt-3 min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+            className="mt-3 w-full"
           >
             Guardar cambios
-          </button>
-          <p className="mt-2 text-xs text-ink/60">
+          </Button>
+          <p className="mt-2 text-xs text-ink-muted">
             El stock y el costo solo cambian con movimientos. Las ventas
             anteriores conservan el precio con el que se cobraron.
           </p>
-        </section>
+        </Card>
       )}
 
       {!product.archivedAt && !confirmArchive && (
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={() => setConfirmArchive(true)}
-          className="flex min-h-11 items-center justify-center rounded-[14px] border border-danger/30 bg-surface px-4 text-sm font-semibold text-danger"
+          className="w-full border-danger/30 text-danger"
         >
           Archivar producto
-        </button>
+        </Button>
       )}
 
       {!product.archivedAt && confirmArchive && (
-        <section className="rounded-2xl border border-danger/20 bg-danger/5 p-4">
+        <section className="rounded-[var(--r-lg)] border border-danger/20 bg-danger/5 p-4 shadow-[var(--shadow-sm)]">
           <p className="text-sm font-semibold">¿Archivar este producto?</p>
-          <p className="mt-1 text-xs leading-relaxed text-ink/70">
+          <p className="mt-1 text-xs leading-relaxed text-ink-muted">
             Dejará de aparecer para vender o surtir, pero su historial se
             conserva. Esta acción no se puede deshacer desde aquí.
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
+            <Button
               type="button"
+              variant="secondary"
               disabled={editBusy}
               onClick={() => setConfirmArchive(false)}
-              className="min-h-11 rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold disabled:opacity-40"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="danger"
               disabled={editBusy}
               onClick={() => {
                 if (editBusy) return;
@@ -297,17 +308,16 @@ export default function ProductoFichaPage() {
                   })
                   .finally(() => setEditBusy(false));
               }}
-              className="min-h-11 rounded-[14px] bg-danger text-sm font-semibold text-white disabled:opacity-40"
             >
               Archivar
-            </button>
+            </Button>
           </div>
           {editError && <p className="mt-2 text-sm text-danger">{editError}</p>}
         </section>
       )}
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink/60">
+        <h2 className="mb-2 text-sm font-semibold text-ink-muted">
           Ajustes de stock
         </h2>
         <div className="flex flex-col gap-2">
@@ -328,14 +338,14 @@ export default function ProductoFichaPage() {
 
       {(fromPreparations.length > 0 || intoPreparations.length > 0) && (
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-ink/60">
+          <h2 className="mb-2 text-sm font-semibold text-ink-muted">
             Preparaciones
           </h2>
           <ul className="flex flex-col gap-2">
             {fromPreparations.map((r) => (
               <li
                 key={r.id}
-                className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
+                className="rounded-[var(--r-lg)] border border-border bg-surface px-4 py-3 text-sm shadow-[var(--shadow-sm)]"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">
@@ -347,7 +357,7 @@ export default function ProductoFichaPage() {
                       : formatCop(r.unitCost * r.qty)}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-ink/50">
+                <p className="mt-1 text-xs text-ink-muted">
                   {r.occurredOn}
                   {r.note ? ` · ${r.note}` : ""}
                 </p>
@@ -356,7 +366,7 @@ export default function ProductoFichaPage() {
             {intoPreparations.map((r) => (
               <li
                 key={r.id}
-                className="rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
+                className="rounded-[var(--r-lg)] border border-border bg-surface px-4 py-3 text-sm shadow-[var(--shadow-sm)]"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">
@@ -368,7 +378,7 @@ export default function ProductoFichaPage() {
                       : formatCop(r.unitCost * r.qty)}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-ink/50">
+                <p className="mt-1 text-xs text-ink-muted">
                   {r.occurredOn}
                   {r.note ? ` · ${r.note}` : ""}
                 </p>
@@ -380,17 +390,17 @@ export default function ProductoFichaPage() {
 
       {moves.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-ink/60">Historial</h2>
+          <h2 className="mb-2 text-sm font-semibold text-ink-muted">Historial</h2>
           <ul className="flex flex-col gap-2">
             {moves.slice(0, 20).map((m) => (
               <li
                 key={m.id}
-                className="flex items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 py-3 text-sm"
+                className="flex items-center justify-between rounded-[var(--r-lg)] border border-border bg-surface px-4 py-3 text-sm shadow-[var(--shadow-sm)]"
               >
                 <span>
                   {REASON_LABEL[m.reason] ?? m.reason}
                   {m.note ? (
-                    <span className="mt-0.5 block text-xs text-ink/50">
+                    <span className="mt-0.5 block text-xs text-ink-muted">
                       {m.note}
                     </span>
                   ) : null}
@@ -411,7 +421,7 @@ function ActionLink({ href, label }: { href: string; label: string }) {
   return (
     <OfflineLink
       href={href}
-      className="flex min-h-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface px-4 text-sm font-semibold"
+      className="flex min-h-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold text-ink"
     >
       {label}
     </OfflineLink>

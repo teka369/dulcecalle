@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { Input } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useMemo, useRef, useState } from "react";
@@ -58,7 +61,7 @@ export default function NuevoGastoPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas/gastos"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -66,20 +69,20 @@ export default function NuevoGastoPage() {
         <h1 className="text-[22px] font-semibold">{CASH_COPY.registrarGasto}</h1>
       </header>
 
-      <p className="text-sm text-ink/70">{CASH_COPY.gastoHelper}</p>
-      <p className="text-sm font-medium text-ink/80">{CASH_COPY.gastoCaption}</p>
+      <p className="text-sm text-ink-muted">{CASH_COPY.gastoHelper}</p>
+      <p className="text-sm font-medium text-ink-muted">{CASH_COPY.gastoCaption}</p>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-ink/[0.08] bg-surface p-4">
+      <Card className="flex flex-col gap-4">
         <div>
           <label className="text-sm font-medium" htmlFor="monto">
             {CASH_COPY.monto}
           </label>
-          <input
+          <Input
             id="monto"
             inputMode="numeric"
             value={amountRaw}
             onChange={(e) => setAmountRaw(e.target.value.replace(/\D/g, ""))}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
             placeholder="0"
           />
         </div>
@@ -88,11 +91,11 @@ export default function NuevoGastoPage() {
           <label className="text-sm font-medium" htmlFor="concepto">
             {CASH_COPY.enQueSeGasto}
           </label>
-          <input
+          <Input
             id="concepto"
             value={categoryRaw}
             onChange={(e) => setCategoryRaw(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
             placeholder="transporte, arriendo…"
           />
         </div>
@@ -117,27 +120,28 @@ export default function NuevoGastoPage() {
           <label className="text-sm font-medium" htmlFor="nota">
             {CASH_COPY.nota}
           </label>
-          <input
+          <Input
             id="nota"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
           />
         </div>
 
         {error && <p className="text-sm text-danger">{error}</p>}
-      </section>
+      </Card>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={!valid || busy}
             onClick={() => void confirm()}
-            className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+            className="w-full"
           >
             {CASH_COPY.confirmarGasto}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -163,10 +167,10 @@ function MethodButton({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
+      className={`min-h-11 rounded-[var(--r-md)] border px-2 text-sm font-semibold ${
         active
           ? "border-primary bg-primary text-ink"
-          : "border-ink/10 bg-surface text-ink/70"
+          : "border-border bg-surface text-ink-muted"
       }`}
     >
       {label}

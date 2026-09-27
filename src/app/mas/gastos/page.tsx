@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
+import { Spinner } from "@/components/ui/Spinner";
+import { Empty } from "@/components/ui/Empty";
+import { Card } from "@/components/ui/Card";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { CASH_COPY } from "@/domain/cash";
@@ -27,7 +30,11 @@ export default function GastosPage() {
   }, [load]);
 
   if (!ready) {
-    return <p className="text-sm text-ink/60">Cargando…</p>;
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
+    );
   }
 
   return (
@@ -35,7 +42,7 @@ export default function GastosPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/mas"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -44,43 +51,38 @@ export default function GastosPage() {
       </header>
 
       {closed && (
-        <p className="rounded-2xl border border-ink/10 bg-surface p-3 text-sm text-ink/70">
+        <p className="rounded-[var(--r-lg)] border border-border bg-surface p-3 shadow-[var(--shadow-sm)] text-sm text-ink-muted">
           {CASH_COPY.elDiaEstaCerrado}
         </p>
       )}
 
       {expenses.length === 0 ? (
-        <div className="rounded-2xl border border-ink/10 bg-surface p-4">
-          <p className="text-sm text-ink/60">Aún no hay gastos.</p>
-        </div>
+        <Empty title="Aún no hay gastos." />
       ) : (
         <ul className="flex flex-col gap-2">
           {expenses.map((e) => (
-            <li
-              key={e.id}
-              className="rounded-2xl border border-ink/[0.08] bg-surface p-4 shadow-sm"
-            >
+            <Card as="li" key={e.id}>
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-semibold">{e.category}</p>
-                  <p className="text-xs text-ink/50">{e.method}</p>
+                  <p className="text-xs text-ink-muted">{e.method}</p>
                 </div>
                 <p className="font-semibold text-danger">{formatCop(e.amount)}</p>
               </div>
               {e.note && (
-                <p className="mt-1 text-sm text-ink/60">{e.note}</p>
+                <p className="mt-1 text-sm text-ink-muted">{e.note}</p>
               )}
-            </li>
+            </Card>
           ))}
         </ul>
       )}
 
       {!closed && hasSession && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
           <div className="mx-auto max-w-lg">
             <OfflineLink
               href="/mas/gastos/nuevo"
-              className="flex min-h-11 w-full items-center justify-center rounded-[14px] bg-cta text-sm font-semibold text-white"
+              className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
             >
               {CASH_COPY.registrarGasto}
             </OfflineLink>
@@ -89,7 +91,7 @@ export default function GastosPage() {
       )}
 
       {!closed && !hasSession && (
-        <p className="text-sm text-ink/60">{CASH_COPY.emptyCerrada}</p>
+        <p className="text-sm text-ink-muted">{CASH_COPY.emptyCerrada}</p>
       )}
     </div>
   );

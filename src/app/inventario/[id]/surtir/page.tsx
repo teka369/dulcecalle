@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 import { useParams, useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -150,16 +154,20 @@ export default function SurtirPage() {
   }
 
   if (!ready) {
-    return <p className="text-sm text-ink/60">Cargando…</p>;
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
+    );
   }
 
   if (!product) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/inventario" className="text-sm text-ink/70">
+        <Link href="/inventario" className="text-sm text-ink-muted">
           ← Inventario
         </Link>
-        <p className="text-sm text-ink/60">No encontramos ese producto.</p>
+        <p className="text-sm text-ink-muted">No encontramos ese producto.</p>
       </div>
     );
   }
@@ -169,7 +177,7 @@ export default function SurtirPage() {
       <header className="flex items-center gap-2">
         <Link
           href={`/inventario/${product.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -177,7 +185,7 @@ export default function SurtirPage() {
         <h1 className="text-[22px] font-semibold">Surtir</h1>
       </header>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-ink/[0.08] bg-surface p-4">
+      <Card className="flex flex-col gap-4">
         <div className="flex items-start gap-3">
           <ProductThumbnail
             secureUrl={primaryImageUrl(product.images)}
@@ -185,7 +193,7 @@ export default function SurtirPage() {
             size="md"
           />
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
               Producto
             </p>
             <p className="mt-1 font-semibold">{product.name}</p>
@@ -203,7 +211,7 @@ export default function SurtirPage() {
               setSupplierId(e.target.value);
               setSupplierCreate("");
             }}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base outline-none focus:border-primary"
+            className="mt-2 h-11 min-h-11 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <option value="">Elegir o crear…</option>
             {suppliers.map((s) =>
@@ -219,17 +227,17 @@ export default function SurtirPage() {
             )}
           </select>
           {pendingSupplierIds.length > 0 && (
-            <p className="mt-2 text-xs text-ink/60">
+            <p className="mt-2 text-xs text-ink-muted">
               Los proveedores marcados se están sincronizando y estarán
               disponibles en cuanto terminen.
             </p>
           )}
           {supplierId === "" && (
-            <input
+            <Input
               value={supplierCreate}
               onChange={(e) => setSupplierCreate(e.target.value)}
               placeholder="Escribir nombre nuevo"
-              className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+              className="mt-2"
             />
           )}
         </div>
@@ -238,12 +246,12 @@ export default function SurtirPage() {
           <label className="text-sm font-medium" htmlFor="cantidad">
             Cantidad
           </label>
-          <input
+          <Input
             id="cantidad"
             inputMode="numeric"
             value={qtyRaw}
             onChange={(e) => onQtyChange(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
             placeholder="0"
           />
         </div>
@@ -252,12 +260,12 @@ export default function SurtirPage() {
           <label className="text-sm font-medium" htmlFor="unit-cost">
             Costo unitario
           </label>
-          <input
+          <Input
             id="unit-cost"
             inputMode="numeric"
             value={unitCostRaw}
             onChange={(e) => onUnitChange(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
             placeholder="0"
           />
         </div>
@@ -266,16 +274,16 @@ export default function SurtirPage() {
           <label className="text-sm font-medium" htmlFor="total-cost">
             Costo total
           </label>
-          <input
+          <Input
             id="total-cost"
             inputMode="numeric"
             value={totalCostRaw}
             onChange={(e) => onTotalChange(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
             placeholder="0"
           />
           {previewTotal > 0 && (
-            <p className="mt-1 text-sm text-ink/60">{formatCop(previewTotal)}</p>
+            <p className="mt-1 text-sm text-ink-muted">{formatCop(previewTotal)}</p>
           )}
         </div>
 
@@ -294,7 +302,7 @@ export default function SurtirPage() {
             />
           </div>
           {previewTotal > 0 && (
-            <p className="mt-2 text-sm text-ink/70">
+            <p className="mt-2 text-sm text-ink-muted">
               Sale {formatCop(previewTotal)} de {method}. No es un gasto ni un
               retiro.
             </p>
@@ -305,29 +313,30 @@ export default function SurtirPage() {
           <label className="text-sm font-medium" htmlFor="notas">
             Notas
           </label>
-          <input
+          <Input
             id="notas"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
           />
         </div>
 
         {error && <p className="text-sm text-danger">{error}</p>}
-      </section>
+      </Card>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={!valid || busy}
             onClick={() => void confirm()}
-            className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+            className="w-full"
           >
             {previewTotal > 0
               ? `Confirmar surtir · ${formatCop(previewTotal)}`
               : "Confirmar surtir"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -353,10 +362,10 @@ function MethodButton({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
+      className={`min-h-11 rounded-[var(--r-md)] border px-2 text-sm font-semibold ${
         active
           ? "border-primary bg-primary text-ink"
-          : "border-ink/10 bg-surface text-ink/70"
+          : "border-border bg-surface text-ink-muted"
       }`}
     >
       {label}

@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { Input } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -176,7 +179,7 @@ export default function CobrarPage() {
       <header className="flex items-center gap-2">
         <Link
           href="/ventas/nueva"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
@@ -184,8 +187,8 @@ export default function CobrarPage() {
         <h1 className="text-[22px] font-semibold">Cobrar</h1>
       </header>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
-        <h2 className="text-sm font-semibold text-ink/60">Resumen</h2>
+      <Card>
+        <h2 className="text-sm font-semibold text-ink-muted">Resumen</h2>
         <ul className="mt-2 flex flex-col gap-1">
           {lines.map((l) => (
             <li key={l.productId} className="flex items-center justify-between gap-2 text-sm">
@@ -194,7 +197,7 @@ export default function CobrarPage() {
                 <span className="min-w-0">
                   {l.name} ×{l.qty}
                   {l.unitPrice !== l.catalogPrice && (
-                    <span className="ml-1 text-ink/45">
+                    <span className="ml-1 text-ink-muted">
                       ({formatCop(l.unitPrice)})
                     </span>
                   )}
@@ -204,11 +207,11 @@ export default function CobrarPage() {
             </li>
           ))}
         </ul>
-        <div className="mt-3 flex justify-between border-t border-ink/10 pt-3 text-base font-semibold">
+        <div className="mt-3 flex justify-between border-t border-border pt-3 text-base font-semibold">
           <span>Total</span>
           <span>{formatCop(total)}</span>
         </div>
-      </section>
+      </Card>
 
       <section>
         <h2 className="mb-2 text-base font-semibold">¿Cómo pagan?</h2>
@@ -235,7 +238,7 @@ export default function CobrarPage() {
       </section>
 
       {paymentKind !== "credit" && (
-        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+        <Card>
           <p className="text-sm font-semibold">¿Cómo recibes?</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <MethodButton
@@ -249,26 +252,26 @@ export default function CobrarPage() {
               onClick={() => setMethod("Nequi")}
             />
           </div>
-        </section>
+        </Card>
       )}
 
       {paymentKind === "partial" && (
-        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+        <Card>
           <label className="text-sm font-medium" htmlFor="abono">
             Abono
           </label>
-          <input
+          <Input
             id="abono"
             inputMode="numeric"
             value={abonoInput}
             onChange={(e) =>
               setAbonoInput(e.target.value.replace(/\D/g, ""))
             }
-            className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+            className="mt-2"
             placeholder="0"
           />
           {abono > 0 && abono < total && (
-            <p className="mt-2 text-sm text-ink/70">
+            <p className="mt-2 text-sm text-ink-muted">
               Queda debiendo {formatCop(quedaDebiendo)}
             </p>
           )}
@@ -278,32 +281,33 @@ export default function CobrarPage() {
             pendingIds={pendingCustomerIds}
             onChange={setCustomerId}
           />
-        </section>
+        </Card>
       )}
 
       {paymentKind === "credit" && (
-        <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+        <Card>
           <CustomerPicker
             customers={customers}
             customerId={customerId}
             pendingIds={pendingCustomerIds}
             onChange={setCustomerId}
           />
-        </section>
+        </Card>
       )}
 
       {error && <p className="text-sm text-danger">{error}</p>}
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={!valid || busy}
             onClick={() => void confirm()}
-            className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+            className="w-full"
           >
             Confirmar venta
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -340,8 +344,8 @@ function ModeButton({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
-        active ? activeBg : "border-ink/10 bg-surface text-ink/70"
+      className={`min-h-11 rounded-[var(--r-md)] border px-2 text-sm font-semibold ${
+        active ? activeBg : "border-border bg-surface text-ink-muted"
       }`}
     >
       {label}
@@ -362,10 +366,10 @@ function MethodButton({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-11 rounded-[14px] border px-2 text-sm font-semibold ${
+      className={`min-h-11 rounded-[var(--r-md)] border px-2 text-sm font-semibold ${
         active
           ? "border-primary bg-primary text-ink"
-          : "border-ink/10 bg-surface text-ink/70"
+          : "border-border bg-surface text-ink-muted"
       }`}
     >
       {label}
@@ -392,7 +396,7 @@ function CustomerPicker({
       </label>
       <select
         id="cliente"
-        className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base"
+        className="mt-2 h-11 min-h-11 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink"
         value={customerId ?? ""}
         onChange={(e) => onChange(e.target.value ? e.target.value : null)}
       >
@@ -410,7 +414,7 @@ function CustomerPicker({
         )}
       </select>
       {pendingIds.length > 0 && (
-        <p className="mt-2 text-xs text-ink/60">
+        <p className="mt-2 text-xs text-ink-muted">
           Los clientes marcados se están sincronizando y estarán disponibles
           en cuanto terminen.
         </p>

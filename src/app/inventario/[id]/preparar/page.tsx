@@ -2,6 +2,9 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { OfflineLink } from "@/components/shell/OfflineLink";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useEffect, useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
@@ -33,7 +36,7 @@ export default function PrepararPage() {
   }, [products, sourceId]);
 
   if (!sourceId) {
-    return <p className="text-sm text-ink/60">No encontramos ese producto.</p>;
+    return <p className="text-sm text-ink-muted">No encontramos ese producto.</p>;
   }
 
   async function onPrepare() {
@@ -79,19 +82,20 @@ export default function PrepararPage() {
     return (
       <div className="flex flex-col gap-4 pb-28">
         <h1 className="text-[22px] font-semibold">Preparación lista</h1>
-        <p className="text-sm text-ink/60">
+        <p className="text-sm text-ink-muted">
           {qtyRaw} uds de {target?.name ?? "producto"} ya son stock vendible.
         </p>
-        <button
+        <Button
           type="button"
+          variant="primary"
           onClick={() => navigateOfflineAware(router, `/inventario/${done}`)}
-          className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white"
+          className="w-full"
         >
           Ver producto
-        </button>
+        </Button>
         <OfflineLink
           href={`/inventario/${sourceId}`}
-          className="flex min-h-11 w-full items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-sm font-semibold"
+          className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-sm font-semibold"
         >
           Volver al combo
         </OfflineLink>
@@ -108,7 +112,7 @@ export default function PrepararPage() {
       <header className="flex items-center gap-2">
         <OfflineLink
           href={`/inventario/${sourceId}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] border border-ink/10 bg-surface text-lg"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           ariaLabel="Volver"
         >
           ←
@@ -117,29 +121,29 @@ export default function PrepararPage() {
       </header>
 
       {source && (
-        <section className="flex items-start gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4">
+        <Card className="flex items-start gap-3">
           <ProductThumbnail
             secureUrl={primaryImageUrl(source.images)}
             alt={source.name}
             size="md"
           />
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
               Proviene de
             </p>
             <p className="mt-1 font-semibold">{source.name}</p>
-            <p className="mt-1 text-sm text-ink/60">
+            <p className="mt-1 text-sm text-ink-muted">
               Lotes disponibles: {source.stock} · Valor restante:{" "}
               {formatCop(source.avgCost)}
             </p>
-            <p className="mt-1 text-sm text-ink/60">
+            <p className="mt-1 text-sm text-ink-muted">
               Costo máximo asignable en total: {formatCop(source.avgCost)}
             </p>
           </div>
-        </section>
+        </Card>
       )}
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
+      <Card>
         <label className="text-sm font-medium" htmlFor="preparar-producto">
           ¿Qué vas a preparar?
         </label>
@@ -147,7 +151,7 @@ export default function PrepararPage() {
           id="preparar-producto"
           value={targetId}
           onChange={(e) => setTargetId(e.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 bg-bg px-3 text-base outline-none focus:border-primary"
+          className="mt-2 h-11 min-h-11 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <option value="">Elige el producto…</option>
           {targets.map((p) => (
@@ -160,27 +164,27 @@ export default function PrepararPage() {
         <label className="mt-4 block text-sm font-medium" htmlFor="preparar-cantidad">
           ¿Cuántas hiciste?
         </label>
-        <input
+        <Input
           id="preparar-cantidad"
           inputMode="numeric"
           value={qtyRaw}
           onChange={(e) => setQtyRaw(e.target.value.replace(/\D/g, ""))}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           placeholder="10"
         />
 
         <label className="mt-4 block text-sm font-medium" htmlFor="preparar-costo">
           Costo por unidad (opcional)
         </label>
-        <input
+        <Input
           id="preparar-costo"
           inputMode="numeric"
           value={costRaw}
           onChange={(e) => setCostRaw(e.target.value.replace(/\D/g, ""))}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           placeholder="0"
         />
-        <p className="mt-1 text-xs text-ink/55">
+        <p className="mt-1 text-xs text-ink-muted">
           {INVENTORY_ERRORS.pendingCostHint} El combo conserva su valor; aquí
           solo defines el costo de estas unidades.
         </p>
@@ -188,28 +192,29 @@ export default function PrepararPage() {
         <label className="mt-4 block text-sm font-medium" htmlFor="preparar-nota">
           Nota (opcional)
         </label>
-        <input
+        <Input
           id="preparar-nota"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[14px] border border-ink/10 px-3 text-base outline-none focus:border-primary"
+          className="mt-2"
           placeholder="Tanda de la mañana"
           maxLength={160}
         />
 
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      </section>
+      </Card>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
-          <button
+          <Button
             type="button"
+            variant="primary"
             disabled={busy || !targetId}
             onClick={() => void onPrepare()}
-            className="min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white disabled:opacity-40"
+            className="w-full"
           >
             Preparar
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -1,6 +1,10 @@
 "use client";
 
 import { OfflineLink } from "@/components/shell/OfflineLink";
+import { Badge } from "@/components/ui/Badge";
+import { Empty } from "@/components/ui/Empty";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
@@ -30,7 +34,7 @@ export default function ClientesPage() {
         <h1 className="text-[22px] font-semibold tracking-tight">Clientes</h1>
         <OfflineLink
           href="/clientes/nuevo"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] bg-cta text-xl font-semibold text-white"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] bg-cta text-xl font-semibold text-cta-fg"
           ariaLabel="Agregar cliente"
         >
           +
@@ -40,65 +44,62 @@ export default function ClientesPage() {
       <label className="sr-only" htmlFor="buscar-cliente">
         Buscar cliente
       </label>
-      <input
+      <Input
         id="buscar-cliente"
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Buscar cliente..."
-        className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base outline-none focus:border-primary"
       />
 
       {loading && customers.length === 0 ? (
-        <p className="text-sm text-ink/60">Cargando…</p>
-      ) : customers.length === 0 ? (
-        <div className="rounded-2xl border border-ink/10 bg-surface p-6 text-center">
-          <p className="text-base font-medium">Sin clientes aún.</p>
-          <OfflineLink
-            href="/clientes/nuevo"
-            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
-          >
-            Agregar cliente
-          </OfflineLink>
+        <div className="flex justify-center py-10">
+          <Spinner />
         </div>
+      ) : customers.length === 0 ? (
+        <Empty
+          title="Sin clientes aún."
+          action={
+            <OfflineLink
+              href="/clientes/nuevo"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
+            >
+              Agregar cliente
+            </OfflineLink>
+          }
+        />
       ) : filtered.length === 0 && searching ? (
-        <p className="text-sm text-ink/60">No encontramos ese cliente.</p>
+        <p className="text-sm text-ink-muted">No encontramos ese cliente.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {filtered.map((c) => (
             <li key={c.id}>
               <OfflineLink
                 href={`/clientes/${c.id}`}
-                className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4"
+                className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--r-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)]"
               >
                 <span className="min-w-0 truncate">
-                  <span className="block font-medium">
+                  <span className="flex flex-wrap items-center gap-2 font-medium">
                     {c.name}
                     {pendingIds.includes(c.id) && (
-                      <span className="ml-2 rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold text-ink/70">
-                        ⏳ Pendiente
-                      </span>
+                      <Badge tone="warning">⏳ Pendiente</Badge>
                     )}
                   </span>
                   {c.code && (
-                    <span className="block text-xs text-ink/50">{c.code}</span>
+                    <span className="block text-xs text-ink-muted">{c.code}</span>
                   )}
                 </span>
-                <span className="flex shrink-0 flex-col items-end">
+                <span className="flex shrink-0 flex-col items-end gap-1">
                   <span
                     className={`text-sm font-semibold tabular-nums ${
-                      c.debt > 0 ? "text-accent" : "text-ink/50"
+                      c.debt > 0 ? "text-accent" : "text-ink-muted"
                     }`}
                   >
                     {formatCop(c.debt)}
                   </span>
-                  <span
-                    className={`text-[11px] font-medium ${
-                      c.debt > 0 ? "text-accent/80" : "text-ok"
-                    }`}
-                  >
+                  <Badge tone={c.debt > 0 ? "info" : "ok"}>
                     {c.debt > 0 ? "Pendiente" : "Al día"}
-                  </span>
+                  </Badge>
                 </span>
               </OfflineLink>
             </li>

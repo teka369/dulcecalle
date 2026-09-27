@@ -1,6 +1,11 @@
 "use client";
 
 import { OfflineLink } from "@/components/shell/OfflineLink";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Empty } from "@/components/ui/Empty";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
@@ -53,7 +58,7 @@ export default function InventarioPage() {
               ? "/inventario/nuevo"
               : "/inventario/proveedores/nuevo"
           }
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[14px] bg-cta text-xl font-semibold text-white"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] bg-cta text-xl font-semibold text-cta-fg"
           ariaLabel={
             segment === "productos" ? "Agregar producto" : "Agregar proveedor"
           }
@@ -62,7 +67,7 @@ export default function InventarioPage() {
         </OfflineLink>
       </header>
 
-      <div className="grid grid-cols-2 gap-2 rounded-[14px] border border-ink/10 bg-surface p-1">
+      <div className="grid grid-cols-2 gap-2 rounded-[var(--r-md)] border border-border bg-surface p-1">
         <SegmentButton
           label="Productos"
           active={segment === "productos"}
@@ -84,7 +89,7 @@ export default function InventarioPage() {
       <label className="sr-only" htmlFor="buscar-inventario">
         {segment === "productos" ? "Buscar producto" : "Buscar proveedor"}
       </label>
-      <input
+      <Input
         id="buscar-inventario"
         type="search"
         value={query}
@@ -94,20 +99,27 @@ export default function InventarioPage() {
             ? "Buscar producto..."
             : "Buscar proveedor..."
         }
-        className="min-h-11 w-full rounded-[14px] border border-ink/10 bg-surface px-3 text-base outline-none focus:border-primary"
       />
 
       {loading && products.length === 0 && suppliers.length === 0 ? (
-        <p className="text-sm text-ink/60">Cargando…</p>
+        <div className="flex justify-center py-10">
+          <Spinner />
+        </div>
       ) : segment === "productos" ? (
         products.length === 0 ? (
-          <EmptyBlock
-            message="Aún no hay productos."
-            cta="Agregar producto"
-            href="/inventario/nuevo"
+          <Empty
+            title="Aún no hay productos."
+            action={
+              <OfflineLink
+                href="/inventario/nuevo"
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
+              >
+                Agregar producto
+              </OfflineLink>
+            }
           />
         ) : filteredProducts.length === 0 && searching ? (
-          <p className="text-sm text-ink/60">No hay productos con ese nombre.</p>
+          <p className="text-sm text-ink-muted">No hay productos con ese nombre.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {filteredProducts.map((p) => {
@@ -119,7 +131,7 @@ export default function InventarioPage() {
                 <li key={p.id}>
                   <OfflineLink
                     href={`/inventario/${p.id}`}
-                    className="flex min-h-11 items-start justify-between gap-2 rounded-2xl border border-ink/[0.08] bg-surface p-4"
+                    className="flex min-h-11 items-start justify-between gap-2 rounded-[var(--r-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)]"
                   >
                     <div className="flex min-w-0 items-start gap-3">
                       <ProductThumbnail
@@ -128,30 +140,23 @@ export default function InventarioPage() {
                         size="md"
                       />
                       <div className="min-w-0">
-                      <p className="font-medium">{p.name}</p>
-                      <p className="mt-0.5 text-sm text-ink/60">
-                        {formatCop(p.price)}
-                      </p>
-                      {(agotado || low) && (
-                        <span
-                          className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            agotado
-                              ? "bg-danger/15 text-danger"
-                              : "bg-primary/40 text-ink"
-                          }`}
-                        >
-                          {agotado ? "Agotado" : "Stock bajo"}
-                        </span>
-                      )}
+                        <p className="font-medium">{p.name}</p>
+                        <p className="mt-0.5 text-sm text-ink-muted">
+                          {formatCop(p.price)}
+                        </p>
+                        {(agotado || low) && (
+                          <Badge
+                            tone={agotado ? "danger" : "warning"}
+                            className="mt-1"
+                          >
+                            {agotado ? "Agotado" : "Stock bajo"}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <p
                       className={`text-sm font-semibold ${
-                        agotado
-                          ? "text-danger"
-                          : low
-                            ? "text-danger"
-                            : "text-ink/70"
+                        agotado || low ? "text-danger" : "text-ink-muted"
                       }`}
                     >
                       Stock {p.stock}
@@ -163,31 +168,35 @@ export default function InventarioPage() {
           </ul>
         )
       ) : suppliers.length === 0 ? (
-        <EmptyBlock
-          message="Aún no hay proveedores."
-          cta="Agregar proveedor"
-          href="/inventario/proveedores/nuevo"
+        <Empty
+          title="Aún no hay proveedores."
+          action={
+            <OfflineLink
+              href="/inventario/proveedores/nuevo"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
+            >
+              Agregar proveedor
+            </OfflineLink>
+          }
         />
       ) : filteredSuppliers.length === 0 && searching ? (
-        <p className="text-sm text-ink/60">No encontramos ese proveedor.</p>
+        <p className="text-sm text-ink-muted">No encontramos ese proveedor.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {filteredSuppliers.map((s) => (
             <li key={s.id}>
               <OfflineLink
                 href={`/inventario/proveedores/${s.id}`}
-                className="flex min-h-11 flex-col justify-center rounded-2xl border border-ink/[0.08] bg-surface p-4"
+                className="flex min-h-11 flex-col justify-center rounded-[var(--r-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)]"
               >
-                <span className="font-medium">
+                <span className="flex flex-wrap items-center gap-2 font-medium">
                   {s.name}
                   {pendingSupplierIds.includes(s.id) && (
-                    <span className="ml-2 rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold text-ink/70">
-                      ⏳ Pendiente
-                    </span>
+                    <Badge tone="warning">⏳ Pendiente</Badge>
                   )}
                 </span>
                 {s.phone && (
-                  <span className="text-sm text-ink/50">{s.phone}</span>
+                  <span className="text-sm text-ink-muted">{s.phone}</span>
                 )}
               </OfflineLink>
             </li>
@@ -208,36 +217,15 @@ function SegmentButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={onClick}
-      className={`min-h-11 rounded-[12px] text-sm font-semibold ${
-        active ? "bg-primary text-ink" : "bg-transparent text-ink/60"
+      className={`w-full ${
+        active ? "bg-primary text-ink hover:text-ink" : "text-ink-muted"
       }`}
     >
       {label}
-    </button>
-  );
-}
-
-function EmptyBlock({
-  message,
-  cta,
-  href,
-}: {
-  message: string;
-  cta: string;
-  href: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-ink/10 bg-surface p-6 text-center">
-      <p className="text-base font-medium">{message}</p>
-      <OfflineLink
-        href={href}
-        className="mt-4 inline-flex min-h-11 items-center justify-center rounded-[14px] bg-cta px-4 text-sm font-semibold text-white"
-      >
-        {cta}
-      </OfflineLink>
-    </div>
+    </Button>
   );
 }
