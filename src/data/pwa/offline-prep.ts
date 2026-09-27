@@ -25,7 +25,7 @@ import {
   statsSnapshotKind,
 } from "./offline-snapshots";
 
-export const PREP_VERSION = 6;
+export const PREP_VERSION = 7;
 export const PREP_DOCUMENT_CACHE = "documents";
 
 export type PrepTaskGroup = "app" | "catalogos" | "resumen" | "sistema";
@@ -213,6 +213,12 @@ export async function dynamicDocumentTasks(businessId: string): Promise<PrepTask
       group: "app" as const,
       label: `Documento abono ${c.name}`,
       run: () => warmDocument(`/clientes/${c.id}/abono`),
+    });
+    tasks.push({
+      key: `doc:/clientes/${c.id}/deuda-inicial`,
+      group: "app" as const,
+      label: `Documento deuda inicial ${c.name}`,
+      run: () => warmDocument(`/clientes/${c.id}/deuda-inicial`),
     });
   }
   const suppliers = await db.suppliers.where("businessId").equals(businessId).toArray();

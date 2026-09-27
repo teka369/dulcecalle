@@ -114,6 +114,25 @@ async function buildLocalStatement(
     });
   }
 
+  const customerSaleIds = new Set(
+    sales.filter((row) => row.customerId === customerId).map((row) => row.id),
+  );
+  const returns = await db.saleReturns.where("businessId").equals(businessId).toArray();
+  for (const ret of returns) {
+    if (ret.debtReduced <= 0 || !customerSaleIds.has(ret.saleId)) continue;
+    events.push({
+      at: ret.createdAt,
+      delta: -ret.debtReduced,
+      entry: {
+        kind: "devolucion",
+        id: `dev-${ret.id}`,
+        createdAt: ret.createdAt,
+        amount: ret.debtReduced,
+        runningBalance: 0,
+      },
+    });
+  }
+
   events.sort((a, b) => a.at - b.at);
   let running = 0;
   let charged = 0;

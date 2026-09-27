@@ -181,12 +181,12 @@ export default function ClienteFichaPage() {
         </OfflineLink>
       )}
 
-      <Link
+      <OfflineLink
         href={`/clientes/${customer.id}/deuda-inicial`}
         className="flex min-h-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold"
       >
         Agregar deuda anterior
-      </Link>
+      </OfflineLink>
     </div>
   );
 }

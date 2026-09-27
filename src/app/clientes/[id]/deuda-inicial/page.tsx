@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { OfflineLink } from "@/components/shell/OfflineLink";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   INITIAL_DEBT_TOAST,
@@ -68,14 +70,18 @@ export default function AgregarDeudaAnteriorPage() {
       if (!requestIdRef.current) {
         requestIdRef.current = crypto.randomUUID();
       }
-      await customerStore.recordInitialDebt({
+      const result = await customerStore.recordInitialDebt({
         customerId: customer.id,
         amountRaw,
         requestId: requestIdRef.current,
       });
-      setToast(INITIAL_DEBT_TOAST);
+      setToast(
+        result.mode === "offline"
+          ? "Deuda anterior guardada sin conexión"
+          : INITIAL_DEBT_TOAST,
+      );
       setTimeout(() => {
-        router.push(`/clientes/${customer.id}`);
+        navigateOfflineAware(router, `/clientes/${customer.id}`);
       }, 700);
     } catch (e) {
       setError(
@@ -107,13 +113,13 @@ export default function AgregarDeudaAnteriorPage() {
   return (
     <div className="flex flex-col gap-4 pb-28">
       <header className="flex items-center gap-2">
-        <Link
+        <OfflineLink
           href={`/clientes/${customer.id}`}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
+          ariaLabel="Volver"
         >
           ←
-        </Link>
+        </OfflineLink>
         <h1 className="text-[22px] font-semibold">Agregar deuda anterior</h1>
       </header>
 

@@ -13,7 +13,6 @@ import {
   validateInitialDebtAmount,
 } from "@/domain/initialDebt";
 import { ApiError } from "@/data/errors";
-import { getPwaApi } from "@/data/pwa/api";
 import { getCachedCustomer, listCachedCustomers } from "@/data/pwa/catalog";
 import { createPaymentWithOfflineFallback } from "@/data/pwa/offline-payments";
 import {
@@ -21,6 +20,7 @@ import {
   patchCustomerWithOfflineFallback,
 } from "@/data/pwa/offline-catalog";
 import { getStatementWithOfflineFallback } from "@/data/pwa/offline-statement";
+import { createInitialDebtWithOfflineFallback } from "@/data/pwa/offline-initial-debt";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import type { DebtStatement } from "@/domain/debt/statement";
 
@@ -181,7 +181,7 @@ export const customerStore = {
     customerId: string;
     amountRaw: string;
     requestId?: string;
-  }): Promise<string> {
+  }): Promise<{ id: string; mode: "online" | "offline" }> {
     const customer = await this.getCustomer(input.customerId);
     if (!customer) throw new Error("customer not found");
 
@@ -190,14 +190,21 @@ export const customerStore = {
 
     const amount = parseInitialDebtAmount(input.amountRaw);
     try {
-      const row = await getPwaApi().customers.initialDebt(
-        input.customerId,
-        { amount },
+      const result = await createInitialDebtWithOfflineFallback(
+        { customerId: input.customerId, amount },
         input.requestId ?? crypto.randomUUID(),
       );
       await this.refresh();
-      setState({ lastToast: INITIAL_DEBT_TOAST });
-      return row.id;
+      setState({
+        lastToast:
+          result.mode === "offline"
+            ? "Deuda anterior guardada sin conexión"
+            : INITIAL_DEBT_TOAST,
+      });
+      return {
+        id: result.mode === "offline" ? result.debtId : result.debt.id,
+        mode: result.mode,
+      };
     } catch (e) {
       fail(e);
     }
