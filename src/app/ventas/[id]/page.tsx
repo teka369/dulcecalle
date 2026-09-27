@@ -16,6 +16,7 @@ import {
 import { getPwaAuthSession } from "@/data/http/session";
 import { useProductImageMap } from "@/data/pwa/product-image-map";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
+import { listCachedCustomers } from "@/data/pwa/catalog";
 
 const kindLabel: Record<string, string> = {
   paid: "Pagada",
@@ -29,10 +30,20 @@ function kindTone(kind: string): BadgeTone {
   return "info";
 }
 
+function saleDateLabel(occurredOn: string | null | undefined, createdAt: number | null | undefined): string {
+  if (occurredOn) return occurredOn;
+  if (createdAt) {
+    const d = new Date(createdAt);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  return "";
+}
+
 export default function VentaDetallePage() {
   const params = useParams();
   const id = routeId(params.id);
   const [data, setData] = useState<SaleDetailResult | null>(null);
+  const [customerName, setCustomerName] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const imageMap = useProductImageMap(getPwaAuthSession().businessId);
 
@@ -43,6 +54,17 @@ export default function VentaDetallePage() {
     }
     const row = await getSaleDetailWithOfflineFallback(id);
     setData(row);
+    if (row?.sale.customerId) {
+      try {
+        const customers = await listCachedCustomers();
+        const found = customers.find((c) => c.id === row.sale.customerId);
+        setCustomerName(found?.name ?? null);
+      } catch {
+        setCustomerName(null);
+      }
+    } else {
+      setCustomerName(null);
+    }
     setReady(true);
   }, [id]);
 
@@ -73,6 +95,7 @@ export default function VentaDetallePage() {
   const pending = sale.pending;
   const fromCache = data.source === "cache";
   const canReturn = remainingValue > 0;
+  const date = saleDateLabel(sale.occurredOn, sale.createdAt);
 
   return (
     <div className="flex flex-col gap-4">
@@ -84,27 +107,45 @@ export default function VentaDetallePage() {
         >
           ←
         </Link>
-        <div>
+        <div className="min-w-0">
           <h1 className="text-[22px] font-semibold">Venta</h1>
           <p className="flex flex-wrap items-center gap-2 text-sm text-ink-muted">
             <Badge tone={kindTone(sale.paymentKind)}>
               {kindLabel[sale.paymentKind] ?? sale.paymentKind}
             </Badge>
-            {pending && <Badge tone="warning">⏳ Pendiente de sincronización</Badge>}
+            {pending && (
+              <Badge tone="warning">⏳ Pendiente de sincronización</Badge>
+            )}
           </p>
         </div>
       </header>
 
+      {/* Resumen — saleTotal ≠ amountReceived ≠ credit */}
       <Card>
         <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
           Total
         </p>
-        <p className="mt-1 text-2xl font-semibold">{formatCop(sale.saleTotal)}</p>
-        <p className="mt-2 text-sm text-ink-muted">
-          Recibido {formatCop(sale.amountReceived)} · Fiado {formatCop(sale.credit)}
+        <p className="mt-1 text-2xl font-semibold tabular-nums">
+          {formatCop(sale.saleTotal)}
         </p>
+        <p className="mt-2 text-sm text-ink-muted">
+          Recibido {formatCop(sale.amountReceived)} · Fiado{" "}
+          {formatCop(sale.credit)}
+        </p>
+        {(date || sale.method || customerName) && (
+          <p className="mt-2 text-xs text-ink-muted">
+            {[date, customerName, sale.method].filter(Boolean).join(" · ")}
+          </p>
+        )}
+        {sale.note ? (
+          <p className="mt-2 text-sm text-ink">
+            <span className="text-ink-muted">Nota · </span>
+            {sale.note}
+          </p>
+        ) : null}
       </Card>
 
+      {/* Líneas */}
       <section>
         <h2 className="mb-2 text-sm font-semibold text-ink-muted">Productos</h2>
         <ul className="flex flex-col gap-2">
@@ -122,10 +163,15 @@ export default function VentaDetallePage() {
                   />
                   <span className="min-w-0 font-medium">{l.productName}</span>
                 </span>
-                <span className="shrink-0 font-semibold">{formatCop(l.lineTotal)}</span>
+                <span className="shrink-0 font-semibold tabular-nums">
+                  {formatCop(l.lineTotal)}
+                </span>
               </div>
               <p className="mt-1 text-xs text-ink-muted">
                 {l.qty} × {formatCop(l.unitPrice)}
+                {l.unitCost != null && l.unitCost > 0
+                  ? ` · Costo ${formatCop(l.unitCost)}`
+                  : ""}
                 {l.returnedQty > 0
                   ? ` · Devuelto ${l.returnedQty} · Quedan ${l.remaining}`
                   : ""}
@@ -135,6 +181,7 @@ export default function VentaDetallePage() {
         </ul>
       </section>
 
+      {/* CTA Devolver if applicable */}
       {canReturn && (
         <OfflineLink
           href={`/ventas/${sale.id}/devolver`}
@@ -146,13 +193,15 @@ export default function VentaDetallePage() {
 
       {data.returnPending && (
         <p className="text-xs text-ink-muted">
-          Devolución pendiente de confirmación. El inventario no sube hasta que el servidor la acepte.
+          Devolución pendiente de confirmación. El inventario no sube hasta que
+          el servidor la acepte.
         </p>
       )}
 
       {pending && canReturn && (
         <p className="text-xs text-ink-muted">
-          La venta se sincroniza primero. Puedes dejar la devolución lista en este dispositivo.
+          La venta se sincroniza primero. Puedes dejar la devolución lista en
+          este dispositivo.
         </p>
       )}
 
@@ -168,7 +217,9 @@ export default function VentaDetallePage() {
 
       {returns.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-ink-muted">Devoluciones</h2>
+          <h2 className="mb-2 text-sm font-semibold text-ink-muted">
+            Devoluciones
+          </h2>
           <ul className="flex flex-col gap-2">
             {returns.map((r) => (
               <li

@@ -144,14 +144,13 @@ export default function DevolverVentaPage() {
         >
           ←
         </Link>
-        <h1 className="text-[22px] font-semibold">Devolver</h1>
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold">Devolver</h1>
+          <p className="text-sm text-ink-muted">
+            Elige cantidades · inventario vuelve al confirmar
+          </p>
+        </div>
       </header>
-
-      <p className="text-sm text-ink-muted">
-        Los productos vuelven al inventario. Si la venta fue pagada, sale plata
-        de caja o Nequi. Si fue fiada, baja la deuda. La venta original no se
-        borra.
-      </p>
 
       {data.returnPending && (
         <p className="text-xs text-ink-muted">
@@ -167,7 +166,8 @@ export default function DevolverVentaPage() {
         </p>
       ) : (
         <>
-          <section className="flex flex-col gap-3">
+          {/* Zona tarea — qty por línea primero */}
+          <section className="flex flex-col gap-3" aria-label="Cantidades">
             {remainingLines.map((l) => (
               <Card key={l.id}>
                 <div className="flex items-start gap-2">
@@ -217,6 +217,12 @@ export default function DevolverVentaPage() {
           )}
 
           {error && <p className="text-sm text-danger">{error}</p>}
+
+          {/* Zona secundaria — explicación */}
+          <p className="text-xs text-ink-muted">
+            Si la venta fue pagada, sale plata de caja o Nequi. Si fue fiada,
+            baja la deuda. La venta original no se borra.
+          </p>
         </>
       )}
 

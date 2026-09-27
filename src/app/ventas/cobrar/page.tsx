@@ -36,6 +36,7 @@ export default function CobrarPage() {
   const [customers, setCustomers] = useState<RemoteCustomer[]>([]);
   const [pendingCustomerIds, setPendingCustomerIds] = useState<string[]>([]);
   const [abonoInput, setAbonoInput] = useState("");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +95,11 @@ export default function CobrarPage() {
     [lines],
   );
 
+  const itemCount = useMemo(
+    () => lines.reduce((s, l) => s + l.qty, 0),
+    [lines],
+  );
+
   const abono =
     paymentKind === "partial"
       ? Number.parseInt(abonoInput || "0", 10) || 0
@@ -136,6 +142,7 @@ export default function CobrarPage() {
         requestIdRef.current = crypto.randomUUID();
       }
 
+      const trimmedNote = note.trim();
       const result = await createSaleWithOfflineFallback(
         {
           lines: lines.map((l) => ({
@@ -148,6 +155,7 @@ export default function CobrarPage() {
             paymentKind === "paid" ? undefined : (customerId ?? undefined),
           amountReceived: received,
           method: received > 0 ? method : undefined,
+          ...(trimmedNote ? { note: trimmedNote } : {}),
         },
         requestIdRef.current,
       );
@@ -187,32 +195,51 @@ export default function CobrarPage() {
         <h1 className="text-[22px] font-semibold">Cobrar</h1>
       </header>
 
-      <Card>
-        <h2 className="text-sm font-semibold text-ink-muted">Resumen</h2>
-        <ul className="mt-2 flex flex-col gap-1">
-          {lines.map((l) => (
-            <li key={l.productId} className="flex items-center justify-between gap-2 text-sm">
-              <span className="flex min-w-0 items-center gap-2">
-                <ProductThumbnail secureUrl={l.imageUrl} alt={l.name} size="xs" />
-                <span className="min-w-0">
-                  {l.name} ×{l.qty}
-                  {l.unitPrice !== l.catalogPrice && (
-                    <span className="ml-1 text-ink-muted">
-                      ({formatCop(l.unitPrice)})
-                    </span>
-                  )}
-                </span>
-              </span>
-              <span className="shrink-0 font-medium">{formatCop(l.lineTotal)}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-3 flex justify-between border-t border-border pt-3 text-base font-semibold">
-          <span>Total</span>
-          <span>{formatCop(total)}</span>
+      {/* Compact total summary */}
+      <Card className="p-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Total
+            </p>
+            <p className="mt-0.5 text-2xl font-semibold tabular-nums">
+              {formatCop(total)}
+            </p>
+          </div>
+          <p className="shrink-0 text-sm text-ink-muted">
+            {itemCount} {itemCount === 1 ? "ítem" : "ítems"}
+          </p>
         </div>
+        {lines.length > 0 && (
+          <ul className="mt-3 flex flex-col gap-1 border-t border-border pt-2">
+            {lines.map((l) => (
+              <li
+                key={l.productId}
+                className="flex items-center justify-between gap-2 text-xs text-ink-muted"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <ProductThumbnail
+                    secureUrl={l.imageUrl}
+                    alt={l.name}
+                    size="xs"
+                  />
+                  <span className="min-w-0 truncate">
+                    {l.name} ×{l.qty}
+                    {l.unitPrice !== l.catalogPrice && (
+                      <span className="ml-1">({formatCop(l.unitPrice)})</span>
+                    )}
+                  </span>
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {formatCop(l.lineTotal)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
+      {/* PRIMARY: payment kind before method */}
       <section>
         <h2 className="mb-2 text-base font-semibold">¿Cómo pagan?</h2>
         <div className="grid grid-cols-3 gap-2">
@@ -237,10 +264,13 @@ export default function CobrarPage() {
         </div>
       </section>
 
+      {/* SECONDARY: method only if not Fiada */}
       {paymentKind !== "credit" && (
-        <Card>
-          <p className="text-sm font-semibold">¿Cómo recibes?</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
+        <section>
+          <p className="mb-2 text-sm font-medium text-ink-muted">
+            ¿Cómo recibes?
+          </p>
+          <div className="grid grid-cols-2 gap-2">
             <MethodButton
               label="Efectivo"
               active={method === "Efectivo"}
@@ -252,7 +282,7 @@ export default function CobrarPage() {
               onClick={() => setMethod("Nequi")}
             />
           </div>
-        </Card>
+        </section>
       )}
 
       {paymentKind === "partial" && (
@@ -294,6 +324,21 @@ export default function CobrarPage() {
           />
         </Card>
       )}
+
+      {/* G6: optional note — field already on CreateSaleInput */}
+      <Card>
+        <label className="text-sm font-medium" htmlFor="nota">
+          Nota <span className="font-normal text-ink-muted">(opcional)</span>
+        </label>
+        <Input
+          id="nota"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          className="mt-2"
+          placeholder="Ej. entrega en la tarde"
+          maxLength={200}
+        />
+      </Card>
 
       {error && <p className="text-sm text-danger">{error}</p>}
 

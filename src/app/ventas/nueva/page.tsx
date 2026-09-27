@@ -106,6 +106,7 @@ export default function NuevaVentaPage() {
         <h1 className="text-[22px] font-semibold">Nueva venta</h1>
       </header>
 
+      {/* Zona tarea — buscar + categorías */}
       <Input
         type="search"
         value={query}
@@ -113,7 +114,7 @@ export default function NuevaVentaPage() {
         placeholder="Buscar dulce..."
       />
 
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Categorías">
         <Chip
           active={category === null}
           onClick={() => setCategory(null)}
@@ -202,9 +203,10 @@ export default function NuevaVentaPage() {
         <p className="text-center text-sm text-danger">{stockError}</p>
       )}
 
+      {/* Sticky: N ítems · $ total · Cobrar */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
-          <p className="text-sm font-medium">
+          <p className="text-sm font-medium tabular-nums">
             {totalQty} ítems · {formatCop(total)}
           </p>
           <Button
