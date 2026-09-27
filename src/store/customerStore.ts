@@ -13,7 +13,6 @@ import {
   validateInitialDebtAmount,
 } from "@/domain/initialDebt";
 import { ApiError } from "@/data/errors";
-import { getPwaApi } from "@/data/pwa/api";
 import { getCachedCustomer, listCachedCustomers } from "@/data/pwa/catalog";
 import { createPaymentWithOfflineFallback } from "@/data/pwa/offline-payments";
 import {
@@ -182,7 +181,7 @@ export const customerStore = {
     customerId: string;
     amountRaw: string;
     requestId?: string;
-  }): Promise<string> {
+  }): Promise<{ id: string; mode: "online" | "offline" }> {
     const customer = await this.getCustomer(input.customerId);
     if (!customer) throw new Error("customer not found");
 
@@ -202,7 +201,10 @@ export const customerStore = {
             ? "Deuda anterior guardada sin conexión"
             : INITIAL_DEBT_TOAST,
       });
-      return result.mode === "offline" ? result.debtId : result.debt.id;
+      return {
+        id: result.mode === "offline" ? result.debtId : result.debt.id,
+        mode: result.mode,
+      };
     } catch (e) {
       fail(e);
     }
