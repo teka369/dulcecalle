@@ -37,11 +37,11 @@ export default function LoginPage() {
     return (
       <div className="flex flex-col gap-4">
         <Image
-          src="/DulceCalle.png"
+          src="/brand/dulcecalle-logo.png"
           alt="Dulce Calle"
           width={80}
           height={80}
-          className="h-20 w-20 rounded-[var(--r-lg)] object-cover"
+          className="h-20 w-20 rounded-[var(--r-lg)] object-contain"
           priority
         />
         <h1 className="text-[22px] font-semibold">Cuenta</h1>
@@ -74,11 +74,11 @@ export default function LoginPage() {
         className="w-fit rounded-[var(--r-lg)] outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <Image
-          src="/DulceCalle.png"
+          src="/brand/dulcecalle-logo.png"
           alt="Dulce Calle"
           width={80}
           height={80}
-          className="h-20 w-20 rounded-[var(--r-lg)] object-cover"
+          className="h-20 w-20 rounded-[var(--r-lg)] object-contain"
           priority
         />
       </button>

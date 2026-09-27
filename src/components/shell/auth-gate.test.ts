@@ -114,7 +114,7 @@ describe("customer portal routing", () => {
       "utf8",
     );
     expect(page).toContain("CustomerLoginForm");
-    expect(page).toContain("/DulceCalle.png");
+    expect(page).toContain("/brand/dulcecalle-logo.png");
     const form = readFileSync(
       join(__dirname, "../customer/CustomerLoginForm.tsx"),
       "utf8",

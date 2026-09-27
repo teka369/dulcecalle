@@ -154,10 +154,10 @@ export function InicioDashboard({
             <Link
               key={action.href}
               href={action.href}
-              className={`flex min-h-11 items-center justify-center rounded-[var(--r-md)] px-3 text-center text-sm font-semibold ${
+              className={`inline-flex h-11 min-h-11 items-center justify-center rounded-[var(--r-md)] px-4 text-center text-sm font-semibold transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 action.primary
-                  ? "bg-cta text-cta-fg"
-                  : "border border-border bg-surface text-ink"
+                  ? "bg-cta text-cta-fg hover:opacity-[0.92]"
+                  : "border border-border bg-surface text-ink hover:opacity-[0.92]"
               }`}
             >
               {action.label}

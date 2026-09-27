@@ -39,11 +39,11 @@ export function CustomerChrome({
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <Image
-          src="/DulceCalle.png"
+          src="/brand/dulcecalle-logo.png"
           alt="Dulce Calle"
-          width={36}
-          height={36}
-          className="h-9 w-9 rounded-[var(--r-md)] object-cover"
+          width={32}
+          height={32}
+          className="h-8 w-8 rounded-[var(--r-md)] object-contain"
         />
         <span className="text-sm font-semibold text-ink-muted">Dulce Calle</span>
       </div>
@@ -60,10 +60,10 @@ export function CustomerChrome({
             <Link
               key={item.href}
               href={item.href}
-              className={`flex min-h-11 items-center rounded-[var(--r-md)] px-3 text-sm font-semibold ${
+              className={`inline-flex h-11 min-h-11 items-center justify-center rounded-[var(--r-md)] px-4 text-sm font-semibold transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 active
-                  ? "bg-cta text-cta-fg"
-                  : "border border-border bg-surface text-ink"
+                  ? "bg-cta text-cta-fg hover:opacity-[0.92]"
+                  : "border border-border bg-surface text-ink hover:opacity-[0.92]"
               }`}
             >
               {item.label}

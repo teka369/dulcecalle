@@ -42,13 +42,14 @@ function ledger(): CustomerLedger {
 
 describe("branding único Dulce Calle", () => {
   it("usa el logo oficial y ninguna marca alternativa en código", () => {
+    expect(existsSync(join(ROOT, "public", "brand", "dulcecalle-logo.png"))).toBe(true);
     expect(existsSync(join(ROOT, "public", "DulceCalle.png"))).toBe(true);
     const all = [
       src("src/app/layout.tsx"),
       src("src/app/login/page.tsx"),
       src("src/components/customer/CustomerChrome.tsx"),
     ].join("\n");
-    expect(all).toContain("/DulceCalle.png");
+    expect(all).toContain("/brand/dulcecalle-logo.png");
     expect(all).not.toContain("next.svg");
     expect(all).not.toContain("vercel.svg");
     expect(all).not.toMatch(/emoji|🔥|🛒|store-icon|shop-logo/i);
@@ -58,11 +59,17 @@ describe("branding único Dulce Calle", () => {
     const layout = src("src/app/layout.tsx");
     expect(layout).toContain("/icons/icon-192.png");
     expect(layout).toContain("/icons/icon-512.png");
+    expect(layout).toContain("/icons/apple-touch-icon.png");
+    expect(layout).toContain("#F7F3EE");
     const manifest = src("public/manifest.webmanifest");
     expect(manifest).toContain("/icons/icon-192.png");
     expect(manifest).toContain("/icons/icon-512.png");
+    expect(manifest).toContain("/icons/icon-512-maskable.png");
+    expect(manifest).toContain('"theme_color": "#F7F3EE"');
+    expect(manifest).toContain('"background_color": "#F7F3EE"');
     expect(existsSync(join(ROOT, "public", "icons", "icon-192.png"))).toBe(true);
     expect(existsSync(join(ROOT, "public", "icons", "icon-512.png"))).toBe(true);
+    expect(existsSync(join(ROOT, "public", "icons", "icon-512-maskable.png"))).toBe(true);
     expect(existsSync(join(ROOT, "src", "app", "favicon.ico"))).toBe(true);
   });
 });
@@ -71,7 +78,7 @@ describe("login con Cliente como prioridad", () => {
   it("muestra Cliente primero y conserva la tienda en ruta privada", () => {
     const page = src("src/app/login/page.tsx");
     expect(page).toContain("CustomerLoginForm");
-    expect(page).toContain("/DulceCalle.png");
+    expect(page).toContain("/brand/dulcecalle-logo.png");
     expect(page).not.toContain("type=\"email\"");
     expect(page).not.toContain("Contraseña");
     expect(src("src/app/acceso-tienda/page.tsx")).toContain("StoreLoginForm");
@@ -157,7 +164,7 @@ describe("portal cliente comprensible", () => {
 
   it("el chrome del portal muestra marca y navegación a perfil", () => {
     const chrome = src("src/components/customer/CustomerChrome.tsx");
-    expect(chrome).toContain("/DulceCalle.png");
+    expect(chrome).toContain("/brand/dulcecalle-logo.png");
     expect(chrome).toContain("/cliente/perfil");
   });
 });

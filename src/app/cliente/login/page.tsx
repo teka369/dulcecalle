@@ -5,11 +5,11 @@ export default function CustomerLoginPage() {
   return (
     <div className="flex flex-col gap-4">
       <Image
-        src="/DulceCalle.png"
+        src="/brand/dulcecalle-logo.png"
         alt="Dulce Calle"
         width={72}
         height={72}
-        className="h-[72px] w-[72px] rounded-[var(--r-lg)] object-cover"
+        className="h-[72px] w-[72px] rounded-[var(--r-lg)] object-contain"
         priority
       />
       <CustomerLoginForm showBack />
