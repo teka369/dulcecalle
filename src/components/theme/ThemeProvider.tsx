@@ -1,16 +1,21 @@
 "use client";
 
 import { useLayoutEffect } from "react";
-import { applyPalette, loadPalette, readCachedPalette } from "@/theme/storage";
+import {
+  applyMode,
+  applyPalette,
+  loadMode,
+  loadPalette,
+  readCachedMode,
+  readCachedPalette,
+} from "@/theme/storage";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useLayoutEffect(() => {
-    const root = document.documentElement;
-    if (!root.dataset.mode) {
-      root.dataset.mode = "light";
-    }
     applyPalette(readCachedPalette());
+    applyMode(readCachedMode());
     void loadPalette().then(applyPalette);
+    void loadMode().then(applyMode);
   }, []);
   return children;
 }

@@ -38,24 +38,24 @@ export function SyncCenter() {
       role="dialog"
       aria-modal="false"
       aria-label="Centro de sincronización"
-      className="fixed inset-x-0 bottom-0 z-[60] mx-auto max-h-[80dvh] w-full max-w-lg overflow-y-auto rounded-t-[28px] border border-ink/10 bg-surface p-5 shadow-2xl"
+      className="fixed inset-x-0 bottom-0 z-[60] mx-auto max-h-[80dvh] w-full max-w-lg overflow-y-auto rounded-t-[var(--r-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-lg)]"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold">Sincronización</h2>
           {!online ? (
-            <p className="mt-1 text-sm leading-snug text-ink/60">
+            <p className="mt-1 text-sm leading-snug text-ink-muted">
               Sin conexión. Las operaciones nuevas se guardarán en este
               dispositivo y se sincronizarán automáticamente al volver
               internet.
             </p>
           ) : authRequired ? (
-            <p className="mt-1 text-sm leading-snug text-ink/60">
+            <p className="mt-1 text-sm leading-snug text-ink-muted">
               Inicia sesión para continuar la sincronización. Nada se perdió
               en este dispositivo.
             </p>
           ) : (
-            <p className="mt-1 text-sm leading-snug text-ink/60">
+            <p className="mt-1 text-sm leading-snug text-ink-muted">
               {counts.total === 0 && !flushing
                 ? "Todo está sincronizado."
                 : "Guardado local y sincronización con el servidor."}
@@ -66,13 +66,13 @@ export function SyncCenter() {
           type="button"
           onClick={closeCenter}
           aria-label="Cerrar centro de sincronización"
-          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[14px] border border-ink/10 bg-bg text-lg"
+          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[var(--r-md)] border border-border bg-bg text-lg"
         >
           ×
         </button>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-ink/10 bg-bg p-3 text-sm">
+      <div className="mt-4 rounded-[var(--r-lg)] border border-border bg-bg p-3 text-sm">
         <p>✓ {synced} sincronizada{synced === 1 ? "" : "s"} (último ciclo)</p>
         <p className="mt-1">
           {flushing ? `↻ Sincronizando ${flushing.completed}/${flushing.total}` : `○ ${counts.pending + counts.active} pendiente${counts.pending + counts.active === 1 ? "" : "s"}`}
@@ -83,12 +83,12 @@ export function SyncCenter() {
             : "! 0 necesitan atención"}
         </p>
         {lastDoneAt && (
-          <p className="mt-2 text-xs text-ink/55">
+          <p className="mt-2 text-xs text-ink-muted">
             Última sincronización: {formatDateTime(lastDoneAt)}
           </p>
         )}
         {prepPhase === "ready" && prepReadyAt && (
-          <p className="mt-1 text-xs text-ink/55">
+          <p className="mt-1 text-xs text-ink-muted">
             ✓ Offline listo desde {formatDateTime(prepReadyAt)}
           </p>
         )}
@@ -96,13 +96,13 @@ export function SyncCenter() {
 
       {flushing && flushing.total > 0 && (
         <div className="mt-4">
-          <div className="flex items-center justify-between text-xs font-medium text-ink/55">
+          <div className="flex items-center justify-between text-xs font-medium text-ink-muted">
             <span>
               {flushing.completed} de {flushing.total}
             </span>
             <span>{progress}%</span>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-ink/10">
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2">
             <div
               className="h-full rounded-full bg-cta transition-all duration-300"
               style={{ width: `${progress}%` }}
@@ -114,7 +114,7 @@ export function SyncCenter() {
       {online && authRequired && (
         <a
           href="/login"
-          className="mt-4 flex min-h-11 w-full items-center justify-center rounded-[14px] bg-cta text-sm font-semibold text-white"
+          className="mt-4 flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
         >
           Inicia sesión para sincronizar
         </a>
@@ -124,7 +124,7 @@ export function SyncCenter() {
         <button
           type="button"
           onClick={() => void syncNow()}
-          className="mt-4 min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white"
+          className="mt-4 min-h-11 w-full rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
         >
           Sincronizar ahora
         </button>
@@ -132,7 +132,7 @@ export function SyncCenter() {
 
       <h3 className="mb-2 mt-5 text-sm font-semibold">Operaciones</h3>
       {loading ? (
-        <p className="text-sm text-ink/60">Cargando…</p>
+        <p className="text-sm text-ink-muted">Cargando…</p>
       ) : (
         <SyncOperationList items={items} flushing={flushing != null} />
       )}
@@ -144,7 +144,7 @@ export function SyncCenter() {
             {recent.map((r) => (
               <li
                 key={r.key}
-                className="flex items-center justify-between gap-2 rounded-2xl border border-ink/[0.08] bg-bg px-3 py-2 text-xs text-ink/70"
+                className="flex items-center justify-between gap-2 rounded-[var(--r-lg)] border border-border bg-bg px-3 py-2 text-xs text-ink-muted"
               >
                 <span className="truncate">
                   {r.status === "synced" ? "✓" : "!"} {r.entity ?? "Operación"}

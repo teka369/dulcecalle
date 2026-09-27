@@ -5,8 +5,15 @@ import {
   parsePalette,
   type PaletteId,
 } from "./palettes";
+import {
+  DEFAULT_MODE,
+  MODE_SETTING_KEY,
+  parseMode,
+  type ColorMode,
+} from "./mode";
 
 const PALETTE_CACHE_KEY = "dulcecalle.palette";
+const MODE_CACHE_KEY = "dulcecalle.mode";
 
 export function readCachedPalette(): PaletteId {
   if (typeof localStorage === "undefined") return DEFAULT_PALETTE;
@@ -44,4 +51,43 @@ export async function loadPalette(): Promise<PaletteId> {
 export async function savePalette(id: PaletteId): Promise<void> {
   await getDb().settings.put({ key: PALETTE_SETTING_KEY, value: id });
   applyPalette(id);
+}
+
+export function readCachedMode(): ColorMode {
+  if (typeof localStorage === "undefined") return DEFAULT_MODE;
+  try {
+    return parseMode(localStorage.getItem(MODE_CACHE_KEY));
+  } catch {
+    return DEFAULT_MODE;
+  }
+}
+
+/** Apply color mode without touching data-theme (palette). */
+export function applyMode(mode: ColorMode): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.dataset.mode = mode;
+  try {
+    localStorage.setItem(MODE_CACHE_KEY, mode);
+  } catch {
+    /* private mode */
+  }
+  const bg = getComputedStyle(document.documentElement)
+    .getPropertyValue("--bg")
+    .trim();
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta && bg) meta.setAttribute("content", bg);
+}
+
+export async function loadMode(): Promise<ColorMode> {
+  try {
+    const row = await getDb().settings.get(MODE_SETTING_KEY);
+    return parseMode(row?.value);
+  } catch {
+    return readCachedMode();
+  }
+}
+
+export async function saveMode(mode: ColorMode): Promise<void> {
+  await getDb().settings.put({ key: MODE_SETTING_KEY, value: mode });
+  applyMode(mode);
 }

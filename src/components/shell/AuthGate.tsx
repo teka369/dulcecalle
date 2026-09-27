@@ -40,11 +40,19 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return children;
   }
   if (isCustomerPath(pathname) && !ok) {
-    return <p className="text-sm text-ink/60">Cargando…</p>;
+    return (
+      <p className="rounded-[var(--r-md)] border border-border bg-surface px-3 py-2 text-sm text-ink-muted">
+        Cargando…
+      </p>
+    );
   }
   if (ADMIN_PUBLIC.has(pathname)) return children;
   if (!ok) {
-    return <p className="text-sm text-ink/60">Cargando…</p>;
+    return (
+      <p className="rounded-[var(--r-md)] border border-border bg-surface px-3 py-2 text-sm text-ink-muted">
+        Cargando…
+      </p>
+    );
   }
   return children;
 }

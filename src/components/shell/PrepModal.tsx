@@ -51,17 +51,17 @@ export function PrepModal() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="prep-title"
-        className="w-full max-w-sm rounded-[28px] border border-ink/10 bg-surface p-5 shadow-2xl"
+        className="w-full max-w-sm rounded-[var(--r-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-lg)]"
       >
         {phase === "ready" ? (
           <>
             <h2 id="prep-title" className="text-base font-semibold">
               ✓ Dulce Calle está listo
             </h2>
-            <p className="mt-1 text-sm leading-snug text-ink/60">
+            <p className="mt-1 text-sm leading-snug text-ink-muted">
               Tu dispositivo ya está preparado para trabajar sin conexión.
             </p>
-            <p className="mt-2 text-xs text-ink/55">
+            <p className="mt-2 text-xs text-ink-muted">
               Datos preparados: catálogos y documentos de la app.
             </p>
           </>
@@ -70,19 +70,19 @@ export function PrepModal() {
             <h2 id="prep-title" className="text-base font-semibold">
               Preparando Dulce Calle
             </h2>
-            <p className="mt-1 text-sm leading-snug text-ink/60">
+            <p className="mt-1 text-sm leading-snug text-ink-muted">
               Estamos guardando en este dispositivo todo lo necesario para
               seguir trabajando si pierdes internet.
             </p>
 
             <div className="mt-4">
-              <div className="flex items-center justify-between text-xs font-medium text-ink/55">
+              <div className="flex items-center justify-between text-xs font-medium text-ink-muted">
                 <span>
                   {completed} de {total} tareas completadas
                 </span>
                 <span>{progress}%</span>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-ink/10">
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2">
                 <div
                   className="h-full rounded-full bg-cta transition-all duration-300"
                   style={{ width: `${progress}%` }}
@@ -95,7 +95,7 @@ export function PrepModal() {
               if (groupTasks.length === 0) return null;
               return (
                 <div key={group} className="mt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     {GROUP_TITLES[group]}
                   </h3>
                   <ul className="mt-2 flex flex-col gap-1">
@@ -113,7 +113,7 @@ export function PrepModal() {
                           </span>
                         ) : (
                           task.detail && (
-                            <span className="shrink-0 text-xs text-ink/55">{task.detail}</span>
+                            <span className="shrink-0 text-xs text-ink-muted">{task.detail}</span>
                           )
                         )}
                       </li>
@@ -124,9 +124,9 @@ export function PrepModal() {
             })}
 
             {phase === "failed" && (
-              <div className="mt-4 rounded-2xl border border-danger/20 bg-danger/5 p-3">
+              <div className="mt-4 rounded-[var(--r-lg)] border border-danger/20 bg-danger-soft/40 p-3">
                 <p className="text-sm font-semibold">Preparación incompleta</p>
-                <p className="mt-1 text-xs leading-relaxed text-ink/70">
+                <p className="mt-1 text-xs leading-relaxed text-ink-muted">
                   {completed} de {total} tareas completadas. Faltan datos
                   necesarios:
                 </p>
@@ -138,13 +138,13 @@ export function PrepModal() {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 text-xs leading-relaxed text-ink/70">
+                <p className="mt-2 text-xs leading-relaxed text-ink-muted">
                   No estás listo para trabajar sin conexión.
                 </p>
                 <button
                   type="button"
                   onClick={() => void start()}
-                  className="mt-3 min-h-11 w-full rounded-[14px] bg-cta text-sm font-semibold text-white"
+                  className="mt-3 min-h-11 w-full rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
                 >
                   Reintentar
                 </button>
@@ -152,7 +152,7 @@ export function PrepModal() {
             )}
 
             {phase !== "failed" && (
-              <p className="mt-4 text-xs text-ink/55">No cierres la aplicación.</p>
+              <p className="mt-4 text-xs text-ink-muted">No cierres la aplicación.</p>
             )}
           </>
         )}

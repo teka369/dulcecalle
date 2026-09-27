@@ -28,6 +28,7 @@ export function onOfflineLinkClick(event: OfflineClick, href: string): void {
  * Link that degrades to a document navigation while offline, so the
  * Service Worker can serve the prepared document (or /offline) instead
  * of failing an RSC client navigation. Online behavior is unchanged.
+ * Visual: inherits className; adds DS focus ring when not overridden.
  */
 export function OfflineLink({
   href,
@@ -44,8 +45,12 @@ export function OfflineLink({
     onOfflineLinkClick(e, href);
   }
 
+  const focus =
+    "outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--bg)]";
+  const merged = className ? `${focus} ${className}` : focus;
+
   return (
-    <Link href={href} className={className} onClick={onClick} aria-label={ariaLabel}>
+    <Link href={href} className={merged} onClick={onClick} aria-label={ariaLabel}>
       {children}
     </Link>
   );

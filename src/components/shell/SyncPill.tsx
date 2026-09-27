@@ -39,7 +39,7 @@ export function SyncPill() {
 
   const label = syncPillLabel(online, counts, flushing, authRequired);
   const tone = !online
-    ? "border-ink/10 bg-surface text-ink/70"
+    ? "border-border bg-surface text-ink-muted"
     : authRequired
       ? "border-danger/30 bg-surface text-danger"
       : flushing && flushing.total > 0
@@ -47,15 +47,15 @@ export function SyncPill() {
         : counts.permanent > 0
           ? "border-danger/30 bg-surface text-danger"
           : counts.total > 0
-            ? "border-ink/10 bg-surface text-ink/70"
-            : "border-ok/25 bg-surface text-ink/60";
+            ? "border-border bg-surface text-ink-muted"
+            : "border-ok/25 bg-surface text-ink-muted";
 
   return (
     <button
       type="button"
       onClick={openCenter}
       aria-label={`Sincronización: ${label}. Abrir centro de sincronización.`}
-      className={`fixed bottom-[4.5rem] left-4 z-50 flex min-h-11 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold shadow-lg ${tone}`}
+      className={`fixed bottom-[4.5rem] left-4 z-50 flex min-h-11 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-[var(--r-pill)] border px-3 py-2 text-xs font-semibold shadow-[var(--shadow-md)] ${tone}`}
     >
       <span className="truncate">{label}</span>
     </button>
