@@ -15,7 +15,26 @@ export function isActiveDebtIntent(op: OutboxItem): boolean {
 export function isPermanentDebtRejection(error: unknown): boolean {
   return (
     error instanceof ApiError &&
-    (error.status === 400 || error.status === 404 || error.status === 409 || error.status === 422)
+    (error.status === 400 ||
+      error.status === 403 ||
+      error.status === 404 ||
+      error.status === 409 ||
+      error.status === 422)
+  );
+}
+
+/**
+ * Hide a local financial row when the server rejected it, or when the
+ * optimistic effect was rolled back and has not been re-applied yet.
+ * 401 is not this case: the intent stays pending and the effect stays.
+ */
+export function isSuppressedLocalEffect(op: OutboxItem): boolean {
+  if (op.status === "failed" && op.nextAttemptAt == null) return true;
+  const raw = op.payload;
+  return (
+    !!raw &&
+    typeof raw === "object" &&
+    (raw as { optimisticApplied?: unknown }).optimisticApplied === false
   );
 }
 
@@ -57,6 +76,7 @@ export async function pendingDebtAdjustment(
   for (const op of ops) {
     if (op.businessId !== businessId || excluded.has(op.operationId)) continue;
     if (!isActiveDebtIntent(op)) continue;
+    if (isSuppressedLocalEffect(op)) continue;
     if (op.entity === "initialDebt" && op.operation === "create") {
       if (payloadCustomerId(op) !== customerId) continue;
       delta = addCop(delta, payloadAmount(op, "amount"));

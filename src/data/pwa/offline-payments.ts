@@ -6,7 +6,8 @@ import { getLocalDb } from "../local/db";
 import { ConnectivityMonitor, getOutboxSyncEngine } from "../local/outbox";
 import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
 import { newEntityId } from "../local/ids";
-import { subCop } from "@/domain/money";
+import { subCop, addCop } from "@/domain/money";
+import { isPermanentDebtRejection } from "./pending-debt";
 
 export type CreatePaymentInput = {
   customerId: string;
@@ -158,6 +159,77 @@ export async function createPaymentWithOfflineFallback(
   }
 }
 
+function paymentEffectApplied(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object") return true;
+  return (payload as { optimisticApplied?: unknown }).optimisticApplied !== false;
+}
+
+async function setPaymentApplied(operationId: string, applied: boolean): Promise<void> {
+  const db = getLocalDb();
+  const op = await db.outbox.get(operationId);
+  if (!op || !op.payload || typeof op.payload !== "object") return;
+  await db.outbox.put({
+    ...op,
+    payload: { ...(op.payload as Record<string, unknown>), optimisticApplied: applied },
+  });
+}
+
+async function revertOptimisticPayment(businessId: string, operationId: string): Promise<void> {
+  const db = getLocalDb();
+  const op = await db.outbox.get(operationId);
+  if (!op || op.businessId !== businessId || !paymentEffectApplied(op.payload)) return;
+  const payment = await db.customerPayments.get(operationId);
+  if (payment && payment.businessId === businessId) {
+    const customer = await db.customers.get(payment.customerId);
+    if (customer && customer.businessId === businessId) {
+      await db.customers.put({
+        ...customer,
+        debt: addCop(customer.debt, payment.amount),
+        updatedAt: Date.now(),
+      });
+    }
+  }
+  const cash = await db.cashMoves.where("businessId").equals(businessId).toArray();
+  for (const move of cash) {
+    if (move.requestId !== op.requestId || move.refType !== "customer_payment") continue;
+    await db.cashMoves.delete(move.id);
+  }
+  await setPaymentApplied(operationId, false);
+}
+
+async function ensurePaymentOptimistic(businessId: string, operationId: string): Promise<void> {
+  const db = getLocalDb();
+  const op = await db.outbox.get(operationId);
+  if (!op || op.businessId !== businessId || paymentEffectApplied(op.payload)) return;
+  const payment = await db.customerPayments.get(operationId);
+  if (!payment || payment.businessId !== businessId) return;
+  const customer = await db.customers.get(payment.customerId);
+  if (customer && customer.businessId === businessId) {
+    const next = subCop(customer.debt, payment.amount);
+    await db.customers.put({
+      ...customer,
+      debt: next < 0 ? 0 : next,
+      updatedAt: Date.now(),
+    });
+  }
+  await db.cashMoves.put({
+    id: newEntityId(),
+    businessId,
+    amount: payment.amount,
+    direction: "in",
+    method: payment.method,
+    kind: "debt_collect",
+    sessionId: null,
+    refType: "customer_payment",
+    refId: payment.id,
+    requestId: op.requestId,
+    note: payment.note,
+    occurredOn: payment.occurredOn,
+    createdAt: Date.now(),
+  });
+  await setPaymentApplied(operationId, true);
+}
+
 export async function syncPendingPayments(businessId: string) {
   return getOutboxSyncEngine().flush(
     businessId,
@@ -165,20 +237,29 @@ export async function syncPendingPayments(businessId: string) {
       if (item.entity !== "customerPayment" || item.operation !== "pay") {
         throw new Error("Operación de outbox no compatible con M6.6.");
       }
-      const payload = item.payload as CreatePaymentInput;
-      return {
-        remoteId: (
-          await getPwaApi().customers.pay(
-            payload.customerId,
-            {
-              amount: payload.amount,
-              method: payload.method,
-              ...(payload.note ? { note: payload.note } : {}),
-            },
-            item.requestId,
-          )
-        ).id,
-      };
+      await ensurePaymentOptimistic(businessId, item.operationId);
+      const current = await getLocalDb().outbox.get(item.operationId);
+      const payload = (current?.payload ?? item.payload) as CreatePaymentInput;
+      try {
+        return {
+          remoteId: (
+            await getPwaApi().customers.pay(
+              payload.customerId,
+              {
+                amount: payload.amount,
+                method: payload.method,
+                ...(payload.note ? { note: payload.note } : {}),
+              },
+              item.requestId,
+            )
+          ).id,
+        };
+      } catch (error) {
+        if (isPermanentDebtRejection(error)) {
+          await revertOptimisticPayment(businessId, item.operationId);
+        }
+        throw error;
+      }
     },
     (item) => item.entity === "customerPayment" && item.operation === "pay",
   );

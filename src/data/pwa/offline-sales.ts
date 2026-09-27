@@ -10,6 +10,7 @@ import { getLocalDb } from "../local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
 import { getLocalStore } from "../local/store";
 import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
+import { isPermanentDebtRejection } from "./pending-debt";
 import { newEntityId } from "../local/ids";
 import { addCop, mulCop, subCop } from "@/domain/money";
 import type { LocalCustomer, LocalProduct, LocalSale, LocalSaleLine, LocalStockMove, LocalCashMove } from "../local/types";
@@ -398,14 +399,160 @@ export async function getSaleDetailWithOfflineFallback(
   return loadLocalReturnable(businessId, saleId);
 }
 
+function saleRequestBody(payload: unknown): CreateSaleInput {
+  const raw = payload as CreateSaleInput & { optimisticApplied?: unknown };
+  return {
+    lines: raw.lines,
+    paymentKind: raw.paymentKind,
+    amountReceived: raw.amountReceived,
+    ...(raw.customerId ? { customerId: raw.customerId } : {}),
+    ...(raw.method ? { method: raw.method } : {}),
+    ...(raw.note ? { note: raw.note } : {}),
+  };
+}
+
+function effectApplied(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object") return true;
+  return (payload as { optimisticApplied?: unknown }).optimisticApplied !== false;
+}
+
+async function setOptimisticApplied(
+  businessId: string,
+  operationId: string,
+  applied: boolean,
+): Promise<void> {
+  const db = getLocalDb();
+  const op = await db.outbox.get(operationId);
+  if (!op || op.businessId !== businessId || !op.payload || typeof op.payload !== "object") return;
+  await db.outbox.put({
+    ...op,
+    payload: { ...(op.payload as Record<string, unknown>), optimisticApplied: applied },
+  });
+}
+
+/** Put the local stock, cash and credit back when the server rejects the sale. */
+async function revertOptimisticSale(businessId: string, operationId: string): Promise<void> {
+  const db = getLocalDb();
+  const op = await db.outbox.get(operationId);
+  if (!op || op.businessId !== businessId || !effectApplied(op.payload)) return;
+  const sale = await db.sales.get(operationId);
+  if (sale && sale.businessId === businessId && sale.credit > 0 && sale.customerId) {
+    const customer = await db.customers.get(sale.customerId);
+    if (customer && customer.businessId === businessId) {
+      const next = subCop(customer.debt, sale.credit);
+      await db.customers.put({
+        ...customer,
+        debt: next < 0 ? 0 : next,
+        updatedAt: Date.now(),
+      });
+    }
+  }
+  const stockMoves = await db.stockMoves.where("businessId").equals(businessId).toArray();
+  for (const move of stockMoves) {
+    if (move.requestId !== op.requestId || move.reason !== "sale") continue;
+    const product = await db.products.get(move.productId);
+    if (product && product.businessId === businessId) {
+      await db.products.put({
+        ...product,
+        stock: product.stock - move.delta,
+        updatedAt: Date.now(),
+      });
+    }
+    await db.stockMoves.delete(move.id);
+  }
+  const cashMoves = await db.cashMoves.where("businessId").equals(businessId).toArray();
+  for (const move of cashMoves) {
+    if (move.requestId !== op.requestId || move.refType !== "sale") continue;
+    await db.cashMoves.delete(move.id);
+  }
+  await setOptimisticApplied(businessId, operationId, false);
+}
+
+/** A manual retry must re-apply the effect that a rejection rolled back. */
+async function ensureSaleOptimistic(businessId: string, operationId: string): Promise<void> {
+  const db = getLocalDb();
+  const op = await db.outbox.get(operationId);
+  if (!op || op.businessId !== businessId || effectApplied(op.payload)) return;
+  const sale = await db.sales.get(operationId);
+  if (!sale || sale.businessId !== businessId) return;
+  const lines = await db.saleLines.where("[businessId+saleId]").equals([businessId, sale.id]).toArray();
+  const now = Date.now();
+  for (const line of lines) {
+    const product = await db.products.get(line.productId);
+    if (product && product.businessId === businessId) {
+      await db.products.put({
+        ...product,
+        stock: product.stock - line.qty,
+        updatedAt: now,
+      });
+    }
+    const move: LocalStockMove = {
+      id: newEntityId(),
+      businessId,
+      productId: line.productId,
+      delta: -line.qty,
+      reason: "sale",
+      unitCost: line.unitCost,
+      supplierId: null,
+      refType: "sale",
+      refId: sale.id,
+      note: null,
+      requestId: op.requestId,
+      occurredOn: sale.occurredOn,
+      createdAt: now,
+    };
+    await db.stockMoves.put(move);
+  }
+  if (sale.amountReceived > 0 && sale.method) {
+    const cash: LocalCashMove = {
+      id: newEntityId(),
+      businessId,
+      amount: sale.amountReceived,
+      direction: "in",
+      method: sale.method,
+      kind: "sale",
+      sessionId: null,
+      refType: "sale",
+      refId: sale.id,
+      requestId: op.requestId,
+      note: sale.note,
+      occurredOn: sale.occurredOn,
+      createdAt: now,
+    };
+    await db.cashMoves.put(cash);
+  }
+  if (sale.credit > 0 && sale.customerId) {
+    const customer = await db.customers.get(sale.customerId);
+    if (customer && customer.businessId === businessId) {
+      await db.customers.put({
+        ...customer,
+        debt: addCop(customer.debt, sale.credit),
+        updatedAt: now,
+      });
+    }
+  }
+  await setOptimisticApplied(businessId, operationId, true);
+}
+
 export async function syncPendingSales(businessId: string) {
   return getOutboxSyncEngine().flush(businessId, async (item) => {
     if (item.entity !== "sale" || item.operation !== "create") {
       throw new Error("Operación de outbox no compatible con M6.5.");
     }
-    return {
-      remoteId: (await getPwaApi().sales.create(item.payload as CreateSaleInput, item.requestId)).id,
-    };
+    await ensureSaleOptimistic(businessId, item.operationId);
+    const current = await getLocalDb().outbox.get(item.operationId);
+    try {
+      const remote = await getPwaApi().sales.create(
+        saleRequestBody(current?.payload ?? item.payload),
+        item.requestId,
+      );
+      return { remoteId: remote.id };
+    } catch (error) {
+      if (isPermanentDebtRejection(error)) {
+        await revertOptimisticSale(businessId, item.operationId);
+      }
+      throw error;
+    }
   }, (item) => item.entity === "sale" && item.operation === "create");
 }
 

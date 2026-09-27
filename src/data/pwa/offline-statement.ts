@@ -5,7 +5,7 @@ import { getPwaApi } from "./api";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
 import { loadHttpStatement } from "./statement";
-import { isActiveDebtIntent } from "./pending-debt";
+import { isActiveDebtIntent, isSuppressedLocalEffect } from "./pending-debt";
 
 /**
  * Admin customer statement with an honest offline fallback. Online uses
@@ -50,13 +50,11 @@ async function buildLocalStatement(
     .equals([businessId, customerId])
     .toArray();
   const ops = await db.outbox.where("businessId").equals(businessId).toArray();
-  const deadRequests = new Set(
-    ops
-      .filter((op) => op.status === "failed" && op.nextAttemptAt == null)
-      .map((op) => op.requestId),
+  const suppressed = new Set(
+    ops.filter((op) => isSuppressedLocalEffect(op)).map((op) => op.requestId),
   );
   for (const d of initials) {
-    if (deadRequests.has(d.requestId)) continue;
+    if (suppressed.has(d.requestId)) continue;
     events.push({
       at: d.createdAt,
       delta: d.amount,
@@ -74,6 +72,7 @@ async function buildLocalStatement(
   const sales = await db.sales.where("businessId").equals(businessId).toArray();
   let fiadoIndex = 0;
   for (const s of sales.filter((row) => row.customerId === customerId && row.credit > 0)) {
+    if (suppressed.has(s.requestId)) continue;
     fiadoIndex += 1;
     const lines = await db.saleLines
       .where("[businessId+saleId]")
@@ -107,6 +106,7 @@ async function buildLocalStatement(
     .equals([businessId, customerId])
     .toArray();
   for (const p of payments) {
+    if (suppressed.has(p.requestId)) continue;
     events.push({
       at: p.createdAt,
       delta: -p.amount,
