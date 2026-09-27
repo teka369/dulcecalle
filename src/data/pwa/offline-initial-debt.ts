@@ -6,7 +6,6 @@ import { getLocalStore } from "../local/store";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
 import { newEntityId } from "../local/ids";
 import { customerToLocal } from "../local/read-cache";
-import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
 import { addCop } from "@/domain/money";
 import type { RemoteInitialDebt } from "../http/mappers";
 
