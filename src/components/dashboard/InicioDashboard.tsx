@@ -6,8 +6,17 @@ import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
 
-function MetricCard({
+/** Zona Ahora — existing routes only (AUDIT §7 / SPECS U1 wire). FAB stays global primary. */
+const AHORA_ACTIONS = [
+  { href: "/ventas/nueva", label: "Nueva venta" },
+  { href: "/mas/caja", label: "Caja" },
+  { href: "/clientes", label: "Fiados" },
+  { href: "/inventario", label: "Surtir" },
+] as const;
+
+function SignalChip({
   label,
   value,
   caption,
@@ -34,7 +43,7 @@ function MetricCard({
         {label}
       </p>
       <p
-        className={`mt-1 break-all text-base font-semibold leading-tight tabular-nums ${toneClass}`}
+        className={`mt-1 break-all text-sm font-semibold leading-tight tabular-nums ${toneClass}`}
       >
         {value}
       </p>
@@ -48,7 +57,7 @@ function MetricCard({
       </Link>
     );
   }
-  return body;
+  return <div className="min-w-0">{body}</div>;
 }
 
 function cajaCopy(snap: DashboardSnapshot): {
@@ -77,6 +86,43 @@ function cajaCopy(snap: DashboardSnapshot): {
   };
 }
 
+function heroFor(snap: DashboardSnapshot): {
+  label: string;
+  value: string;
+  caption: string;
+  href: string;
+  cta: string;
+  tone: "accent" | "ink";
+} {
+  // U1 hero rule: debt / por cobrar > 0 → Por cobrar; else Ventas hoy.
+  if (snap.debtTotal > 0) {
+    const caption =
+      snap.debtorCount === 0
+        ? "Nadie debe…"
+        : `${snap.debtorCount} ${snap.debtorCount === 1 ? "cliente" : "clientes"}`;
+    return {
+      label: "Por cobrar",
+      value: formatCop(snap.debtTotal),
+      caption,
+      href: "/clientes",
+      cta: "Ir a Clientes",
+      tone: "accent",
+    };
+  }
+  const caption =
+    snap.todaySalesCount === 0
+      ? "Sin ventas registradas hoy"
+      : `${snap.todaySalesCount} ${snap.todaySalesCount === 1 ? "venta" : "ventas"}`;
+  return {
+    label: "Ventas hoy",
+    value: formatCop(snap.todaySalesTotal),
+    caption,
+    href: "/ventas",
+    cta: "Ir a Ventas",
+    tone: "ink",
+  };
+}
+
 export function InicioDashboard({
   snap,
   onLoadDemo,
@@ -87,14 +133,11 @@ export function InicioDashboard({
   toast: string | null;
 }) {
   const caja = cajaCopy(snap);
+  const hero = heroFor(snap);
   const salesCaption =
     snap.todaySalesCount === 0
       ? "Sin ventas registradas hoy"
       : `${snap.todaySalesCount} ${snap.todaySalesCount === 1 ? "venta" : "ventas"}`;
-  const debtCaption =
-    snap.debtorCount === 0
-      ? "Nadie debe…"
-      : `${snap.debtorCount} ${snap.debtorCount === 1 ? "cliente" : "clientes"}`;
   const stockCaption =
     snap.productCount === 0
       ? "Sin productos en catálogo"
@@ -102,44 +145,63 @@ export function InicioDashboard({
         ? "Nada en poco stock"
         : `${snap.lowStockCount} con poco stock`;
 
+  const subtitleParts = [snap.greeting, snap.dateLabel];
+  if (snap.businessLabel) subtitleParts.push(snap.businessLabel);
+  const subtitle = subtitleParts.join(" · ");
+
+  const ahoraActions = AHORA_ACTIONS.map((a) =>
+    a.href === "/inventario" && snap.lowStockCount > 0
+      ? { ...a, label: "Stock bajo" }
+      : a,
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      <header>
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="text-sm text-ink-muted">{snap.greeting}</p>
-          <p className="min-w-0 text-right text-xs leading-tight text-ink-muted">
-            {snap.dateLabel}
-          </p>
-        </div>
-        <h1 className="text-[22px] font-semibold tracking-tight">
-          Resumen de hoy
-        </h1>
-        {snap.businessLabel ? (
-          <p className="text-xs text-ink-muted">{snap.businessLabel}</p>
-        ) : null}
-      </header>
+      <PageHeader title="Inicio" subtitle={subtitle} />
 
-      <section className="grid grid-cols-2 gap-2">
-        <MetricCard
-          label="Ventas de hoy"
+      {/* Hero — one navigation signal (not page primary CTA; FAB stays global) */}
+      <section aria-label="Señal principal">
+        <Link href={hero.href} className="block">
+          <Card className="p-4">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+              {hero.label}
+            </p>
+            <p
+              className={`mt-1 break-all text-2xl font-semibold leading-tight tabular-nums ${
+                hero.tone === "accent" ? "text-accent" : "text-ink"
+              }`}
+            >
+              {hero.value}
+            </p>
+            <div className="mt-1 flex items-baseline justify-between gap-2">
+              <p className="text-sm leading-snug text-ink-muted">{hero.caption}</p>
+              <span className="shrink-0 text-xs font-semibold text-cta">
+                {hero.cta} →
+              </span>
+            </div>
+          </Card>
+        </Link>
+      </section>
+
+      {/* Signal row — ventas ≠ caja ≠ stock (S5); existing snapshot fields only */}
+      <section
+        className="grid grid-cols-3 gap-2"
+        aria-label="Señales del día"
+      >
+        <SignalChip
+          label="Ventas hoy"
           value={formatCop(snap.todaySalesTotal)}
           caption={salesCaption}
+          href="/ventas"
         />
-        <MetricCard
-          label="Por cobrar"
-          value={formatCop(snap.debtTotal)}
-          caption={debtCaption}
-          tone={snap.debtTotal > 0 ? "accent" : "ink"}
-          href="/clientes"
-        />
-        <MetricCard
+        <SignalChip
           label="Caja"
           value={caja.value}
           caption={caja.caption}
           tone={caja.tone}
           href="/mas/caja"
         />
-        <MetricCard
+        <SignalChip
           label="Inventario"
           value={String(snap.productCount)}
           caption={stockCaption}
@@ -148,17 +210,15 @@ export function InicioDashboard({
         />
       </section>
 
-      <section>
+      {/* Zona Ahora — shortcuts to locked flows; secondary only */}
+      <section className="flex flex-col gap-2" aria-label="Ahora">
+        <h2 className="text-sm font-semibold text-ink-muted">Ahora</h2>
         <div className="grid grid-cols-2 gap-2">
-          {snap.actions.map((action) => (
+          {ahoraActions.map((action) => (
             <Link
               key={action.href}
               href={action.href}
-              className={`inline-flex h-11 min-h-11 items-center justify-center rounded-[var(--r-md)] px-4 text-center text-sm font-semibold transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                action.primary
-                  ? "bg-cta text-cta-fg hover:opacity-[0.92]"
-                  : "border border-border bg-surface text-ink hover:opacity-[0.92]"
-              }`}
+              className="inline-flex h-11 min-h-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-center text-sm font-semibold text-ink transition-opacity hover:opacity-[0.92] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {action.label}
             </Link>
@@ -166,10 +226,16 @@ export function InicioDashboard({
         </div>
       </section>
 
-      <section className="flex flex-col gap-2">
+      {/* Short lists — after hero / shortcuts */}
+      <section className="flex flex-col gap-2" aria-label="Fiados pendientes">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold text-ink-muted">Fiados pendientes</h2>
-          <Link href="/clientes" className="text-xs font-semibold text-cta underline underline-offset-2">
+          <h2 className="text-sm font-semibold text-ink-muted">
+            Fiados pendientes
+          </h2>
+          <Link
+            href="/clientes"
+            className="text-xs font-semibold text-cta underline underline-offset-2"
+          >
             Ver todos
           </Link>
         </div>
@@ -199,7 +265,7 @@ export function InicioDashboard({
         )}
       </section>
 
-      <section className="flex flex-col gap-2">
+      <section className="flex flex-col gap-2" aria-label="Atención en inventario">
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="text-sm font-semibold text-ink-muted">
             Atención en inventario
@@ -239,7 +305,7 @@ export function InicioDashboard({
         )}
       </section>
 
-      <section className="flex flex-col gap-2">
+      <section className="flex flex-col gap-2" aria-label="Actividad reciente">
         <h2 className="text-sm font-semibold text-ink-muted">Actividad reciente</h2>
         {snap.activity.length === 0 ? (
           <p className="rounded-[var(--r-lg)] border border-border bg-surface px-3 py-2.5 text-sm text-ink-muted shadow-[var(--shadow-sm)]">
@@ -287,8 +353,8 @@ export function InicioDashboard({
         )}
       </section>
 
-      {snap.emptyDb && (
-        onLoadDemo ? (
+      {snap.emptyDb &&
+        (onLoadDemo ? (
           <Button
             type="button"
             variant="secondary"
@@ -304,8 +370,7 @@ export function InicioDashboard({
           >
             Agregar el primer producto
           </Link>
-        )
-      )}
+        ))}
 
       {toast && (
         <div className="fixed bottom-28 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white">
@@ -320,11 +385,12 @@ export function InicioSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-busy="true" aria-label="Cargando">
       <div>
-        <div className="h-4 w-28 rounded bg-surface-2" />
-        <div className="mt-2 h-6 w-40 rounded bg-surface-2" />
+        <div className="h-6 w-28 rounded bg-surface-2" />
+        <div className="mt-2 h-4 w-48 rounded bg-surface-2" />
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="h-[6.5rem] rounded-[var(--r-lg)] border border-border bg-surface shadow-[var(--shadow-sm)]" />
+      <div className="grid grid-cols-3 gap-2">
+        {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
             className="h-[5.25rem] rounded-[var(--r-lg)] border border-border bg-surface shadow-[var(--shadow-sm)]"
