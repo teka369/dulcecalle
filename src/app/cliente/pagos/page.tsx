@@ -5,6 +5,9 @@ import { CustomerChrome, CustomerCacheNotice } from "@/components/customer/Custo
 import type { CustomerLedger } from "@/data/http/customer-api";
 import { loadCachedCustomerLedger } from "@/data/pwa/customer-ledger-cache";
 import { formatCop } from "@/domain/money";
+import { Card } from "@/components/ui/Card";
+import { Empty } from "@/components/ui/Empty";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function CustomerPaymentsPage() {
   const [ledger, setLedger] = useState<CustomerLedger | null>(null);
@@ -34,7 +37,10 @@ export default function CustomerPaymentsPage() {
   if (!ledger) {
     return (
       <CustomerChrome title="Pagos">
-        <p className="text-sm text-ink/60">Cargando…</p>
+        <div className="flex flex-col items-center gap-2 py-10">
+          <Spinner />
+          <p className="text-sm text-ink-muted">Cargando…</p>
+        </div>
       </CustomerChrome>
     );
   }
@@ -52,19 +58,19 @@ export default function CustomerPaymentsPage() {
         <CustomerCacheNotice capturedAt={capturedAt} />
       )}
       {payments.length === 0 ? (
-        <p className="text-sm text-ink/60">No hay pagos registrados.</p>
+        <Empty title="No hay pagos registrados." />
       ) : (
         <ul className="flex flex-col gap-2">
           {payments.map((p) => (
             <li
               key={p.id}
-              className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4"
+              className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--r-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)]"
             >
               <span className="min-w-0">
                 <span className="block font-medium">{p.method}</span>
-                <span className="block text-xs text-ink/55">{p.occurredOn}</span>
+                <span className="block text-xs text-ink-muted">{p.occurredOn}</span>
               </span>
-              <span className="text-sm font-semibold tabular-nums">
+              <span className="text-sm font-semibold tabular-nums text-ok">
                 {formatCop(p.amount)}
               </span>
             </li>
@@ -74,23 +80,24 @@ export default function CustomerPaymentsPage() {
 
       {initials.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold">Deuda anterior</h2>
+          <h2 className="text-sm font-semibold text-ink-muted">Deuda anterior</h2>
           {initials.map((d) => (
-            <article
+            <Card
+              as="article"
               key={d.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4"
+              className="flex items-center justify-between gap-3"
             >
               <span className="min-w-0">
                 <span className="block font-medium">Deuda anterior</span>
-                <span className="block text-xs text-ink/55">{d.occurredOn}</span>
+                <span className="block text-xs text-ink-muted">{d.occurredOn}</span>
                 {d.note && (
-                  <span className="mt-1 block text-xs text-ink/55">{d.note}</span>
+                  <span className="mt-1 block text-xs text-ink-muted">{d.note}</span>
                 )}
               </span>
-              <span className="text-sm font-semibold tabular-nums">
+              <span className="text-sm font-semibold tabular-nums text-accent">
                 {formatCop(d.amount)}
               </span>
-            </article>
+            </Card>
           ))}
         </section>
       )}

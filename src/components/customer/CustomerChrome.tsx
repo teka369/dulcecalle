@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getCustomerApi } from "@/data/http/customer-api";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 
 const links = [
   { href: "/cliente", label: "Inicio" },
@@ -41,9 +43,9 @@ export function CustomerChrome({
           alt="Dulce Calle"
           width={36}
           height={36}
-          className="h-9 w-9 rounded-xl object-cover"
+          className="h-9 w-9 rounded-[var(--r-md)] object-cover"
         />
-        <span className="text-sm font-semibold text-ink/70">Dulce Calle</span>
+        <span className="text-sm font-semibold text-ink-muted">Dulce Calle</span>
       </div>
       {title && (
         <h1 className="text-[22px] font-semibold tracking-tight">{title}</h1>
@@ -58,23 +60,23 @@ export function CustomerChrome({
             <Link
               key={item.href}
               href={item.href}
-              className={`flex min-h-11 items-center rounded-[14px] px-3 text-sm font-semibold ${
+              className={`flex min-h-11 items-center rounded-[var(--r-md)] px-3 text-sm font-semibold ${
                 active
-                  ? "bg-cta text-white"
-                  : "border border-ink/10 bg-surface text-ink"
+                  ? "bg-cta text-cta-fg"
+                  : "border border-border bg-surface text-ink"
               }`}
             >
               {item.label}
             </Link>
           );
         })}
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={() => void onLogout()}
-          className="flex min-h-11 items-center rounded-[14px] border border-ink/10 bg-surface px-3 text-sm font-semibold"
         >
           Salir
-        </button>
+        </Button>
       </nav>
       {children}
     </div>
@@ -87,13 +89,13 @@ export function CustomerCacheNotice({ capturedAt }: { capturedAt: number }) {
   const pad = (n: number) => String(n).padStart(2, "0");
   const when = `${pad(at.getDate())}/${pad(at.getMonth() + 1)}/${at.getFullYear()} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
   return (
-    <div className="rounded-2xl border border-ink/10 bg-surface px-4 py-3 text-sm">
-      <p className="font-semibold">
+    <Card className="py-3">
+      <p className="text-sm font-semibold">
         Sin conexión · Mostrando datos de la última consulta
       </p>
-      <p className="mt-1 text-ink/60">
+      <p className="mt-1 text-sm text-ink-muted">
         Última consulta: {when}. No es el saldo en tiempo real.
       </p>
-    </div>
+    </Card>
   );
 }

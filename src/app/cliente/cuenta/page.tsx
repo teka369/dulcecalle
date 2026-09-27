@@ -7,6 +7,9 @@ import type { CustomerLedger } from "@/data/http/customer-api";
 import { loadCachedCustomerLedger } from "@/data/pwa/customer-ledger-cache";
 import { customerStatementRows } from "@/data/pwa/customer-portal";
 import { formatCop } from "@/domain/money";
+import { Card } from "@/components/ui/Card";
+import { Empty } from "@/components/ui/Empty";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function CustomerStatementPage() {
   const [ledger, setLedger] = useState<CustomerLedger | null>(null);
@@ -36,7 +39,10 @@ export default function CustomerStatementPage() {
   if (!ledger) {
     return (
       <CustomerChrome title="Estado de cuenta">
-        <p className="text-sm text-ink/60">Cargando…</p>
+        <div className="flex flex-col items-center gap-2 py-10">
+          <Spinner />
+          <p className="text-sm text-ink-muted">Cargando…</p>
+        </div>
       </CustomerChrome>
     );
   }
@@ -48,8 +54,8 @@ export default function CustomerStatementPage() {
       {fromCache && capturedAt != null && (
         <CustomerCacheNotice capturedAt={capturedAt} />
       )}
-      <article className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-ink/50">
+      <Card as="article">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
           Saldo actual
         </p>
         <p
@@ -59,22 +65,22 @@ export default function CustomerStatementPage() {
         >
           {formatCop(ledger.customer.debt)}
         </p>
-      </article>
+      </Card>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-ink/60">
-          Todavía no tienes movimientos registrados. Cuando compres o abones,
-          aparecerán aquí.
-        </p>
+        <Empty
+          title="Todavía no tienes movimientos registrados."
+          description="Cuando compres o abones, aparecerán aquí."
+        />
       ) : (
         <ul className="flex flex-col gap-2">
           {rows.map((row) => {
             const lowers = row.kind === "pago" || row.kind === "devolucion";
             const body = (
-              <span className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4">
+              <span className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--r-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)]">
                 <span className="min-w-0">
                   <span className="block font-medium">{row.title}</span>
-                  <span className="block text-xs text-ink/55">
+                  <span className="block text-xs text-ink-muted">
                     {row.occurredOn} ·{" "}
                     {lowers ? "baja tu deuda" : "sube tu deuda"}
                   </span>

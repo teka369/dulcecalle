@@ -232,16 +232,17 @@ function Chip({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant={active ? "primary" : "secondary"}
       onClick={onClick}
-      className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-medium ${
+      className={`shrink-0 rounded-full px-4 ${
         active
-          ? "bg-primary text-ink"
-          : "border border-border bg-surface text-ink-muted"
+          ? "bg-primary text-ink hover:opacity-[0.92]"
+          : "text-ink-muted"
       }`}
     >
       {label}
-    </button>
+    </Button>
   );
 }

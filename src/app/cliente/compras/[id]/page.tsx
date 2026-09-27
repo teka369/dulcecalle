@@ -11,6 +11,9 @@ import { usePortalImageMap } from "@/data/pwa/product-image-map";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { routeId } from "@/data/pwa/ids";
 import { formatCop } from "@/domain/money";
+import { Card } from "@/components/ui/Card";
+import { Empty } from "@/components/ui/Empty";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function CustomerPurchaseDetailPage() {
   const params = useParams();
@@ -43,7 +46,10 @@ export default function CustomerPurchaseDetailPage() {
   if (!ledger) {
     return (
       <CustomerChrome title="Compra">
-        <p className="text-sm text-ink/60">Cargando…</p>
+        <div className="flex flex-col items-center gap-2 py-10">
+          <Spinner />
+          <p className="text-sm text-ink-muted">Cargando…</p>
+        </div>
       </CustomerChrome>
     );
   }
@@ -52,10 +58,17 @@ export default function CustomerPurchaseDetailPage() {
   if (!sale) {
     return (
       <CustomerChrome title="Compra">
-        <p className="text-sm text-ink/60">No encontramos esa compra.</p>
-        <Link href="/cliente/compras" className="text-sm font-semibold">
-          ← Compras
-        </Link>
+        <Empty
+          title="No encontramos esa compra."
+          action={
+            <Link
+              href="/cliente/compras"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold text-ink"
+            >
+              ← Compras
+            </Link>
+          }
+        />
       </CustomerChrome>
     );
   }
@@ -65,16 +78,16 @@ export default function CustomerPurchaseDetailPage() {
       {fromCache && capturedAt != null && (
         <CustomerCacheNotice capturedAt={capturedAt} />
       )}
-      <Link href="/cliente/compras" className="text-sm font-semibold text-ink/70">
+      <Link href="/cliente/compras" className="text-sm font-semibold text-ink-muted">
         ← Compras
       </Link>
-      <p className="text-sm text-ink/55">{sale.occurredOn}</p>
+      <p className="text-sm text-ink-muted">{sale.occurredOn}</p>
 
       <ul className="flex flex-col gap-2">
         {sale.lines.map((l) => (
           <li
             key={l.id}
-            className="flex items-start justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4"
+            className="flex items-start justify-between gap-3 rounded-[var(--r-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)]"
           >
             <span className="flex min-w-0 items-start gap-2">
               <ProductThumbnail
@@ -88,7 +101,7 @@ export default function CustomerPurchaseDetailPage() {
               />
               <span className="min-w-0">
                 <span className="block font-medium">{l.productName}</span>
-                <span className="block text-xs text-ink/55">
+                <span className="block text-xs text-ink-muted">
                   {l.qty} × {formatCop(l.unitPrice)}
                 </span>
               </span>
@@ -100,22 +113,19 @@ export default function CustomerPurchaseDetailPage() {
         ))}
       </ul>
 
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4 text-sm">
+      <Card as="section" className="text-sm">
         <Row label="Total" value={formatCop(sale.saleTotal)} />
         <Row label="Recibido" value={formatCop(sale.amountReceived)} />
         <Row label="A crédito" value={formatCop(sale.credit)} />
         {sale.method && <Row label="Medio" value={sale.method} />}
-      </section>
+      </Card>
 
       {sale.returns.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold">Devoluciones</h2>
+          <h2 className="text-sm font-semibold text-ink-muted">Devoluciones</h2>
           {sale.returns.map((r) => (
-            <article
-              key={r.id}
-              className="rounded-2xl border border-ink/[0.08] bg-surface p-4 text-sm"
-            >
-              <p className="text-xs text-ink/55">{r.occurredOn}</p>
+            <Card as="article" key={r.id} className="text-sm">
+              <p className="text-xs text-ink-muted">{r.occurredOn}</p>
               {r.lines.map((l) => (
                 <p key={l.id}>
                   {l.qty} × {formatCop(l.unitPrice)}
@@ -127,7 +137,7 @@ export default function CustomerPurchaseDetailPage() {
               {r.refundAmount > 0 && (
                 <p>Reembolso {formatCop(r.refundAmount)}</p>
               )}
-            </article>
+            </Card>
           ))}
         </section>
       )}
@@ -138,7 +148,7 @@ export default function CustomerPurchaseDetailPage() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <p className="flex items-center justify-between gap-3 py-1">
-      <span className="text-ink/60">{label}</span>
+      <span className="text-ink-muted">{label}</span>
       <span className="font-semibold tabular-nums">{value}</span>
     </p>
   );

@@ -10,6 +10,8 @@ import {
   customerPortalTotals,
 } from "@/data/pwa/customer-portal";
 import { formatCop } from "@/domain/money";
+import { Card } from "@/components/ui/Card";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function CustomerHomePage() {
   const [ledger, setLedger] = useState<CustomerLedger | null>(null);
@@ -40,7 +42,10 @@ export default function CustomerHomePage() {
   if (!ledger) {
     return (
       <CustomerChrome title="Tu consulta">
-        <p className="text-sm text-ink/60">Cargando…</p>
+        <div className="flex flex-col items-center gap-2 py-10">
+          <Spinner />
+          <p className="text-sm text-ink-muted">Cargando…</p>
+        </div>
       </CustomerChrome>
     );
   }
@@ -57,10 +62,10 @@ export default function CustomerHomePage() {
       <h1 className="text-[22px] font-semibold tracking-tight">
         Hola, {summary.name}
       </h1>
-      <p className="text-sm text-ink/55">{summary.code}</p>
+      <p className="text-sm text-ink-muted">{summary.code}</p>
 
-      <article className="rounded-2xl border border-ink/[0.08] bg-surface p-5">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-ink/50">
+      <Card as="article" className="p-5">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
           Por cobrar
         </p>
         <p
@@ -70,12 +75,12 @@ export default function CustomerHomePage() {
         >
           {formatCop(summary.debt)}
         </p>
-        <p className="mt-1 text-sm text-ink/55">
+        <p className="mt-1 text-sm text-ink-muted">
           {summary.debt > 0
             ? "Esto es lo que debes en este momento."
             : "Estás al día. No debes nada."}
         </p>
-      </article>
+      </Card>
 
       <section className="grid grid-cols-2 gap-2">
         <SummaryChip label="Total comprado" value={formatCop(totalComprado)} />
@@ -105,12 +110,12 @@ export default function CustomerHomePage() {
 
 function SummaryChip({ label, value }: { label: string; value: string }) {
   return (
-    <article className="rounded-2xl border border-ink/[0.08] bg-surface p-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-ink/50">
+    <Card as="article" className="p-3">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
         {label}
       </p>
       <p className="mt-1 text-base font-semibold tabular-nums">{value}</p>
-    </article>
+    </Card>
   );
 }
 
@@ -118,7 +123,7 @@ function PortalLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="flex min-h-11 items-center justify-between rounded-2xl border border-ink/[0.08] bg-surface px-4 text-sm font-semibold"
+      className="flex min-h-11 items-center justify-between rounded-[var(--r-lg)] border border-border bg-surface px-4 text-sm font-semibold shadow-[var(--shadow-sm)]"
     >
       {label}
       <span aria-hidden>→</span>

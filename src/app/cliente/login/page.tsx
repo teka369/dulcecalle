@@ -9,7 +9,7 @@ export default function CustomerLoginPage() {
         alt="Dulce Calle"
         width={72}
         height={72}
-        className="h-[72px] w-[72px] rounded-2xl object-cover"
+        className="h-[72px] w-[72px] rounded-[var(--r-lg)] object-cover"
         priority
       />
       <CustomerLoginForm showBack />

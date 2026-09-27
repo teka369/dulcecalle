@@ -1,6 +1,10 @@
-import Link from "next/link";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
 
 export default function OfflinePage() {
+  const router = useRouter();
   return (
     <div className="flex flex-col gap-3 py-8">
       <h1 className="text-[22px] font-semibold tracking-tight">Sin conexión</h1>
@@ -8,12 +12,14 @@ export default function OfflinePage() {
         No hay red. Tus datos locales siguen en el dispositivo; vuelve a intentar
         cuando tengas internet.
       </p>
-      <Link
-        href="/"
-        className="mt-2 inline-flex min-h-11 w-fit items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
+      <Button
+        type="button"
+        variant="primary"
+        className="mt-2 w-fit"
+        onClick={() => router.push("/")}
       >
         Reintentar
-      </Link>
+      </Button>
     </div>
   );
 }

@@ -396,7 +396,7 @@ function CustomerPicker({
       </label>
       <select
         id="cliente"
-        className="mt-2 h-11 min-h-11 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink"
+        className="mt-2 h-11 min-h-11 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-primary"
         value={customerId ?? ""}
         onChange={(e) => onChange(e.target.value ? e.target.value : null)}
       >

@@ -8,6 +8,22 @@ import { loadCachedCustomerLedger } from "@/data/pwa/customer-ledger-cache";
 import { usePortalImageMap } from "@/data/pwa/product-image-map";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { formatCop } from "@/domain/money";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Empty } from "@/components/ui/Empty";
+import { Spinner } from "@/components/ui/Spinner";
+
+function purchaseLabel(credit: number, paymentKind: string): string {
+  if (credit > 0) {
+    return paymentKind === "partial" ? "Venta parcial" : "Fiado";
+  }
+  return "Compra";
+}
+
+function purchaseTone(credit: number, paymentKind: string): BadgeTone {
+  if (credit <= 0) return "ok";
+  if (paymentKind === "partial") return "warning";
+  return "info";
+}
 
 export default function CustomerPurchasesPage() {
   const [ledger, setLedger] = useState<CustomerLedger | null>(null);
@@ -38,7 +54,10 @@ export default function CustomerPurchasesPage() {
   if (!ledger) {
     return (
       <CustomerChrome title="Compras">
-        <p className="text-sm text-ink/60">Cargando…</p>
+        <div className="flex flex-col items-center gap-2 py-10">
+          <Spinner />
+          <p className="text-sm text-ink-muted">Cargando…</p>
+        </div>
       </CustomerChrome>
     );
   }
@@ -55,14 +74,14 @@ export default function CustomerPurchasesPage() {
         <CustomerCacheNotice capturedAt={capturedAt} />
       )}
       {sales.length === 0 ? (
-        <p className="text-sm text-ink/60">Todavía no hay compras a tu nombre.</p>
+        <Empty title="Todavía no hay compras a tu nombre." />
       ) : (
         <ul className="flex flex-col gap-2">
           {sales.map((s) => (
             <li key={s.id}>
               <Link
                 href={`/cliente/compras/${s.id}`}
-                className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-surface p-4"
+                className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--r-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)]"
               >
                 <span className="flex min-w-0 items-center gap-3">
                   <ProductThumbnail
@@ -78,14 +97,14 @@ export default function CustomerPurchasesPage() {
                     size="sm"
                   />
                   <span className="min-w-0">
-                    <span className="block font-medium">
-                      {s.credit > 0
-                        ? s.paymentKind === "partial"
-                          ? "Venta parcial"
-                          : "Fiado"
-                        : "Compra"}
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Badge tone={purchaseTone(s.credit, s.paymentKind)}>
+                        {purchaseLabel(s.credit, s.paymentKind)}
+                      </Badge>
                     </span>
-                    <span className="block text-xs text-ink/55">{s.occurredOn}</span>
+                    <span className="mt-1 block text-xs text-ink-muted">
+                      {s.occurredOn}
+                    </span>
                   </span>
                 </span>
                 <span className="shrink-0 text-sm font-semibold tabular-nums">

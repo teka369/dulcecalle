@@ -4,6 +4,7 @@ import { formatBogotaDateTime } from "@/domain/debt/statement";
 import { CASH_COPY } from "@/domain/cash";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 
 function MetricCard({
@@ -288,13 +289,14 @@ export function InicioDashboard({
 
       {snap.emptyDb && (
         onLoadDemo ? (
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={onLoadDemo}
-            className="min-h-11 rounded-[var(--r-md)] bg-primary px-4 text-sm font-semibold text-ink"
+            className="bg-primary"
           >
             Cargar demo
-          </button>
+          </Button>
         ) : (
           <Link
             href="/inventario/nuevo"

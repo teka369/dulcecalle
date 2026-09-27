@@ -15,6 +15,10 @@ import {
 } from "@/data/pwa/customer-catalog-cache";
 import { routeId } from "@/data/pwa/ids";
 import { formatCop } from "@/domain/money";
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
+import { Empty } from "@/components/ui/Empty";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function CustomerProductDetailPage() {
   const params = useParams();
@@ -23,14 +27,17 @@ export default function CustomerProductDetailPage() {
   const [capturedAt, setCapturedAt] = useState<number | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [missing, setMissing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
 
   useEffect(() => {
     if (!id) {
       setMissing(true);
+      setLoading(false);
       return;
     }
+    setLoading(true);
     void loadCachedCustomerCatalog()
       .then((result) => {
         const found = result.products.find((p) => p.id === id) ?? null;
@@ -41,7 +48,8 @@ export default function CustomerProductDetailPage() {
       })
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : "No se pudo cargar.");
-      });
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
   if (error) {
@@ -52,16 +60,31 @@ export default function CustomerProductDetailPage() {
     );
   }
 
+  if (loading) {
+    return (
+      <CustomerChrome title="Producto">
+        <div className="flex flex-col items-center gap-2 py-10">
+          <Spinner />
+          <p className="text-sm text-ink-muted">Cargando…</p>
+        </div>
+      </CustomerChrome>
+    );
+  }
+
   if (missing || !product) {
     return (
       <CustomerChrome title="Producto">
-        <p className="text-sm text-ink/60">No encontramos ese producto.</p>
-        <Link
-          href="/cliente/productos"
-          className="text-sm font-semibold text-ink/70"
-        >
-          ← Productos
-        </Link>
+        <Empty
+          title="No encontramos ese producto."
+          action={
+            <Link
+              href="/cliente/productos"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold text-ink"
+            >
+              ← Productos
+            </Link>
+          }
+        />
       </CustomerChrome>
     );
   }
@@ -79,7 +102,7 @@ export default function CustomerProductDetailPage() {
       )}
       <Link
         href="/cliente/productos"
-        className="text-sm font-semibold text-ink/70"
+        className="text-sm font-semibold text-ink-muted"
       >
         ← Productos
       </Link>
@@ -99,8 +122,8 @@ export default function CustomerProductDetailPage() {
                 onClick={() => setSelected(index)}
                 aria-label={`Ver foto ${index + 1}`}
                 aria-pressed={index === selected}
-                className={`w-full overflow-hidden rounded-2xl border ${
-                  index === selected ? "border-cta" : "border-ink/10"
+                className={`w-full overflow-hidden rounded-[var(--r-lg)] border ${
+                  index === selected ? "border-cta" : "border-border"
                 }`}
               >
                 <ProductImageView
@@ -114,21 +137,19 @@ export default function CustomerProductDetailPage() {
           ))}
         </ul>
       )}
-      <section className="rounded-2xl border border-ink/[0.08] bg-surface p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+      <Card as="section">
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
           Precio
         </p>
         <p className="mt-1 text-2xl font-semibold tabular-nums">
           {formatCop(product.price)}
         </p>
-        <p
-          className={`mt-1 text-sm font-semibold ${
-            product.available ? "text-ok" : "text-ink/50"
-          }`}
-        >
-          {product.available ? "Disponible" : "Agotado por ahora"}
+        <p className="mt-2">
+          <Badge tone={product.available ? "ok" : "danger"}>
+            {product.available ? "Disponible" : "Agotado por ahora"}
+          </Badge>
         </p>
-      </section>
+      </Card>
     </CustomerChrome>
   );
 }
