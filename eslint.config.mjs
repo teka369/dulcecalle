@@ -23,6 +23,7 @@ const eslintConfig = defineConfig([
     "public/swe-worker*",
     "public/__grok/**",
     "backend/**",
+    "e2e/**",
   ]),
 ]);
 

@@ -47,6 +47,7 @@
     "scripts",
     "server",
     "migrations",
-    "backend"
+    "backend",
+    "e2e"
   ]
 }
