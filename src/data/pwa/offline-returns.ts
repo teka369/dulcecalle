@@ -3,8 +3,10 @@ import type { RemoteReturn, RemoteSale } from "../http/mappers";
 import { getPwaApi } from "./api";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
+import { getLocalStore } from "../local/store";
 import { getOutboxStore, getOutboxSyncEngine } from "../local/outbox";
 import { newEntityId } from "../local/ids";
+import { customerToLocal } from "../local/read-cache";
 import { mulCop } from "@/domain/money";
 import type {
   LocalSale,
@@ -246,6 +248,23 @@ export async function applyReturnStockOnce(
   });
 }
 
+async function reconcileReturnCustomer(
+  businessId: string,
+  saleRef: string,
+): Promise<void> {
+  const db = getLocalDb();
+  const sale = await db.sales.get(saleRef);
+  if (!sale?.customerId) return;
+  try {
+    const customer = await getPwaApi().customers.get(sale.customerId);
+    await getLocalStore().customers.put(
+      customerToLocal(customer, businessId, Date.now()),
+    );
+  } catch {
+    // The return is already synced; customer cache can reconcile next cycle.
+  }
+}
+
 async function openReturnQty(
   businessId: string,
   saleIds: string[],
@@ -443,6 +462,7 @@ export async function syncPendingReturns(businessId: string) {
       await db.transaction("rw", [db.saleReturns, db.saleReturnLines], async () => {
         await putReturnRows(businessId, payload.saleRef, item.requestId, remote);
       });
+      await reconcileReturnCustomer(businessId, payload.saleRef);
       return { remoteId: remote.id };
     },
     (item) => item.entity === "saleReturn" && item.operation === "return",
