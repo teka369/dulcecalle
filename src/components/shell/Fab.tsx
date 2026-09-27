@@ -2,14 +2,26 @@
 
 import { OfflineLink } from "./OfflineLink";
 
+/** Circular primary action, seated beside the floating nav — not above it. */
 export function Fab() {
   return (
     <OfflineLink
       href="/ventas/nueva"
-      className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-50 flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg shadow-md"
+      className="flex size-12 shrink-0 items-center justify-center rounded-full bg-cta text-cta-fg shadow-[var(--shadow-lg)] min-[380px]:size-14"
       ariaLabel="Nueva venta"
     >
-      + Nueva venta
+      <svg
+        width="26"
+        height="26"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        aria-hidden
+      >
+        <path d="M12 5v14M5 12h14" />
+      </svg>
     </OfflineLink>
   );
 }

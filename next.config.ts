@@ -21,6 +21,9 @@ const withSerwist = withSerwistInit({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The preview browser calls the dev server as 127.0.0.1. Next blocks
+  // that host unless it is listed, and the client bundle never hydrates.
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   async rewrites() {
     // Same-origin /v1 → Nest. Dev/preview only.
     // Production uses NEXT_PUBLIC_API_URL; never proxy to loopback.

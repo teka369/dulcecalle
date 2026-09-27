@@ -13,15 +13,14 @@ const items = [
 
 type IconName = (typeof items)[number]["icon"];
 
-function NavIcon({ name, active }: { name: IconName; active: boolean }) {
-  const stroke = "currentColor";
+function NavIcon({ name }: { name: IconName }) {
   const common = {
     width: 22,
     height: 22,
     viewBox: "0 0 24 24",
     fill: "none",
-    stroke,
-    strokeWidth: active ? 2.25 : 1.75,
+    stroke: "currentColor",
+    strokeWidth: 1.85,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
     "aria-hidden": true as const,
@@ -62,9 +61,9 @@ function NavIcon({ name, active }: { name: IconName; active: boolean }) {
     case "more":
       return (
         <svg {...common}>
-          <circle cx="6" cy="12" r="1.35" fill={stroke} stroke="none" />
-          <circle cx="12" cy="12" r="1.35" fill={stroke} stroke="none" />
-          <circle cx="18" cy="12" r="1.35" fill={stroke} stroke="none" />
+          <circle cx="6" cy="12" r="1.35" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="12" r="1.35" fill="currentColor" stroke="none" />
+          <circle cx="18" cy="12" r="1.35" fill="currentColor" stroke="none" />
         </svg>
       );
   }
@@ -75,25 +74,31 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80"
+      className="flex h-12 min-w-0 flex-1 items-stretch rounded-full bg-ink px-1 py-1 text-bg shadow-[var(--shadow-lg)] min-[380px]:h-14"
       aria-label="Navegación principal"
     >
-      <ul className="mx-auto flex max-w-lg items-stretch justify-between px-1 pb-[env(safe-area-inset-bottom)]">
+      <ul className="flex w-full items-stretch justify-between gap-0.5">
         {items.map((item) => {
           const active =
             item.href === "/"
               ? pathname === "/"
               : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
-            <li key={item.href} className="flex-1">
+            <li key={item.href} className="flex min-w-0 flex-1">
               <OfflineLink
                 href={item.href}
-                className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium ${
-                  active ? "text-cta" : "text-ink-muted"
+                className={`flex min-h-11 w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-0.5 motion-safe:transition-colors motion-safe:duration-200 ${
+                  active ? "bg-bg text-ink" : "text-bg opacity-70"
                 }`}
               >
-                <NavIcon name={item.icon} active={active} />
-                {item.label}
+                <NavIcon name={item.icon} />
+                <span className="max-w-full truncate text-[clamp(8px,2.6vw,10px)] font-semibold leading-none tracking-tight">
+                  {item.label}
+                </span>
+                <span
+                  className={`h-1 w-1 rounded-full ${active ? "bg-accent" : "bg-transparent"}`}
+                  aria-hidden
+                />
               </OfflineLink>
             </li>
           );

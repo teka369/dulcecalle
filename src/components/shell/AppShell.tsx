@@ -4,34 +4,17 @@ import { usePathname } from "next/navigation";
 import { BottomNav } from "./BottomNav";
 import { Fab } from "./Fab";
 import { AuthGate } from "./AuthGate";
+import { shellHidesChrome, shellHidesFab } from "./shell-chrome";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const hideChrome =
-    pathname === "/login" ||
-    pathname === "/register" ||
-    pathname === "/cliente" ||
-    pathname.startsWith("/cliente/") ||
-    pathname.startsWith("/ventas/nueva") ||
-    pathname.startsWith("/ventas/cobrar") ||
-    /^\/ventas\/[^/]+\/devolver$/.test(pathname) ||
-    pathname === "/clientes/nuevo" ||
-    /^\/clientes\/[^/]+\/abono$/.test(pathname) ||
-    /^\/clientes\/[^/]+\/deuda-inicial$/.test(pathname) ||
-    pathname === "/inventario/nuevo" ||
-    pathname === "/inventario/proveedores/nuevo" ||
-    /^\/inventario\/[^/]+\/(surtir|me-lo-comi|regalo|perdido)$/.test(pathname) ||
-    pathname.startsWith("/mas/gastos/nuevo") ||
-    pathname.startsWith("/mas/caja/aporte") ||
-    pathname.startsWith("/mas/caja/retiro") ||
-    pathname.startsWith("/mas/caja/cerrar");
-  const hideFab = pathname.startsWith("/mas/datos");
+  const hideChrome = shellHidesChrome(pathname);
+  const hideFab = shellHidesFab(pathname);
 
-  // Chrome clearance: BottomNav + FAB/SyncPill band (~4.5rem above nav) + safe-area
-  // so primary actions / last list rows are not covered by Sync chrome or FAB.
+  // Floating pill + circular action + sync pill above them, plus the home-indicator inset.
   const mainPad = hideChrome
     ? "pb-6 pt-4"
-    : "pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-4";
+    : "pb-[calc(8.75rem+env(safe-area-inset-bottom))] pt-4";
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col overflow-x-hidden bg-bg text-ink">
@@ -40,10 +23,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       {!hideChrome && (
-        <>
-          {!hideFab && <Fab />}
-          <BottomNav />
-        </>
+        <div className="pointer-events-none fixed inset-x-0 z-40 px-1.5 bottom-[max(0.75rem,env(safe-area-inset-bottom))] min-[380px]:px-3">
+          <div className="pointer-events-auto mx-auto flex w-full max-w-lg items-center gap-1.5 min-[380px]:gap-2">
+            <BottomNav />
+            {!hideFab && <Fab />}
+          </div>
+        </div>
       )}
       </AuthGate>
     </div>

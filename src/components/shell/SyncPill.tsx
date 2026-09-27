@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useSync, type SyncCounts } from "@/store/syncStore";
+import { shellHidesChrome } from "./shell-chrome";
 
 const HIDDEN_PREFIXES = ["/cliente", "/login", "/register"];
 
@@ -32,6 +33,7 @@ export function syncPillLabel(
 export function SyncPill() {
   const pathname = usePathname();
   const { online, counts, flushing, authRequired, openCenter } = useSync();
+  const aboveNav = !shellHidesChrome(pathname);
 
   if (HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return null;
@@ -51,13 +53,23 @@ export function SyncPill() {
             : "border-ok/25 bg-surface text-ink-muted";
 
   return (
-    <button
-      type="button"
-      onClick={openCenter}
-      aria-label={`Sincronización: ${label}. Abrir centro de sincronización.`}
-      className={`fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 z-50 flex min-h-11 max-w-[min(16rem,calc(100vw-8.5rem))] items-center gap-2 rounded-[var(--r-pill)] border px-3 py-2 text-xs font-semibold shadow-[var(--shadow-md)] ${tone}`}
+    <div
+      className={`pointer-events-none fixed inset-x-0 z-50 px-3 ${
+        aboveNav
+          ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
+          : "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]"
+      }`}
     >
-      <span className="truncate">{label}</span>
-    </button>
+      <div className="mx-auto flex w-full max-w-lg">
+        <button
+          type="button"
+          onClick={openCenter}
+          aria-label={`Sincronización: ${label}. Abrir centro de sincronización.`}
+          className={`pointer-events-auto flex min-h-11 max-w-[min(16rem,calc(100%_-_4.5rem))] items-center gap-2 rounded-[var(--r-pill)] border px-3 py-2 text-xs font-semibold shadow-[var(--shadow-md)] ${tone}`}
+        >
+          <span className="truncate">{label}</span>
+        </button>
+      </div>
+    </div>
   );
 }
