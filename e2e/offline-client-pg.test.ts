@@ -384,7 +384,7 @@ describe("client data layer to PostgreSQL", () => {
     expect(Number((await prisma.customer.findFirst({ where: { id: customerId } }))?.debt)).toBe(2_500);
   });
 
-  it("C: offline return does not confirm stock or cash until sync, and does not duplicate", async () => {
+  it("C: offline credit return projects debtReduced and syncs it once", async () => {
     await freshDexie();
     applySession();
     offline = false;
@@ -405,59 +405,82 @@ describe("client data layer to PostgreSQL", () => {
     const sold = await createSaleWithOfflineFallback(
       {
         lines: [{ productId, qty: 4 }],
-        paymentKind: "paid",
+        paymentKind: "credit",
         customerId,
-        amountReceived: 4_000,
-        method: "Efectivo",
+        amountReceived: 0,
       },
       saleKey,
     );
     if (sold.mode !== "online") throw new Error("sale should be online");
+    await listCachedCustomers();
     await listCachedProducts();
-    expect((await getLocalDb().products.get(productId))?.stock).toBe(6);
+    expect(await prisma.sale.count({ where: { businessId: biz, requestId: saleKey } })).toBe(1);
+    expect(Number((await prisma.customer.findFirst({ where: { id: customerId } }))?.debt)).toBe(4_000);
     expect((await prisma.product.findFirst({ where: { id: productId } }))?.stock).toBe(6);
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(4_000);
+    expect((await getLocalDb().products.get(productId))?.stock).toBe(6);
     const lineId = sold.sale.lines[0]?.id;
     if (!lineId) throw new Error("sale line missing");
 
     const returnKey = newEntityId();
     offline = true;
-    const stockBefore = (await getLocalDb().products.get(productId))?.stock;
-    const returned = await createReturnWithOfflineFallback(sold.sale.id, [{ saleLineId: lineId, qty: 2 }], returnKey);
+    const returned = await createReturnWithOfflineFallback(
+      sold.sale.id,
+      [{ saleLineId: lineId, qty: 2 }],
+      returnKey,
+    );
     if (returned.mode !== "offline") throw new Error("return should be offline");
     const returnOp = await getLocalDb().outbox.get(returned.operationId);
-    expect(returnOp?.status).toBe("pending");
-    expect(returnOp?.payload).toMatchObject({ projectedDebtReduced: 0, projectedRefundAmount: 2_000 });
-    expect((await getLocalDb().products.get(productId))?.stock).toBe(stockBefore);
+    expect(returnOp).toMatchObject({
+      status: "pending",
+      requestId: returnKey,
+      payload: {
+        saleRef: sold.sale.id,
+        projectedDebtReduced: 2_000,
+        projectedRefundAmount: 0,
+      },
+    });
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(2_000);
+    expect((await getLocalDb().products.get(productId))?.stock).toBe(6);
     const localMoves = await getLocalDb().stockMoves.where("businessId").equals(biz).toArray();
     expect(localMoves.filter((row) => row.requestId === returnKey)).toHaveLength(0);
     const localCash = await getLocalDb().cashMoves.where("businessId").equals(biz).toArray();
     expect(localCash.filter((row) => row.kind === "devolucion")).toHaveLength(0);
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(0);
     expect(await prisma.saleReturn.count({ where: { requestId: returnKey } })).toBe(0);
+    expect(Number((await prisma.customer.findFirst({ where: { id: customerId } }))?.debt)).toBe(4_000);
     expect((await prisma.product.findFirst({ where: { id: productId } }))?.stock).toBe(6);
     expect(await prisma.cashMove.count({ where: { businessId: biz, kind: "devolucion" } })).toBe(0);
-    const statement = await getStatementWithOfflineFallback(customerId);
-    expect(statement?.source).toBe("cache");
-    expect(statement?.statement.total).toBe(0);
-    expect(statement?.statement.entries.some((entry) => entry.kind === "devolucion")).toBe(false);
+    expect(attempts.some((row) => row.blocked && row.method === "POST" && row.url.includes("/returns"))).toBe(true);
+
+    const pendingStatement = await getStatementWithOfflineFallback(customerId);
+    expect(pendingStatement?.source).toBe("cache");
+    expect(pendingStatement?.statement.total).toBe(2_000);
+    const pendingReturn = pendingStatement?.statement.entries.find((entry) => entry.kind === "devolucion");
+    expect(pendingReturn).toMatchObject({ amount: 2_000, pending: true });
 
     reopen();
-    expect((await getLocalDb().outbox.get(returned.operationId))?.status).toBe("pending");
+    const reloaded = await getLocalDb().outbox.get(returned.operationId);
+    expect(reloaded).toMatchObject({
+      status: "pending",
+      requestId: returnKey,
+      payload: { projectedDebtReduced: 2_000, projectedRefundAmount: 0 },
+    });
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(2_000);
     expect((await getLocalDb().products.get(productId))?.stock).toBe(6);
+    const reloadedStatement = await getStatementWithOfflineFallback(customerId);
+    expect(reloadedStatement?.source).toBe("cache");
+    expect(reloadedStatement?.statement.total).toBe(2_000);
 
     offline = false;
     const synced = await syncAllPending(biz);
     expect(synced.returns).toMatchObject({ synced: 1, failed: 0 });
     const stored = await prisma.saleReturn.findFirst({ where: { businessId: biz, requestId: returnKey } });
-    expect(Number(stored?.refundAmount)).toBe(2_000);
-    expect(Number(stored?.debtReduced)).toBe(0);
+    expect(Number(stored?.debtReduced)).toBe(2_000);
+    expect(Number(stored?.refundAmount)).toBe(0);
     expect(await prisma.saleReturn.count({ where: { requestId: returnKey } })).toBe(1);
+    expect(Number((await prisma.customer.findFirst({ where: { id: customerId } }))?.debt)).toBe(2_000);
     expect((await prisma.product.findFirst({ where: { id: productId } }))?.stock).toBe(8);
-    const refunds = await prisma.cashMove.findMany({
-      where: { businessId: biz, kind: "devolucion", direction: "out" },
-    });
-    expect(refunds.filter((row) => Number(row.amount) === 2_000)).toHaveLength(1);
-    expect(Number((await prisma.customer.findFirst({ where: { id: customerId } }))?.debt)).toBe(0);
+    expect(await prisma.cashMove.count({ where: { businessId: biz, kind: "devolucion" } })).toBe(0);
     expect((await getLocalDb().products.get(productId))?.stock).toBe(8);
     expect(await prisma.saleReturn.count({ where: { businessId: ready.otherBusinessId } })).toBe(0);
 
@@ -465,11 +488,8 @@ describe("client data layer to PostgreSQL", () => {
     await syncAllPending(biz);
     expect(attempts.length).toBe(replayFrom);
     expect(await prisma.saleReturn.count({ where: { requestId: returnKey } })).toBe(1);
+    expect(Number((await prisma.customer.findFirst({ where: { id: customerId } }))?.debt)).toBe(2_000);
     expect((await prisma.product.findFirst({ where: { id: productId } }))?.stock).toBe(8);
-    expect(
-      (await prisma.cashMove.findMany({ where: { businessId: biz, kind: "devolucion" } })).filter(
-        (row) => Number(row.amount) === 2_000,
-      ),
-    ).toHaveLength(1);
+    expect(await prisma.cashMove.count({ where: { businessId: biz, kind: "devolucion" } })).toBe(0);
   });
 });
