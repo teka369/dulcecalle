@@ -55,7 +55,7 @@ export function SyncPill() {
       type="button"
       onClick={openCenter}
       aria-label={`Sincronización: ${label}. Abrir centro de sincronización.`}
-      className={`fixed bottom-[4.5rem] left-4 z-50 flex min-h-11 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-[var(--r-pill)] border px-3 py-2 text-xs font-semibold shadow-[var(--shadow-md)] ${tone}`}
+      className={`fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 z-50 flex min-h-11 max-w-[min(16rem,calc(100vw-8.5rem))] items-center gap-2 rounded-[var(--r-pill)] border px-3 py-2 text-xs font-semibold shadow-[var(--shadow-md)] ${tone}`}
     >
       <span className="truncate">{label}</span>
     </button>

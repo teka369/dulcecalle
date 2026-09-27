@@ -4,3 +4,4 @@ export { Card, type CardProps } from "./Card";
 export { Badge, type BadgeProps, type BadgeTone } from "./Badge";
 export { Empty, type EmptyProps } from "./Empty";
 export { Spinner, type SpinnerProps } from "./Spinner";
+export { PageHeader, type PageHeaderProps } from "./PageHeader";
