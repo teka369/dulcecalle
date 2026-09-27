@@ -64,6 +64,7 @@ function EntryCard({ entry }: { entry: DebtEntry }) {
         <p className="text-sm font-semibold">{entryTitle(entry)}</p>
         <p className="mt-0.5 text-xs text-ink-muted">
           {formatBogotaDateTime(entry.createdAt)}
+          {entry.pending ? " · Pendiente de confirmación" : ""}
         </p>
         <p className="mt-3 text-lg font-semibold tabular-nums text-ok">
           −{formatCop(entry.amount)}

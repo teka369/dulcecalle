@@ -6,6 +6,8 @@ import { getLocalStore } from "@/data/local/store";
 import { ConnectivityMonitor, getOutboxStore, getOutboxSyncEngine } from "@/data/local/outbox";
 import { assertUuid } from "@/data/local/ids";
 import { customerToLocal, productToLocal, supplierToLocal } from "@/data/local/read-cache";
+import { pendingDebtAdjustment } from "./pending-debt";
+import { addCop } from "@/domain/money";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
 
 export type CustomerInput = { name: string; phone?: string };
@@ -308,10 +310,49 @@ export async function createProductWithOfflineFallback(
 
 async function reconcileCustomer(businessId: string, localId: string, remote: RemoteCustomer) {
   const db = getLocalDb();
-  await db.transaction("rw", db.customers, async () => {
-    const local = await getLocalStore().customers.get(businessId, localId);
-    if (local && local.id !== remote.id) await db.customers.delete(local.id);
-    await getLocalStore().customers.put(customerToLocal(remote, businessId, Date.now()));
+  await db.transaction(
+    "rw",
+    [db.customers, db.initialDebts, db.sales, db.customerPayments, db.outbox],
+    async () => {
+      const local = await getLocalStore().customers.get(businessId, localId);
+      if (local && local.id !== remote.id) {
+        const debts = await db.initialDebts.where("businessId").equals(businessId).toArray();
+        for (const row of debts) {
+          if (row.customerId === localId) {
+            await db.initialDebts.put({ ...row, customerId: remote.id });
+          }
+        }
+        const sales = await db.sales.where("businessId").equals(businessId).toArray();
+        for (const row of sales) {
+          if (row.customerId === localId) {
+            await db.sales.put({ ...row, customerId: remote.id });
+          }
+        }
+        const payments = await db.customerPayments.where("businessId").equals(businessId).toArray();
+        for (const row of payments) {
+          if (row.customerId === localId) {
+            await db.customerPayments.put({ ...row, customerId: remote.id });
+          }
+        }
+        const ops = await db.outbox.where("businessId").equals(businessId).toArray();
+        for (const op of ops) {
+          if (op.status === "synced" || !op.payload || typeof op.payload !== "object") continue;
+          const payload = op.payload as Record<string, unknown>;
+          if (payload.customerId !== localId) continue;
+          await db.outbox.put({
+            ...op,
+            payload: { ...payload, customerId: remote.id },
+          });
+        }
+        await db.customers.delete(local.id);
+      }
+    },
+  );
+  const snapshot = customerToLocal(remote, businessId, Date.now());
+  const pending = await pendingDebtAdjustment(businessId, remote.id);
+  await getLocalStore().customers.put({
+    ...snapshot,
+    debt: addCop(snapshot.debt, pending),
   });
 }
 

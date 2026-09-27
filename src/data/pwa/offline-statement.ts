@@ -5,13 +5,14 @@ import { getPwaApi } from "./api";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
 import { loadHttpStatement } from "./statement";
+import { isActiveDebtIntent } from "./pending-debt";
 
 /**
  * Admin customer statement with an honest offline fallback. Online uses
- * the server ledger; only a NetworkError falls back to Dexie rows created
- * on this device (offline sales, payments, initial debts). There is no
- * local source for returns (returns are online-only), so they are simply
- * absent offline. `total` always comes from the cached server debt.
+ * the server ledger. A NetworkError falls back to Dexie rows on this device
+ * plus a pending return projection. Pending returns reduce debt only by
+ * debtReduced, stay marked pending, and do not change stock or cash.
+ * `total` is the local customer balance, including those pending effects.
  */
 export async function getStatementWithOfflineFallback(
   customerId: string,
@@ -48,7 +49,14 @@ async function buildLocalStatement(
     .where("[businessId+customerId]")
     .equals([businessId, customerId])
     .toArray();
+  const ops = await db.outbox.where("businessId").equals(businessId).toArray();
+  const deadRequests = new Set(
+    ops
+      .filter((op) => op.status === "failed" && op.nextAttemptAt == null)
+      .map((op) => op.requestId),
+  );
   for (const d of initials) {
+    if (deadRequests.has(d.requestId)) continue;
     events.push({
       at: d.createdAt,
       delta: d.amount,
@@ -118,6 +126,7 @@ async function buildLocalStatement(
     sales.filter((row) => row.customerId === customerId).map((row) => row.id),
   );
   const returns = await db.saleReturns.where("businessId").equals(businessId).toArray();
+  const confirmedReturnRequests = new Set(returns.map((row) => row.requestId));
   for (const ret of returns) {
     if (ret.debtReduced <= 0 || !customerSaleIds.has(ret.saleId)) continue;
     events.push({
@@ -128,6 +137,30 @@ async function buildLocalStatement(
         id: `dev-${ret.id}`,
         createdAt: ret.createdAt,
         amount: ret.debtReduced,
+        runningBalance: 0,
+      },
+    });
+  }
+  for (const op of ops) {
+    if (!isActiveDebtIntent(op) || op.entity !== "saleReturn" || op.operation !== "return") {
+      continue;
+    }
+    if (confirmedReturnRequests.has(op.requestId)) continue;
+    const raw = op.payload;
+    if (!raw || typeof raw !== "object") continue;
+    const saleRef = (raw as { saleRef?: unknown }).saleRef;
+    const reduced = (raw as { projectedDebtReduced?: unknown }).projectedDebtReduced;
+    if (typeof saleRef !== "string" || typeof reduced !== "number" || reduced <= 0) continue;
+    if (!customerSaleIds.has(saleRef)) continue;
+    events.push({
+      at: op.localCreatedAt,
+      delta: -reduced,
+      entry: {
+        kind: "devolucion",
+        id: `dev-pending-${op.operationId}`,
+        createdAt: op.localCreatedAt,
+        amount: reduced,
+        pending: true,
         runningBalance: 0,
       },
     });

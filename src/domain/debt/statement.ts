@@ -49,6 +49,8 @@ export type DebtEntry =
       id: string;
       createdAt: number;
       amount: number;
+      /** Local projection. Not a server-confirmed return and not cash. */
+      pending?: boolean;
       runningBalance: number;
     };
 

@@ -6,7 +6,8 @@ import { getLocalStore } from "../local/store";
 import { getOutboxStore, getOutboxSyncEngine } from "../local/outbox";
 import { newEntityId } from "../local/ids";
 import { customerToLocal } from "../local/read-cache";
-import { addCop } from "@/domain/money";
+import { pendingDebtAdjustment, isPermanentDebtRejection } from "./pending-debt";
+import { addCop, subCop } from "@/domain/money";
 import type { RemoteInitialDebt } from "../http/mappers";
 
 export type CreateInitialDebtInput = {
@@ -42,7 +43,14 @@ async function customerDependency(
 async function resolveRemoteCustomerId(
   businessId: string,
   customerId: string,
+  dependsOn: string[] = [],
 ): Promise<string | null> {
+  for (const depId of dependsOn) {
+    const dep = await getOutboxStore().get(businessId, depId);
+    if (dep?.entity !== "customer" || dep.operation !== "create") continue;
+    if (dep.status !== "synced" || !dep.remoteId) return null;
+    return dep.remoteId;
+  }
   const direct = await getOutboxStore().get(businessId, customerId);
   if (direct?.entity === "customer" && direct.operation === "create") {
     if (direct.status !== "synced" || !direct.remoteId) return null;
@@ -127,9 +135,15 @@ export async function createInitialDebtWithOfflineFallback(
   const businessId = getPwaAuthSession().businessId;
   if (!businessId) throw new Error("Selecciona el negocio.");
 
+  const remoteCustomerId = await resolveRemoteCustomerId(businessId, input.customerId);
+  if (!remoteCustomerId) {
+    const debtId = await createLocalInitialDebt(input, businessId, requestId);
+    return { mode: "offline", debtId };
+  }
+
   try {
     const debt = await getPwaApi().customers.initialDebt(
-      input.customerId,
+      remoteCustomerId,
       { amount: input.amount, ...(input.note ? { note: input.note } : {}) },
       requestId,
     );
@@ -138,6 +152,35 @@ export async function createInitialDebtWithOfflineFallback(
     if (!(error instanceof NetworkError)) throw error;
     const debtId = await createLocalInitialDebt(input, businessId, requestId);
     return { mode: "offline", debtId };
+  }
+}
+
+async function revertOptimisticInitialDebt(
+  businessId: string,
+  operationId: string,
+  customerId: string,
+  amount: number,
+): Promise<void> {
+  const db = getLocalDb();
+  const op = await db.outbox.get(operationId);
+  const payload = op?.payload;
+  if (payload && typeof payload === "object" && (payload as { optimisticApplied?: unknown }).optimisticApplied === false) {
+    return;
+  }
+  const customer = await getLocalStore().customers.get(businessId, customerId);
+  if (customer && amount > 0) {
+    const next = subCop(customer.debt, amount);
+    await getLocalStore().customers.put({
+      ...customer,
+      debt: next < 0 ? 0 : next,
+      updatedAt: Date.now(),
+    });
+  }
+  if (op && payload && typeof payload === "object") {
+    await db.outbox.put({
+      ...op,
+      payload: { ...payload, optimisticApplied: false },
+    });
   }
 }
 
@@ -164,9 +207,12 @@ async function reconcileInitialDebt(
   });
   try {
     const customer = await getPwaApi().customers.get(remote.customerId);
-    await getLocalStore().customers.put(
-      customerToLocal(customer, businessId, Date.now()),
-    );
+    const snapshot = customerToLocal(customer, businessId, Date.now());
+    const pending = await pendingDebtAdjustment(businessId, remote.customerId, [operationId]);
+    await getLocalStore().customers.put({
+      ...snapshot,
+      debt: addCop(snapshot.debt, pending),
+    });
   } catch {
     // The outbox remains synced; a later customer refresh can reconcile the cache.
   }
@@ -181,15 +227,31 @@ export async function syncPendingInitialDebts(businessId: string) {
         throw new Error("Operación de outbox no compatible con deuda inicial.");
       }
       const payload = item.payload as { customerId: string; amount: number; note?: string };
-      const customerId = await resolveRemoteCustomerId(businessId, payload.customerId);
-      if (!customerId) throw new NetworkError("El cliente todavía no tiene id remoto.");
-      const remote = await api.customers.initialDebt(
-        customerId,
-        { amount: payload.amount, ...(payload.note ? { note: payload.note } : {}) },
-        item.requestId,
+      const customerId = await resolveRemoteCustomerId(
+        businessId,
+        payload.customerId,
+        item.dependsOn,
       );
-      await reconcileInitialDebt(businessId, item.operationId, remote);
-      return { remoteId: remote.id };
+      if (!customerId) throw new NetworkError("El cliente todavía no tiene id remoto.");
+      try {
+        const remote = await api.customers.initialDebt(
+          customerId,
+          { amount: payload.amount, ...(payload.note ? { note: payload.note } : {}) },
+          item.requestId,
+        );
+        await reconcileInitialDebt(businessId, item.operationId, remote);
+        return { remoteId: remote.id };
+      } catch (error) {
+        if (isPermanentDebtRejection(error)) {
+          await revertOptimisticInitialDebt(
+            businessId,
+            item.operationId,
+            customerId,
+            payload.amount,
+          );
+        }
+        throw error;
+      }
     },
     (item) => item.entity === "initialDebt" && item.operation === "create",
   );

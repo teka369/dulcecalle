@@ -7,7 +7,9 @@ import { getLocalStore } from "../local/store";
 import { getOutboxStore, getOutboxSyncEngine } from "../local/outbox";
 import { newEntityId } from "../local/ids";
 import { customerToLocal } from "../local/read-cache";
-import { mulCop } from "@/domain/money";
+import { pendingDebtAdjustment, isPermanentDebtRejection, isActiveDebtIntent } from "./pending-debt";
+import { addCop, mulCop, subCop } from "@/domain/money";
+import { splitReturnSettlement } from "@/domain/sale/returns";
 import type {
   LocalSale,
   LocalSaleLine,
@@ -257,9 +259,12 @@ async function reconcileReturnCustomer(
   if (!sale?.customerId) return;
   try {
     const customer = await getPwaApi().customers.get(sale.customerId);
-    await getLocalStore().customers.put(
-      customerToLocal(customer, businessId, Date.now()),
-    );
+    const snapshot = customerToLocal(customer, businessId, Date.now());
+    const pending = await pendingDebtAdjustment(businessId, sale.customerId);
+    await getLocalStore().customers.put({
+      ...snapshot,
+      debt: addCop(snapshot.debt, pending),
+    });
   } catch {
     // The return is already synced; customer cache can reconcile next cycle.
   }
@@ -403,16 +408,60 @@ async function enqueueReturn(
       ? [saleOp.operationId]
       : [];
 
+  const db = getLocalDb();
+  const returnValue = lines.reduce((sum, line) => {
+    const known = local.lines.find((row) => row.id === line.saleLineId);
+    return known ? addCop(sum, mulCop(known.unitPrice, line.qty)) : sum;
+  }, 0);
+  const priorReturns = (await db.saleReturns.where("businessId").equals(businessId).toArray()).filter(
+    (row) => row.saleId === local.sale.id,
+  );
+  let alreadyDebtReduced = priorReturns.reduce((sum, row) => addCop(sum, row.debtReduced), 0);
+  const open = await db.outbox.where("businessId").equals(businessId).toArray();
+  for (const op of open) {
+    if (!isActiveDebtIntent(op) || op.entity !== "saleReturn" || op.operation !== "return") continue;
+    const raw = op.payload;
+    if (!raw || typeof raw !== "object") continue;
+    const saleRef = (raw as { saleRef?: unknown }).saleRef;
+    const projected = (raw as { projectedDebtReduced?: unknown }).projectedDebtReduced;
+    if (saleRef !== local.sale.id || typeof projected !== "number") continue;
+    alreadyDebtReduced = addCop(alreadyDebtReduced, projected);
+  }
+  const customer = local.sale.customerId
+    ? await db.customers.get(local.sale.customerId)
+    : undefined;
+  const split = splitReturnSettlement({
+    returnValue,
+    saleCredit: local.sale.credit,
+    alreadyDebtReduced,
+    customerDebt: customer && customer.businessId === businessId ? customer.debt : 0,
+  });
+
   const operationId = newEntityId();
-  await getOutboxStore().enqueue({
-    operationId,
-    businessId,
-    entity: "saleReturn",
-    operation: "return",
-    requestId,
-    payload: { saleRef: local.sale.id, lines },
-    dependsOn,
-    localCreatedAt: Date.now(),
+  await db.transaction("rw", [db.customers, db.outbox], async () => {
+    if (customer && customer.businessId === businessId && split.debtReduced > 0) {
+      const next = subCop(customer.debt, split.debtReduced);
+      await db.customers.put({
+        ...customer,
+        debt: next < 0 ? 0 : next,
+        updatedAt: Date.now(),
+      });
+    }
+    await getOutboxStore().enqueue({
+      operationId,
+      businessId,
+      entity: "saleReturn",
+      operation: "return",
+      requestId,
+      payload: {
+        saleRef: local.sale.id,
+        lines,
+        projectedDebtReduced: split.debtReduced,
+        projectedRefundAmount: split.refundAmount,
+      },
+      dependsOn,
+      localCreatedAt: Date.now(),
+    });
   });
   return operationId;
 }
@@ -441,6 +490,35 @@ export async function createReturnWithOfflineFallback(
   }
 }
 
+async function revertOptimisticReturnDebt(businessId: string, item: OutboxItem): Promise<void> {
+  const raw = item.payload;
+  if (!raw || typeof raw !== "object") return;
+  if ((raw as { optimisticApplied?: unknown }).optimisticApplied === false) return;
+  const reduced = (raw as { projectedDebtReduced?: unknown }).projectedDebtReduced;
+  const saleRef = (raw as { saleRef?: unknown }).saleRef;
+  const db = getLocalDb();
+  if (typeof reduced === "number" && reduced > 0 && typeof saleRef === "string") {
+    const sale = await db.sales.get(saleRef);
+    if (sale && sale.businessId === businessId && sale.customerId) {
+      const customer = await db.customers.get(sale.customerId);
+      if (customer && customer.businessId === businessId) {
+        await db.customers.put({
+          ...customer,
+          debt: addCop(customer.debt, reduced),
+          updatedAt: Date.now(),
+        });
+      }
+    }
+  }
+  const current = await db.outbox.get(item.operationId);
+  if (current?.payload && typeof current.payload === "object") {
+    await db.outbox.put({
+      ...current,
+      payload: { ...current.payload, optimisticApplied: false },
+    });
+  }
+}
+
 export async function syncPendingReturns(businessId: string) {
   return getOutboxSyncEngine().flush(
     businessId,
@@ -452,18 +530,25 @@ export async function syncPendingReturns(businessId: string) {
       if (!payload) throw new Error("La devolución no tiene líneas.");
       const remoteSaleId = await resolveRemoteSaleId(businessId, payload.saleRef);
       if (!remoteSaleId) throw new Error("La venta todavía no tiene id remoto.");
-      const remote = await getPwaApi().sales.createReturn(
-        remoteSaleId,
-        { lines: payload.lines },
-        item.requestId,
-      );
-      await applyReturnStockOnce(businessId, item.requestId, remote.lines);
-      const db = getLocalDb();
-      await db.transaction("rw", [db.saleReturns, db.saleReturnLines], async () => {
-        await putReturnRows(businessId, payload.saleRef, item.requestId, remote);
-      });
-      await reconcileReturnCustomer(businessId, payload.saleRef);
-      return { remoteId: remote.id };
+      try {
+        const remote = await getPwaApi().sales.createReturn(
+          remoteSaleId,
+          { lines: payload.lines },
+          item.requestId,
+        );
+        await applyReturnStockOnce(businessId, item.requestId, remote.lines);
+        const db = getLocalDb();
+        await db.transaction("rw", [db.saleReturns, db.saleReturnLines], async () => {
+          await putReturnRows(businessId, payload.saleRef, item.requestId, remote);
+        });
+        await reconcileReturnCustomer(businessId, payload.saleRef);
+        return { remoteId: remote.id };
+      } catch (error) {
+        if (isPermanentDebtRejection(error)) {
+          await revertOptimisticReturnDebt(businessId, item);
+        }
+        throw error;
+      }
     },
     (item) => item.entity === "saleReturn" && item.operation === "return",
   );
