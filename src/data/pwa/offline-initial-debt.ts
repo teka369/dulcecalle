@@ -3,7 +3,7 @@ import { getPwaApi } from "./api";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
 import { getLocalStore } from "../local/store";
-import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
+import { getOutboxStore, getOutboxSyncEngine } from "../local/outbox";
 import { newEntityId } from "../local/ids";
 import { customerToLocal } from "../local/read-cache";
 import { addCop } from "@/domain/money";
@@ -196,25 +196,3 @@ export async function syncPendingInitialDebts(businessId: string) {
   return result;
 }
 
-let stopInitialDebtSync: (() => void) | null = null;
-
-export function startInitialDebtSync(): () => void {
-  if (stopInitialDebtSync) return stopInitialDebtSync;
-  const monitor = new ConnectivityMonitor();
-  const sync = () => {
-    const businessId = getPwaAuthSession().businessId;
-    if (businessId && monitor.online) void syncPendingInitialDebts(businessId);
-  };
-  monitor.start();
-  monitor.refresh();
-  sync();
-  const unsubscribe = monitor.subscribe((online) => {
-    if (online) sync();
-  });
-  stopInitialDebtSync = () => {
-    unsubscribe();
-    monitor.stop();
-    stopInitialDebtSync = null;
-  };
-  return stopInitialDebtSync;
-}
