@@ -157,17 +157,31 @@ export async function createInitialDebtWithOfflineFallback(
 
 async function revertOptimisticInitialDebt(
   businessId: string,
+  operationId: string,
   customerId: string,
   amount: number,
 ): Promise<void> {
+  const db = getLocalDb();
+  const op = await db.outbox.get(operationId);
+  const payload = op?.payload;
+  if (payload && typeof payload === "object" && (payload as { optimisticApplied?: unknown }).optimisticApplied === false) {
+    return;
+  }
   const customer = await getLocalStore().customers.get(businessId, customerId);
-  if (!customer || amount <= 0) return;
-  const next = subCop(customer.debt, amount);
-  await getLocalStore().customers.put({
-    ...customer,
-    debt: next < 0 ? 0 : next,
-    updatedAt: Date.now(),
-  });
+  if (customer && amount > 0) {
+    const next = subCop(customer.debt, amount);
+    await getLocalStore().customers.put({
+      ...customer,
+      debt: next < 0 ? 0 : next,
+      updatedAt: Date.now(),
+    });
+  }
+  if (op && payload && typeof payload === "object") {
+    await db.outbox.put({
+      ...op,
+      payload: { ...payload, optimisticApplied: false },
+    });
+  }
 }
 
 async function reconcileInitialDebt(
@@ -229,7 +243,12 @@ export async function syncPendingInitialDebts(businessId: string) {
         return { remoteId: remote.id };
       } catch (error) {
         if (isPermanentDebtRejection(error)) {
-          await revertOptimisticInitialDebt(businessId, customerId, payload.amount);
+          await revertOptimisticInitialDebt(
+            businessId,
+            item.operationId,
+            customerId,
+            payload.amount,
+          );
         }
         throw error;
       }

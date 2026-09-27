@@ -584,6 +584,16 @@ describe("M7.1 offline debt reconciliation", () => {
     expect(api.customers.initialDebt.mock.calls.length).toBe(calls);
     expect((await getLocalDb().customers.get(customerId))?.debt).toBe(100_000);
     expect(await getLocalDb().initialDebts.count()).toBe(1);
+
+    const rejected = await getOutboxStore().getByRequestId(BIZ, requestId);
+    if (!rejected) throw new Error("missing rejected debt");
+    await getOutboxStore().requeue(BIZ, rejected.operationId);
+    await syncPendingInitialDebts(BIZ);
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(100_000);
+    const retried = await getOutboxStore().getByRequestId(BIZ, requestId);
+    expect(retried?.status).toBe("failed");
+    expect(retried?.nextAttemptAt).toBeNull();
+    expect(retried?.requestId).toBe(requestId);
   });
 
   it("T9 pending return moves the offline statement without stock or a confirmed row", async () => {

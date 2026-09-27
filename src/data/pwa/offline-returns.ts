@@ -493,19 +493,30 @@ export async function createReturnWithOfflineFallback(
 async function revertOptimisticReturnDebt(businessId: string, item: OutboxItem): Promise<void> {
   const raw = item.payload;
   if (!raw || typeof raw !== "object") return;
+  if ((raw as { optimisticApplied?: unknown }).optimisticApplied === false) return;
   const reduced = (raw as { projectedDebtReduced?: unknown }).projectedDebtReduced;
   const saleRef = (raw as { saleRef?: unknown }).saleRef;
-  if (typeof reduced !== "number" || reduced <= 0 || typeof saleRef !== "string") return;
   const db = getLocalDb();
-  const sale = await db.sales.get(saleRef);
-  if (!sale || sale.businessId !== businessId || !sale.customerId) return;
-  const customer = await db.customers.get(sale.customerId);
-  if (!customer || customer.businessId !== businessId) return;
-  await db.customers.put({
-    ...customer,
-    debt: addCop(customer.debt, reduced),
-    updatedAt: Date.now(),
-  });
+  if (typeof reduced === "number" && reduced > 0 && typeof saleRef === "string") {
+    const sale = await db.sales.get(saleRef);
+    if (sale && sale.businessId === businessId && sale.customerId) {
+      const customer = await db.customers.get(sale.customerId);
+      if (customer && customer.businessId === businessId) {
+        await db.customers.put({
+          ...customer,
+          debt: addCop(customer.debt, reduced),
+          updatedAt: Date.now(),
+        });
+      }
+    }
+  }
+  const current = await db.outbox.get(item.operationId);
+  if (current?.payload && typeof current.payload === "object") {
+    await db.outbox.put({
+      ...current,
+      payload: { ...current.payload, optimisticApplied: false },
+    });
+  }
 }
 
 export async function syncPendingReturns(businessId: string) {
