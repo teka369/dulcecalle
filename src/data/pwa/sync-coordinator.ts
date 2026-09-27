@@ -5,6 +5,7 @@ import { syncPendingProductImages } from "./product-images";
 import { syncPendingPreparations } from "./offline-production";
 import { syncPendingOperations } from "./offline-operations";
 import { syncPendingPayments } from "./offline-payments";
+import { syncPendingInitialDebts } from "./offline-initial-debt";
 import { syncPendingSales } from "./offline-sales";
 import { syncPendingReturns } from "./offline-returns";
 
@@ -12,6 +13,7 @@ export type SyncAllResult = {
   sales: SyncFlushResult;
   returns: SyncFlushResult;
   payments: SyncFlushResult;
+  initialDebts: SyncFlushResult;
   customers: SyncFlushResult;
   suppliers: SyncFlushResult;
   products: SyncFlushResult;
@@ -45,6 +47,7 @@ export async function syncAllPending(businessId: string): Promise<SyncAllResult>
     sales: AUTH_IDLE,
     returns: AUTH_IDLE,
     payments: AUTH_IDLE,
+    initialDebts: AUTH_IDLE,
     customers: AUTH_IDLE,
     suppliers: AUTH_IDLE,
     products: AUTH_IDLE,
@@ -57,6 +60,7 @@ export async function syncAllPending(businessId: string): Promise<SyncAllResult>
     ["returns", () => syncPendingReturns(businessId)],
     ["payments", () => syncPendingPayments(businessId)],
     ["customers", () => syncPendingCustomers(businessId)],
+    ["initialDebts", () => syncPendingInitialDebts(businessId)],
     ["suppliers", () => syncPendingSuppliers(businessId)],
     ["products", () => syncPendingProducts(businessId)],
     ["images", () => syncPendingProductImages(businessId)],
