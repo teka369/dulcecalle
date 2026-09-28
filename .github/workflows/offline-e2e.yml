@@ -105,6 +105,8 @@ jobs:
       - name: Install backend
         working-directory: backend
         run: npm ci
+      - name: Embedded Postgres user
+        run: getent passwd 999 || sudo useradd --system --uid 999 --no-create-home --shell /usr/sbin/nologin dcpg
       - name: Full backend suite
         working-directory: backend
         run: npm test -- --runInBand --forceExit
