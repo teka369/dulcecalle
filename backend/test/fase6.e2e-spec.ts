@@ -220,6 +220,7 @@ describe("Fase 6 backend", () => {
       .post("/v1/cash/sessions")
       .set("Authorization", `Bearer ${tokenA}`)
       .set("X-Business-Id", bizA)
+      .set("Idempotency-Key", randomUUID())
       .send({ openingFloat: 5000 })
       .expect(201);
     expect(opened.body.openingFloat).toBe(5000);
@@ -228,6 +229,7 @@ describe("Fase 6 backend", () => {
       .post("/v1/cash/sessions")
       .set("Authorization", `Bearer ${tokenA}`)
       .set("X-Business-Id", bizA)
+      .set("Idempotency-Key", randomUUID())
       .send({ openingFloat: 9999 })
       .expect(201);
     expect(dupOpen.body.id).toBe(opened.body.id);
@@ -349,6 +351,7 @@ describe("Fase 6 backend", () => {
       .post(`/v1/cash/sessions/${opened.body.id}/close`)
       .set("Authorization", `Bearer ${tokenA}`)
       .set("X-Business-Id", bizA)
+      .set("Idempotency-Key", randomUUID())
       .send({ countedEfectivo: 8000 })
       .expect(201);
     expect(closed.body.expectedEfectivo).toBe(8000);
@@ -359,6 +362,7 @@ describe("Fase 6 backend", () => {
       .post(`/v1/cash/sessions/${opened.body.id}/close`)
       .set("Authorization", `Bearer ${tokenA}`)
       .set("X-Business-Id", bizA)
+      .set("Idempotency-Key", randomUUID())
       .send({ countedEfectivo: 1 })
       .expect(409)
       .expect((r) => expect(r.body.error.code).toBe("SESSION_ALREADY_CLOSED"));
@@ -720,6 +724,7 @@ describe("Fase 6 backend", () => {
       .post("/v1/cash/sessions")
       .set("Authorization", `Bearer ${tokenA}`)
       .set("X-Business-Id", bizA)
+      .set("Idempotency-Key", randomUUID())
       .send({ openingFloat: 1 })
       .expect(201);
     expect(again.body.id).toBe(today.body.session.id);

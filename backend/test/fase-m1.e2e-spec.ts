@@ -169,6 +169,7 @@ describe("Fase M1 domain endpoints", () => {
     const opened = await api()
       .post("/v1/cash/sessions")
       .set(auth(tokenA, bizA))
+      .set("Idempotency-Key", randomUUID())
       .send({ openingFloat: 50_000 })
       .expect(201);
     expect(opened.body.openingFloat).toBe(50_000);
@@ -825,6 +826,7 @@ describe("Fase M1 domain endpoints", () => {
     await api()
       .post(`/v1/cash/sessions/${sessionId}/close`)
       .set(auth(tokenA, bizA))
+      .set("Idempotency-Key", randomUUID())
       .send({ countedEfectivo: today.body.expected.efectivo })
       .expect(201);
 
