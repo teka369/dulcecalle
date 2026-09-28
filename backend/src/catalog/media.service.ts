@@ -170,8 +170,8 @@ export class MediaService {
     productId: string,
     requestId: string,
   ): Promise<UploadSignature> {
-    const config = this.config();
     await this.requireProduct(ctx, productId);
+    const config = this.config();
     const timestamp = Math.floor(Date.now() / 1000);
     const publicId = imagePublicId(ctx.businessId, productId, requestId);
     const signature = signUploadParams(
@@ -200,8 +200,8 @@ export class MediaService {
     productId: string,
     dto: RegisterProductImageDto,
   ) {
-    const config = this.config();
     await this.requireProduct(ctx, productId);
+    const config = this.config();
     if (dto.resourceType !== undefined && dto.resourceType !== "image") {
       throw new AppError(ERROR_CODES.VALIDATION, "Solo se permiten imágenes.");
     }
@@ -352,17 +352,17 @@ export class MediaService {
   /**
    * Delete: destroy the Cloudinary asset first (server-side, secret stays
    * here), then remove the row. A Cloudinary 404 still deletes the row so
-   * retries converge; other Cloudinary failures abort with 502 and the row
+   * retries converge; other Cloudinary failures abort with 500 and the row
    * is kept for retry. If no image remains primary, the lowest position
    * is promoted.
    */
   async removeImage(ctx: BusinessContext, productId: string, imageId: string) {
-    const config = this.config();
     await this.requireProduct(ctx, productId);
     const existing = await this.prisma.productImage.findFirst({
       where: { id: imageId, businessId: ctx.businessId, productId },
     });
     if (!existing) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+    const config = this.config();
 
     const result = await this.destroyPublicId(config, existing.publicId);
     if (result !== "ok" && result !== "not found") {
