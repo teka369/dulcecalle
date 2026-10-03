@@ -52,11 +52,13 @@ describe("Fase M5 customer login throttle", () => {
     else process.env.DISABLE_THROTTLE = previousThrottle;
   });
 
-  it("returns 429 RATE_LIMIT on the 11th identification attempt", async () => {
+  it("returns 429 RATE_LIMIT on the 11th identification attempt even if X-Forwarded-For changes", async () => {
     const http = request(app.getHttpServer());
     for (let i = 0; i < 10; i += 1) {
       const res = await http
         .post("/v1/customer-access/login")
+        .set("X-Forwarded-For", `203.0.113.${i + 1}`)
+        .set("X-Real-IP", `198.51.100.${i + 1}`)
         .send({ code: "DC-0001", name: "Nadie" });
       expect(res.status).not.toBe(429);
       expect(res.body.error?.code).not.toBe("RATE_LIMIT");
@@ -64,6 +66,8 @@ describe("Fase M5 customer login throttle", () => {
 
     const blocked = await http
       .post("/v1/customer-access/login")
+      .set("X-Forwarded-For", "203.0.113.250")
+      .set("X-Real-IP", "198.51.100.250")
       .send({ code: "DC-0001", name: "Nadie" })
       .expect(429);
     expect(blocked.body.error.code).toBe("RATE_LIMIT");
