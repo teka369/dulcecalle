@@ -17,6 +17,8 @@ import { createInitialDebtWithOfflineFallback } from "@/data/pwa/offline-initial
 import { createPaymentWithOfflineFallback } from "@/data/pwa/offline-payments";
 import { createProductWithOfflineFallback } from "@/data/pwa/offline-catalog";
 import { createSaleWithOfflineFallback } from "@/data/pwa/offline-sales";
+import { createReturnWithOfflineFallback } from "@/data/pwa/offline-returns";
+import { getStatementWithOfflineFallback } from "@/data/pwa/offline-statement";
 import { syncAllPending } from "@/data/pwa/sync-coordinator";
 import { getPwaAuthSession, resetPwaAuthSessionForTests } from "@/data/http/session";
 import { __reopenLocalDbForTests, __resetLocalDbForTests, getLocalDb } from "@/data/local/db";
@@ -59,6 +61,17 @@ type PrismaLike = {
   initialDebt: Countable;
   customerPayment: Countable;
   cashMove: Countable;
+  saleReturn: {
+    count(args: { where: Record<string, unknown> }): Promise<number>;
+    findFirst(args: { where: Record<string, unknown> }): Promise<{
+      debtReduced: bigint;
+      refundAmount: bigint;
+    } | null>;
+  };
+  businessMembership: {
+    deleteMany(args: { where: Record<string, unknown> }): Promise<unknown>;
+    create(args: { data: Record<string, unknown> }): Promise<unknown>;
+  };
 };
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
@@ -423,6 +436,9 @@ describe("round 2.1 offline attacks against PostgreSQL", () => {
     expect(await prisma.sale.count({ where: { requestId: saleKey } })).toBe(0);
     expect((await prisma.product.findFirst({ where: { id: shelf.productId } }))?.stock).toBe(1);
     expect((await getLocalDb().products.get(shelf.productId))?.stock).toBe(5);
+    const refreshed = await listCachedProducts();
+    expect(refreshed.find((row) => row.id === shelf.productId)?.stock).toBe(1);
+    expect((await getLocalDb().products.get(shelf.productId))?.stock).toBe(1);
 
     await wait(1_500);
     const again = await syncAllPending(biz);
@@ -483,5 +499,298 @@ describe("round 2.1 offline attacks against PostgreSQL", () => {
     expect((await getOutboxStore().getByRequestId(biz, keyB))?.status).toBe("pending");
     expect(await prisma.customer.count({ where: { businessId: biz, requestId: keyA } })).toBe(0);
     expect(await prisma.customer.count({ where: { businessId: biz, requestId: keyB } })).toBe(0);
+  });
+
+  it("drops the return response after commit and the retry writes one return", async () => {
+    await freshDexie();
+    applySession();
+    const shelf = await onlineShelf("Devolucion Drop", 10);
+    offline = false;
+    const saleKey = newEntityId();
+    const sold = await createSaleWithOfflineFallback(
+      {
+        lines: [{ productId: shelf.productId, qty: 4 }],
+        paymentKind: "credit",
+        customerId: shelf.customerId,
+        amountReceived: 0,
+      },
+      saleKey,
+    );
+    if (sold.mode !== "online") throw new Error("sale should be online");
+    await listCachedCustomers();
+    await listCachedProducts();
+    const lineId = sold.sale.lines[0]?.id;
+    if (!lineId) throw new Error("sale line missing");
+    const returnKey = newEntityId();
+    offline = true;
+    const returned = await createReturnWithOfflineFallback(
+      sold.sale.id,
+      [{ saleLineId: lineId, qty: 2 }],
+      returnKey,
+    );
+    if (returned.mode !== "offline") throw new Error("return should be offline");
+    expect((await getLocalDb().customers.get(shelf.customerId))?.debt).toBe(2_000);
+    reopen();
+    offline = false;
+    dropPost = (url) => url.includes("/returns");
+    const first = await syncAllPending(biz);
+    expect(first.returns.failed).toBe(1);
+    expect(first.returns.synced).toBe(0);
+    expect(await prisma.saleReturn.count({ where: { requestId: returnKey } })).toBe(1);
+    expect(await prisma.sale.count({ where: { requestId: saleKey } })).toBe(1);
+    const row = await prisma.saleReturn.findFirst({ where: { requestId: returnKey } });
+    expect(Number(row?.debtReduced)).toBe(2_000);
+    expect(Number(row?.refundAmount)).toBe(0);
+    expect(Number((await prisma.customer.findFirst({ where: { id: shelf.customerId } }))?.debt)).toBe(2_000);
+    expect((await prisma.product.findFirst({ where: { id: shelf.productId } }))?.stock).toBe(8);
+    expect(await prisma.cashMove.count({ where: { businessId: biz, kind: "devolucion" } })).toBe(0);
+
+    await wait(1_500);
+    const second = await syncAllPending(biz);
+    expect(second.returns.synced).toBe(1);
+    expect((await getLocalDb().outbox.get(returned.operationId))?.status).toBe("synced");
+    expect(await prisma.saleReturn.count({ where: { requestId: returnKey } })).toBe(1);
+    expect(Number((await prisma.customer.findFirst({ where: { id: shelf.customerId } }))?.debt)).toBe(2_000);
+    expect((await prisma.product.findFirst({ where: { id: shelf.productId } }))?.stock).toBe(8);
+    expect((await getLocalDb().customers.get(shelf.customerId))?.debt).toBe(2_000);
+
+    const third = await syncAllPending(biz);
+    expect(third.returns.synced).toBe(0);
+    expect(await prisma.saleReturn.count({ where: { requestId: returnKey } })).toBe(1);
+  });
+
+  it("drops the initial-debt response after commit and the retry writes one row", async () => {
+    await freshDexie();
+    applySession();
+    const shelf = await onlineShelf("Deuda Drop", 3);
+    const debtKey = newEntityId();
+    offline = true;
+    const debt = await createInitialDebtWithOfflineFallback(
+      { customerId: shelf.customerId, amount: 7_000 },
+      debtKey,
+    );
+    if (debt.mode !== "offline") throw new Error("debt should be offline");
+    reopen();
+    expect((await getLocalDb().customers.get(shelf.customerId))?.debt).toBe(7_000);
+    offline = false;
+    dropPost = (url) => url.includes("/initial-debts");
+    const first = await syncAllPending(biz);
+    expect(first.initialDebts.failed).toBe(1);
+    expect(await prisma.initialDebt.count({ where: { requestId: debtKey } })).toBe(1);
+    expect(Number((await prisma.customer.findFirst({ where: { id: shelf.customerId } }))?.debt)).toBe(7_000);
+
+    await wait(1_500);
+    const second = await syncAllPending(biz);
+    expect(second.initialDebts.synced).toBe(1);
+    expect(await prisma.initialDebt.count({ where: { requestId: debtKey } })).toBe(1);
+    expect(Number((await prisma.customer.findFirst({ where: { id: shelf.customerId } }))?.debt)).toBe(7_000);
+    expect((await getLocalDb().customers.get(shelf.customerId))?.debt).toBe(7_000);
+    const again = await syncAllPending(biz);
+    expect(again.initialDebts.synced).toBe(0);
+    expect(await prisma.initialDebt.count({ where: { requestId: debtKey } })).toBe(1);
+  });
+
+  it("maps 403 and 404 to a permanent outbox failure with no server row", async () => {
+    await freshDexie();
+    applySession();
+    const shelf = await onlineShelf("Errores", 6);
+    const forbiddenKey = newEntityId();
+    offline = true;
+    const forbidden = await createSaleWithOfflineFallback(
+      {
+        lines: [{ productId: shelf.productId, qty: 1 }],
+        paymentKind: "credit",
+        customerId: shelf.customerId,
+        amountReceived: 0,
+      },
+      forbiddenKey,
+    );
+    if (forbidden.mode !== "offline") throw new Error("sale should be offline");
+    await prisma.businessMembership.deleteMany({
+      where: { userId: ready.owner.userId, businessId: biz },
+    });
+    reopen();
+    offline = false;
+    const denied = await syncAllPending(biz);
+    expect(denied.sales.failed).toBe(1);
+    expect(denied.sales.synced).toBe(0);
+    const deniedRow = await getLocalDb().outbox.get(forbidden.saleId);
+    expect(deniedRow?.status).toBe("failed");
+    expect(deniedRow?.nextAttemptAt).toBeNull();
+    expect(await prisma.sale.count({ where: { requestId: forbiddenKey } })).toBe(0);
+    expect((await prisma.product.findFirst({ where: { id: shelf.productId } }))?.stock).toBe(6);
+    await prisma.businessMembership.create({
+      data: {
+        id: newEntityId(),
+        businessId: biz,
+        userId: ready.owner.userId,
+        role: "owner",
+      },
+    });
+    applySession();
+    const still = await syncAllPending(biz);
+    expect(still.sales.processed).toBe(0);
+    expect(await prisma.sale.count({ where: { requestId: forbiddenKey } })).toBe(0);
+
+    const missingKey = newEntityId();
+    offline = true;
+    const missing = await createSaleWithOfflineFallback(
+      {
+        lines: [{ productId: shelf.productId, qty: 1 }],
+        paymentKind: "credit",
+        customerId: shelf.customerId,
+        amountReceived: 0,
+      },
+      missingKey,
+    );
+    if (missing.mode !== "offline") throw new Error("sale should be offline");
+    const op = await getLocalDb().outbox.get(missing.saleId);
+    if (!op?.payload || typeof op.payload !== "object") throw new Error("payload missing");
+    const payload = op.payload as { lines: Array<{ productId: string }> };
+    payload.lines[0].productId = newEntityId();
+    await getLocalDb().outbox.put({ ...op, payload });
+    reopen();
+    offline = false;
+    const notFound = await syncAllPending(biz);
+    expect(notFound.sales.failed).toBe(1);
+    const missingRow = await getLocalDb().outbox.get(missing.saleId);
+    expect(missingRow?.status).toBe("failed");
+    expect(missingRow?.nextAttemptAt).toBeNull();
+    expect(await prisma.sale.count({ where: { requestId: missingKey } })).toBe(0);
+    expect((await prisma.product.findFirst({ where: { id: shelf.productId } }))?.stock).toBe(6);
+    await wait(1_500);
+    expect((await syncAllPending(biz)).sales.processed).toBe(0);
+  });
+
+  it("a zero quantity is a permanent 400 and the server never emits 422", async () => {
+    await freshDexie();
+    applySession();
+    const shelf = await onlineShelf("Cero", 4);
+    const saleKey = newEntityId();
+    offline = true;
+    const sale = await createSaleWithOfflineFallback(
+      {
+        lines: [{ productId: shelf.productId, qty: 1 }],
+        paymentKind: "credit",
+        customerId: shelf.customerId,
+        amountReceived: 0,
+      },
+      saleKey,
+    );
+    if (sale.mode !== "offline") throw new Error("sale should be offline");
+    const op = await getLocalDb().outbox.get(sale.saleId);
+    if (!op?.payload || typeof op.payload !== "object") throw new Error("payload missing");
+    const payload = op.payload as { lines: Array<{ qty: number }> };
+    payload.lines[0].qty = 0;
+    await getLocalDb().outbox.put({ ...op, payload });
+    reopen();
+    offline = false;
+    const synced = await syncAllPending(biz);
+    expect(synced.sales).toMatchObject({ failed: 1, synced: 0 });
+    const row = await getLocalDb().outbox.get(sale.saleId);
+    expect(row?.status).toBe("failed");
+    expect(row?.nextAttemptAt).toBeNull();
+    expect(await prisma.sale.count({ where: { requestId: saleKey } })).toBe(0);
+    await wait(1_500);
+    expect((await syncAllPending(biz)).sales.processed).toBe(0);
+  });
+
+  it("a missing parent blocks the child without a request", async () => {
+    await freshDexie();
+    applySession();
+    offline = true;
+    const customerKey = newEntityId();
+    const created = await createCustomerWithOfflineFallback({ name: "Huerfano" }, customerKey);
+    if (created.mode !== "offline") throw new Error("customer should be offline");
+    const debtKey = newEntityId();
+    const debt = await createInitialDebtWithOfflineFallback(
+      { customerId: created.customerId, amount: 3_000 },
+      debtKey,
+    );
+    if (debt.mode !== "offline") throw new Error("debt should be offline");
+    const parent = await getOutboxStore().getByRequestId(biz, customerKey);
+    if (!parent) throw new Error("parent missing");
+    await getLocalDb().outbox.delete(parent.operationId);
+    reopen();
+    offline = false;
+    const synced = await syncAllPending(biz);
+    expect(synced.customers.synced).toBe(0);
+    expect(synced.initialDebts.synced).toBe(0);
+    expect(synced.initialDebts.blocked).toBeGreaterThan(0);
+    expect((await getLocalDb().outbox.get(debt.debtId))?.status).toBe("pending");
+    expect(await prisma.customer.count({ where: { requestId: customerKey } })).toBe(0);
+    expect(await prisma.initialDebt.count({ where: { requestId: debtKey } })).toBe(0);
+  });
+
+  it("keeps the combined pending projection across a reload and syncs it once", async () => {
+    await freshDexie();
+    applySession();
+    offline = false;
+    const customer = await createCustomerWithOfflineFallback({ name: "Proyeccion" }, newEntityId());
+    if (customer.mode !== "online") throw new Error("customer should be online");
+    const product = await createProductWithOfflineFallback(
+      { name: "Proyeccion", price: 1_000, stock: 40, avgCost: 100 },
+      newEntityId(),
+    );
+    if (product.mode !== "online") throw new Error("product should be online");
+    await prisma.customer.update({
+      where: { id: customer.customer.id },
+      data: { debt: 100_000n },
+    });
+    await listCachedCustomers();
+    await listCachedProducts();
+    expect((await getLocalDb().customers.get(customer.customer.id))?.debt).toBe(100_000);
+
+    offline = true;
+    const debt = await createInitialDebtWithOfflineFallback(
+      { customerId: customer.customer.id, amount: 20_000 },
+      newEntityId(),
+    );
+    const sold = await createSaleWithOfflineFallback(
+      {
+        lines: [{ productId: product.product.id, qty: 30 }],
+        paymentKind: "credit",
+        customerId: customer.customer.id,
+        amountReceived: 0,
+      },
+      newEntityId(),
+    );
+    if (debt.mode !== "offline" || sold.mode !== "offline") throw new Error("expected offline");
+    const lineId = (await getLocalDb().saleLines.where("[businessId+saleId]").equals([biz, sold.saleId]).toArray())[0]?.id;
+    if (!lineId) throw new Error("local line missing");
+    await createPaymentWithOfflineFallback(
+      { customerId: customer.customer.id, amount: 10_000, method: "Efectivo" },
+      newEntityId(),
+    );
+    const returnKey = newEntityId();
+    const returned = await createReturnWithOfflineFallback(
+      sold.saleId,
+      [{ saleLineId: lineId, qty: 20 }],
+      returnKey,
+    );
+    if (returned.mode !== "offline") throw new Error("return should be offline");
+    expect((await getLocalDb().customers.get(customer.customer.id))?.debt).toBe(120_000);
+    const before = await getStatementWithOfflineFallback(customer.customer.id);
+    expect(before?.source).toBe("cache");
+    expect(before?.statement.total).toBe(120_000);
+
+    reopen();
+    expect((await getLocalDb().customers.get(customer.customer.id))?.debt).toBe(120_000);
+    const reloaded = await getStatementWithOfflineFallback(customer.customer.id);
+    expect(reloaded?.statement.total).toBe(120_000);
+
+    offline = false;
+    const synced = await syncAllPending(biz);
+    expect(synced.sales.synced).toBe(1);
+    expect(synced.returns.synced).toBe(1);
+    expect(synced.payments.synced).toBe(1);
+    expect(synced.initialDebts.synced).toBe(1);
+    expect(Number((await prisma.customer.findFirst({ where: { id: customer.customer.id } }))?.debt)).toBe(120_000);
+    expect((await getLocalDb().customers.get(customer.customer.id))?.debt).toBe(120_000);
+    expect(await prisma.sale.count({ where: { customerId: customer.customer.id } })).toBe(1);
+    expect(await prisma.saleReturn.count({ where: { requestId: returnKey } })).toBe(1);
+    expect(await prisma.initialDebt.count({ where: { customerId: customer.customer.id } })).toBe(1);
+    expect(await prisma.customerPayment.count({ where: { customerId: customer.customer.id } })).toBe(1);
+    expect((await prisma.product.findFirst({ where: { id: product.product.id } }))?.stock).toBe(30);
   });
 });
