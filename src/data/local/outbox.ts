@@ -438,7 +438,11 @@ export class OutboxSyncEngine {
           });
         } catch (error) {
           if (isAuthRequiredError(error)) {
-            await this.outbox.releaseInFlight(businessId, current.operationId);
+            const released = await this.settleLostAttempt(businessId, current.operationId, null);
+            if (released === "synced") {
+              synced += 1;
+              continue;
+            }
             stopped = true;
             authRequired = true;
             emitSyncEvent({
@@ -449,12 +453,16 @@ export class OutboxSyncEngine {
           }
           const retryable = isRetryableError(error);
           const message = error instanceof Error ? error.message : "Error de sincronización.";
-          await this.outbox.markFailed(
+          const settled = await this.settleLostAttempt(
             businessId,
             current.operationId,
-            message,
             retryable ? retryAt(flying.attempts, this.clock()) : null,
+            message,
           );
+          if (settled === "synced") {
+            synced += 1;
+            continue;
+          }
           failed += 1;
           emitSyncEvent({
             type: "item",
@@ -489,6 +497,30 @@ export class OutboxSyncEngine {
       });
     }
     return result;
+  }
+
+  /**
+   * Another flush (a second tab, or a restarted engine) may already have
+   * synced this row. Downgrading it to failed would be a lie.
+   */
+  private async settleLostAttempt(
+    businessId: string,
+    operationId: string,
+    nextAttemptAt: number | null,
+    message?: string,
+  ): Promise<"synced" | "settled"> {
+    try {
+      if (message === undefined) {
+        await this.outbox.releaseInFlight(businessId, operationId);
+      } else {
+        await this.outbox.markFailed(businessId, operationId, message, nextAttemptAt);
+      }
+      return "settled";
+    } catch (error) {
+      const row = await this.outbox.get(businessId, operationId);
+      if (row?.status === "synced") return "synced";
+      throw error;
+    }
   }
 
   private async dependenciesReady(businessId: string, item: OutboxItem): Promise<boolean> {

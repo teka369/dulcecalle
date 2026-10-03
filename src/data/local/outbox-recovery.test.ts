@@ -202,4 +202,42 @@ describe("M6.9 outbox recovery", () => {
     await expect(outbox.discard(BIZ, pending)).rejects.toThrow("only pending/failed");
     await expect(outbox.discard(OTHER_BIZ, pending)).rejects.toThrow("another business");
   });
+
+  it("a second engine that already synced the row is not marked failed", async () => {
+    const outbox = getOutboxStore();
+    const operationId = newEntityId();
+    const remoteId = newEntityId();
+    await outbox.enqueue({
+      operationId,
+      businessId: BIZ,
+      entity: "sale",
+      operation: "create",
+      requestId: newRequestId(),
+      payload: {},
+    });
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = new OutboxSyncEngine(outbox, () => 10_000).flush(BIZ, async () => {
+      await gate;
+      throw new Error("socket dropped");
+    });
+    const started = Date.now();
+    while ((await outbox.get(BIZ, operationId))?.status !== "in_flight") {
+      if (Date.now() - started > 2000) throw new Error("never in_flight");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    const second = await new OutboxSyncEngine(outbox, () => 10_000).flush(BIZ, async () => ({
+      remoteId,
+    }));
+    release();
+    const finished = await first;
+    expect(second.synced).toBe(1);
+    expect(finished).toMatchObject({ synced: 1, failed: 0 });
+    expect(await outbox.get(BIZ, operationId)).toMatchObject({
+      status: "synced",
+      remoteId,
+    });
+  });
 });
