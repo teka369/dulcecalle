@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { IdentityService } from "./identity.service";
 import { CreateBusinessDto, LoginDto, RefreshDto } from "./dto";
 import { Public, SkipBusiness } from "../shared/http/decorators";
@@ -10,12 +11,14 @@ export class IdentityController {
   constructor(private readonly identity: IdentityService) {}
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post("auth/login")
   login(@Body() dto: LoginDto) {
     return this.identity.login(dto.email, dto.password);
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post("auth/refresh")
   refresh(@Body() dto: RefreshDto) {
     return this.identity.refresh(dto.refreshToken);

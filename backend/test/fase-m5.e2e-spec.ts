@@ -249,10 +249,11 @@ describe("Fase M5 customer portal", () => {
     const blob = JSON.stringify(ledger.body);
     expect(blob).not.toContain(pedro.id);
     expect(blob).not.toContain(other.id);
+    expect(blob).not.toContain(productB.body.id);
     expect(blob).not.toContain("Chicle B");
     expect(blob).not.toMatch(/unitCost/);
-    expect(blob).not.toMatch(/productId/);
     expect(blob).not.toMatch(/saleLineId/);
+    expect(ledger.body.sales[0].lines[0].productId).toBe(productA.body.id);
   });
 
   it("fails closed when the same code+name exists in two businesses", async () => {
@@ -479,8 +480,8 @@ describe("Fase M5 customer portal", () => {
     expect(line.productName).toBe("Galleta");
     expect(line.qty).toBe(2);
     expect(line.unitPrice).toBe(500);
+    expect(line.productId).toBe(product.body.id);
     expect(line).not.toHaveProperty("unitCost");
-    expect(line).not.toHaveProperty("productId");
     expect(credit.returns[0].lines[0]).not.toHaveProperty("unitCost");
     expect(credit.returns[0].lines[0]).not.toHaveProperty("saleLineId");
     expect(credit.returns[0].lines[0]).not.toHaveProperty("productId");
