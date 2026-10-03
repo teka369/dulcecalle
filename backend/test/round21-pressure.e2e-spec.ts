@@ -111,6 +111,96 @@ describe("Round 2.1 pressure, scale, and refresh replay", () => {
     expect(Number(debtor.debt)).toBeGreaterThanOrEqual(0);
   });
 
+  it("100 concurrent attempts on the last unit and the same debt stay non-negative", async () => {
+    const owner = await seedOwner(app, "r22-100@test.co", "Cien");
+    const customer = await api()
+      .post("/v1/customers")
+      .set(admin(owner.accessToken, owner.business.id))
+      .set("Idempotency-Key", randomUUID())
+      .send({ name: "Cien" })
+      .expect(201);
+    await prisma.customer.update({
+      where: { id: customer.body.id },
+      data: { debt: 1000n },
+    });
+    const product = await api()
+      .post("/v1/products")
+      .set(admin(owner.accessToken, owner.business.id))
+      .set("Idempotency-Key", randomUUID())
+      .send({ name: "Cien", price: 100, stock: 1, avgCost: 10 })
+      .expect(201);
+    const extra = await api()
+      .post("/v1/products")
+      .set(admin(owner.accessToken, owner.business.id))
+      .set("Idempotency-Key", randomUUID())
+      .send({ name: "Clave cien", price: 100, stock: 20, avgCost: 10 })
+      .expect(201);
+    const n = 100;
+    const sales = await Promise.all(
+      Array.from({ length: n }, () =>
+        api()
+          .post("/v1/sales")
+          .set(admin(owner.accessToken, owner.business.id))
+          .set("Idempotency-Key", randomUUID())
+          .send({
+            lines: [{ productId: product.body.id, qty: 1, unitPrice: 100 }],
+            paymentKind: "credit",
+            customerId: customer.body.id,
+            amountReceived: 0,
+          }),
+      ),
+    );
+    const saleCounts = sales.reduce<Record<number, number>>((acc, res) => {
+      acc[res.status] = (acc[res.status] ?? 0) + 1;
+      return acc;
+    }, {});
+    await prisma.customer.update({
+      where: { id: customer.body.id },
+      data: { debt: 1000n },
+    });
+    const pays = await Promise.all(
+      Array.from({ length: n }, () =>
+        api()
+          .post(`/v1/customers/${customer.body.id}/payments`)
+          .set(admin(owner.accessToken, owner.business.id))
+          .set("Idempotency-Key", randomUUID())
+          .send({ amount: 1000, method: "Efectivo" }),
+      ),
+    );
+    const payCounts = pays.reduce<Record<number, number>>((acc, res) => {
+      acc[res.status] = (acc[res.status] ?? 0) + 1;
+      return acc;
+    }, {});
+    expect(payCounts[500] ?? 0).toBe(0);
+    expect(payCounts[201]).toBe(1);
+    expect(Number((await prisma.customer.findUniqueOrThrow({ where: { id: customer.body.id } })).debt)).toBe(0);
+    const key = randomUUID();
+    const same = await Promise.all(
+      Array.from({ length: n }, () =>
+        api()
+          .post("/v1/sales")
+          .set(admin(owner.accessToken, owner.business.id))
+          .set("Idempotency-Key", key)
+          .send({
+            lines: [{ productId: extra.body.id, qty: 1, unitPrice: 100 }],
+            paymentKind: "credit",
+            customerId: customer.body.id,
+            amountReceived: 0,
+          }),
+      ),
+    );
+    console.log(JSON.stringify({ n, saleCounts, payCounts, sameStatuses: [...new Set(same.map((res) => res.status))] }));
+    expect(saleCounts[500] ?? 0).toBe(0);
+    expect(saleCounts[201]).toBe(1);
+    expect(same.some((res) => res.status === 500)).toBe(false);
+    const stock = await prisma.product.findUniqueOrThrow({ where: { id: product.body.id } });
+    expect(Number(stock.stock)).toBe(0);
+    const keyed = await prisma.product.findUniqueOrThrow({ where: { id: extra.body.id } });
+    expect(Number(keyed.stock)).toBe(19);
+    expect(await prisma.sale.count({ where: { businessId: owner.business.id, requestId: key } })).toBe(1);
+    expect(await prisma.customerPayment.count({ where: { customerId: customer.body.id } })).toBe(1);
+  });
+
   it("50 concurrent abonos cannot drive debt below zero", async () => {
     const owner = await seedOwner(app, "r21-debt@test.co", "Deuda");
     const customer = await api()
@@ -342,5 +432,90 @@ describe("Round 2.1 pressure, scale, and refresh replay", () => {
       .get("/v1/customers")
       .set(admin(owner.accessToken, owner.business.id))
       .expect(403);
+
+    const expiredAccess = jwt.sign(
+      { sub: owner.user.id, email: owner.user.email },
+      { expiresIn: -10 },
+    );
+    await api().get("/v1/me").set("Authorization", `Bearer ${expiredAccess}`).expect(401);
+  });
+
+  it("lists 100000 products and a 5000-sale ledger", async () => {
+    const owner = await seedOwner(app, "r22-products@test.co", "Productos");
+    const total = 100_000;
+    for (let offset = 0; offset < total; offset += 5000) {
+      await prisma.product.createMany({
+        data: Array.from({ length: 5000 }, (_, i) => {
+          const n = offset + i + 1;
+          return {
+            id: randomUUID(),
+            businessId: owner.business.id,
+            name: `P ${String(n).padStart(6, "0")}`,
+            price: 1000n,
+            avgCost: 100n,
+            stock: 1,
+            lowStockAt: 0,
+          };
+        }),
+      });
+    }
+    const started = Date.now();
+    const listed = await api()
+      .get("/v1/products")
+      .set(admin(owner.accessToken, owner.business.id))
+      .expect(200);
+    const listMs = Date.now() - started;
+    const plan = await prisma.$queryRawUnsafe<Array<{ "QUERY PLAN": string }>>(
+      `EXPLAIN ANALYZE SELECT id FROM products WHERE business_id = '${owner.business.id}'::uuid AND archived_at IS NULL ORDER BY name ASC`,
+    );
+    console.log(
+      JSON.stringify({
+        products: listed.body.length,
+        listMs,
+        bytes: JSON.stringify(listed.body).length,
+        heap: process.memoryUsage().heapUsed,
+        plan: plan.map((row) => row["QUERY PLAN"]),
+      }),
+    );
+    expect(listed.body).toHaveLength(total);
+    expect(listMs).toBeLessThan(60_000);
+
+    const customer = await api()
+      .post("/v1/customers")
+      .set(admin(owner.accessToken, owner.business.id))
+      .set("Idempotency-Key", randomUUID())
+      .send({ name: "Ledger" })
+      .expect(201);
+    const sales = 5_000;
+    await prisma.sale.createMany({
+      data: Array.from({ length: sales }, () => ({
+        id: randomUUID(),
+        businessId: owner.business.id,
+        customerId: customer.body.id,
+        paymentKind: "credit" as const,
+        saleTotal: 1000n,
+        amountReceived: 0n,
+        credit: 1000n,
+        occurredOn: new Date("2026-10-03"),
+      })),
+    });
+    const ledgerStarted = Date.now();
+    const ledger = await api()
+      .get(`/v1/customers/${customer.body.id}/ledger`)
+      .set(admin(owner.accessToken, owner.business.id))
+      .expect(200);
+    const ledgerMs = Date.now() - ledgerStarted;
+    const ledgerPlan = await prisma.$queryRawUnsafe<Array<{ "QUERY PLAN": string }>>(
+      `EXPLAIN ANALYZE SELECT id FROM sales WHERE business_id = '${owner.business.id}'::uuid AND customer_id = '${customer.body.id}'::uuid ORDER BY created_at ASC`,
+    );
+    console.log(
+      JSON.stringify({
+        ledgerSales: ledger.body.sales.length,
+        ledgerMs,
+        ledgerBytes: JSON.stringify(ledger.body).length,
+        ledgerPlan: ledgerPlan.map((row) => row["QUERY PLAN"]),
+      }),
+    );
+    expect(ledger.body.sales).toHaveLength(sales);
   });
 });
