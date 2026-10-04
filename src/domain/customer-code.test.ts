@@ -15,16 +15,16 @@ describe("customer codes", () => {
     expect(normalizeCustomerCode("DC 12")).toBe("DC-0012");
   });
 
-  it("validates login input without inventing a code", () => {
-    expect(validateCustomerLoginInput("", "Rosa")).toEqual({
-      error: "Escribe el código y el nombre.",
+  it("validates a code and a 6-digit PIN", () => {
+    expect(validateCustomerLoginInput("", "135790")).toEqual({
+      error: "Escribe el código y el PIN de 6 dígitos.",
     });
-    expect(validateCustomerLoginInput("DC-0001", "   ")).toEqual({
-      error: "Escribe el código y el nombre.",
+    expect(validateCustomerLoginInput("DC-0001", "12345")).toEqual({
+      error: "Escribe el código y el PIN de 6 dígitos.",
     });
-    expect(validateCustomerLoginInput(" dc-1 ", "  María  Pérez ")).toEqual({
+    expect(validateCustomerLoginInput(" dc-1 ", "135790")).toEqual({
       code: "DC-0001",
-      name: "María Pérez",
+      pin: "135790",
     });
   });
 

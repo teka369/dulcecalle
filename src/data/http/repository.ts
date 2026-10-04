@@ -134,13 +134,14 @@ export class HttpRepository {
     },
 
     logout: async () => {
+      const refreshToken = this.session.refreshToken;
       try {
         await this.http.request<{ ok: boolean }>("POST", "/auth/logout", {
+          body: refreshToken ? { refreshToken } : {},
           skipBusiness: true,
-          skipRefresh: true,
         });
       } catch {
-        /* JWT is stateless; local clear is logout. */
+        /* Local clear still logs this device out. */
       }
       this.session.clear();
       return { ok: true as const };
@@ -379,6 +380,12 @@ export class HttpRepository {
         requestId ? { body, idempotencyKey: requestId } : { body },
       );
       return mapCustomer(row);
+    },
+
+    setPin: async (id: string, pin: string): Promise<{ ok: true }> => {
+      return this.http.request<{ ok: true }>("POST", `/customers/${id}/pin`, {
+        body: { pin },
+      });
     },
 
     pay: async (

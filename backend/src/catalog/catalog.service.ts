@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
+import * as bcrypt from "bcrypt";
 import { PrismaService } from "../prisma/prisma.service";
 import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import type {
@@ -485,6 +486,29 @@ export class CatalogService {
     });
     if (!c) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
     return customerJson(c);
+  }
+
+  async setCustomerPin(ctx: BusinessContext, id: string, pin: string) {
+    if (!/^\d{6}$/.test(pin)) {
+      throw new AppError(ERROR_CODES.VALIDATION, "El PIN debe tener 6 dígitos.");
+    }
+    const existing = await this.prisma.customer.findFirst({
+      where: { id, businessId: ctx.businessId, archivedAt: null },
+      select: { id: true },
+    });
+    if (!existing) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+    const pinHash = await bcrypt.hash(pin, 12);
+    await this.prisma.$transaction([
+      this.prisma.customer.update({
+        where: { id: existing.id },
+        data: { pinHash },
+      }),
+      this.prisma.authSession.updateMany({
+        where: { kind: "customer", subjectId: existing.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+    return { ok: true as const };
   }
 
   async customerLedger(ctx: BusinessContext, customerId: string) {

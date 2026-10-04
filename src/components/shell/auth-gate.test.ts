@@ -108,7 +108,7 @@ describe("customer portal routing", () => {
     expect(src).toContain("StoreLoginForm");
   });
 
-  it("customer login is a shared code+name form with volver", () => {
+  it("customer login is a shared code+PIN form with volver", () => {
     const page = readFileSync(
       join(__dirname, "../../app/cliente/login/page.tsx"),
       "utf8",
@@ -121,7 +121,8 @@ describe("customer portal routing", () => {
     );
     expect(form).toContain("Consulta como cliente");
     expect(form).toContain("Código de cliente");
-    expect(form).toContain("Nombre");
+    expect(form).toContain("PIN");
+    expect(form).not.toContain("Nombre");
     expect(form).toContain("Consultar");
     expect(form).toContain("Consultando…");
     expect(form).toContain("← Volver");

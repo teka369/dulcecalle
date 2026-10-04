@@ -150,6 +150,8 @@ model Customer {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   requestId     String?   @map("request_id") @db.Uuid
+  /** bcrypt of the 6-digit portal PIN. Null means the portal cannot log in. */
+  pinHash       String?   @map("pin_hash")
 
   business Business           @relation(fields: [businessId], references: [id])
   sales    Sale[]
@@ -496,4 +498,31 @@ model Preparation {
   @@index([businessId, sourceId, createdAt])
   @@index([businessId, targetId, createdAt])
   @@map("preparations")
+}
+
+/// Server-side refresh session. The raw refresh token is never stored.
+model AuthSession {
+  id         String    @id @db.Uuid
+  kind       String
+  subjectId  String    @map("subject_id") @db.Uuid
+  businessId String?   @map("business_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
+
+  @@index([subjectId, kind])
+  @@map("auth_sessions")
+}
+
+/// Per customer-code cooldown for the portal PIN. Not an IP bucket and not a permanent lock.
+model PortalLoginThrottle {
+  id            String    @id @db.Uuid
+  bucket        String    @unique
+  failures      Int
+  windowStart   DateTime  @map("window_start") @db.Timestamptz(3)
+  cooldownUntil DateTime? @map("cooldown_until") @db.Timestamptz(3)
+
+  @@map("portal_login_throttles")
 }

@@ -189,14 +189,20 @@ describe("Fase M2 auth + session", () => {
       .expect(200);
   });
 
-  it("logout is client-side: endpoint returns ok, access JWT still works", async () => {
+  it("logout revokes the refresh and leaves the current access JWT until it expires", async () => {
     const reg = await registerUser("m2-logout@test.co", "Puesto Logout");
 
     await api()
       .post("/v1/auth/logout")
       .set("Authorization", `Bearer ${reg.accessToken}`)
+      .send({ refreshToken: reg.refreshToken })
       .expect(201)
       .expect((r) => expect(r.body.ok).toBe(true));
+
+    await api()
+      .post("/v1/auth/refresh")
+      .send({ refreshToken: reg.refreshToken })
+      .expect(401);
 
     await api()
       .get("/v1/me")

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { CustomerAccessService } from "./customer-access.service";
-import { CustomerLoginDto, CustomerRefreshDto } from "./customer-access.dto";
+import { CustomerLoginDto, CustomerLogoutDto, CustomerRefreshDto } from "./customer-access.dto";
 import { CustomerJwtGuard } from "./customer.guard";
 import { CurrentCustomer } from "./customer.decorator";
 import { Public } from "../shared/http/decorators";
@@ -15,7 +15,7 @@ export class CustomerAccessController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post("customer-access/login")
   login(@Body() dto: CustomerLoginDto) {
-    return this.access.login(dto.code, dto.name);
+    return this.access.login(dto.code, dto.pin, dto.businessId);
   }
 
   @Public()
@@ -27,8 +27,8 @@ export class CustomerAccessController {
   @Public()
   @UseGuards(CustomerJwtGuard)
   @Post("customer-access/logout")
-  logout() {
-    return { ok: true as const };
+  logout(@CurrentCustomer() customer: CustomerAuth, @Body() dto: CustomerLogoutDto) {
+    return this.access.logout(customer, dto.refreshToken);
   }
 
   @Public()

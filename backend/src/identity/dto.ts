@@ -32,3 +32,10 @@ export class RefreshDto {
   @MinLength(1)
   refreshToken!: string;
 }
+
+export class LogoutDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  refreshToken?: string;
+}
