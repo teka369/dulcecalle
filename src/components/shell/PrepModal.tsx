@@ -7,6 +7,7 @@ import { usePrep } from "@/store/prepStore";
 const GROUP_TITLES = {
   app: "Aplicación",
   catalogos: "Catálogos",
+  historial: "Historial",
   resumen: "Resumen",
   sistema: "Sistema",
 } as const;
@@ -19,12 +20,11 @@ function TaskIcon({ status }: { status: string }) {
 }
 
 /**
- * Blocking offline-preparation modal. Unlike SyncCenter, this intentionally
- * locks the app until the device is ready: an incomplete preparation would
- * silently fail offline later. No close/cancel by design.
+ * First-run explanation. Closing it does not stop preparation.
+ * The app stays usable; the indicator keeps the status.
  */
 export function PrepModal() {
-  const { phase, tasks, completed, total, modalOpen, evaluate, start, closeModal } = usePrep();
+  const { phase, tasks, completed, total, modalOpen, panelOpen, stale, evaluate, continueUsing, closePanel, start } = usePrep();
 
   const pathname = usePathname();
   useEffect(() => {
@@ -36,9 +36,9 @@ export function PrepModal() {
 
   useEffect(() => {
     if (phase !== "ready" || !modalOpen) return;
-    const timer = window.setTimeout(() => closeModal(), 1600);
+    const timer = window.setTimeout(() => continueUsing(), 1600);
     return () => window.clearTimeout(timer);
-  }, [phase, modalOpen, closeModal]);
+  }, [phase, modalOpen, continueUsing]);
 
   if (!modalOpen) return null;
 
@@ -59,7 +59,7 @@ export function PrepModal() {
               ✓ Dulce Calle está listo
             </h2>
             <p className="mt-1 text-sm leading-snug text-ink-muted">
-              Productos, clientes y proveedores quedaron en este teléfono, junto con las pantallas principales.
+              Productos, clientes y proveedores quedaron en este teléfono, junto con las pantallas y el historial de la ventana preparada.
             </p>
             <p className="mt-2 text-xs leading-relaxed text-ink-muted">
               Lo que anotes sin conexión se envía cuando vuelva internet. Esto no es una copia del negocio: el historial sigue en el servidor. Si abres directo una ficha que nunca cargaste, puede pedir conexión. Entra por el inicio y navega desde las secciones preparadas.
@@ -71,7 +71,7 @@ export function PrepModal() {
               Preparando Dulce Calle
             </h2>
             <p className="mt-1 text-sm leading-snug text-ink-muted">
-              Estamos guardando productos, clientes, proveedores y las pantallas principales en este teléfono. Así puedes registrar ventas y movimientos si se cae internet.
+              Estamos guardando productos, clientes, proveedores, ventas, fiados, caja y movimientos en este teléfono.
             </p>
 
             <div className="mt-4">
@@ -89,7 +89,7 @@ export function PrepModal() {
               </div>
             </div>
 
-            {(["app", "catalogos", "resumen", "sistema"] as const).map((group) => {
+            {(["app", "catalogos", "historial", "resumen", "sistema"] as const).map((group) => {
               const groupTasks = tasks.filter((t) => t.group === group);
               if (groupTasks.length === 0) return null;
               return (
@@ -150,9 +150,14 @@ export function PrepModal() {
               </div>
             )}
 
-            {phase !== "failed" && (
-              <p className="mt-4 text-xs text-ink-muted">No cierres la aplicación.</p>
-            )}
+            <p className="mt-4 text-xs text-ink-muted">Puedes seguir usando Dulce Calle. Lo que falte se indica en cada pantalla.</p>
+            <button
+              type="button"
+              onClick={continueUsing}
+              className="mt-3 min-h-11 w-full rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
+            >
+              Continuar usando la app
+            </button>
           </>
         )}
       </div>

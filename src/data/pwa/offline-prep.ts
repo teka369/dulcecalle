@@ -25,11 +25,18 @@ import {
   loadStatsWithOfflineFallback,
   statsSnapshotKind,
 } from "./offline-snapshots";
+import {
+  HISTORY_RESOURCES,
+  warmCashHistory,
+  warmLedgerHistory,
+  warmMoveHistory,
+  warmSalesHistory,
+} from "./offline-history";
 
-export const PREP_VERSION = 8;
+export const PREP_VERSION = 9;
 export const PREP_DOCUMENT_CACHE = "documents";
 
-export type PrepTaskGroup = "app" | "catalogos" | "resumen" | "sistema";
+export type PrepTaskGroup = "app" | "catalogos" | "historial" | "resumen" | "sistema";
 
 export type PrepTaskDef = {
   key: string;
@@ -229,6 +236,11 @@ export async function checkReadiness(
     }
   }
   if (!(await staticDocumentsPresent())) return { status: "stale", row };
+  for (const resource of HISTORY_RESOURCES) {
+    if (!(await db.cacheMeta.get(`${businessId}::${resource}`))) {
+      return { status: "stale", row };
+    }
+  }
   return { status: "ready", row };
 }
 
@@ -308,9 +320,19 @@ export async function buildPrepTaskDefs(
     const detail = await run();
     if (typeof detail === "string") details.set(key, detail);
   };
+  const base = prepTaskDefs();
+  const documents = base.filter((task) => task.key.startsWith("doc:"));
+  const catalogs = base.filter((task) => task.key.startsWith("catalog:"));
+  const snapshots = base.filter((task) => task.key.startsWith("snapshot:"));
   const defs: PrepTaskDef[] = [
     { key: "sys:sw", group: "sistema", label: "Service Worker", run: wrap("sys:sw", checkServiceWorker) },
-    ...prepTaskDefs(),
+    ...documents,
+    ...catalogs,
+    { key: "history:sales", group: "historial", label: "Ventas", run: wrap("history:sales", () => warmSalesHistory(businessId)) },
+    { key: "history:ledgers", group: "historial", label: "Fiados", run: wrap("history:ledgers", () => warmLedgerHistory(businessId)) },
+    { key: "history:cash", group: "historial", label: "Caja", run: wrap("history:cash", () => warmCashHistory(businessId)) },
+    { key: "history:moves", group: "historial", label: "Movimientos", run: wrap("history:moves", () => warmMoveHistory(businessId)) },
+    ...snapshots,
     { key: "media:thumbs", group: "resumen", label: "Miniaturas de productos", run: wrap("media:thumbs", () => warmPrimaryThumbs(businessId)) },
     { key: "sys:storage", group: "sistema", label: "Almacenamiento", run: wrap("sys:storage", checkStorage) },
     {
@@ -326,6 +348,26 @@ export async function buildPrepTaskDefs(
   return { defs, details };
 }
 
+async function taskSatisfied(businessId: string, key: string): Promise<boolean> {
+  const db = getLocalDb();
+  if (key.startsWith("catalog:")) {
+    return Boolean(await db.cacheMeta.get(`${businessId}::${key.slice("catalog:".length)}`));
+  }
+  if (key.startsWith("history:")) {
+    return Boolean(await db.cacheMeta.get(`${businessId}::${key}`));
+  }
+  if (key.startsWith("snapshot:")) {
+    return Boolean(await db.snapshots.get(`${businessId}::${key.slice(9)}`));
+  }
+  if (key.startsWith("doc:") && typeof window !== "undefined") {
+    const scope = window as unknown as { caches?: CacheStorage };
+    if (!scope.caches) return false;
+    const cache = await scope.caches.open(PREP_DOCUMENT_CACHE);
+    return Boolean(await cache.match(key.slice(4)));
+  }
+  return false;
+}
+
 const activeRuns = new Map<string, Promise<PrepReadiness>>();
 
 /**
@@ -335,11 +377,12 @@ const activeRuns = new Map<string, Promise<PrepReadiness>>();
 export function runPreparation(
   businessId: string,
   onProgress?: (progress: PrepProgress) => void,
+  options?: { refresh?: boolean },
 ): Promise<PrepReadiness> {
   assertUuid(businessId, "businessId");
   const active = activeRuns.get(businessId);
   if (active) return active;
-  const task = runPreparationInternal(businessId, onProgress);
+  const task = runPreparationInternal(businessId, onProgress, options?.refresh === true);
   activeRuns.set(businessId, task);
   const cleanup = () => {
     if (activeRuns.get(businessId) === task) activeRuns.delete(businessId);
@@ -351,6 +394,7 @@ export function runPreparation(
 async function runPreparationInternal(
   businessId: string,
   onProgress?: (progress: PrepProgress) => void,
+  refresh = false,
 ): Promise<PrepReadiness> {
   const db = getLocalDb();
   const { defs, details } = await buildPrepTaskDefs(businessId);
@@ -360,6 +404,12 @@ async function runPreparationInternal(
   for (const def of defs) {
     onProgress?.({ key: def.key, status: "running", error: null, completed, total: defs.length });
     try {
+      if (!refresh && (await taskSatisfied(businessId, def.key))) {
+        completed += 1;
+        records.push({ key: def.key, status: "done", error: null, finishedAt: Date.now(), detail: "Ya preparado" });
+        onProgress?.({ key: def.key, status: "done", error: null, detail: "Ya preparado", completed, total: defs.length });
+        continue;
+      }
       await def.run();
       completed += 1;
       const detail = detailOf(def.key);

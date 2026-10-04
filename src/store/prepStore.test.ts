@@ -15,11 +15,16 @@ const BIZ = "11111111-1111-4111-8111-111111111111";
 const api = {
   session: { businessId: BIZ },
   products: { list: vi.fn() },
-  customers: { list: vi.fn() },
+  customers: { list: vi.fn(), ledger: vi.fn(async () => ({ customer: {}, initials: [], sales: [], payments: [] })) },
   suppliers: { list: vi.fn() },
-  sales: { list: vi.fn(async () => []) },
-  cash: { today: vi.fn(async () => ({ moves: [] })), expenses: vi.fn(async () => []) },
+  sales: { list: vi.fn(async () => []), returns: vi.fn(async () => []) },
+  cash: {
+    today: vi.fn(async () => ({ moves: [], session: null, localDate: "2026-10-04", expected: { efectivo: 0, nequi: 0, total: 0 }, closed: false })),
+    expenses: vi.fn(async () => []),
+    moves: vi.fn(async () => []),
+  },
   inventory: { moves: vi.fn(async () => []) },
+  production: { list: vi.fn(async () => []) },
   auth: { me: vi.fn(async () => null) },
   stats: { get: vi.fn(async (period: string) => ({ period, ventas: 0, emptyPeriod: true })) },
 };
@@ -80,8 +85,8 @@ describe("prepStore evaluate/start", () => {
     expect(snap.phase).toBe("ready");
     expect(snap.modalOpen).toBe(true);
     expect(snap.completed).toBe(snap.total);
-    // 19 static docs + 3 catalogs + 4 snapshots + 1 thumbs + 3 sistema. Entity HTML is not a task.
-    expect(snap.total).toBe(30);
+    // 19 static docs + 3 catalogs + 4 history + 4 snapshots + 1 thumbs + 3 sistema.
+    expect(snap.total).toBe(34);
     expect(snap.lastReadyAt).toBeGreaterThan(0);
   });
 
@@ -100,6 +105,16 @@ describe("prepStore evaluate/start", () => {
     expect(first).toBeUndefined();
     expect(second).toBeUndefined();
     expect(prepStore.getSnapshot().phase).toBe("ready");
+  });
+
+  it("keeps the app usable while preparation continues after dismiss", async () => {
+    getPwaAuthSession().businessId = BIZ;
+    const pending = prepStore.evaluate();
+    prepStore.continueUsing();
+    expect(prepStore.getSnapshot().modalOpen).toBe(false);
+    await pending;
+    expect(prepStore.getSnapshot().phase).toBe("ready");
+    expect(prepStore.getSnapshot().dismissed).toBe(true);
   });
 
   it("does nothing while offline", async () => {

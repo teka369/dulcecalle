@@ -81,7 +81,7 @@ export default function DatosPage() {
         <Button
           type="button"
           variant="primary"
-          onClick={() => void start()}
+          onClick={() => void start({ refresh: true })}
           disabled={!online}
           className="mt-4 w-full"
         >

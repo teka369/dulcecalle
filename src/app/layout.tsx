@@ -4,6 +4,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { PreviewHostBridge } from "@/components/shell/PreviewHostBridge";
 import { SalesSyncBridge } from "@/components/shell/SalesSyncBridge";
 import { PrepModal } from "@/components/shell/PrepModal";
+import { PrepIndicator } from "@/components/shell/PrepIndicator";
 import { SyncCenter } from "@/components/shell/SyncCenter";
 import { SyncPill } from "@/components/shell/SyncPill";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
@@ -61,6 +62,7 @@ export default function RootLayout({
         <PreviewHostBridge />
         <SalesSyncBridge />
         <PrepModal />
+        <PrepIndicator />
         <SyncPill />
         <SyncCenter />
         <ThemeProvider>

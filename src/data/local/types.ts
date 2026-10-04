@@ -7,11 +7,19 @@ import type { CustomerCatalogProduct, CustomerLedger } from "../http/customer-ap
 
 export type CatalogResource = "products" | "customers" | "suppliers";
 
+export type HistoryResource =
+  | "history:sales"
+  | "history:ledgers"
+  | "history:cash"
+  | "history:moves";
+
+export type CacheResource = CatalogResource | HistoryResource;
+
 export type LocalCacheMeta = {
   /** `${businessId}::${resource}` — not a UUID. */
   id: string;
   businessId: string;
-  resource: CatalogResource;
+  resource: CacheResource;
   cachedAt: number;
 };
 

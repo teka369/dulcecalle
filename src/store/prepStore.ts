@@ -28,6 +28,8 @@ type PrepUiState = {
   completed: number;
   total: number;
   modalOpen: boolean;
+  panelOpen: boolean;
+  dismissed: boolean;
   lastReadyAt: number | null;
 };
 
@@ -41,6 +43,8 @@ let state: PrepUiState = {
   completed: 0,
   total: 0,
   modalOpen: false,
+  panelOpen: false,
+  dismissed: false,
   lastReadyAt: null,
 };
 
@@ -69,9 +73,28 @@ function isOnline(): boolean {
   }
 }
 
-let starting: Promise<void> | null = null;
+function dismissedKey(businessId: string): string {
+  return `prep-dismissed::${businessId}`;
+}
 
-async function startInternal(businessId: string): Promise<void> {
+function readDismissed(businessId: string): boolean {
+  try {
+    return localStorage.getItem(dismissedKey(businessId)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeDismissed(businessId: string): void {
+  try {
+    localStorage.setItem(dismissedKey(businessId), "1");
+  } catch {
+    // The in-memory flag still lets this session continue.
+  }
+}
+
+async function startInternal(businessId: string, refresh: boolean): Promise<void> {
+  const dismissed = state.dismissed || readDismissed(businessId);
   const { defs } = await buildPrepTaskDefs(businessId);
   setState({
     phase: "preparing",
@@ -79,7 +102,9 @@ async function startInternal(businessId: string): Promise<void> {
     tasks: defs.map((d) => ({ key: d.key, label: d.label, group: d.group, status: "pending" as const, error: null, detail: null })),
     completed: 0,
     total: defs.length,
-    modalOpen: true,
+    modalOpen: !dismissed,
+    panelOpen: state.panelOpen,
+    dismissed,
     stale: false,
   });
   const row = await runPreparation(businessId, (progress) => {
@@ -91,13 +116,15 @@ async function startInternal(businessId: string): Promise<void> {
       ),
       completed: progress.completed,
     });
-  });
+  }, { refresh });
   if (row.status === "ready") {
     setState({ phase: "ready", lastReadyAt: row.completedAt });
   } else {
     setState({ phase: "failed" });
   }
 }
+
+let starting: Promise<void> | null = null;
 
 export const prepStore = {
   subscribe(listener: () => void) {
@@ -109,17 +136,17 @@ export const prepStore = {
   getSnapshot(): PrepUiState {
     return state;
   },
-  /** Starts preparation unless one is already running for any business. */
-  start(): Promise<void> {
+  /** Starts preparation unless one is already running. Refresh repeats every dataset. */
+  start(options?: { refresh?: boolean }): Promise<void> {
     const businessId = sessionBusinessId();
     if (!businessId || !isOnline()) return Promise.resolve();
     if (starting) return starting;
-    starting = startInternal(businessId).finally(() => {
+    starting = startInternal(businessId, options?.refresh === true).finally(() => {
       starting = null;
     });
     return starting;
   },
-  /** Opens the blocking modal when this device still needs preparation. */
+  /** Starts preparation without blocking the app. The intro stays closed after dismiss. */
   async evaluate(): Promise<void> {
     const businessId = sessionBusinessId();
     if (!businessId || !isOnline()) return;
@@ -135,13 +162,22 @@ export const prepStore = {
       });
       return;
     }
-    if (status === "stale") {
-      setState({ stale: true });
-    }
-    await this.start();
+    if (status === "stale") setState({ stale: true });
+    await this.start({ refresh: false });
+  },
+  continueUsing() {
+    const businessId = state.businessId ?? sessionBusinessId();
+    if (businessId) writeDismissed(businessId);
+    setState({ modalOpen: false, dismissed: true });
+  },
+  openPanel() {
+    setState({ panelOpen: true });
+  },
+  closePanel() {
+    setState({ panelOpen: false });
   },
   closeModal() {
-    if (state.phase === "ready") setState({ modalOpen: false });
+    this.continueUsing();
   },
   /** Test-only reset. */
   __reset() {
@@ -154,6 +190,8 @@ export const prepStore = {
       completed: 0,
       total: 0,
       modalOpen: false,
+      panelOpen: false,
+      dismissed: false,
       lastReadyAt: null,
     };
   },
@@ -165,8 +203,11 @@ export function usePrep() {
     prepStore.getSnapshot,
     prepStore.getSnapshot,
   );
-  const start = useCallback(() => prepStore.start(), []);
+  const start = useCallback((options?: { refresh?: boolean }) => prepStore.start(options), []);
   const evaluate = useCallback(() => prepStore.evaluate(), []);
+  const continueUsing = useCallback(() => prepStore.continueUsing(), []);
+  const openPanel = useCallback(() => prepStore.openPanel(), []);
+  const closePanel = useCallback(() => prepStore.closePanel(), []);
   const closeModal = useCallback(() => prepStore.closeModal(), []);
-  return { ...snap, start, evaluate, closeModal };
+  return { ...snap, start, evaluate, continueUsing, openPanel, closePanel, closeModal };
 }

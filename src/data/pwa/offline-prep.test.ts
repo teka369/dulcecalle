@@ -23,11 +23,16 @@ const OTHER_BIZ = "22222222-2222-4222-8222-222222222222";
 const api = {
   session: { businessId: BIZ },
   products: { list: vi.fn() },
-  customers: { list: vi.fn(), ledger: vi.fn() },
+  customers: { list: vi.fn(), ledger: vi.fn(async () => ({ customer: {}, initials: [], sales: [], payments: [] })) },
   suppliers: { list: vi.fn() },
-  sales: { list: vi.fn(async () => []) },
-  cash: { today: vi.fn(async () => ({ moves: [] })), expenses: vi.fn(async () => []) },
+  sales: { list: vi.fn(async () => []), returns: vi.fn(async () => []) },
+  cash: {
+    today: vi.fn(async () => ({ moves: [], session: null, localDate: "2026-10-04", expected: { efectivo: 0, nequi: 0, total: 0 }, closed: false })),
+    expenses: vi.fn(async () => []),
+    moves: vi.fn(async () => []),
+  },
   inventory: { moves: vi.fn(async () => []) },
+  production: { list: vi.fn(async () => []) },
   auth: { me: vi.fn(async () => null) },
   stats: { get: vi.fn(async (period: string) => ({ period, ventas: 0, emptyPeriod: true })) },
 };
@@ -125,8 +130,8 @@ describe("offline preparation", () => {
     const seen: PrepProgress[] = [];
     const row = await runPreparation(BIZ, (p) => seen.push({ ...p }));
     expect(row.status).toBe("ready");
-    // sys:sw + static/catalog/snapshot defs + media:thumbs + sys:storage + sys:verify
-    const expected = prepTaskDefs().length + 4;
+    // sys:sw + 4 history + media:thumbs + sys:storage + sys:verify
+    const expected = prepTaskDefs().length + 8;
     expect(row.tasks).toHaveLength(expected);
     expect(row.tasks.every((t) => t.status === "done")).toBe(true);
     expect(seen.length).toBeGreaterThan(expected - 1);
