@@ -316,12 +316,16 @@ describe("storage screens stay honest", () => {
 
   it("the sync screen does not request persistence until the button handler", () => {
     const page = readFileSync(resolve(process.cwd(), "src/app/sincronizacion/page.tsx"), "utf8");
+    const center = readFileSync(resolve(process.cwd(), "src/components/shell/SyncCenter.tsx"), "utf8");
     const card = readFileSync(resolve(process.cwd(), "src/components/shell/StorageProtectionCard.tsx"), "utf8");
     const summary = readFileSync(resolve(process.cwd(), "src/components/shell/SyncStatusSummary.tsx"), "utf8");
     const prep = readFileSync(resolve(process.cwd(), "src/data/pwa/offline-prep.ts"), "utf8");
     expect(page).toContain("StorageProtectionCard");
+    expect(center).toContain("StorageProtectionCard");
     expect(page).not.toMatch(/\.persist\s*\(/);
+    expect(center).not.toMatch(/\.persist\s*\(/);
     expect(page).not.toContain("navigator.storage");
+    expect(center).not.toContain("navigator.storage");
     const effect = card.slice(card.indexOf("useEffect(() =>"), card.indexOf("async function onProtect"));
     expect(effect).toContain("readOriginStorage()");
     expect(effect).not.toContain("requestOriginPersistence");
@@ -333,7 +337,7 @@ describe("storage screens stay honest", () => {
     expect(card).toMatch(/Guardado solo aquí/);
     expect(card).toMatch(/Protección del dispositivo/);
     expect(card).toMatch(/Copia de seguridad/);
-    expect(`${page}\n${card}\n${summary}`).not.toMatch(banned);
+    expect(`${page}\n${center}\n${card}\n${summary}`).not.toMatch(banned);
     expect(summary).toMatch(/En el servidor/);
     expect(summary).toMatch(/Guardado solo aquí/);
     expect(prep).toContain("readOriginStorage()");
@@ -347,6 +351,8 @@ describe("storage screens stay honest", () => {
     expect(datos.toLowerCase()).not.toContain("solamente guarda");
     expect(datos).toMatch(/todavía no se han enviado/);
     expect(datos).toMatch(/copia para trabajar sin conexión/);
+    expect(datos).toContain('href="/sincronizacion"');
+    expect(datos).toMatch(/Ver almacenamiento de este teléfono/);
     expect(datos).not.toMatch(banned);
   });
 });
