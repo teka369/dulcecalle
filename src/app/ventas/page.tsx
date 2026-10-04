@@ -135,7 +135,7 @@ export default function VentasPage() {
         <Empty
           title={
             fromCache
-              ? "No hay ventas guardadas en este dispositivo."
+              ? "No hay ventas de los últimos 90 días en este teléfono. Una venta más vieja no está disponible sin conexión."
               : "Aún no hay ventas hoy."
           }
           action={

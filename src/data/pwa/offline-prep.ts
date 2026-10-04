@@ -25,11 +25,18 @@ import {
   loadStatsWithOfflineFallback,
   statsSnapshotKind,
 } from "./offline-snapshots";
+import {
+  HISTORY_RESOURCES,
+  warmCashHistory,
+  warmLedgerHistory,
+  warmMoveHistory,
+  warmSalesHistory,
+} from "./offline-history";
 
-export const PREP_VERSION = 8;
+export const PREP_VERSION = 9;
 export const PREP_DOCUMENT_CACHE = "documents";
 
-export type PrepTaskGroup = "app" | "catalogos" | "resumen" | "sistema";
+export type PrepTaskGroup = "app" | "catalogos" | "historial" | "resumen" | "sistema";
 
 export type PrepTaskDef = {
   key: string;
@@ -229,6 +236,11 @@ export async function checkReadiness(
     }
   }
   if (!(await staticDocumentsPresent())) return { status: "stale", row };
+  for (const resource of HISTORY_RESOURCES) {
+    if (!(await db.cacheMeta.get(`${businessId}::${resource}`))) {
+      return { status: "stale", row };
+    }
+  }
   return { status: "ready", row };
 }
 
@@ -308,9 +320,19 @@ export async function buildPrepTaskDefs(
     const detail = await run();
     if (typeof detail === "string") details.set(key, detail);
   };
+  const base = prepTaskDefs();
+  const documents = base.filter((task) => task.key.startsWith("doc:"));
+  const catalogs = base.filter((task) => task.key.startsWith("catalog:"));
+  const snapshots = base.filter((task) => task.key.startsWith("snapshot:"));
   const defs: PrepTaskDef[] = [
     { key: "sys:sw", group: "sistema", label: "Service Worker", run: wrap("sys:sw", checkServiceWorker) },
-    ...prepTaskDefs(),
+    ...documents,
+    ...catalogs,
+    { key: "history:sales", group: "historial", label: "Ventas", run: wrap("history:sales", () => warmSalesHistory(businessId)) },
+    { key: "history:ledgers", group: "historial", label: "Fiados", run: wrap("history:ledgers", () => warmLedgerHistory(businessId)) },
+    { key: "history:cash", group: "historial", label: "Caja", run: wrap("history:cash", () => warmCashHistory(businessId)) },
+    { key: "history:moves", group: "historial", label: "Movimientos", run: wrap("history:moves", () => warmMoveHistory(businessId)) },
+    ...snapshots,
     { key: "media:thumbs", group: "resumen", label: "Miniaturas de productos", run: wrap("media:thumbs", () => warmPrimaryThumbs(businessId)) },
     { key: "sys:storage", group: "sistema", label: "Almacenamiento", run: wrap("sys:storage", checkStorage) },
     {

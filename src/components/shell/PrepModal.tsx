@@ -7,6 +7,7 @@ import { usePrep } from "@/store/prepStore";
 const GROUP_TITLES = {
   app: "Aplicación",
   catalogos: "Catálogos",
+  historial: "Historial",
   resumen: "Resumen",
   sistema: "Sistema",
 } as const;
@@ -59,7 +60,7 @@ export function PrepModal() {
               ✓ Dulce Calle está listo
             </h2>
             <p className="mt-1 text-sm leading-snug text-ink-muted">
-              Productos, clientes y proveedores quedaron en este teléfono, junto con las pantallas principales.
+              Productos, clientes y proveedores quedaron en este teléfono, junto con las pantallas y el historial de la ventana preparada.
             </p>
             <p className="mt-2 text-xs leading-relaxed text-ink-muted">
               Lo que anotes sin conexión se envía cuando vuelva internet. Esto no es una copia del negocio: el historial sigue en el servidor. Si abres directo una ficha que nunca cargaste, puede pedir conexión. Entra por el inicio y navega desde las secciones preparadas.
@@ -71,7 +72,7 @@ export function PrepModal() {
               Preparando Dulce Calle
             </h2>
             <p className="mt-1 text-sm leading-snug text-ink-muted">
-              Estamos guardando productos, clientes, proveedores y las pantallas principales en este teléfono. Así puedes registrar ventas y movimientos si se cae internet.
+              Estamos guardando productos, clientes, proveedores, ventas, fiados, caja y movimientos en este teléfono.
             </p>
 
             <div className="mt-4">
@@ -89,7 +90,7 @@ export function PrepModal() {
               </div>
             </div>
 
-            {(["app", "catalogos", "resumen", "sistema"] as const).map((group) => {
+            {(["app", "catalogos", "historial", "resumen", "sistema"] as const).map((group) => {
               const groupTasks = tasks.filter((t) => t.group === group);
               if (groupTasks.length === 0) return null;
               return (

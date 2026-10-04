@@ -385,7 +385,7 @@ export default function ProductoFichaPage() {
         </section>
       )}
 
-      {moves.length > 0 && (
+      {moves.length > 0 ? (
         <section>
           <h2 className="mb-2 text-sm font-semibold text-ink-muted">Historial</h2>
           <ul className="flex flex-col gap-2">
@@ -409,6 +409,10 @@ export default function ProductoFichaPage() {
             ))}
           </ul>
         </section>
+      ) : (
+        <p className="text-sm text-ink-muted">
+          Sin movimientos de los últimos 90 días. Uno más viejo no está disponible sin conexión.
+        </p>
       )}
     </div>
   );
