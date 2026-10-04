@@ -20,12 +20,11 @@ function TaskIcon({ status }: { status: string }) {
 }
 
 /**
- * Blocking offline-preparation modal. Unlike SyncCenter, this intentionally
- * locks the app until the device is ready: an incomplete preparation would
- * silently fail offline later. No close/cancel by design.
+ * First-run explanation. Closing it does not stop preparation.
+ * The app stays usable; the indicator keeps the status.
  */
 export function PrepModal() {
-  const { phase, tasks, completed, total, modalOpen, evaluate, start, closeModal } = usePrep();
+  const { phase, tasks, completed, total, modalOpen, panelOpen, stale, evaluate, continueUsing, closePanel, start } = usePrep();
 
   const pathname = usePathname();
   useEffect(() => {
@@ -37,9 +36,9 @@ export function PrepModal() {
 
   useEffect(() => {
     if (phase !== "ready" || !modalOpen) return;
-    const timer = window.setTimeout(() => closeModal(), 1600);
+    const timer = window.setTimeout(() => continueUsing(), 1600);
     return () => window.clearTimeout(timer);
-  }, [phase, modalOpen, closeModal]);
+  }, [phase, modalOpen, continueUsing]);
 
   if (!modalOpen) return null;
 
@@ -151,9 +150,14 @@ export function PrepModal() {
               </div>
             )}
 
-            {phase !== "failed" && (
-              <p className="mt-4 text-xs text-ink-muted">No cierres la aplicación.</p>
-            )}
+            <p className="mt-4 text-xs text-ink-muted">Puedes seguir usando Dulce Calle. Lo que falte se indica en cada pantalla.</p>
+            <button
+              type="button"
+              onClick={continueUsing}
+              className="mt-3 min-h-11 w-full rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
+            >
+              Continuar usando la app
+            </button>
           </>
         )}
       </div>

@@ -107,6 +107,16 @@ describe("prepStore evaluate/start", () => {
     expect(prepStore.getSnapshot().phase).toBe("ready");
   });
 
+  it("keeps the app usable while preparation continues after dismiss", async () => {
+    getPwaAuthSession().businessId = BIZ;
+    const pending = prepStore.evaluate();
+    prepStore.continueUsing();
+    expect(prepStore.getSnapshot().modalOpen).toBe(false);
+    await pending;
+    expect(prepStore.getSnapshot().phase).toBe("ready");
+    expect(prepStore.getSnapshot().dismissed).toBe(true);
+  });
+
   it("does nothing while offline", async () => {
     getPwaAuthSession().businessId = BIZ;
     installStubs(false);
