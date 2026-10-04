@@ -1,9 +1,13 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
 import { getLocalDb } from "@/data/local/db";
 import type { SyncFlushResult } from "@/data/local/outbox";
+import {
+  readLastCompletedSync,
+  writeLastCompletedSync,
+} from "@/data/pwa/last-completed-sync";
 import { syncAllPending } from "@/data/pwa/sync-coordinator";
 
 export type SyncCounts = {
@@ -40,19 +44,23 @@ type SyncUiState = {
 
 const EMPTY_COUNTS: SyncCounts = { pending: 0, active: 0, failed: 0, permanent: 0, total: 0 };
 
+function initialState(): SyncUiState {
+  return {
+    online: typeof navigator === "undefined" ? true : navigator.onLine,
+    counts: EMPTY_COUNTS,
+    flushing: null,
+    lastDoneAt: null,
+    lastResult: null,
+    recent: [],
+    centerOpen: false,
+    itemsVersion: 0,
+    authRequired: false,
+  };
+}
+
 const listeners = new Set<() => void>();
 
-let state: SyncUiState = {
-  online: typeof navigator === "undefined" ? true : navigator.onLine,
-  counts: EMPTY_COUNTS,
-  flushing: null,
-  lastDoneAt: null,
-  lastResult: null,
-  recent: [],
-  centerOpen: false,
-  itemsVersion: 0,
-  authRequired: false,
-};
+let state: SyncUiState = initialState();
 
 // Aggregates one connectivity cycle (the coordinator runs several
 // sequential flushes: sales, payments, catalog, operations). Reset only
@@ -80,11 +88,11 @@ function businessId(): string | null {
   }
 }
 
-async function refreshCounts(): Promise<void> {
+async function refreshCounts(): Promise<boolean> {
   const id = businessId();
   if (!id) {
-    setState({ counts: EMPTY_COUNTS });
-    return;
+    setState({ counts: EMPTY_COUNTS, lastDoneAt: null });
+    return true;
   }
   try {
     const db = getLocalDb();
@@ -93,7 +101,9 @@ async function refreshCounts(): Promise<void> {
       db.outbox.where("[businessId+status]").equals([id, "in_flight"]).toArray(),
       db.outbox.where("[businessId+status]").equals([id, "failed"]).toArray(),
     ]);
+    if (businessId() !== id) return false;
     const permanent = failed.filter((row) => row.nextAttemptAt == null).length;
+    const lastDoneAt = readLastCompletedSync(id);
     setState({
       counts: {
         pending: pending.length,
@@ -102,11 +112,33 @@ async function refreshCounts(): Promise<void> {
         permanent,
         total: pending.length + active.length + failed.length,
       },
+      lastDoneAt,
       itemsVersion: state.itemsVersion + 1,
     });
+    return true;
   } catch {
     /* IndexedDB unavailable: keep last known counts */
+    return false;
   }
+}
+
+/**
+ * A cycle counts as completed only when the flush that just went idle did
+ * not fail, block, or stop, and this shop has nothing left to send.
+ * A dirty cycle must not move the clock.
+ */
+async function maybeRememberCompleted(result: SyncFlushResult | undefined): Promise<void> {
+  if (!result || result.authRequired || result.failed > 0 || result.blocked > 0 || result.stopped) {
+    return;
+  }
+  const ok = await refreshCounts();
+  if (!ok || activeFlushes !== 0 || state.authRequired) return;
+  if (state.counts.total !== 0 || state.counts.permanent !== 0) return;
+  const id = businessId();
+  if (!id) return;
+  const at = Date.now();
+  writeLastCompletedSync(id, at);
+  if (businessId() === id) setState({ lastDoneAt: at });
 }
 
 type SyncEventDetail = {
@@ -173,13 +205,14 @@ function onSyncEvent(event: Event): void {
 
   if (detail.type === "done") {
     activeFlushes = Math.max(0, activeFlushes - 1);
+    const idle = activeFlushes === 0;
     setState({
-      lastDoneAt: Date.now(),
       lastResult: detail.result ?? null,
-      flushing: activeFlushes > 0 ? { completed: cycleCompleted, total: cycleTotal } : null,
+      flushing: idle ? null : { completed: cycleCompleted, total: cycleTotal },
       authRequired: detail.result?.authRequired ? true : state.authRequired,
     });
     void refreshCounts();
+    if (idle) void maybeRememberCompleted(detail.result);
     return;
   }
 
@@ -219,6 +252,16 @@ function ensureListening() {
   void refreshCounts();
 }
 
+/** Test-only. Does not delete the outbox or the stored clock. */
+export function __resetSyncUiForTests(): void {
+  activeFlushes = 0;
+  cycleCompleted = 0;
+  cycleTotal = 0;
+  lastStartAt = 0;
+  recentKey = 0;
+  state = initialState();
+}
+
 export const syncStore = {
   subscribe(listener: () => void) {
     ensureListening();
@@ -254,9 +297,21 @@ export function useSync() {
     syncStore.getSnapshot,
     syncStore.getSnapshot,
   );
+  const sessionBusinessId = readSessionBusinessId();
+  useEffect(() => {
+    void syncStore.refresh();
+  }, [sessionBusinessId]);
   const openCenter = useCallback(() => syncStore.openCenter(), []);
   const closeCenter = useCallback(() => syncStore.closeCenter(), []);
   const refresh = useCallback(() => syncStore.refresh(), []);
   const syncNow = useCallback(() => syncStore.syncNow(), []);
   return { ...snap, openCenter, closeCenter, refresh, syncNow };
+}
+
+function readSessionBusinessId(): string | null {
+  try {
+    return getPwaAuthSession().businessId;
+  } catch {
+    return null;
+  }
 }

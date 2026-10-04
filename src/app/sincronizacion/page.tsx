@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useSync } from "@/store/syncStore";
-import { SyncOperationList, formatDateTime, useSyncItems } from "@/components/shell/sync-items";
+import { SyncOperationList, useSyncItems } from "@/components/shell/sync-items";
+import { SyncStatusSummary } from "@/components/shell/SyncStatusSummary";
+import { DISCARD_NOTICE } from "@/data/pwa/sync-copy";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Empty } from "@/components/ui/Empty";
 import { Spinner } from "@/components/ui/Spinner";
 
 export default function SincronizacionPage() {
-  const { online, counts, flushing, lastDoneAt, syncNow } = useSync();
+  const { online, counts, flushing, lastDoneAt, authRequired, syncNow } = useSync();
   const { items, loading } = useSyncItems();
 
   return (
@@ -22,36 +23,26 @@ export default function SincronizacionPage() {
         >
           ←
         </Link>
-        <h1 className="text-[22px] font-semibold">Sincronización</h1>
+        <h1 className="text-[22px] font-semibold">Datos y sincronización</h1>
       </header>
 
-      {!online && (
-        <Card className="px-4 py-3 text-sm">
-          <p className="font-semibold">Sin conexión</p>
-          <p className="mt-1 text-ink-muted">
-            Las operaciones nuevas se guardarán en este dispositivo y se
-            sincronizarán automáticamente al volver internet.
-          </p>
-        </Card>
-      )}
-
-      <Card className="text-sm">
-        <p>
-          ○ {counts.pending + counts.active} pendiente{(counts.pending + counts.active) === 1 ? "" : "s"}
+      <section className="text-sm leading-snug">
+        <p className="font-semibold">Este teléfono</p>
+        <p className="mt-1 text-ink-muted">
+          Los datos de la tienda abierta se conservan aquí para poder trabajar
+          incluso sin conexión.
         </p>
-        <p className="mt-1">
-          {counts.permanent > 0
-            ? `! ${counts.permanent} necesita${counts.permanent === 1 ? "" : "n"} atención`
-            : "! 0 necesitan atención"}
-        </p>
-        {lastDoneAt && (
-          <p className="mt-2 text-xs text-ink-muted">
-            Última sincronización: {formatDateTime(lastDoneAt)}
-          </p>
-        )}
-      </Card>
+      </section>
 
-      {online && counts.total > 0 && (
+      <SyncStatusSummary
+        online={online}
+        counts={counts}
+        flushing={flushing}
+        authRequired={authRequired}
+        lastDoneAt={lastDoneAt}
+      />
+
+      {online && counts.total > 0 && !authRequired && (
         <Button type="button" variant="primary" onClick={() => void syncNow()} className="w-full">
           Sincronizar ahora
         </Button>
@@ -63,19 +54,14 @@ export default function SincronizacionPage() {
         </div>
       ) : items.length === 0 ? (
         <Empty
-          title="Todo al día"
-          description="No hay operaciones pendientes ni errores de sincronización."
+          title="Nada pendiente"
+          description="No hay operaciones por enviar desde este teléfono."
         />
       ) : (
         <SyncOperationList items={items} flushing={flushing != null} />
       )}
 
-      {items.length > 0 && (
-        <p className="text-xs leading-relaxed text-ink-muted">
-          Descartar elimina el pendiente de este dispositivo. No deshace nada
-          que ya esté guardado en el servidor.
-        </p>
-      )}
+      <p className="text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>
     </div>
   );
 }

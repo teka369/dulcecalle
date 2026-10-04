@@ -5,23 +5,18 @@ import { getPwaAuthSession } from "@/data/http/session";
 import {
   describeOutboxDetail,
   describeOutboxOperation,
-  describeTrayStatus,
   discardOutboxOperation,
   humanizeSyncError,
-  isPermanentFailure,
   listEnrichedTray,
   retryOutboxOperation,
   type EnrichedTrayItem,
 } from "@/data/pwa/sync-tray";
 import { syncStore } from "@/store/syncStore";
+import { DISCARD_NOTICE, formatDateTime, syncOperationNotes } from "@/data/pwa/sync-copy";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
-export function formatDateTime(at: number): string {
-  const d = new Date(at);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+export { formatDateTime };
 
 export function timeAgo(at: number, now: number = Date.now()): string {
   const seconds = Math.max(0, Math.round((now - at) / 1000));
@@ -86,9 +81,9 @@ function StatusChip({ item, flushing }: { item: EnrichedTrayItem; flushing: bool
   // in_flight rows with no active flush (e.g. after a reload while
   // offline) resume on the next cycle; never show them as stuck.
   if (item.status === "in_flight" && flushing) {
-    return <Badge tone="warning" className="shrink-0">↻ Sincronizando</Badge>;
+    return <Badge tone="warning" className="shrink-0">↑ Enviando</Badge>;
   }
-  return <Badge tone="info" className="shrink-0">○ Pendiente</Badge>;
+  return <Badge tone="info" className="shrink-0">○ Guardada aquí</Badge>;
 }
 
 export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; flushing: boolean }) {
@@ -164,19 +159,9 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
 
       {expanded && (
         <div className="mt-3 space-y-1 border-t border-border pt-3 text-xs text-ink-muted">
-          <p>Estado: {describeTrayStatus(item.status)}</p>
-          <p>Creada: {formatDateTime(item.localCreatedAt)}</p>
-          <p>Intentos: {item.attempts}</p>
-          {item.status === "failed" && !isPermanentFailure(item) && (
-            <p>Se reintentará automáticamente.</p>
-          )}
-          {item.status === "failed" && isPermanentFailure(item) && (
-            <p>Qué puedes hacer: revisa el motivo y reintenta si corresponde.</p>
-          )}
-          <details>
-            <summary className="cursor-pointer font-medium">Información técnica</summary>
-            <p className="mt-1 break-all">requestId: {item.requestId}</p>
-          </details>
+          {syncOperationNotes(item).map((line) => (
+            <p key={line}>{line}</p>
+          ))}
         </div>
       )}
 
@@ -193,11 +178,8 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
 
       {item.status === "failed" && confirming && (
         <div className="mt-3 rounded-[var(--r-lg)] border border-danger/20 bg-danger/5 p-3">
-          <p className="text-sm font-semibold">¿Descartar esta operación?</p>
-          <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-            Se eliminará la intención pendiente de este dispositivo. Esto no
-            revierte una operación que ya hubiera llegado al servidor.
-          </p>
+          <p className="text-sm font-semibold">¿Descartar este envío?</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(false)} className="w-full">
               Cancelar
