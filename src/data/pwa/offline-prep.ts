@@ -18,6 +18,7 @@ import {
   listCachedProducts,
   listCachedSuppliers,
 } from "./catalog";
+import { formatStorageProbeDetail, readOriginStorage } from "./origin-storage";
 import {
   DASHBOARD_SNAPSHOT_KIND,
   loadDashboardWithOfflineFallback,
@@ -340,27 +341,9 @@ async function checkServiceWorker(): Promise<string> {
 }
 
 async function checkStorage(): Promise<string> {
-  const storage = (
-    globalThis as unknown as {
-      navigator?: Navigator & {
-        storage?: {
-          estimate?: () => Promise<{ usage?: number; quota?: number }>;
-          persist?: () => Promise<boolean>;
-        };
-      };
-    }
-  ).navigator?.storage;
-  if (!storage?.estimate) throw new Error("Este navegador no expone uso de almacenamiento.");
-  const { usage = 0, quota = 0 } = await storage.estimate();
-  let persisted: boolean | null = null;
-  try {
-    if (storage.persist) persisted = await storage.persist();
-  } catch {
-    persisted = null;
-  }
-  const mb = (n: number) => `${(n / 1048576).toFixed(1)} MB`;
-  const base = quota > 0 ? `${mb(usage)} de ${mb(quota)}` : `${mb(usage)} usados`;
-  return persisted == null ? base : `${base} · persistente: ${persisted ? "sí" : "no"}`;
+  // Measure only. persist() is reserved for the explicit button on /sincronizacion.
+  const snapshot = await readOriginStorage();
+  return formatStorageProbeDetail(snapshot);
 }
 
 async function verifyPreparation(businessId: string, warmedPaths: string[]): Promise<string> {

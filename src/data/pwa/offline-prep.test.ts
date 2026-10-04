@@ -61,7 +61,10 @@ function installCacheStubs(failPaths: string[] = []) {
     serviceWorker: { controller: {} },
     storage: {
       estimate: async () => ({ usage: 1048576, quota: 536870912 }),
-      persist: async () => true,
+      persisted: async () => false,
+      persist: async () => {
+        throw new Error("preparation must not request persistence");
+      },
     },
   });
   return stored;
@@ -86,6 +89,35 @@ describe("offline preparation", () => {
     getPwaAuthSession().businessId = BIZ;
     mockCatalogsEmpty();
     installCacheStubs();
+  });
+
+  it("measures storage during preparation and does not request persistence", async () => {
+    const order: string[] = [];
+    vi.stubGlobal("navigator", {
+      onLine: true,
+      serviceWorker: { controller: {} },
+      storage: {
+        estimate: async () => {
+          order.push("estimate");
+          return { usage: 10 * 1048576, quota: 100 * 1048576 };
+        },
+        persisted: async () => {
+          order.push("persisted");
+          return false;
+        },
+        persist: async () => {
+          order.push("persist");
+          return true;
+        },
+      },
+    });
+    const row = await runPreparation(BIZ);
+    const storage = row.tasks.find((t) => t.key === "sys:storage");
+    expect(storage?.status).toBe("done");
+    expect(storage?.detail).toBe("10.0 MB de 100.0 MB · protección: no");
+    expect(order).not.toContain("persist");
+    expect(order).toContain("persisted");
+    expect(order).toContain("estimate");
   });
 
   it("starts not_ready and finishes ready with real progress", async () => {
