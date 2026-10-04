@@ -42,7 +42,16 @@ export default function SincronizacionPage() {
         lastDoneAt={lastDoneAt}
       />
 
-      {online && counts.total > 0 && !authRequired && (
+      {online && authRequired && (
+        <a
+          href="/login"
+          className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
+        >
+          Entra para enviar lo guardado aquí
+        </a>
+      )}
+
+      {online && counts.total > 0 && !flushing && !authRequired && (
         <Button type="button" variant="primary" onClick={() => void syncNow()} className="w-full">
           Sincronizar ahora
         </Button>
