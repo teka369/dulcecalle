@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RemoteProduct } from "@/data/http/mappers";
@@ -11,7 +11,7 @@ import {
   type ShrinkReason,
 } from "@/domain/inventory";
 import { newRequestId } from "@/domain/requestId";
-import { routeId } from "@/data/pwa/ids";
+import { useEntityId } from "@/components/shell/entity-route";
 import { inventoryStore } from "@/store/inventoryStore";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
@@ -35,9 +35,8 @@ export function ShrinkForm({
   showNote?: boolean;
   requireMotivo?: boolean;
 }) {
-  const params = useParams();
   const router = useRouter();
-  const id = routeId(params.id);
+  const id = useEntityId();
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [qtyRaw, setQtyRaw] = useState("");
   const [note, setNote] = useState("");

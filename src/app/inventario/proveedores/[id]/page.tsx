@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import type { RemoteSupplier } from "@/data/http/mappers";
-import { routeId } from "@/data/pwa/ids";
+import { useEntityId } from "@/components/shell/entity-route";
 import {
   inventoryStore,
   type PwaSupplierSurtir,
@@ -19,8 +18,7 @@ import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 
 export default function ProveedorFichaPage() {
-  const params = useParams();
-  const id = routeId(params.id);
+  const id = useEntityId();
   const [supplier, setSupplier] = useState<RemoteSupplier | null>(null);
   const [historial, setHistorial] = useState<PwaSupplierSurtir[]>([]);
   const [ready, setReady] = useState(false);

@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
-import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { DebtStatementView } from "@/components/customers/DebtStatementView";
 import type { DebtStatement } from "@/domain/debt/statement";
 import type { RemoteCustomer } from "@/data/http/mappers";
-import { routeId } from "@/data/pwa/ids";
+import { useEntityId } from "@/components/shell/entity-route";
 import { customerStore } from "@/store/customerStore";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -15,8 +14,7 @@ import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 
 export default function ClienteFichaPage() {
-  const params = useParams();
-  const id = routeId(params.id);
+  const id = useEntityId();
   const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");

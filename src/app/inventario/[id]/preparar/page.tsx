@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -12,14 +12,13 @@ import { formatCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
 import type { RemoteProduct } from "@/data/http/mappers";
 import { primaryImageUrl } from "@/data/media/urls";
-import { routeId } from "@/data/pwa/ids";
+import { useEntityId } from "@/components/shell/entity-route";
 import { inventoryStore, useInventory } from "@/store/inventoryStore";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 
 export default function PrepararPage() {
-  const params = useParams();
   const router = useRouter();
-  const sourceId = routeId(params.id);
+  const sourceId = useEntityId();
   const { products } = useInventory();
   const [source, setSource] = useState<RemoteProduct | null>(null);
   const [targetId, setTargetId] = useState("");

@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCop, mulCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
 import { RETURN_ERRORS, RETURN_TOAST } from "@/domain/sale/returns";
-import { routeId } from "@/data/pwa/ids";
+import { useEntityId } from "@/components/shell/entity-route";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { createReturnWithOfflineFallback } from "@/data/pwa/offline-returns";
 import { getSaleDetailWithOfflineFallback } from "@/data/pwa/offline-sales";
@@ -20,9 +20,8 @@ import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 
 export default function DevolverVentaPage() {
-  const params = useParams();
   const router = useRouter();
-  const id = routeId(params.id);
+  const id = useEntityId();
   const [data, setData] = useState<SaleDetailResult | null>(null);
   const [qtyByLine, setQtyByLine] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
