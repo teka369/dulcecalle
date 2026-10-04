@@ -84,7 +84,8 @@ export function prepTaskDefs(): PrepTaskDef[] {
     { path: "/mas/caja/cerrar", label: "Documento Cerrar caja" },
     { path: "/mas/estadisticas", label: "Documento Estadísticas" },
     { path: "/mas/apariencia", label: "Documento Apariencia" },
-    { path: "/inventario/proveedores", label: "Documento Proveedores" },
+    // The supplier list is a segment of /inventario. There is no
+    // /inventario/proveedores page, so that path is not a document.
     { path: "/inventario/proveedores/nuevo", label: "Documento Nuevo proveedor" },
     { path: "/sincronizacion", label: "Documento Sincronización" },
   ];

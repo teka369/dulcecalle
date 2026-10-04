@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +13,7 @@ import type {
   RemoteProduct,
   RemoteStockMove,
 } from "@/data/http/mappers";
-import { useEntityId } from "@/components/shell/entity-route";
+import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
 import { inventoryStore } from "@/store/inventoryStore";
 import { ProductImageManager } from "@/components/product/ProductImageManager";
 
@@ -86,9 +85,9 @@ export default function ProductoFichaPage() {
   if (!product) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/inventario" className="text-sm text-ink-muted">
+        <EntityBackLink href="/inventario" className="text-sm text-ink-muted">
           ← Inventario
-        </Link>
+        </EntityBackLink>
         <p className="text-sm text-ink-muted">No encontramos ese producto.</p>
       </div>
     );
@@ -97,13 +96,13 @@ export default function ProductoFichaPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-2">
-        <Link
+        <EntityBackLink
           href="/inventario"
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
-        </Link>
+        </EntityBackLink>
         <h1 className="text-[22px] font-semibold tracking-tight">
           {product.name}
         </h1>

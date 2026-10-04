@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -12,7 +11,7 @@ import {
 import { formatCop } from "@/domain/money";
 import type { PayMethod } from "@/domain/types";
 import type { RemoteCustomer } from "@/data/http/mappers";
-import { useEntityId } from "@/components/shell/entity-route";
+import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { customerStore } from "@/store/customerStore";
 import { Button } from "@/components/ui/Button";
@@ -122,9 +121,9 @@ export default function RegistrarAbonoPage() {
   if (!customer) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/clientes" className="text-sm text-ink-muted">
+        <EntityBackLink href="/clientes" className="text-sm text-ink-muted">
           ← Clientes
-        </Link>
+        </EntityBackLink>
         <p className="text-sm text-ink-muted">No encontramos ese cliente.</p>
       </div>
     );
@@ -133,13 +132,13 @@ export default function RegistrarAbonoPage() {
   return (
     <div className="flex flex-col gap-4 pb-28">
       <header className="flex items-center gap-2">
-        <Link
+        <EntityBackLink
           href={`/clientes/${customer.id}`}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
-        </Link>
+        </EntityBackLink>
         <h1 className="text-[22px] font-semibold">Registrar abono</h1>
       </header>
 

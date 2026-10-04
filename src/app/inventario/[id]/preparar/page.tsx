@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { OfflineLink } from "@/components/shell/OfflineLink";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -12,7 +11,7 @@ import { formatCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
 import type { RemoteProduct } from "@/data/http/mappers";
 import { primaryImageUrl } from "@/data/media/urls";
-import { useEntityId } from "@/components/shell/entity-route";
+import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
 import { inventoryStore, useInventory } from "@/store/inventoryStore";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 
@@ -92,12 +91,12 @@ export default function PrepararPage() {
         >
           Ver producto
         </Button>
-        <OfflineLink
+        <EntityBackLink
           href={`/inventario/${sourceId}`}
           className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-sm font-semibold"
         >
           Volver al combo
-        </OfflineLink>
+        </EntityBackLink>
       </div>
     );
   }
@@ -109,13 +108,13 @@ export default function PrepararPage() {
   return (
     <div className="flex flex-col gap-4 pb-28">
       <header className="flex items-center gap-2">
-        <OfflineLink
+        <EntityBackLink
           href={`/inventario/${sourceId}`}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           ariaLabel="Volver"
         >
           ←
-        </OfflineLink>
+        </EntityBackLink>
         <h1 className="text-[22px] font-semibold">Preparar</h1>
       </header>
 

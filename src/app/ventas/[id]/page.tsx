@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
-import { useEntityId } from "@/components/shell/entity-route";
+import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
 import {
   getSaleDetailWithOfflineFallback,
   type SaleDetailResult,
@@ -81,9 +80,9 @@ export default function VentaDetallePage() {
   if (!data) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/ventas" className="text-sm text-ink-muted">
+        <EntityBackLink href="/ventas" className="text-sm text-ink-muted">
           ← Ventas
-        </Link>
+        </EntityBackLink>
         <p className="text-sm text-ink-muted">No encontramos esa venta.</p>
       </div>
     );
@@ -98,13 +97,13 @@ export default function VentaDetallePage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-2">
-        <Link
+        <EntityBackLink
           href="/ventas"
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
-        </Link>
+        </EntityBackLink>
         <div className="min-w-0">
           <h1 className="text-[22px] font-semibold">Venta</h1>
           <p className="flex flex-wrap items-center gap-2 text-sm text-ink-muted">

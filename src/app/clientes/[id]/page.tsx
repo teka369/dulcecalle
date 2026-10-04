@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { useCallback, useEffect, useState } from "react";
 import { DebtStatementView } from "@/components/customers/DebtStatementView";
 import type { DebtStatement } from "@/domain/debt/statement";
 import type { RemoteCustomer } from "@/data/http/mappers";
-import { useEntityId } from "@/components/shell/entity-route";
+import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
 import { customerStore } from "@/store/customerStore";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -62,9 +61,9 @@ export default function ClienteFichaPage() {
   if (!customer) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/clientes" className="text-sm text-ink-muted">
+        <EntityBackLink href="/clientes" className="text-sm text-ink-muted">
           ← Clientes
-        </Link>
+        </EntityBackLink>
         <p className="text-sm text-ink-muted">No encontramos ese cliente.</p>
       </div>
     );
@@ -75,13 +74,13 @@ export default function ClienteFichaPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-2">
-        <Link
+        <EntityBackLink
           href="/clientes"
           className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
-        </Link>
+        </EntityBackLink>
         <h1 className="min-w-0 truncate text-[22px] font-semibold tracking-tight">
           {customer.name}
         </h1>
