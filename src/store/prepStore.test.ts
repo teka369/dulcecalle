@@ -80,8 +80,8 @@ describe("prepStore evaluate/start", () => {
     expect(snap.phase).toBe("ready");
     expect(snap.modalOpen).toBe(true);
     expect(snap.completed).toBe(snap.total);
-    // 20 static docs + 3 catalogs + 4 snapshots + 1 thumbs + 3 sistema. Entity HTML is not a task.
-    expect(snap.total).toBe(31);
+    // 19 static docs + 3 catalogs + 4 snapshots + 1 thumbs + 3 sistema. Entity HTML is not a task.
+    expect(snap.total).toBe(30);
     expect(snap.lastReadyAt).toBeGreaterThan(0);
   });
 

@@ -288,12 +288,13 @@ await runPreparation(BIZ);
 
   it("task list covers documents, catalogs and summaries", () => {
     const defs = prepTaskDefs();
-    expect(defs.filter((d) => d.group === "app")).toHaveLength(20);
+    expect(defs.filter((d) => d.group === "app")).toHaveLength(19);
     expect(defs.filter((d) => d.group === "catalogos")).toHaveLength(3);
     expect(defs.filter((d) => d.group === "resumen")).toHaveLength(4);
-    expect(defs).toHaveLength(27);
+    expect(defs).toHaveLength(26);
     const keys = defs.map((d) => d.key);
     expect(keys).toContain("doc:/inventario/proveedores/nuevo");
+    expect(keys).not.toContain("doc:/inventario/proveedores");
     expect(keys).toContain("doc:/mas/estadisticas");
     expect(keys).toContain("doc:/mas/apariencia");
     expect(keys).toContain("doc:/mas/gastos/nuevo");
