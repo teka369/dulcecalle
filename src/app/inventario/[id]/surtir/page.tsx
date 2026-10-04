@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -15,7 +14,7 @@ import type { RemoteProduct, RemoteSupplier } from "@/data/http/mappers";
 import { validateSurtirForm } from "@/domain/inventory";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
-import { useEntityId } from "@/components/shell/entity-route";
+import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
 import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
 import { inventoryStore } from "@/store/inventoryStore";
 
@@ -163,9 +162,9 @@ export default function SurtirPage() {
   if (!product) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/inventario" className="text-sm text-ink-muted">
+        <EntityBackLink href="/inventario" className="text-sm text-ink-muted">
           ← Inventario
-        </Link>
+        </EntityBackLink>
         <p className="text-sm text-ink-muted">No encontramos ese producto.</p>
       </div>
     );
@@ -174,13 +173,13 @@ export default function SurtirPage() {
   return (
     <div className="flex flex-col gap-4 pb-28">
       <header className="flex items-center gap-2">
-        <Link
+        <EntityBackLink
           href={`/inventario/${product.id}`}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
-        </Link>
+        </EntityBackLink>
         <h1 className="text-[22px] font-semibold">Surtir</h1>
       </header>
 

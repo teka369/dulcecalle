@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -11,7 +10,7 @@ import {
   type ShrinkReason,
 } from "@/domain/inventory";
 import { newRequestId } from "@/domain/requestId";
-import { useEntityId } from "@/components/shell/entity-route";
+import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
 import { inventoryStore } from "@/store/inventoryStore";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
@@ -115,9 +114,9 @@ export function ShrinkForm({
   if (!product) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/inventario" className="text-sm text-ink-muted">
+        <EntityBackLink href="/inventario" className="text-sm text-ink-muted">
           ← Inventario
-        </Link>
+        </EntityBackLink>
         <p className="text-sm text-ink-muted">No encontramos ese producto.</p>
       </div>
     );
@@ -126,13 +125,13 @@ export function ShrinkForm({
   return (
     <div className="flex flex-col gap-4 pb-28">
       <header className="flex items-center gap-2">
-        <Link
+        <EntityBackLink
           href={`/inventario/${product.id}`}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
-        </Link>
+        </EntityBackLink>
         <h1 className="text-[22px] font-semibold">{title}</h1>
       </header>
 

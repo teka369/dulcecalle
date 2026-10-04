@@ -51,6 +51,11 @@ export const entityViewStore = {
   close() {
     setStack([]);
   },
+  /** Online again: drop the overlay. The page underneath stays. No reload, no assign, no push. */
+  dismissOnOnline() {
+    if (state.stack.length === 0) return;
+    setStack([]);
+  },
   __reset() {
     state = { stack: [] };
   },

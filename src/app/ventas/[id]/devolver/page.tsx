@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCop, mulCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
 import { RETURN_ERRORS, RETURN_TOAST } from "@/domain/sale/returns";
-import { useEntityId } from "@/components/shell/entity-route";
+import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { createReturnWithOfflineFallback } from "@/data/pwa/offline-returns";
 import { getSaleDetailWithOfflineFallback } from "@/data/pwa/offline-sales";
@@ -123,9 +122,9 @@ export default function DevolverVentaPage() {
   if (!data) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/ventas" className="text-sm text-ink-muted">
+        <EntityBackLink href="/ventas" className="text-sm text-ink-muted">
           ← Ventas
-        </Link>
+        </EntityBackLink>
         <p className="text-sm text-ink-muted">No encontramos esa venta.</p>
       </div>
     );
@@ -136,13 +135,13 @@ export default function DevolverVentaPage() {
   return (
     <div className="flex flex-col gap-4 pb-28">
       <header className="flex items-center gap-2">
-        <Link
+        <EntityBackLink
           href={`/ventas/${data.sale.id}`}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           aria-label="Volver"
         >
           ←
-        </Link>
+        </EntityBackLink>
         <div className="min-w-0">
           <h1 className="text-[22px] font-semibold">Devolver</h1>
           <p className="text-sm text-ink-muted">

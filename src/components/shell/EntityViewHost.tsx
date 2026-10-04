@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { EntityIdProvider } from "@/components/shell/entity-route";
 import { entityViewStore, useEntityView } from "@/store/entityViewStore";
 import type { EntityHref } from "@/data/pwa/entity-href";
@@ -39,6 +40,13 @@ function EntityScreen({ view }: { view: EntityHref }) {
 export function EntityViewHost() {
   const { stack } = useEntityView();
   const view = stack[stack.length - 1];
+
+  useEffect(() => {
+    const onOnline = () => entityViewStore.dismissOnOnline();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, []);
+
   if (!view) return null;
 
   return (

@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { OfflineLink } from "@/components/shell/OfflineLink";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -12,7 +10,7 @@ import {
 } from "@/domain/initialDebt";
 import { formatCop } from "@/domain/money";
 import type { RemoteCustomer } from "@/data/http/mappers";
-import { useEntityId } from "@/components/shell/entity-route";
+import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
 import { customerStore } from "@/store/customerStore";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -101,9 +99,9 @@ export default function AgregarDeudaAnteriorPage() {
   if (!customer) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href="/clientes" className="text-sm text-ink-muted">
+        <EntityBackLink href="/clientes" className="text-sm text-ink-muted">
           ← Clientes
-        </Link>
+        </EntityBackLink>
         <p className="text-sm text-ink-muted">No encontramos ese cliente.</p>
       </div>
     );
@@ -112,13 +110,13 @@ export default function AgregarDeudaAnteriorPage() {
   return (
     <div className="flex flex-col gap-4 pb-28">
       <header className="flex items-center gap-2">
-        <OfflineLink
+        <EntityBackLink
           href={`/clientes/${customer.id}`}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
           ariaLabel="Volver"
         >
           ←
-        </OfflineLink>
+        </EntityBackLink>
         <h1 className="text-[22px] font-semibold">Agregar deuda anterior</h1>
       </header>
 
