@@ -24,7 +24,7 @@ function TaskIcon({ status }: { status: string }) {
  * The app stays usable; the indicator keeps the status.
  */
 export function PrepModal() {
-  const { phase, tasks, completed, total, modalOpen, panelOpen, stale, evaluate, continueUsing, closePanel, start } = usePrep();
+  const { phase, tasks, completed, total, modalOpen, evaluate, continueUsing, start } = usePrep();
 
   const pathname = usePathname();
   useEffect(() => {
