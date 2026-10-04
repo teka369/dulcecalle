@@ -16,6 +16,9 @@ export default function OfflinePage() {
       <p className="text-base leading-snug">
         No se ha perdido. Tampoco está todavía en el servidor.
       </p>
+      <p className="text-sm leading-snug text-ink-muted">
+        Para trabajar sin conexión, abre Dulce Calle desde el inicio y navega desde las secciones preparadas. Una ficha abierta directo, que nunca cargaste, no está disponible sin internet.
+      </p>
       <p className="text-sm leading-snug text-ink-muted">{NOT_A_BACKUP}</p>
       <Button
         type="button"

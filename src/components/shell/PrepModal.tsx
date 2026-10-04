@@ -59,10 +59,10 @@ export function PrepModal() {
               ✓ Dulce Calle está listo
             </h2>
             <p className="mt-1 text-sm leading-snug text-ink-muted">
-              Tu dispositivo ya está preparado para trabajar sin conexión.
+              Productos, clientes y proveedores quedaron en este teléfono, junto con las pantallas principales.
             </p>
-            <p className="mt-2 text-xs text-ink-muted">
-              Datos preparados: catálogos y documentos de la app.
+            <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+              Lo que anotes sin conexión se envía cuando vuelva internet. Esto no es una copia del negocio: el historial sigue en el servidor. Si abres directo una ficha que nunca cargaste, puede pedir conexión. Entra por el inicio y navega desde las secciones preparadas.
             </p>
           </>
         ) : (
@@ -71,8 +71,7 @@ export function PrepModal() {
               Preparando Dulce Calle
             </h2>
             <p className="mt-1 text-sm leading-snug text-ink-muted">
-              Estamos guardando en este dispositivo todo lo necesario para
-              seguir trabajando si pierdes internet.
+              Estamos guardando productos, clientes, proveedores y las pantallas principales en este teléfono. Así puedes registrar ventas y movimientos si se cae internet.
             </p>
 
             <div className="mt-4">

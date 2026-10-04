@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
-import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import type {
@@ -15,7 +14,7 @@ import type {
   RemoteProduct,
   RemoteStockMove,
 } from "@/data/http/mappers";
-import { routeId } from "@/data/pwa/ids";
+import { useEntityId } from "@/components/shell/entity-route";
 import { inventoryStore } from "@/store/inventoryStore";
 import { ProductImageManager } from "@/components/product/ProductImageManager";
 
@@ -32,8 +31,7 @@ const REASON_LABEL: Record<string, string> = {
 };
 
 export default function ProductoFichaPage() {
-  const params = useParams();
-  const id = routeId(params.id);
+  const id = useEntityId();
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [moves, setMoves] = useState<RemoteStockMove[]>([]);
   const [ready, setReady] = useState(false);

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCop } from "@/domain/money";
@@ -15,14 +15,13 @@ import type { RemoteProduct, RemoteSupplier } from "@/data/http/mappers";
 import { validateSurtirForm } from "@/domain/inventory";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
-import { routeId } from "@/data/pwa/ids";
+import { useEntityId } from "@/components/shell/entity-route";
 import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
 import { inventoryStore } from "@/store/inventoryStore";
 
 export default function SurtirPage() {
-  const params = useParams();
   const router = useRouter();
-  const id = routeId(params.id);
+  const id = useEntityId();
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [suppliers, setSuppliers] = useState<RemoteSupplier[]>([]);
   const [pendingSupplierIds, setPendingSupplierIds] = useState<string[]>([]);

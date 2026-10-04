@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { BottomNav } from "./BottomNav";
 import { Fab } from "./Fab";
 import { AuthGate } from "./AuthGate";
+import { EntityViewHost } from "./EntityViewHost";
 import { shellHidesChrome, shellHidesFab } from "./shell-chrome";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className={`flex-1 px-4 ${mainPad}`}>
         {children}
       </main>
+      <EntityViewHost />
       {!hideChrome && (
         <div className="pointer-events-none fixed inset-x-0 z-40 px-1.5 bottom-[max(0.75rem,env(safe-area-inset-bottom))] min-[380px]:px-3">
           <div className="pointer-events-auto mx-auto flex w-full max-w-lg items-center gap-1.5 min-[380px]:gap-2">

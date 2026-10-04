@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -12,7 +12,7 @@ import {
 import { formatCop } from "@/domain/money";
 import type { PayMethod } from "@/domain/types";
 import type { RemoteCustomer } from "@/data/http/mappers";
-import { routeId } from "@/data/pwa/ids";
+import { useEntityId } from "@/components/shell/entity-route";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { customerStore } from "@/store/customerStore";
 import { Button } from "@/components/ui/Button";
@@ -21,9 +21,8 @@ import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 
 export default function RegistrarAbonoPage() {
-  const params = useParams();
   const router = useRouter();
-  const id = routeId(params.id);
+  const id = useEntityId();
   const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [amountRaw, setAmountRaw] = useState("");
   const [method, setMethod] = useState<PayMethod>("Efectivo");

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
 import { isOffline } from "@/data/pwa/offline-nav";
+import { parseEntityHref } from "@/data/pwa/entity-href";
+import { entityViewStore } from "@/store/entityViewStore";
 
 type OfflineClick = {
   metaKey: boolean;
@@ -13,21 +15,25 @@ type OfflineClick = {
   preventDefault: () => void;
 };
 
-/** Offline primary clicks become document navigations. Online clicks do not. */
+/** Offline static clicks become document navigations. Entity fichas stay in the shell. */
 export function onOfflineLinkClick(event: OfflineClick, href: string): void {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
     return;
   }
-  if (isOffline()) {
-    event.preventDefault();
-    window.location.assign(href);
+  if (!isOffline()) return;
+  event.preventDefault();
+  if (parseEntityHref(href)) {
+    entityViewStore.open(href);
+    return;
   }
+  window.location.assign(href);
 }
 
 /**
- * Link that degrades to a document navigation while offline, so the
- * Service Worker can serve the prepared document (or /offline) instead
- * of failing an RSC client navigation. Online behavior is unchanged.
+ * Link that stays a normal Next navigation while online. Offline, a
+ * prepared static route becomes a document navigation. An entity ficha
+ * opens inside the already-loaded shell and reads IndexedDB — it does
+ * not request a new HTML or RSC payload.
  * Visual: inherits className; adds DS focus ring when not overridden.
  */
 export function OfflineLink({

@@ -5,10 +5,9 @@ import { OfflineLink } from "@/components/shell/OfflineLink";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
-import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
-import { routeId } from "@/data/pwa/ids";
+import { useEntityId } from "@/components/shell/entity-route";
 import {
   getSaleDetailWithOfflineFallback,
   type SaleDetailResult,
@@ -40,8 +39,7 @@ function saleDateLabel(occurredOn: string | null | undefined, createdAt: number 
 }
 
 export default function VentaDetallePage() {
-  const params = useParams();
-  const id = routeId(params.id);
+  const id = useEntityId();
   const [data, setData] = useState<SaleDetailResult | null>(null);
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [ready, setReady] = useState(false);

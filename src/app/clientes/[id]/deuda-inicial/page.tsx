@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -12,7 +12,7 @@ import {
 } from "@/domain/initialDebt";
 import { formatCop } from "@/domain/money";
 import type { RemoteCustomer } from "@/data/http/mappers";
-import { routeId } from "@/data/pwa/ids";
+import { useEntityId } from "@/components/shell/entity-route";
 import { customerStore } from "@/store/customerStore";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -20,9 +20,8 @@ import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 
 export default function AgregarDeudaAnteriorPage() {
-  const params = useParams();
   const router = useRouter();
-  const id = routeId(params.id);
+  const id = useEntityId();
   const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [amountRaw, setAmountRaw] = useState("");
   const [error, setError] = useState<string | null>(null);
