@@ -40,7 +40,7 @@ describe("CustomerApi", () => {
       });
     };
     const api = new CustomerApi("http://example.test/v1", session, fetchImpl);
-    await api.login("DC-0001", "Rosa");
+    await api.login("DC-0001", "135790");
     expect(url).toContain("/customer-access/login");
     expect(headers["X-Business-Id"]).toBeUndefined();
     expect(session.accessToken).toBe("acc");
@@ -63,7 +63,7 @@ describe("CustomerApi", () => {
       });
     };
     const api = new CustomerApi("http://example.test/v1", session, fetchImpl);
-    await expect(api.login("DC-0001", "Nadie")).rejects.toMatchObject({
+    await expect(api.login("DC-0001", "000000")).rejects.toMatchObject({
       status: 401,
       message: "No pudimos identificarte.",
     });

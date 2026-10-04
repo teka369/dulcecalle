@@ -12,21 +12,21 @@ import { Input } from "@/components/ui/Input";
 export function CustomerLoginForm({ showBack = false }: { showBack?: boolean }) {
   const router = useRouter();
   const [code, setCode] = useState("");
-  const [name, setName] = useState("");
+  const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit() {
     if (busy) return;
     setError(null);
-    const parsed = validateCustomerLoginInput(code, name);
+    const parsed = validateCustomerLoginInput(code, pin);
     if ("error" in parsed) {
       setError(parsed.error);
       return;
     }
     setBusy(true);
     try {
-      await getCustomerApi().login(parsed.code, parsed.name);
+      await getCustomerApi().login(parsed.code, parsed.pin);
       router.replace("/cliente");
     } catch (e) {
       setError(
@@ -61,15 +61,18 @@ export function CustomerLoginForm({ showBack = false }: { showBack?: boolean }) 
           autoComplete="off"
           autoFocus
         />
-        <label className="mt-4 block text-sm font-medium" htmlFor="nombre-cliente">
-          Nombre
+        <label className="mt-4 block text-sm font-medium" htmlFor="pin-cliente">
+          PIN
         </label>
         <Input
-          id="nombre-cliente"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          id="pin-cliente"
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
           className="mt-2"
-          autoComplete="name"
+          inputMode="numeric"
+          autoComplete="off"
+          type="password"
+          maxLength={6}
         />
         {error && <p className="mt-2 text-sm text-danger">{error}</p>}
       </Card>

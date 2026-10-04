@@ -13,6 +13,7 @@ import {
   validateInitialDebtAmount,
 } from "@/domain/initialDebt";
 import { ApiError } from "@/data/errors";
+import { getPwaApi } from "@/data/pwa/api";
 import { getCachedCustomer, listCachedCustomers } from "@/data/pwa/catalog";
 import { createPaymentWithOfflineFallback } from "@/data/pwa/offline-payments";
 import {
@@ -90,6 +91,16 @@ export const customerStore = {
             : "Cliente guardado",
       });
       return result.mode === "offline" ? result.customerId : result.customer.id;
+    } catch (e) {
+      fail(e);
+    }
+  },
+  async setCustomerPin(customerId: string, pin: string): Promise<void> {
+    if (!/^\d{6}$/.test(pin)) {
+      throw new Error("El PIN debe tener 6 dígitos.");
+    }
+    try {
+      await getPwaApi().customers.setPin(customerId, pin);
     } catch (e) {
       fail(e);
     }

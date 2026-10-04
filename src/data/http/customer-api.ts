@@ -104,13 +104,13 @@ export class CustomerApi {
     );
   }
 
-  async login(code: string, name: string) {
+  async login(code: string, pin: string, businessId?: string) {
     const body = await this.http.request<{
       customer: { id: string; code: string; name: string; debt: number };
       accessToken: string;
       refreshToken: string;
     }>("POST", "/customer-access/login", {
-      body: { code, name },
+      body: businessId ? { code, pin, businessId } : { code, pin },
       skipBusiness: true,
       skipRefresh: true,
     });
@@ -146,14 +146,45 @@ export class CustomerApi {
 
   async logout() {
     const customerId = this.session.customer?.id;
+    const refreshToken = this.session.refreshToken;
     try {
       await this.http.request<{ ok: boolean }>(
         "POST",
         "/customer-access/logout",
-        { skipBusiness: true, skipRefresh: true },
+        {
+          body: refreshToken ? { refreshToken } : {},
+          skipBusiness: true,
+          skipRefresh: true,
+        },
       );
-    } catch {
-      /* stateless JWT */
+    } catch (error) {
+      if (refreshToken) {
+        try {
+          const renewed = await this.http.request<{
+            accessToken: string;
+            refreshToken?: string;
+          }>("POST", "/customer-access/refresh", {
+            body: { refreshToken },
+            skipBusiness: true,
+            skipRefresh: true,
+          });
+          this.session.accessToken = renewed.accessToken;
+          if (renewed.refreshToken) this.session.refreshToken = renewed.refreshToken;
+          await this.http.request<{ ok: boolean }>(
+            "POST",
+            "/customer-access/logout",
+            {
+              body: { refreshToken: this.session.refreshToken },
+              skipBusiness: true,
+              skipRefresh: true,
+            },
+          );
+        } catch {
+          /* local clear still happens */
+        }
+      } else {
+        void error;
+      }
     }
     this.session.clear();
     // M6.10 — Never leave the private ledger stored after logout.

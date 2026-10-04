@@ -19,6 +19,7 @@ import {
   PatchCustomerDto,
   PatchProductDto,
   PatchSupplierDto,
+  SetCustomerPinDto,
   ShrinkDto,
   SurtirDto,
 } from "./catalog.dto";
@@ -173,6 +174,15 @@ export class CatalogController {
     @Body() dto: PatchCustomerDto,
   ) {
     return this.catalog.patchCustomer(ctx, id, dto);
+  }
+
+  @Post("customers/:id/pin")
+  setCustomerPin(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+    @Body() dto: SetCustomerPinDto,
+  ) {
+    return this.catalog.setCustomerPin(ctx, id, dto.pin);
   }
 
   @Throttle({ default: { limit: 30, ttl: 60000 } })

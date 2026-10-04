@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { IdentityService } from "./identity.service";
-import { CreateBusinessDto, LoginDto, RefreshDto } from "./dto";
+import { CreateBusinessDto, LoginDto, LogoutDto, RefreshDto } from "./dto";
 import { Public, SkipBusiness } from "../shared/http/decorators";
 import { CurrentUser } from "../tenancy/business.decorator";
 import type { AuthedUser } from "./auth.types";
@@ -26,8 +26,8 @@ export class IdentityController {
 
   @SkipBusiness()
   @Post("auth/logout")
-  logout() {
-    return { ok: true };
+  logout(@CurrentUser() user: AuthedUser, @Body() dto: LogoutDto) {
+    return this.identity.logout(user.id, dto.refreshToken);
   }
 
   @SkipBusiness()

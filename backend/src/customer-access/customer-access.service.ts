@@ -1,17 +1,24 @@
 import { Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import * as bcrypt from "bcrypt";
 import { PrismaService } from "../prisma/prisma.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
-import { requireJwtSecrets } from "../identity/jwt-secrets";
-import {
-  normalizeCustomerCode,
-  normalizePersonName,
-} from "../shared/customer-code";
+import { AuthSessionService } from "../identity/auth-sessions";
+import { normalizeCustomerCode } from "../shared/customer-code";
 import type { CustomerAuth } from "../identity/auth.types";
 import { copToJson } from "../shared/money";
+import { PortalLoginThrottle } from "./portal-throttle";
 
 const IDENTIFY_FAIL = "No pudimos identificarte.";
+const PIN_RE = /^\d{6}$/;
+
+let dummyPinHash: Promise<string> | null = null;
+
+function dummyHash(): Promise<string> {
+  dummyPinHash ??= bcrypt.hash("portal-pin-dummy", 12);
+  return dummyPinHash;
+}
 
 @Injectable()
 export class CustomerAccessService {
@@ -19,40 +26,59 @@ export class CustomerAccessService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly catalog: CatalogService,
+    private readonly sessions: AuthSessionService,
+    private readonly throttle: PortalLoginThrottle,
   ) {}
 
   private tokens(customerId: string, businessId: string) {
-    const { refresh } = requireJwtSecrets();
-    const accessToken = this.jwt.sign(
-      { sub: customerId, businessId, typ: "customer" },
-      { expiresIn: "15m" },
-    );
-    const refreshToken = this.jwt.sign(
-      { sub: customerId, businessId, typ: "customer_refresh" },
-      { secret: refresh, expiresIn: "7d" },
-    );
-    return { accessToken, refreshToken };
+    return this.sessions.issue({
+      kind: "customer",
+      subjectId: customerId,
+      businessId,
+      refreshClaims: { sub: customerId, businessId, typ: "customer_refresh" },
+      accessClaims: { sub: customerId, businessId, typ: "customer" },
+      accessExpiresIn: "15m",
+    });
   }
 
-  async login(codeRaw: string, nameRaw: string) {
+  async login(codeRaw: string, pinRaw: string, businessIdRaw?: string) {
     const code = normalizeCustomerCode(codeRaw);
-    const name = normalizePersonName(nameRaw);
-    if (!code || !name) {
+    const pin = pinRaw.trim();
+    const businessId = businessIdRaw?.trim() || undefined;
+    if (!code || !PIN_RE.test(pin) || (businessId && !/^[0-9a-f-]{36}$/i.test(businessId))) {
+      await bcrypt.compare(pin || "000000", await dummyHash());
       throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
     }
 
+    const where = businessId
+      ? { code, businessId, archivedAt: null, pinHash: { not: null } }
+      : { code, archivedAt: null, pinHash: { not: null } };
     const rows = await this.prisma.customer.findMany({
-      where: { code },
+      where,
       include: { business: { select: { timezone: true } } },
     });
-    const matches = rows.filter(
-      (row) =>
-        !row.archivedAt && normalizePersonName(row.name) === name,
-    );
+    const gateKey = rows.length === 1 ? `customer:${rows[0].id}` : `code:${code}:${businessId ?? "*"}`;
+    if ((await this.throttle.take(gateKey)) === "cooled") {
+      await bcrypt.compare(pin, await dummyHash());
+      throw new AppError(
+        ERROR_CODES.RATE_LIMIT,
+        "Demasiados intentos. Espera un momento.",
+      );
+    }
+
+    const dummy = await dummyHash();
+    const hashes = rows.length > 0 ? rows.map((row) => row.pinHash as string) : [dummy];
+    const matches: typeof rows = [];
+    for (let i = 0; i < hashes.length; i += 1) {
+      const ok = await bcrypt.compare(pin, hashes[i]);
+      if (ok && rows[i]) matches.push(rows[i]);
+    }
     if (matches.length !== 1) {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
     }
     const customer = matches[0];
+    await this.throttle.reset(`customer:${customer.id}`);
+    const issued = await this.tokens(customer.id, customer.businessId);
     return {
       customer: {
         id: customer.id,
@@ -64,48 +90,58 @@ export class CustomerAccessService {
         id: customer.businessId,
         timezone: customer.business.timezone,
       },
-      ...this.tokens(customer.id, customer.businessId),
+      accessToken: issued.accessToken,
+      refreshToken: issued.refreshToken,
     };
   }
 
   async refresh(refreshToken: string) {
-    const token = refreshToken?.trim() ?? "";
-    if (!token) {
+    const { session, payload } = await this.sessions.verify(
+      refreshToken,
+      "customer_refresh",
+    );
+    if (!payload.businessId) {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, MESSAGES.unauthorized);
     }
-    const { refresh } = requireJwtSecrets();
-    try {
-      const payload = this.jwt.verify<{
-        sub?: string;
-        businessId?: string;
-        typ?: string;
-      }>(token, { secret: refresh });
-      if (
-        payload.typ !== "customer_refresh" ||
-        !payload.sub ||
-        !payload.businessId
-      ) {
-        throw new AppError(ERROR_CODES.UNAUTHORIZED, MESSAGES.unauthorized);
-      }
-      const customer = await this.prisma.customer.findFirst({
-        where: { id: payload.sub, businessId: payload.businessId },
-      });
-      if (!customer || customer.archivedAt) {
-        throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
-      }
-      return {
-        customer: {
-          id: customer.id,
-          code: customer.code,
-          name: customer.name,
-          debt: copToJson(customer.debt),
-        },
-        ...this.tokens(customer.id, customer.businessId),
-      };
-    } catch (e) {
-      if (e instanceof AppError) throw e;
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: payload.sub, businessId: payload.businessId },
+    });
+    if (
+      !customer ||
+      customer.archivedAt ||
+      customer.id !== session.subjectId ||
+      customer.businessId !== session.businessId
+    ) {
+      throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
+    }
+    const accessToken = this.jwt.sign(
+      { sub: customer.id, businessId: customer.businessId, typ: "customer" },
+      { expiresIn: "15m" },
+    );
+    await this.sessions.touch(session.id);
+    return {
+      customer: {
+        id: customer.id,
+        code: customer.code,
+        name: customer.name,
+        debt: copToJson(customer.debt),
+      },
+      accessToken,
+      refreshToken: refreshToken.trim(),
+    };
+  }
+
+  async logout(auth: CustomerAuth, refreshToken?: string) {
+    if (!refreshToken?.trim()) return { ok: true as const };
+    const result = await this.sessions.revokeOwned(
+      refreshToken,
+      { kind: "customer", subjectId: auth.customerId },
+      "customer_refresh",
+    );
+    if (result === "foreign") {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, MESSAGES.unauthorized);
     }
+    return { ok: true as const };
   }
 
   async me(auth: CustomerAuth) {
@@ -229,4 +265,3 @@ export function publicCustomerLedger(raw: AdminLedger) {
 }
 
 export type PublicCustomerLedger = ReturnType<typeof publicCustomerLedger>;
-

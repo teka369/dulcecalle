@@ -26,12 +26,12 @@ export function normalizePersonName(raw: string): string {
 
 export function validateCustomerLoginInput(
   codeRaw: string,
-  nameRaw: string,
-): { code: string; name: string } | { error: string } {
+  pinRaw: string,
+): { code: string; pin: string } | { error: string } {
   const code = normalizeCustomerCode(codeRaw);
-  const name = nameRaw.normalize("NFC").trim().replace(/\s+/g, " ");
-  if (!code || !name) {
-    return { error: "Escribe el código y el nombre." };
+  const pin = pinRaw.trim();
+  if (!code || !/^\d{6}$/.test(pin)) {
+    return { error: "Escribe el código y el PIN de 6 dígitos." };
   }
-  return { code, name };
+  return { code, pin };
 }

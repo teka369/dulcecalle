@@ -107,8 +107,31 @@ describe("Fase M5 customer portal", () => {
     return res.body as { id: string; code: string; name: string; debt: number };
   }
 
-  async function customerLogin(code: string, name: string, status = 201) {
-    return api().post("/v1/customer-access/login").send({ code, name }).expect(status);
+  const PIN = "135790";
+
+  async function setPin(
+    token: string,
+    businessId: string,
+    customerId: string,
+    pin = PIN,
+  ) {
+    await api()
+      .post(`/v1/customers/${customerId}/pin`)
+      .set(adminHeaders(token, businessId))
+      .send({ pin })
+      .expect(201);
+  }
+
+  async function customerLogin(
+    code: string,
+    pin: string,
+    status = 201,
+    businessId?: string,
+  ) {
+    return api()
+      .post("/v1/customer-access/login")
+      .send(businessId ? { code, pin, businessId } : { code, pin })
+      .expect(status);
   }
 
   it("assigns sequential codes and does not reuse an archived number", async () => {
@@ -127,7 +150,7 @@ describe("Fase M5 customer portal", () => {
     expect(c.code).toBe("DC-0003");
   });
 
-  it("identifies by code + name (case/space insensitive)", async () => {
+  it("identifies by code + PIN", async () => {
     const admin = await registerUser("m5-id@test.co", "Puesto Id");
     const customer = await createCustomer(
       admin.accessToken,
@@ -135,10 +158,13 @@ describe("Fase M5 customer portal", () => {
       "María Pérez",
     );
     expect(customer.code).toBe("DC-0001");
+    await setPin(admin.accessToken, admin.business.id, customer.id);
 
-    const ok = await customerLogin(" dc-1 ", "  MARÍA   PÉREZ ");
+    const ok = await customerLogin(" dc-1 ", PIN);
     expect(ok.body.customer.code).toBe("DC-0001");
     expect(ok.body.customer.name).toBe("María Pérez");
+    expect(JSON.stringify(ok.body)).not.toContain(PIN);
+    expect(JSON.stringify(ok.body)).not.toContain("pinHash");
     expect(ok.body.accessToken).toBeTruthy();
     expect(ok.body.refreshToken).toBeTruthy();
     const payload = jwt.decode(ok.body.accessToken) as {
@@ -151,7 +177,7 @@ describe("Fase M5 customer portal", () => {
     expect(payload.businessId).toBe(admin.business.id);
   });
 
-  it("rejects wrong name, missing customer, and archived with the same copy", async () => {
+  it("rejects wrong PIN, missing customer, and archived with the same copy", async () => {
     const admin = await registerUser("m5-fail@test.co", "Puesto Fail");
     const live = await createCustomer(
       admin.accessToken,
@@ -163,19 +189,22 @@ describe("Fase M5 customer portal", () => {
       admin.business.id,
       "Rosa Archivo",
     );
+    await setPin(admin.accessToken, admin.business.id, live.id);
+    await setPin(admin.accessToken, admin.business.id, archived.id);
     await prisma.customer.update({
       where: { id: archived.id },
       data: { archivedAt: new Date() },
     });
 
-    const wrong = await customerLogin(live.code, "Otro Nombre", 401);
+    const wrong = await customerLogin(live.code, "000000", 401);
     expect(wrong.body.error.code).toBe("UNAUTHORIZED");
     expect(wrong.body.error.message).toBe("No pudimos identificarte.");
 
-    const missing = await customerLogin("DC-9999", "Rosa Viva", 401);
+    const missing = await customerLogin("DC-9999", PIN, 401);
     expect(missing.body.error.message).toBe("No pudimos identificarte.");
+    expect(JSON.stringify(missing.body)).toBe(JSON.stringify(wrong.body));
 
-    const dead = await customerLogin(archived.code, "Rosa Archivo", 401);
+    const dead = await customerLogin(archived.code, PIN, 401);
     expect(dead.body.error.message).toBe("No pudimos identificarte.");
     expect(JSON.stringify(dead.body)).not.toMatch(/archiv/i);
   });
@@ -236,7 +265,10 @@ describe("Fase M5 customer portal", () => {
       })
       .expect(201);
 
-    const rosaSession = await customerLogin(rosa.code, "Rosa");
+    const rosaSession = await (async () => {
+      await setPin(a.accessToken, a.business.id, rosa.id);
+      return customerLogin(rosa.code, PIN, 201, a.business.id);
+    })();
     const ledger = await api()
       .get("/v1/customer/me/ledger")
       .set("Authorization", `Bearer ${rosaSession.body.accessToken}`)
@@ -256,13 +288,19 @@ describe("Fase M5 customer portal", () => {
     expect(ledger.body.sales[0].lines[0].productId).toBe(productA.body.id);
   });
 
-  it("fails closed when the same code+name exists in two businesses", async () => {
+  it("fails closed when the same code and PIN exist in two businesses", async () => {
     const a = await registerUser("m5-amb-a@test.co", "Ambiguo A");
     const b = await registerUser("m5-amb-b@test.co", "Ambiguo B");
-    await createCustomer(a.accessToken, a.business.id, "Rosa");
-    await createCustomer(b.accessToken, b.business.id, "Rosa");
-    const res = await customerLogin("DC-0001", "Rosa", 401);
+    const left = await createCustomer(a.accessToken, a.business.id, "Rosa");
+    const right = await createCustomer(b.accessToken, b.business.id, "Rosa");
+    await setPin(a.accessToken, a.business.id, left.id);
+    await setPin(b.accessToken, b.business.id, right.id);
+    const res = await customerLogin("DC-0001", PIN, 401);
     expect(res.body.error.message).toBe("No pudimos identificarte.");
+    const scoped = await customerLogin("DC-0001", PIN, 201, a.business.id);
+    expect(scoped.body.customer.id).toBe(left.id);
+    const scopedB = await customerLogin("DC-0001", PIN, 201, b.business.id);
+    expect(scopedB.body.customer.id).toBe(right.id);
   });
 
   it("rejects invalid, expired, refresh, and admin tokens on customer routes", async () => {
@@ -272,7 +310,8 @@ describe("Fase M5 customer portal", () => {
       admin.business.id,
       "Lina",
     );
-    const session = await customerLogin(customer.code, "Lina");
+    await setPin(admin.accessToken, admin.business.id, customer.id);
+    const session = await customerLogin(customer.code, PIN, 201, admin.business.id);
 
     await api().get("/v1/customer/me").expect(401);
     await api()
@@ -330,7 +369,8 @@ describe("Fase M5 customer portal", () => {
       admin.business.id,
       "Nora",
     );
-    const session = await customerLogin(customer.code, "Nora");
+    await setPin(admin.accessToken, admin.business.id, customer.id);
+    const session = await customerLogin(customer.code, PIN, 201, admin.business.id);
     const bearer = `Bearer ${session.body.accessToken}`;
 
     await api()
@@ -442,7 +482,8 @@ describe("Fase M5 customer portal", () => {
     expect(ret.body.debtReduced).toBe(500);
     expect(ret.body.refundAmount).toBe(0);
 
-    const session = await customerLogin(customer.code, "Doña Ledger");
+    await setPin(admin.accessToken, admin.business.id, customer.id);
+    const session = await customerLogin(customer.code, PIN, 201, admin.business.id);
     const me = await api()
       .get("/v1/customer/me")
       .set("Authorization", `Bearer ${session.body.accessToken}`)
@@ -495,7 +536,8 @@ describe("Fase M5 customer portal", () => {
       admin.business.id,
       "Eva",
     );
-    const session = await customerLogin(customer.code, "Eva");
+    await setPin(admin.accessToken, admin.business.id, customer.id);
+    const session = await customerLogin(customer.code, PIN, 201, admin.business.id);
 
     const rotated = await api()
       .post("/v1/customer-access/refresh")
@@ -512,8 +554,14 @@ describe("Fase M5 customer portal", () => {
     await api()
       .post("/v1/customer-access/logout")
       .set("Authorization", `Bearer ${rotated.body.accessToken}`)
+      .send({ refreshToken: session.body.refreshToken })
       .expect(201)
       .expect((r) => expect(r.body.ok).toBe(true));
+
+    await api()
+      .post("/v1/customer-access/refresh")
+      .send({ refreshToken: session.body.refreshToken })
+      .expect(401);
 
     await api()
       .get("/v1/customer/me")

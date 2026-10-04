@@ -23,6 +23,9 @@ export default function ClienteFichaPage() {
   const [editPhone, setEditPhone] = useState("");
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [pin, setPin] = useState("");
+  const [pinBusy, setPinBusy] = useState(false);
+  const [pinMessage, setPinMessage] = useState<string | null>(null);
   const [statement, setStatement] = useState<DebtStatement | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [ready, setReady] = useState(false);
@@ -88,6 +91,49 @@ export default function ClienteFichaPage() {
       {customer.code && (
         <p className="text-sm text-ink-muted">Código {customer.code}</p>
       )}
+
+      <Card>
+        <label className="text-sm font-medium" htmlFor="pin-cliente">
+          PIN del portal
+        </label>
+        <p className="mt-1 text-xs text-ink-muted">
+          6 dígitos. No se puede ver después. Sin PIN el cliente no entra.
+        </p>
+        <Input
+          id="pin-cliente"
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          className="mt-2"
+          inputMode="numeric"
+          autoComplete="off"
+          type="password"
+          maxLength={6}
+        />
+        {pinMessage && <p className="mt-2 text-sm text-ink-muted">{pinMessage}</p>}
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={pinBusy}
+          onClick={() => {
+            if (pinBusy) return;
+            setPinBusy(true);
+            setPinMessage(null);
+            void customerStore
+              .setCustomerPin(customer.id, pin)
+              .then(() => {
+                setPin("");
+                setPinMessage("PIN guardado. No vuelve a mostrarse.");
+              })
+              .catch((e: unknown) => {
+                setPinMessage(e instanceof Error ? e.message : "No se pudo guardar el PIN.");
+              })
+              .finally(() => setPinBusy(false));
+          }}
+          className="mt-3 w-full"
+        >
+          {pinBusy ? "Guardando…" : "Guardar PIN"}
+        </Button>
+      </Card>
 
       {fromCache && (
         <p className="text-xs text-ink-muted">

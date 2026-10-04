@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Min,
   MinLength,
 } from "class-validator";
@@ -104,6 +105,12 @@ export class CreateCustomerPaymentDto {
   @IsOptional()
   @IsUUID()
   requestId?: string;
+}
+
+export class SetCustomerPinDto {
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "El PIN debe tener 6 dígitos." })
+  pin!: string;
 }
 
 export class PatchCustomerDto {
