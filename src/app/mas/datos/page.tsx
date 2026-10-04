@@ -52,14 +52,15 @@ export default function DatosPage() {
       </header>
 
       <Card>
-        <p className="font-semibold">El negocio vive en el servidor</p>
+        <p className="font-semibold">El negocio vive en el servidor y en este teléfono</p>
         <p className="mt-2 text-sm text-ink-muted">
-          Ventas, fiados, caja e inventario se guardan en tu cuenta. Este
-          teléfono solo guarda la sesión para no pedirte la clave a cada rato.
+          Ventas, fiados, caja e inventario que ya se enviaron quedan en tu cuenta.
+          Este teléfono también guarda una copia para trabajar sin conexión y las
+          operaciones que todavía no se han enviado.
         </p>
         <p className="mt-2 text-sm text-ink-muted">
-          Si sales de la cuenta, los datos del negocio no se borran. Vuelves a
-          entrar con el mismo correo.
+          Si sales de la cuenta, lo que ya está en el servidor no se borra. Cerrar
+          sesión tampoco borra esa copia local.
         </p>
       </Card>
 

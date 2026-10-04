@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSync } from "@/store/syncStore";
 import { SyncOperationList, useSyncItems } from "@/components/shell/sync-items";
 import { SyncStatusSummary } from "@/components/shell/SyncStatusSummary";
+import { StorageProtectionCard } from "@/components/shell/StorageProtectionCard";
 import { DISCARD_NOTICE } from "@/data/pwa/sync-copy";
 import { Button } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
@@ -41,6 +42,8 @@ export default function SincronizacionPage() {
         authRequired={authRequired}
         lastDoneAt={lastDoneAt}
       />
+
+      <StorageProtectionCard />
 
       {online && authRequired && (
         <a
