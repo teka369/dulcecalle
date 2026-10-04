@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { NOT_A_BACKUP } from "@/data/pwa/sync-copy";
 import { Button } from "@/components/ui/Button";
 
 export default function OfflinePage() {
@@ -8,10 +9,14 @@ export default function OfflinePage() {
   return (
     <div className="flex flex-col gap-3 py-8">
       <h1 className="text-[22px] font-semibold tracking-tight">Sin conexión</h1>
-      <p className="text-base text-ink-muted">
-        No hay red. Tus datos locales siguen en el dispositivo; vuelve a intentar
-        cuando tengas internet.
+      <p className="text-base leading-snug text-ink-muted">
+        Puedes seguir trabajando. Lo que guardes queda en este teléfono y se
+        enviará cuando vuelva la conexión.
       </p>
+      <p className="text-base leading-snug">
+        No se ha perdido. Tampoco está todavía en el servidor.
+      </p>
+      <p className="text-sm leading-snug text-ink-muted">{NOT_A_BACKUP}</p>
       <Button
         type="button"
         variant="primary"

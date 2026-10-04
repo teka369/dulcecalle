@@ -9,6 +9,7 @@ import {
 import { newEntityId } from "@/data/local/ids";
 import { newRequestId } from "@/domain/requestId";
 import {
+  activityLabel,
   describeOutboxOperation,
   describeTrayStatus,
   discardOutboxOperation,
@@ -94,8 +95,14 @@ describe("M6.9 sync tray helpers", () => {
 
   it("describes operations and statuses for the UI", async () => {
     expect(describeOutboxOperation("sale", "create")).toBe("Venta");
+    expect(describeOutboxOperation("product", "create")).toBe("Producto nuevo");
+    expect(describeOutboxOperation("initialDebt", "create")).toBe("Deuda inicial");
+    expect(describeOutboxOperation("saleReturn", "return")).toBe("Devolución");
     expect(describeOutboxOperation("customerPayment", "pay")).toBe("Abono de cliente");
     expect(describeOutboxOperation("supplier", "create")).toBe("Proveedor nuevo");
+    expect(activityLabel("sale", "create")).toBe("Venta");
+    expect(activityLabel(undefined, "create")).toBe("Operación");
+    expect(activityLabel("sale", "create")).not.toBe("sale");
     expect(describeTrayStatus("failed")).toBe("Error");
     expect(describeTrayStatus("pending")).toBe("Pendiente");
     expect(describeTrayStatus("in_flight")).toBe("Sincronizando");

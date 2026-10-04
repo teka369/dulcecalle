@@ -2,12 +2,14 @@
 
 import { useSync } from "@/store/syncStore";
 import { usePrep } from "@/store/prepStore";
+import { activityLabel } from "@/data/pwa/sync-tray";
 import {
   SyncOperationList,
   formatDateTime,
   timeAgo,
   useSyncItems,
 } from "./sync-items";
+import { SyncStatusSummary } from "./SyncStatusSummary";
 
 export function SyncCenter() {
   const {
@@ -15,7 +17,6 @@ export function SyncCenter() {
     counts,
     flushing,
     lastDoneAt,
-    lastResult,
     recent,
     centerOpen,
     authRequired,
@@ -27,7 +28,6 @@ export function SyncCenter() {
 
   if (!centerOpen) return null;
 
-  const synced = lastResult?.synced ?? 0;
   const progress =
     flushing && flushing.total > 0
       ? Math.min(100, Math.round((flushing.completed / flushing.total) * 100))
@@ -37,64 +37,34 @@ export function SyncCenter() {
     <div
       role="dialog"
       aria-modal="false"
-      aria-label="Centro de sincronización"
+      aria-label="Datos y sincronización"
       className="fixed inset-x-0 bottom-0 z-[60] mx-auto max-h-[80dvh] w-full max-w-lg overflow-y-auto rounded-t-[var(--r-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-lg)]"
     >
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <h2 className="text-base font-semibold">Sincronización</h2>
-          {!online ? (
-            <p className="mt-1 text-sm leading-snug text-ink-muted">
-              Sin conexión. Las operaciones nuevas se guardarán en este
-              dispositivo y se sincronizarán automáticamente al volver
-              internet.
-            </p>
-          ) : authRequired ? (
-            <p className="mt-1 text-sm leading-snug text-ink-muted">
-              Inicia sesión para continuar la sincronización. Nada se perdió
-              en este dispositivo.
-            </p>
-          ) : (
-            <p className="mt-1 text-sm leading-snug text-ink-muted">
-              {counts.total === 0 && !flushing
-                ? "Todo está sincronizado."
-                : "Guardado local y sincronización con el servidor."}
-            </p>
-          )}
-        </div>
+        <h2 className="text-base font-semibold">Datos y sincronización</h2>
         <button
           type="button"
           onClick={closeCenter}
-          aria-label="Cerrar centro de sincronización"
+          aria-label="Cerrar datos y sincronización"
           className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[var(--r-md)] border border-border bg-bg text-lg"
         >
           ×
         </button>
       </div>
 
-      <div className="mt-4 rounded-[var(--r-lg)] border border-border bg-bg p-3 text-sm">
-        <p>✓ {synced} sincronizada{synced === 1 ? "" : "s"} (último ciclo)</p>
-        <p className="mt-1">
-          {flushing ? `↻ Sincronizando ${flushing.completed}/${flushing.total}` : `○ ${counts.pending + counts.active} pendiente${counts.pending + counts.active === 1 ? "" : "s"}`}
+      <SyncStatusSummary
+        online={online}
+        counts={counts}
+        flushing={flushing}
+        authRequired={authRequired}
+        lastDoneAt={lastDoneAt}
+      />
+
+      {prepPhase === "ready" && prepReadyAt && (
+        <p className="mt-2 text-xs text-ink-muted">
+          Listo para trabajar sin conexión desde {formatDateTime(prepReadyAt)}
         </p>
-        {!authRequired && (
-          <p className="mt-1">
-            {counts.permanent > 0
-              ? `! ${counts.permanent} necesita${counts.permanent === 1 ? "" : "n"} atención`
-              : "! 0 necesitan atención"}
-          </p>
-        )}
-        {lastDoneAt && (
-          <p className="mt-2 text-xs text-ink-muted">
-            Última sincronización: {formatDateTime(lastDoneAt)}
-          </p>
-        )}
-        {prepPhase === "ready" && prepReadyAt && (
-          <p className="mt-1 text-xs text-ink-muted">
-            ✓ Offline listo desde {formatDateTime(prepReadyAt)}
-          </p>
-        )}
-      </div>
+      )}
 
       {flushing && flushing.total > 0 && (
         <div className="mt-4">
@@ -118,7 +88,7 @@ export function SyncCenter() {
           href="/login"
           className="mt-4 flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
         >
-          Inicia sesión para sincronizar
+          Entra para enviar lo guardado aquí
         </a>
       )}
 
@@ -149,8 +119,7 @@ export function SyncCenter() {
                 className="flex items-center justify-between gap-2 rounded-[var(--r-lg)] border border-border bg-bg px-3 py-2 text-xs text-ink-muted"
               >
                 <span className="truncate">
-                  {r.status === "synced" ? "✓" : "!"} {r.entity ?? "Operación"}
-                  {r.operation ? ` · ${r.operation}` : ""}
+                  {r.status === "synced" ? "✓" : "!"} {activityLabel(r.entity, r.operation)}
                 </span>
                 <span className="shrink-0">{timeAgo(r.at)}</span>
               </li>
