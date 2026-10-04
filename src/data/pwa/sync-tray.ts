@@ -44,18 +44,23 @@ const OPERATION_NAMES: Record<string, string> = {
   "supplier:create": "Proveedor nuevo",
   "supplier:patch": "Edición de proveedor",
   "product:patch": "Edición de producto",
+  "product:create": "Producto nuevo",
   "product:archive": "Archivo de producto",
   "productImage:create": "Foto de producto",
   "productImage:patch": "Foto de producto",
   "productImage:remove": "Foto de producto",
   "preparation:create": "Preparación",
+  "initialDebt:create": "Deuda inicial",
+  "saleReturn:return": "Devolución",
 };
 
-export function describeOutboxOperation(
-  entity: OutboxItem["entity"],
-  operation: OutboxItem["operation"],
-): string {
+export function describeOutboxOperation(entity: string, operation: string): string {
   return OPERATION_NAMES[`${entity}:${operation}`] ?? "Operación";
+}
+
+export function activityLabel(entity?: string, operation?: string): string {
+  if (!entity) return "Operación";
+  return describeOutboxOperation(entity, operation ?? "");
 }
 
 export function describeTrayStatus(status: TrayItemStatus): string {
