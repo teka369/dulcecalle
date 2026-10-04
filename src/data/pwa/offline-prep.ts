@@ -26,7 +26,7 @@ import {
   statsSnapshotKind,
 } from "./offline-snapshots";
 
-export const PREP_VERSION = 7;
+export const PREP_VERSION = 8;
 export const PREP_DOCUMENT_CACHE = "documents";
 
 export type PrepTaskGroup = "app" | "catalogos" | "resumen" | "sistema";
@@ -194,98 +194,14 @@ export function requiredSnapshotKinds(): string[] {
 }
 
 /**
- * Dynamic documents for entities that actually exist in Dexie. Only
- * detail/action pages whose flows work offline are included.
- * /mas/datos stays out.
+ * Dynamic entity documents are not part of preparation. Fichas open from
+ * the already-loaded shell and IndexedDB. A cold load of /inventario/[id]
+ * (and the other entity URLs) stays on the service worker /offline fallback.
  */
-export async function dynamicDocumentTasks(businessId: string): Promise<PrepTaskDef[]> {
-  const db = getLocalDb();
-  const tasks: PrepTaskDef[] = [];
-  const customers = await db.customers.where("businessId").equals(businessId).toArray();
-  for (const c of customers) {
-    tasks.push({
-      key: `doc:/clientes/${c.id}`,
-      group: "app" as const,
-      label: `Documento cliente ${c.name}`,
-      run: () => warmDocument(`/clientes/${c.id}`),
-    });
-    tasks.push({
-      key: `doc:/clientes/${c.id}/abono`,
-      group: "app" as const,
-      label: `Documento abono ${c.name}`,
-      run: () => warmDocument(`/clientes/${c.id}/abono`),
-    });
-    tasks.push({
-      key: `doc:/clientes/${c.id}/deuda-inicial`,
-      group: "app" as const,
-      label: `Documento deuda inicial ${c.name}`,
-      run: () => warmDocument(`/clientes/${c.id}/deuda-inicial`),
-    });
-  }
-  const suppliers = await db.suppliers.where("businessId").equals(businessId).toArray();
-  for (const s of suppliers) {
-    tasks.push({
-      key: `doc:/inventario/proveedores/${s.id}`,
-      group: "app" as const,
-      label: `Documento proveedor ${s.name}`,
-      run: () => warmDocument(`/inventario/proveedores/${s.id}`),
-    });
-  }
-  const products = await db.products.where("businessId").equals(businessId).toArray();
-  for (const p of products) {
-    tasks.push({
-      key: `doc:/inventario/${p.id}`,
-      group: "app" as const,
-      label: `Documento producto ${p.name}`,
-      run: () => warmDocument(`/inventario/${p.id}`),
-    });
-    tasks.push({
-      key: `doc:/inventario/${p.id}/surtir`,
-      group: "app" as const,
-      label: `Documento surtir ${p.name}`,
-      run: () => warmDocument(`/inventario/${p.id}/surtir`),
-    });
-    tasks.push({
-      key: `doc:/inventario/${p.id}/preparar`,
-      group: "app" as const,
-      label: `Documento preparar ${p.name}`,
-      run: () => warmDocument(`/inventario/${p.id}/preparar`),
-    });
-    tasks.push({
-      key: `doc:/inventario/${p.id}/me-lo-comi`,
-      group: "app" as const,
-      label: `Documento merma ${p.name}`,
-      run: () => warmDocument(`/inventario/${p.id}/me-lo-comi`),
-    });
-    tasks.push({
-      key: `doc:/inventario/${p.id}/regalo`,
-      group: "app" as const,
-      label: `Documento regalo ${p.name}`,
-      run: () => warmDocument(`/inventario/${p.id}/regalo`),
-    });
-    tasks.push({
-      key: `doc:/inventario/${p.id}/perdido`,
-      group: "app" as const,
-      label: `Documento perdido ${p.name}`,
-      run: () => warmDocument(`/inventario/${p.id}/perdido`),
-    });
-  }
-  const sales = await db.sales.where("businessId").equals(businessId).toArray();
-  for (const s of sales) {
-    tasks.push({
-      key: `doc:/ventas/${s.id}`,
-      group: "app" as const,
-      label: `Documento venta ${s.id.slice(0, 8)}`,
-      run: () => warmDocument(`/ventas/${s.id}`),
-    });
-    tasks.push({
-      key: `doc:/ventas/${s.id}/devolver`,
-      group: "app" as const,
-      label: `Documento devolver ${s.id.slice(0, 8)}`,
-      run: () => warmDocument(`/ventas/${s.id}/devolver`),
-    });
-  }
-  return tasks;
+export function requiredStaticDocuments(): string[] {
+  return prepTaskDefs()
+    .filter((task) => task.key.startsWith("doc:"))
+    .map((task) => task.key.slice(4));
 }
 
 export type ReadinessStatus = "ready" | "not_ready" | "stale" | "failed";
@@ -311,6 +227,7 @@ export async function checkReadiness(
       return { status: "stale", row };
     }
   }
+  if (!(await staticDocumentsPresent())) return { status: "stale", row };
   return { status: "ready", row };
 }
 
@@ -322,6 +239,17 @@ export type PrepProgress = {
   completed: number;
   total: number;
 };
+
+async function staticDocumentsPresent(): Promise<boolean> {
+  if (typeof window === "undefined") return true;
+  const scope = window as unknown as { caches?: CacheStorage };
+  if (!scope.caches) return false;
+  const cache = await scope.caches.open(PREP_DOCUMENT_CACHE);
+  for (const path of requiredStaticDocuments()) {
+    if (!(await cache.match(path))) return false;
+  }
+  return true;
+}
 
 function swControlling(): boolean {
   if (typeof window === "undefined") return false;
@@ -367,15 +295,14 @@ async function verifyPreparation(businessId: string, warmedPaths: string[]): Pro
 }
 
 /**
- * Full ordered task list for one run: sistema check, static documents,
- * dynamic entity documents, catalogs, storage check, final verification.
- * Shared by the runner and the UI so progress always covers every task.
+ * Full ordered task list for one run: service worker, static screens,
+ * catalogs, summaries, thumbnails, storage, verification.
+ * Entity fichas are not documents. Shared by the runner and the UI.
  */
 export async function buildPrepTaskDefs(
   businessId: string,
   details: Map<string, string> = new Map(),
 ): Promise<{ defs: PrepTaskDef[]; details: Map<string, string> }> {
-  const dynamicDocs = await dynamicDocumentTasks(businessId);
   const wrap = (key: string, run: () => Promise<string | void>) => async () => {
     const detail = await run();
     if (typeof detail === "string") details.set(key, detail);
@@ -383,7 +310,6 @@ export async function buildPrepTaskDefs(
   const defs: PrepTaskDef[] = [
     { key: "sys:sw", group: "sistema", label: "Service Worker", run: wrap("sys:sw", checkServiceWorker) },
     ...prepTaskDefs(),
-    ...dynamicDocs,
     { key: "media:thumbs", group: "resumen", label: "Miniaturas de productos", run: wrap("media:thumbs", () => warmPrimaryThumbs(businessId)) },
     { key: "sys:storage", group: "sistema", label: "Almacenamiento", run: wrap("sys:storage", checkStorage) },
     {
@@ -391,9 +317,7 @@ export async function buildPrepTaskDefs(
       group: "sistema",
       label: "Verificación",
       run: async () => {
-        const warmed = defs
-          .filter((d) => d.key.startsWith("doc:"))
-          .map((d) => d.key.slice(4));
+        const warmed = requiredStaticDocuments();
         details.set("sys:verify", await verifyPreparation(businessId, warmed));
       },
     },

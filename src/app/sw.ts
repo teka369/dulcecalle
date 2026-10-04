@@ -49,8 +49,9 @@ const runtimeCaching = [
   },
   {
     // Offline document navigation: NetworkFirst into "documents" so an
-    // offline reload boots where the user was. Denylist matches the old
-    // NavigationRoute. Must register before ...defaultCache ("others").
+    // offline reload boots a prepared static screen. Entity fichas are not
+    // cached here; a cold load of /inventario/[id] (and the other entity
+    // URLs) falls through to /offline. Must register before ...defaultCache.
     matcher: ({ request, url }: { request: Request; url: URL }) => {
       if (request.mode !== "navigate") return false;
       const p = url.pathname;

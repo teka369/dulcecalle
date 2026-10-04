@@ -210,35 +210,29 @@ await runPreparation(BIZ);
     expect(rows.map((r) => r.id)).toContain("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
   });
 
-  it("generates dynamic documents only for existing Dexie entities", async () => {
-    const { dynamicDocumentTasks } = await import("./offline-prep");
-    expect(await dynamicDocumentTasks(BIZ)).toEqual([]);
+  it("does not require entity documents even when Dexie already has rows", async () => {
     const now = Date.now();
+    const product = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
     await getLocalDb().customers.put({
       id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       businessId: BIZ, code: null, name: "Rosa", phone: null, debt: 0,
       archivedAt: null, createdAt: now, updatedAt: now,
     });
     await getLocalDb().products.put({
-      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      id: product,
       businessId: BIZ, name: "Gomitas", category: "General", price: 500,
       avgCost: 100, stock: 5, lowStockAt: 5, archivedAt: null,
       createdAt: now, updatedAt: now, images: [],
     });
-    const tasks = await dynamicDocumentTasks(BIZ);
-    const keys = tasks.map((t) => t.key);
-    const product = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-    expect(keys).toContain("doc:/clientes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-    expect(keys).toContain("doc:/clientes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/abono");
-    expect(keys).toContain(`doc:/inventario/${product}`);
-    expect(keys).toContain(`doc:/inventario/${product}/surtir`);
-    expect(keys).toContain(`doc:/inventario/${product}/preparar`);
-    expect(keys).toContain(`doc:/inventario/${product}/me-lo-comi`);
-    expect(keys).toContain(`doc:/inventario/${product}/regalo`);
-    expect(keys).toContain(`doc:/inventario/${product}/perdido`);
-    expect(keys).toContain("doc:/clientes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/deuda-inicial");
-    expect(keys.some((k) => k.includes("/mas/datos"))).toBe(false);
-    expect(keys.some((k) => k.includes("22222222"))).toBe(false);
+    const row = await runPreparation(BIZ);
+    expect(row.status).toBe("ready");
+    const keys = row.tasks.map((task) => task.key);
+    expect(keys.some((key) => key.includes("/clientes/aaaaaaaa"))).toBe(false);
+    expect(keys.some((key) => key.includes(`/inventario/${product}`))).toBe(false);
+    expect(keys.some((key) => key.includes("deuda-inicial"))).toBe(false);
+    expect(keys.some((key) => key.includes("/mas/datos"))).toBe(false);
+    expect(await getLocalDb().cacheMeta.get(`${BIZ}::products`)).toBeTruthy();
+    expect((await checkReadiness(BIZ)).status).toBe("ready");
   });
 
   it("fails document tasks clearly when the SW does not control the page", async () => {
@@ -312,7 +306,7 @@ await runPreparation(BIZ);
     expect(keys).toContain("snapshot:dashboard");
   });
 
-  it("verifies the documents that preparation declared, including returns", async () => {
+  it("verifies static documents only and ignores entity HTML", async () => {
     const saleId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
     const now = Date.now();
     await getLocalDb().sales.put({
@@ -351,8 +345,10 @@ await runPreparation(BIZ);
     const declared = row.tasks
       .filter((task) => task.key.startsWith("doc:"))
       .map((task) => task.key.slice(4));
-    expect(declared).toContain(`/ventas/${saleId}/devolver`);
-    expect(declared).toContain("/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/perdido");
+    expect(declared).not.toContain(`/ventas/${saleId}/devolver`);
+    expect(declared).not.toContain("/inventario/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/perdido");
+    expect(declared).toContain("/inventario");
+    expect(declared).toContain("/ventas/nueva");
     expect(declared.some((path) => path.includes("deuda-inicial"))).toBe(false);
     expect(declared).not.toContain("/mas/datos");
     for (const path of declared) {
@@ -361,6 +357,20 @@ await runPreparation(BIZ);
     const verify = row.tasks.find((task) => task.key === "sys:verify");
     expect(verify?.status).toBe("done");
     expect(verify?.detail).toBe(`${declared.length} documentos verificados`);
+  });
+
+  it("is not ready when a required static document is missing", async () => {
+    const stored = installCacheStubs();
+    await runPreparation(BIZ);
+    expect((await checkReadiness(BIZ)).status).toBe("ready");
+    stored.delete("/inventario");
+    expect((await checkReadiness(BIZ)).status).toBe("stale");
+  });
+
+  it("is not ready when catalog meta is missing", async () => {
+    await runPreparation(BIZ);
+    await getLocalDb().cacheMeta.delete(`${BIZ}::customers`);
+    expect((await checkReadiness(BIZ)).status).toBe("stale");
   });
 
   it("offline mid-run fails honestly instead of claiming ready", async () => {
