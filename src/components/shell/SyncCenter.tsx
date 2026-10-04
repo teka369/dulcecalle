@@ -10,6 +10,7 @@ import {
   useSyncItems,
 } from "./sync-items";
 import { SyncStatusSummary } from "./SyncStatusSummary";
+import { StorageProtectionCard } from "./StorageProtectionCard";
 
 export function SyncCenter() {
   const {
@@ -59,6 +60,10 @@ export function SyncCenter() {
         authRequired={authRequired}
         lastDoneAt={lastDoneAt}
       />
+
+      <div className="mt-4">
+        <StorageProtectionCard />
+      </div>
 
       {prepPhase === "ready" && prepReadyAt && (
         <p className="mt-2 text-xs text-ink-muted">

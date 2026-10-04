@@ -62,6 +62,15 @@ export default function DatosPage() {
           Si sales de la cuenta, lo que ya está en el servidor no se borra. Cerrar
           sesión tampoco borra esa copia local.
         </p>
+        <Link
+          href="/sincronizacion"
+          className="mt-4 flex min-h-11 items-center justify-between text-sm font-semibold"
+        >
+          <span>Ver almacenamiento de este teléfono</span>
+          <span className="text-ink/40" aria-hidden>
+            →
+          </span>
+        </Link>
       </Card>
 
       <Card>
