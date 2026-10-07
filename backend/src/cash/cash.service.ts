@@ -13,8 +13,8 @@ import type { CreatePaymentDto } from "../sales/sales.dto";
 import type { CashOwnerMoveDto, CreateExpenseDto } from "./cash.dto";
 
 
-function isOneOpenConstraint(error: Prisma.PrismaClientKnownRequestError): boolean {
-  const blob = JSON.stringify(error.meta ?? {}) + " " + error.message;
+export function isOneOpenConstraint(error: { message?: string; meta?: unknown }): boolean {
+  const blob = `${error.message ?? ""} ${JSON.stringify(error.meta ?? {})}`;
   return blob.includes("cash_sessions_one_open_per_business");
 }
 
@@ -176,21 +176,6 @@ export class CashService {
           });
           if (again) return sessionJson(again);
           if (isOneOpenConstraint(e)) {
-            throw new AppError(ERROR_CODES.PENDING_SESSION, MESSAGES.pendingSession);
-          }
-          const openNow = await tx.cashSession.findFirst({
-            where: { businessId: ctx.businessId, closedAt: null },
-          });
-          if (openNow) {
-            throw new AppError(ERROR_CODES.PENDING_SESSION, MESSAGES.pendingSession);
-          }
-          const todayAgain = await tx.cashSession.findUnique({
-            where: { businessId_localDate: { businessId: ctx.businessId, localDate } },
-          });
-          if (todayAgain?.closedAt) {
-            throw new AppError(ERROR_CODES.SESSION_ALREADY_CLOSED, MESSAGES.sessionAlreadyClosed);
-          }
-          if (todayAgain) {
             throw new AppError(ERROR_CODES.PENDING_SESSION, MESSAGES.pendingSession);
           }
           throw e;
