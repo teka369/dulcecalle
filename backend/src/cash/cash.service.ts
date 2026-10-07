@@ -132,49 +132,48 @@ export class CashService {
       throw new AppError(ERROR_CODES.VALIDATION, "El monto no puede ser negativo.");
     }
     const localDate = occurredOnDate(ctx.timezone);
-    const existingByRequest = await this.prisma.cashSession.findUnique({
-      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
-    });
-    if (existingByRequest) return sessionJson(existingByRequest);
-    const existing = await this.prisma.cashSession.findUnique({
-      where: { businessId_localDate: { businessId: ctx.businessId, localDate } },
-    });
-    if (existing?.closedAt) {
-      throw new AppError(ERROR_CODES.SESSION_ALREADY_CLOSED, MESSAGES.sessionAlreadyClosed);
-    }
-    if (existing) {
-      return sessionJson(existing);
-    }
-    const otherOpen = await this.prisma.cashSession.findFirst({
-      where: { businessId: ctx.businessId, closedAt: null },
-    });
-    if (otherOpen) {
-      throw new AppError(ERROR_CODES.PENDING_SESSION, MESSAGES.pendingSession);
-    }
-    try {
-      const created = await this.prisma.cashSession.create({
-        data: {
-          id: randomUUID(),
-          businessId: ctx.businessId,
-          localDate,
-          openedAt: new Date(),
-          closedAt: null,
-          openingFloat: float,
-          requestId,
-        },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
+      const existingByRequest = await tx.cashSession.findUnique({
+        where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
       });
-      return sessionJson(created);
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        const again = await this.prisma.cashSession.findUnique({
-          where: {
-            businessId_localDate: { businessId: ctx.businessId, localDate },
+      if (existingByRequest) return sessionJson(existingByRequest);
+      const alreadyOpen = await tx.cashSession.findFirst({
+        where: { businessId: ctx.businessId, closedAt: null },
+      });
+      if (alreadyOpen) {
+        throw new AppError(ERROR_CODES.PENDING_SESSION, MESSAGES.pendingSession);
+      }
+      const today = await tx.cashSession.findUnique({
+        where: { businessId_localDate: { businessId: ctx.businessId, localDate } },
+      });
+      if (today?.closedAt) {
+        throw new AppError(ERROR_CODES.SESSION_ALREADY_CLOSED, MESSAGES.sessionAlreadyClosed);
+      }
+      try {
+        const created = await tx.cashSession.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            localDate,
+            openedAt: new Date(),
+            closedAt: null,
+            openingFloat: float,
+            requestId,
           },
         });
-        if (again) return sessionJson(again);
+        return sessionJson(created);
+      } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+          const again = await tx.cashSession.findUnique({
+            where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+          });
+          if (again) return sessionJson(again);
+          throw new AppError(ERROR_CODES.PENDING_SESSION, MESSAGES.pendingSession);
+        }
+        throw e;
       }
-      throw e;
-    }
+    });
   }
 
   async close(ctx: BusinessContext, sessionId: string, countedEfectivo: number, requestId: string = randomUUID()) {
