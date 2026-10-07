@@ -1,8 +1,8 @@
-# Migración diferida — no forma parte de este release
+# Referencia
 
-`cash_one_open_guard.sql` crea el índice único parcial de una sola caja abierta por negocio.
+El índice de una sola caja abierta ya no vive aquí.
 
-No está en `prisma/migrations`, así que `prisma migrate deploy` no la ejecuta.
+La migración que lo aplica es `backend/prisma/migrations/20261007160000_cash_one_open_guard`.
+`prisma migrate deploy` la ejecuta. Si un negocio todavía tiene dos cajas abiertas, aborta y no cierra ninguna.
 
-Aplicarla solo después de regularizar todas las cajas desde Gestionar cajas.
-Si todavía hay dos abiertas, el script aborta y no cierra ni borra nada.
+`cash_one_open_guard.sql` queda como copia de referencia.

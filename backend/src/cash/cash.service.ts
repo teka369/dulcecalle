@@ -12,6 +12,12 @@ import type { BusinessContext } from "../identity/auth.types";
 import type { CreatePaymentDto } from "../sales/sales.dto";
 import type { CashOwnerMoveDto, CreateExpenseDto } from "./cash.dto";
 
+
+export function isOneOpenConstraint(error: { message?: string; meta?: unknown }): boolean {
+  const blob = `${error.message ?? ""} ${JSON.stringify(error.meta ?? {})}`;
+  return blob.includes("cash_sessions_one_open_per_business");
+}
+
 function sessionJson(s: {
   id: string;
   localDate: Date;
@@ -169,7 +175,10 @@ export class CashService {
             where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
           });
           if (again) return sessionJson(again);
-          throw new AppError(ERROR_CODES.PENDING_SESSION, MESSAGES.pendingSession);
+          if (isOneOpenConstraint(e)) {
+            throw new AppError(ERROR_CODES.PENDING_SESSION, MESSAGES.pendingSession);
+          }
+          throw e;
         }
         throw e;
       }
