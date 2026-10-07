@@ -5,6 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import { addCop, asCop, copToJson, mulCop } from "../shared/money";
 import { occurredOnDate, dateKey } from "../shared/clock";
+import { linkForNewMove } from "../cash/session-link";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import { assertPaymentMath, resolveUnitPrice } from "../shared/sale-math";
 import { splitReturnSettlement } from "../shared/returns";
@@ -269,13 +270,11 @@ export class SalesService {
         }
 
         if (amountReceived > 0n && method) {
-          const open = await tx.cashSession.findFirst({
-            where: {
-              businessId: ctx.businessId,
-              localDate: occurredOn,
-              closedAt: null,
-            },
+          const opens = await tx.cashSession.findMany({
+            where: { businessId: ctx.businessId, closedAt: null },
           });
+          const link = linkForNewMove(opens, occurredOn);
+          const open = opens.find((row) => row.id === link.sessionId) ?? null;
           await tx.cashMove.create({
             data: {
               id: randomUUID(),
@@ -284,7 +283,8 @@ export class SalesService {
               direction: "in",
               method,
               kind: "sale",
-              sessionId: open?.id ?? null,
+              sessionId: link.sessionId,
+              pendingForSessionId: link.pendingForSessionId,
               refType: "sale",
               refId: saleId,
               occurredOn,
@@ -520,13 +520,11 @@ export class SalesService {
         }
 
         if (refundAmount > 0n && method) {
-          const open = await tx.cashSession.findFirst({
-            where: {
-              businessId: ctx.businessId,
-              localDate: occurredOn,
-              closedAt: null,
-            },
+          const opens = await tx.cashSession.findMany({
+            where: { businessId: ctx.businessId, closedAt: null },
           });
+          const link = linkForNewMove(opens, occurredOn);
+          const open = opens.find((row) => row.id === link.sessionId) ?? null;
           await tx.cashMove.create({
             data: {
               id: randomUUID(),
@@ -535,7 +533,8 @@ export class SalesService {
               direction: "out",
               method,
               kind: "devolucion",
-              sessionId: open?.id ?? null,
+              sessionId: link.sessionId,
+              pendingForSessionId: link.pendingForSessionId,
               refType: "saleReturn",
               refId: returnId,
               occurredOn,

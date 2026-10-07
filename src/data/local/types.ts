@@ -115,6 +115,8 @@ export type OutboxOperation =
   | "shrink"
   | "open"
   | "close"
+  | "carry"
+  | "assign"
   | "pay"
   | "remove"
   | "return";
@@ -305,6 +307,8 @@ export type LocalCashSession = {
   expectedEfectivo: number | null;
   expectedNequi: number | null;
   difference: number | null;
+  closeMode?: string | null;
+  carriedEfectivo?: number;
   note: string | null;
   createdAt: number;
   updatedAt: number;
@@ -319,6 +323,7 @@ export type LocalCashMove = {
   method: "Efectivo" | "Nequi";
   kind: string;
   sessionId: string | null;
+  pendingForSessionId?: string | null;
   refType: string | null;
   refId: string | null;
   requestId: string | null;

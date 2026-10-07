@@ -672,6 +672,34 @@ export class HttpRepository {
       return mapToday(row);
     },
 
+    listSessions: async (status?: "open" | "closed") => {
+      const suffix = status ? `?status=${status}` : "";
+      return this.http.request<Record<string, unknown>[]>("GET", `/cash/sessions${suffix}`);
+    },
+    session: async (id: string) => {
+      return this.http.request<Record<string, unknown>>("GET", `/cash/sessions/${id}`);
+    },
+    unassigned: async () => {
+      return this.http.request<Record<string, unknown>[]>("GET", "/cash/unassigned-moves");
+    },
+    carry: async (
+      sessionId: string,
+      input: { mode: "counted" | "assumed"; countedEfectivo?: number },
+      requestId: string = crypto.randomUUID(),
+    ) => {
+      return this.http.request<Record<string, unknown>>(
+        "POST",
+        `/cash/sessions/${sessionId}/carry`,
+        { body: input, idempotencyKey: requestId },
+      );
+    },
+    assignMove: async (moveId: string, sessionId: string, requestId: string = crypto.randomUUID()) => {
+      return this.http.request<Record<string, unknown>>(
+        "POST",
+        `/cash/moves/${moveId}/assign`,
+        { body: { sessionId }, idempotencyKey: requestId },
+      );
+    },
     close: async (
       sessionId: string,
       countedEfectivo: number,

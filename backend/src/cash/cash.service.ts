@@ -5,6 +5,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import { addCop, asCop, copToJson, subCop } from "../shared/money";
 import { dateKey, occurredOnDate } from "../shared/clock";
+import { linkForNewMove } from "./session-link";
+import { sessionExpected } from "./carry-rules";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
 import type { CreatePaymentDto } from "../sales/sales.dto";
@@ -96,17 +98,32 @@ export class CashService {
     const session = await db.cashSession.findUnique({
       where: { businessId_localDate: { businessId, localDate } },
     });
-    let efectivo = session ? asCop(session.openingFloat) : 0n;
-    let nequi = 0n;
+    if (!session) return { efectivo: 0n, nequi: 0n, total: 0n };
+    return this.expectedForSession(session, db);
+  }
+
+  async expectedForSession(
+    session: { id: string; businessId: string; openingFloat: bigint; carriedEfectivo?: bigint },
+    db: {
+      cashMove: PrismaService["cashMove"];
+    } = this.prisma,
+  ) {
     const moves = await db.cashMove.findMany({
-      where: { businessId, occurredOn: localDate },
+      where: {
+        businessId: session.businessId,
+        OR: [
+          { sessionId: session.id },
+          { sessionId: null, pendingForSessionId: session.id },
+        ],
+      },
     });
-    for (const m of moves) {
-      const delta = m.direction === "in" ? m.amount : -m.amount;
-      if (m.method === "Efectivo") efectivo = addCop(efectivo, delta);
-      else if (m.method === "Nequi") nequi = addCop(nequi, delta);
-    }
-    return { efectivo, nequi, total: addCop(efectivo, nequi) };
+    const expected = sessionExpected({
+      sessionId: session.id,
+      openingFloat: asCop(session.openingFloat),
+      carriedEfectivo: asCop(session.carriedEfectivo ?? 0n),
+      moves,
+    });
+    return { ...expected, total: addCop(expected.efectivo, expected.nequi) };
   }
 
   async open(ctx: BusinessContext, openingFloat: number, requestId: string = randomUUID()) {
@@ -115,45 +132,53 @@ export class CashService {
       throw new AppError(ERROR_CODES.VALIDATION, "El monto no puede ser negativo.");
     }
     const localDate = occurredOnDate(ctx.timezone);
-    const existingByRequest = await this.prisma.cashSession.findUnique({
-      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
-    });
-    if (existingByRequest) return sessionJson(existingByRequest);
-    const existing = await this.prisma.cashSession.findUnique({
-      where: { businessId_localDate: { businessId: ctx.businessId, localDate } },
-    });
-    if (existing) {
-      return sessionJson(existing);
-    }
-    try {
-      const created = await this.prisma.cashSession.create({
-        data: {
-          id: randomUUID(),
-          businessId: ctx.businessId,
-          localDate,
-          openedAt: new Date(),
-          closedAt: null,
-          openingFloat: float,
-          requestId,
-        },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
+      const existingByRequest = await tx.cashSession.findUnique({
+        where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
       });
-      return sessionJson(created);
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        const again = await this.prisma.cashSession.findUnique({
-          where: {
-            businessId_localDate: { businessId: ctx.businessId, localDate },
+      if (existingByRequest) return sessionJson(existingByRequest);
+      const alreadyOpen = await tx.cashSession.findFirst({
+        where: { businessId: ctx.businessId, closedAt: null },
+      });
+      if (alreadyOpen) {
+        throw new AppError(ERROR_CODES.PENDING_SESSION, MESSAGES.pendingSession);
+      }
+      const today = await tx.cashSession.findUnique({
+        where: { businessId_localDate: { businessId: ctx.businessId, localDate } },
+      });
+      if (today?.closedAt) {
+        throw new AppError(ERROR_CODES.SESSION_ALREADY_CLOSED, MESSAGES.sessionAlreadyClosed);
+      }
+      try {
+        const created = await tx.cashSession.create({
+          data: {
+            id: randomUUID(),
+            businessId: ctx.businessId,
+            localDate,
+            openedAt: new Date(),
+            closedAt: null,
+            openingFloat: float,
+            requestId,
           },
         });
-        if (again) return sessionJson(again);
+        return sessionJson(created);
+      } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+          const again = await tx.cashSession.findUnique({
+            where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+          });
+          if (again) return sessionJson(again);
+          throw new AppError(ERROR_CODES.PENDING_SESSION, MESSAGES.pendingSession);
+        }
+        throw e;
       }
-      throw e;
-    }
+    });
   }
 
   async close(ctx: BusinessContext, sessionId: string, countedEfectivo: number, requestId: string = randomUUID()) {
     const existingByRequest = await this.prisma.cashSession.findUnique({
-      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+      where: { businessId_closeRequestId: { businessId: ctx.businessId, closeRequestId: requestId } },
     });
     if (existingByRequest) return sessionJson(existingByRequest);
 
@@ -173,6 +198,16 @@ export class CashService {
           MESSAGES.sessionAlreadyClosed,
         );
       }
+      const stamped = await tx.cashMove.count({
+        where: {
+          businessId: ctx.businessId,
+          sessionId: null,
+          pendingForSessionId: session.id,
+        },
+      });
+      if (stamped > 0) {
+        throw new AppError(ERROR_CODES.CARRY_REQUIRED, MESSAGES.carryRequired);
+      }
       const expected = await this.expectedBuckets(
         ctx.businessId,
         session.localDate,
@@ -183,11 +218,12 @@ export class CashService {
         where: { id: sessionId },
         data: {
           closedAt: new Date(),
+          closeMode: "counted",
           closingCount: counted,
           expectedEfectivo: expected.efectivo,
           expectedNequi: expected.nequi,
           difference,
-          requestId,
+          closeRequestId: requestId,
         },
       });
       return sessionJson(updated);
@@ -204,6 +240,14 @@ export class CashService {
       where: { businessId: ctx.businessId, occurredOn: localDate },
       orderBy: { createdAt: "asc" },
     });
+    const opens = await this.prisma.cashSession.findMany({
+      where: { businessId: ctx.businessId, closedAt: null },
+      orderBy: { localDate: "asc" },
+    });
+    const pending = opens.filter((row) => dateKey(row.localDate) < dateKey(localDate) || opens.length > 1);
+    const needsReviewCount = await this.prisma.cashMove.count({
+      where: { businessId: ctx.businessId, sessionId: null, pendingForSessionId: null },
+    });
     return {
       localDate: dateKey(localDate),
       session: session ? sessionJson(session) : null,
@@ -213,6 +257,18 @@ export class CashService {
         total: copToJson(expected.total),
       },
       closed: session?.closedAt != null,
+      pendingCount: pending.length,
+      pendingSessions: pending.map((row) => ({
+        id: row.id,
+        localDate: dateKey(row.localDate),
+        openedAt: row.openedAt,
+        openingFloat: copToJson(row.openingFloat),
+      })),
+      needsReviewCount,
+      conflict: false,
+      canOpen: opens.length === 0 && session?.closedAt == null,
+      canCountClose: pending.length === 1 && pending[0] != null,
+      carryMode: needsReviewCount > 0 ? "assumed" : "counted",
       moves: moves.map((m) => ({
         id: m.id,
         amount: copToJson(m.amount),
@@ -332,14 +388,11 @@ export class CashService {
             MESSAGES.abonoExceeds,
           );
         }
-        const open = await tx.cashSession.findFirst({
-          where: {
-            businessId: ctx.businessId,
-            localDate: occurredOn,
-            closedAt: null,
-          },
+        const opens = await tx.cashSession.findMany({
+          where: { businessId: ctx.businessId, closedAt: null },
         });
-        await tx.cashMove.create({
+        const link = linkForNewMove(opens, occurredOn);
+                await tx.cashMove.create({
           data: {
             id: randomUUID(),
             businessId: ctx.businessId,
@@ -347,7 +400,8 @@ export class CashService {
             direction: "in",
             method: dto.method,
             kind: "debt_collect",
-            sessionId: open?.id ?? null,
+            sessionId: link.sessionId,
+            pendingForSessionId: link.pendingForSessionId,
             refType: "payment",
             refId: id,
             requestId,
@@ -448,14 +502,11 @@ export class CashService {
             createdAt: now,
           },
         });
-        const open = await tx.cashSession.findFirst({
-          where: {
-            businessId: ctx.businessId,
-            localDate: occurredOn,
-            closedAt: null,
-          },
+        const opens = await tx.cashSession.findMany({
+          where: { businessId: ctx.businessId, closedAt: null },
         });
-        // requestId lives on expenses only. cash_moves.request_id is UUID and
+        const link = linkForNewMove(opens, occurredOn);
+                // requestId lives on expenses only. cash_moves.request_id is UUID and
         // reserved for aporte/retiro; Dexie `expense-${id}` is not a UUID.
         await tx.cashMove.create({
           data: {
@@ -465,7 +516,8 @@ export class CashService {
             direction: "out",
             method: dto.method,
             kind: "expense",
-            sessionId: open?.id ?? null,
+            sessionId: link.sessionId,
+            pendingForSessionId: link.pendingForSessionId,
             refType: "expense",
             refId: id,
             note: category,
@@ -516,14 +568,11 @@ export class CashService {
     try {
       const move = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
-        const open = await tx.cashSession.findFirst({
-          where: {
-            businessId: ctx.businessId,
-            localDate: occurredOn,
-            closedAt: null,
-          },
+        const opens = await tx.cashSession.findMany({
+          where: { businessId: ctx.businessId, closedAt: null },
         });
-        return tx.cashMove.create({
+        const link = linkForNewMove(opens, occurredOn);
+                return tx.cashMove.create({
           data: {
             id: randomUUID(),
             businessId: ctx.businessId,
@@ -531,7 +580,8 @@ export class CashService {
             direction,
             method: dto.method,
             kind,
-            sessionId: open?.id ?? null,
+            sessionId: link.sessionId,
+            pendingForSessionId: link.pendingForSessionId,
             note: dto.note,
             requestId,
             occurredOn,

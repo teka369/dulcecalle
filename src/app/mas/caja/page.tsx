@@ -74,6 +74,19 @@ export default function CajaPage() {
 
   return (
     <div className="flex flex-col gap-4 pb-28">
+      {summary.pendingCount > 0 && (
+        <Card className="flex flex-col gap-2">
+          <p className="text-sm font-semibold">
+            {summary.pendingCount === 1
+              ? "Tienes una caja pendiente de gestionar"
+              : `Tienes ${summary.pendingCount} cajas pendientes`}
+          </p>
+          <OfflineLink href="/mas/caja/gestionar" className="text-sm font-semibold">Gestionar cajas</OfflineLink>
+        </Card>
+      )}
+      {summary.needsReviewCount > 0 && (
+        <p className="text-sm text-ink-muted">Hay movimientos sin caja. Revísalos en Gestionar cajas.</p>
+      )}
       <header className="flex items-center gap-2">
         <Link
           href="/mas"

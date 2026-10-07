@@ -310,9 +310,10 @@ export async function loadDashboardResult(): Promise<{
   activity.sort((a, b) => b.at - a.at);
 
   let cajaState: DashboardSnapshot["cajaState"] = "none";
-  if (cash.session) {
-    cajaState = cash.closed ? "closed" : "open";
-  }
+  const pendingCount = cash.pendingCount ?? 0;
+  if (cash.conflict) cajaState = "conflict";
+  else if (pendingCount > 0) cajaState = "pending";
+  else if (cash.session) cajaState = cash.closed ? "closed" : "open";
 
   const cachedBusinessId = api.session.businessId;
   const businessLabel =
@@ -332,6 +333,8 @@ export async function loadDashboardResult(): Promise<{
     debtorCount: debtors.length,
     debtors: debtors.slice(0, 5),
     cajaState,
+    pendingCount,
+    needsReviewCount: cash.needsReviewCount ?? 0,
     cajaExpectedEfectivo: cash.session ? cash.expected.efectivo : null,
     productCount: products.length,
     lowStockCount: lowStock.length,
