@@ -329,8 +329,10 @@ model CashSession {
   expectedNequi    BigInt?   @map("expected_nequi")
   difference       BigInt?
   closeMode        String?   @map("close_mode")
+  carriedEfectivo  BigInt    @default(0) @map("carried_efectivo")
   note             String?
   requestId        String?   @map("request_id") @db.Uuid
+  closeRequestId   String?   @map("close_request_id") @db.Uuid
   legacyDexieId    Int?      @map("legacy_dexie_id")
 
   business      Business    @relation(fields: [businessId], references: [id])
@@ -339,6 +341,7 @@ model CashSession {
 
   @@unique([businessId, localDate])
   @@unique([businessId, requestId])
+  @@unique([businessId, closeRequestId])
   @@unique([businessId, legacyDexieId])
   @@map("cash_sessions")
 }

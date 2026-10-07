@@ -6,6 +6,7 @@ import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import { addCop, asCop, copToJson, subCop } from "../shared/money";
 import { dateKey, occurredOnDate } from "../shared/clock";
 import { linkForNewMove } from "./session-link";
+import { sessionExpected } from "./carry-rules";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
 import type { CreatePaymentDto } from "../sales/sales.dto";
@@ -97,17 +98,32 @@ export class CashService {
     const session = await db.cashSession.findUnique({
       where: { businessId_localDate: { businessId, localDate } },
     });
-    let efectivo = session ? asCop(session.openingFloat) : 0n;
-    let nequi = 0n;
+    if (!session) return { efectivo: 0n, nequi: 0n, total: 0n };
+    return this.expectedForSession(session, db);
+  }
+
+  async expectedForSession(
+    session: { id: string; businessId: string; openingFloat: bigint; carriedEfectivo?: bigint },
+    db: {
+      cashMove: PrismaService["cashMove"];
+    } = this.prisma,
+  ) {
     const moves = await db.cashMove.findMany({
-      where: { businessId, occurredOn: localDate },
+      where: {
+        businessId: session.businessId,
+        OR: [
+          { sessionId: session.id },
+          { sessionId: null, pendingForSessionId: session.id },
+        ],
+      },
     });
-    for (const m of moves) {
-      const delta = m.direction === "in" ? m.amount : -m.amount;
-      if (m.method === "Efectivo") efectivo = addCop(efectivo, delta);
-      else if (m.method === "Nequi") nequi = addCop(nequi, delta);
-    }
-    return { efectivo, nequi, total: addCop(efectivo, nequi) };
+    const expected = sessionExpected({
+      sessionId: session.id,
+      openingFloat: asCop(session.openingFloat),
+      carriedEfectivo: asCop(session.carriedEfectivo ?? 0n),
+      moves,
+    });
+    return { ...expected, total: addCop(expected.efectivo, expected.nequi) };
   }
 
   async open(ctx: BusinessContext, openingFloat: number, requestId: string = randomUUID()) {
@@ -163,7 +179,7 @@ export class CashService {
 
   async close(ctx: BusinessContext, sessionId: string, countedEfectivo: number, requestId: string = randomUUID()) {
     const existingByRequest = await this.prisma.cashSession.findUnique({
-      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
+      where: { businessId_closeRequestId: { businessId: ctx.businessId, closeRequestId: requestId } },
     });
     if (existingByRequest) return sessionJson(existingByRequest);
 
@@ -208,7 +224,7 @@ export class CashService {
           expectedEfectivo: expected.efectivo,
           expectedNequi: expected.nequi,
           difference,
-          requestId,
+          closeRequestId: requestId,
         },
       });
       return sessionJson(updated);
@@ -377,8 +393,7 @@ export class CashService {
           where: { businessId: ctx.businessId, closedAt: null },
         });
         const link = linkForNewMove(opens, occurredOn);
-        const open = opens.find((row) => row.id === link.sessionId) ?? null;
-        await tx.cashMove.create({
+                await tx.cashMove.create({
           data: {
             id: randomUUID(),
             businessId: ctx.businessId,
@@ -492,8 +507,7 @@ export class CashService {
           where: { businessId: ctx.businessId, closedAt: null },
         });
         const link = linkForNewMove(opens, occurredOn);
-        const open = opens.find((row) => row.id === link.sessionId) ?? null;
-        // requestId lives on expenses only. cash_moves.request_id is UUID and
+                // requestId lives on expenses only. cash_moves.request_id is UUID and
         // reserved for aporte/retiro; Dexie `expense-${id}` is not a UUID.
         await tx.cashMove.create({
           data: {
@@ -559,8 +573,7 @@ export class CashService {
           where: { businessId: ctx.businessId, closedAt: null },
         });
         const link = linkForNewMove(opens, occurredOn);
-        const open = opens.find((row) => row.id === link.sessionId) ?? null;
-        return tx.cashMove.create({
+                return tx.cashMove.create({
           data: {
             id: randomUUID(),
             businessId: ctx.businessId,

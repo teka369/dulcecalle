@@ -334,6 +334,7 @@ export async function loadDashboardResult(): Promise<{
     debtors: debtors.slice(0, 5),
     cajaState,
     pendingCount,
+    needsReviewCount: cash.needsReviewCount ?? 0,
     cajaExpectedEfectivo: cash.session ? cash.expected.efectivo : null,
     productCount: products.length,
     lowStockCount: lowStock.length,

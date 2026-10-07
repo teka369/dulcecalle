@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatCop } from "@/domain/money";
 import { getPwaApi } from "@/data/pwa/api";
+import { carryCashWithOfflineFallback } from "@/data/pwa/offline-operations";
 
 type Detail = {
   id: string;
@@ -57,7 +58,7 @@ export default function GestionarCajaDetailPage() {
     setBusy(true);
     setError(null);
     try {
-      await getPwaApi().cash.carry(params.id, {
+      await carryCashWithOfflineFallback(params.id, {
         mode,
         countedEfectivo: mode === "counted" ? Number(counted) : undefined,
       });

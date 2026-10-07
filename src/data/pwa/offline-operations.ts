@@ -1,4 +1,4 @@
-import { NetworkError } from "@/data/errors";
+import { ApiError, NetworkError } from "@/data/errors";
 import { getPwaApi } from "@/data/pwa/api";
 import { getPwaAuthSession } from "@/data/http/session";
 import { getLocalDb, type DulceCalleLocalDB } from "@/data/local/db";
@@ -347,6 +347,100 @@ async function closeCashOffline(
       return operationId;
     });
     return { mode: "offline", id };
+}
+
+
+export async function carryCashWithOfflineFallback(
+  sessionId: string,
+  input: { mode: "counted" | "assumed"; countedEfectivo?: number },
+  requestId: string = newEntityId(),
+): Promise<OfflineOperationResult<Record<string, unknown>>> {
+  const business = businessId();
+  try {
+    const value = await getPwaApi().cash.carry(sessionId, input, requestId);
+    return { mode: "online", value };
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
+    return carryCashOffline(business, sessionId, input, requestId);
+  }
+}
+
+async function carryCashOffline(
+  business: string,
+  sessionId: string,
+  input: { mode: "counted" | "assumed"; countedEfectivo?: number },
+  requestId: string,
+): Promise<OfflineOperationResult<Record<string, unknown>>> {
+  const db = getLocalDb();
+  const now = Date.now();
+  const id = await db.transaction("rw", [db.cashSessions, db.outbox], async () => {
+    const session = await db.cashSessions.get(sessionId);
+    if (session?.businessId !== business) throw new Error("La caja no pertenece al negocio seleccionado.");
+    if (!session || session.closedAt) throw new Error("Esa caja ya fue regularizada.");
+    const opens = (await db.cashSessions.where("businessId").equals(business).toArray())
+      .filter((row) => row.closedAt == null && row.id !== sessionId)
+      .sort((a, b) => a.localDate.localeCompare(b.localDate));
+    const destination = opens[0];
+    await db.cashSessions.put({ ...session, closedAt: now, closeMode: input.mode, updatedAt: now });
+    if (destination) {
+      const continuity = input.mode === "counted" ? input.countedEfectivo ?? 0 : session.openingFloat;
+      await db.cashSessions.put({
+        ...destination,
+        carriedEfectivo: (destination.carriedEfectivo ?? 0) + continuity,
+        updatedAt: now,
+      });
+    }
+    const operationId = newEntityId();
+    await getOutboxStore().enqueue({
+      operationId,
+      businessId: business,
+      entity: "cashSession",
+      operation: "carry",
+      requestId,
+      payload: { sessionId, ...input },
+      dependsOn: [],
+      localCreatedAt: now,
+    });
+    return operationId;
+  });
+  return { mode: "offline", id };
+}
+
+export async function assignMoveWithOfflineFallback(
+  moveId: string,
+  sessionId: string,
+  requestId: string = newEntityId(),
+): Promise<OfflineOperationResult<Record<string, unknown>>> {
+  const business = businessId();
+  try {
+    const value = await getPwaApi().cash.assignMove(moveId, sessionId, requestId);
+    return { mode: "online", value };
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
+    const db = getLocalDb();
+    const now = Date.now();
+    const id = await db.transaction("rw", [db.cashMoves, db.cashSessions, db.outbox], async () => {
+      const move = await db.cashMoves.get(moveId);
+      const session = await db.cashSessions.get(sessionId);
+      if (!move || move.businessId !== business) throw new Error("Ese movimiento no está en este negocio.");
+      if (move.sessionId) throw new Error("Ese movimiento ya tiene caja.");
+      if (!session || session.businessId !== business || session.closedAt) throw new Error("La caja destino no está abierta.");
+      await db.cashMoves.put({ ...move, sessionId, pendingForSessionId: null });
+      const operationId = newEntityId();
+      await getOutboxStore().enqueue({
+        operationId,
+        businessId: business,
+        entity: "cashMove",
+        operation: "assign",
+        requestId,
+        payload: { moveId, sessionId },
+        dependsOn: [],
+        localCreatedAt: now,
+      });
+      return operationId;
+    });
+    return { mode: "offline", id };
+  }
 }
 
 async function ownerMove(
@@ -767,6 +861,26 @@ export async function syncPendingOperations(business: string) {
         const payload = item.payload as { openingFloat: number };
         const remote = await getPwaApi().cash.open(payload.openingFloat, item.requestId);
         return { remoteId: remote.id };
+      }
+      if (item.entity === "cashSession" && item.operation === "carry") {
+        const payload = item.payload as { sessionId: string; mode: "counted" | "assumed"; countedEfectivo?: number };
+        try {
+          const remote = await getPwaApi().cash.carry(payload.sessionId, payload, item.requestId);
+          return { remoteId: String(remote.current && (remote.current as { id?: string }).id || payload.sessionId) };
+        } catch (error) {
+          if (error instanceof ApiError && error.code === "ALREADY_CARRIED") return { remoteId: payload.sessionId };
+          throw error;
+        }
+      }
+      if (item.entity === "cashMove" && item.operation === "assign") {
+        const payload = item.payload as { moveId: string; sessionId: string };
+        try {
+          await getPwaApi().cash.assignMove(payload.moveId, payload.sessionId, item.requestId);
+          return { remoteId: payload.moveId };
+        } catch (error) {
+          if (error instanceof ApiError && error.code === "ALREADY_CARRIED") return { remoteId: payload.moveId };
+          throw error;
+        }
       }
       if (item.entity === "cashSession" && item.operation === "close") {
         const payload = item.payload as { sessionId: string; countedEfectivo: number };

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatCop } from "@/domain/money";
 import { getPwaApi } from "@/data/pwa/api";
+import { assignMoveWithOfflineFallback } from "@/data/pwa/offline-operations";
 
 type Row = {
   id: string;
@@ -26,6 +27,7 @@ type Row = {
 export default function GestionarCajasPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [orphans, setOrphans] = useState<Array<{ id: string; occurredOn: string; kind: string; method: string; amount: number }>>([]);
+  const [target, setTarget] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,8 +68,19 @@ export default function GestionarCajasPage() {
             <section className="flex flex-col gap-2">
               <h2 className="text-sm font-semibold">Movimientos sin caja</h2>
               <p className="text-sm text-ink-muted">Estos movimientos no se asignaron solos. Revísalos antes de pasar un saldo.</p>
+              {pending[0] && (
+                <label className="text-sm">Asignar a
+                  <select className="mt-1 w-full rounded-[var(--r-md)] border border-border bg-surface p-2" value={target} onChange={(e) => setTarget(e.target.value)}>
+                    <option value="">Elige la caja</option>
+                    {pending.map((row) => <option key={row.id} value={row.id}>Caja del {row.localDate}</option>)}
+                  </select>
+                </label>
+              )}
               {orphans.map((move) => (
-                <p key={move.id} className="text-sm">{move.occurredOn} · {move.kind} · {move.method} · {formatCop(move.amount)}</p>
+                <div key={move.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span>{move.occurredOn} · {move.kind} · {move.method} · {formatCop(move.amount)}</span>
+                  <button type="button" className="font-semibold" disabled={!target} onClick={() => void assignMoveWithOfflineFallback(move.id, target).then(() => setOrphans((rows) => rows.filter((row) => row.id !== move.id)))}>Asignar a esa caja</button>
+                </div>
               ))}
             </section>
           )}

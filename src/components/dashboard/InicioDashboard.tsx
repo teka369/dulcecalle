@@ -113,7 +113,7 @@ function cajaCopy(snap: DashboardSnapshot): { value: string; label: string } {
   if (snap.cajaState === "pending") {
     const count = snap.pendingCount ?? 1;
     return {
-      value: count === 1 ? "Tienes una caja pendiente de gestionar" : `Tienes ${count} cajas pendientes`,
+      value: count === 1 ? "Tienes una caja pendiente de gestionar" : `Tienes ${count} cajas pendientes de gestionar`,
       label: "Caja",
     };
   }

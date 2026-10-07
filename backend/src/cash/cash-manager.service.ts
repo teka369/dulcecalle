@@ -7,7 +7,7 @@ import { asCop, copToJson, subCop } from "../shared/money";
 import { dateKey, occurredOnDate } from "../shared/clock";
 import type { BusinessContext } from "../identity/auth.types";
 import { ASSUMED_CLOSE_NOTE } from "./session-link";
-import { carryModeAllowed } from "./carry-rules";
+import { carryModeAllowed, sessionExpected } from "./carry-rules";
 import { CashService } from "./cash.service";
 
 const ASSUMED_NOTE = ASSUMED_CLOSE_NOTE;
@@ -97,7 +97,7 @@ export class CashManagerService {
       if (!move) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
       await tx.cashMove.update({
         where: { id: move.id },
-        data: { sessionId: session.id },
+        data: { sessionId: session.id, pendingForSessionId: null },
       });
       const row = await tx.cashCarry.create({
         data: {
@@ -140,6 +140,11 @@ export class CashManagerService {
       });
       if (!previous) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
       if (previous.closedAt) {
+        const done = await tx.cashCarry.findFirst({
+          where: { businessId: ctx.businessId, previousSessionId: previous.id },
+          orderBy: { createdAt: "desc" },
+        });
+        if (done) return this.carryResult(ctx, done);
         throw new AppError(ERROR_CODES.ALREADY_CARRIED, MESSAGES.alreadyCarried);
       }
       const todaySession = await tx.cashSession.findUnique({
@@ -147,9 +152,6 @@ export class CashManagerService {
           businessId_localDate: { businessId: ctx.businessId, localDate: today },
         },
       });
-      if (todaySession?.closedAt) {
-        throw new AppError(ERROR_CODES.TODAY_ALREADY_CLOSED, MESSAGES.todayAlreadyClosed);
-      }
       const stamped = await tx.cashMove.findMany({
         where: {
           businessId: ctx.businessId,
@@ -162,7 +164,25 @@ export class CashManagerService {
       if (!allowed.ok) {
         throw new AppError(ERROR_CODES.ASSUMED_REQUIRED, MESSAGES.assumedRequired);
       }
-      const expected = await this.cash.expectedBuckets(ctx.businessId, previous.localDate, tx);
+      const ownedMoves = await tx.cashMove.findMany({
+        where: { businessId: ctx.businessId, sessionId: previous.id },
+      });
+      const owned = sessionExpected({
+        sessionId: previous.id,
+        openingFloat: previous.openingFloat,
+        carriedEfectivo: previous.carriedEfectivo,
+        moves: ownedMoves,
+      });
+      const pending = sessionExpected({
+        sessionId: previous.id,
+        openingFloat: 0n,
+        carriedEfectivo: 0n,
+        moves: stamped.map((move) => ({ ...move, sessionId: null, pendingForSessionId: previous.id })),
+      });
+      const expected = {
+        efectivo: owned.efectivo + pending.efectivo,
+        nequi: owned.nequi + pending.nequi,
+      };
       const counted = mode === "counted" ? asCop(countedEfectivo ?? 0) : expected.efectivo;
       if (mode === "counted" && counted < 0n) {
         throw new AppError(ERROR_CODES.VALIDATION, "Revisa el monto contado.");
@@ -172,7 +192,7 @@ export class CashManagerService {
         orderBy: { localDate: "asc" },
       });
       const destination = opens[0] ?? null;
-      if (destination && dateKey(destination.localDate) === dateKey(today) && destination.closedAt) {
+      if (!destination && todaySession?.closedAt) {
         throw new AppError(ERROR_CODES.TODAY_ALREADY_CLOSED, MESSAGES.todayAlreadyClosed);
       }
       await tx.cashSession.update({
@@ -189,7 +209,7 @@ export class CashManagerService {
       });
       let current = destination;
       if (!current) {
-        const float = mode === "counted" ? counted : expected.efectivo;
+        const float = mode === "counted" ? counted : owned.efectivo;
         current = await tx.cashSession.create({
           data: {
             id: randomUUID(),
@@ -198,9 +218,17 @@ export class CashManagerService {
             openedAt: new Date(),
             closedAt: null,
             openingFloat: float,
+            carriedEfectivo: 0n,
             closeMode: null,
           },
         });
+      } else {
+        const continuity = mode === "counted" ? counted : owned.efectivo;
+        await tx.cashSession.update({
+          where: { id: current.id },
+          data: { carriedEfectivo: current.carriedEfectivo + continuity },
+        });
+        current = { ...current, carriedEfectivo: current.carriedEfectivo + continuity };
       }
       if (stamped.length) {
         await tx.cashMove.updateMany({
@@ -230,6 +258,7 @@ export class CashManagerService {
     ctx: BusinessContext,
     session: {
       id: string;
+      businessId: string;
       localDate: Date;
       openedAt: Date;
       closedAt: Date | null;
@@ -248,7 +277,7 @@ export class CashManagerService {
           efectivo: session.expectedEfectivo ?? 0n,
           nequi: session.expectedNequi ?? 0n,
         }
-      : await this.cash.expectedBuckets(ctx.businessId, session.localDate);
+      : await this.cash.expectedForSession({ ...session, businessId: ctx.businessId });
     const moveCount = await this.prisma.cashMove.count({
       where: { businessId: ctx.businessId, sessionId: session.id },
     });

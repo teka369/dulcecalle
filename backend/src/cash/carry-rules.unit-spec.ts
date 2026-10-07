@@ -90,3 +90,63 @@ describe("carry rules", () => {
     ).toBe("2026-10-07T00:00:00.000Z");
   });
 });
+
+import { sessionExpected } from "./carry-rules";
+
+describe("session expected after carry onto an open box", () => {
+  it("keeps B opening float and includes the later stamped move", () => {
+    const expected = sessionExpected({
+      sessionId: "B",
+      openingFloat: 10000n,
+      carriedEfectivo: 100000n,
+      moves: [
+        {
+          amount: 20000n,
+          direction: "out",
+          method: "Efectivo",
+          sessionId: "B",
+          pendingForSessionId: null,
+        },
+      ],
+    });
+    expect(expected.efectivo).toBe(90000n);
+    expect(expected.nequi).toBe(0n);
+  });
+
+  it("does not copy historical Nequi into the destination float", () => {
+    const expected = sessionExpected({
+      sessionId: "B",
+      openingFloat: 10000n,
+      carriedEfectivo: 100000n,
+      moves: [
+        {
+          amount: 8000n,
+          direction: "in",
+          method: "Nequi",
+          sessionId: "B",
+          pendingForSessionId: null,
+        },
+      ],
+    });
+    expect(expected.efectivo).toBe(110000n);
+    expect(expected.nequi).toBe(8000n);
+  });
+
+  it("does not adopt an unstamped orphan into the session", () => {
+    const expected = sessionExpected({
+      sessionId: "B",
+      openingFloat: 10000n,
+      carriedEfectivo: 0n,
+      moves: [
+        {
+          amount: 5000n,
+          direction: "in",
+          method: "Efectivo",
+          sessionId: null,
+          pendingForSessionId: null,
+        },
+      ],
+    });
+    expect(expected.efectivo).toBe(10000n);
+  });
+});

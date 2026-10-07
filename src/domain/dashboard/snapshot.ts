@@ -47,6 +47,7 @@ export type DashboardSnapshot = {
   debtors: Array<{ id: number | string; name: string; debt: number }>;
   cajaState: DashboardCajaState;
   pendingCount: number;
+  needsReviewCount: number;
   cajaExpectedEfectivo: number | null;
   productCount: number;
   lowStockCount: number;
@@ -104,6 +105,7 @@ export function buildDashboardSnapshot(input: {
   session: CashSession | null;
   cajaExpectedEfectivo: number | null;
   pendingCount?: number;
+  needsReviewCount?: number;
   conflict?: boolean;
   emptyDb: boolean;
 }): DashboardSnapshot {
@@ -270,6 +272,7 @@ export function buildDashboardSnapshot(input: {
     debtors: debtors.slice(0, 5),
     cajaState,
     pendingCount: input.pendingCount ?? 0,
+    needsReviewCount: input.needsReviewCount ?? 0,
     cajaExpectedEfectivo: input.session ? input.cajaExpectedEfectivo : null,
     productCount: input.products.length,
     lowStockCount: lowStock.length,
