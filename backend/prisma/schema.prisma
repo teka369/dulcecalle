@@ -82,6 +82,7 @@ model Business {
   saleReturnLines    SaleReturnLine[]
   stockMoves         StockMove[]
   cashSessions       CashSession[]
+  cashCarries        CashCarry[]
   cashMoves          CashMove[]
   expenses           Expense[]
   customerPayments   CustomerPayment[]
@@ -327,12 +328,14 @@ model CashSession {
   expectedEfectivo BigInt?   @map("expected_efectivo")
   expectedNequi    BigInt?   @map("expected_nequi")
   difference       BigInt?
+  closeMode        String?   @map("close_mode")
   note             String?
   requestId        String?   @map("request_id") @db.Uuid
   legacyDexieId    Int?      @map("legacy_dexie_id")
 
-  business Business   @relation(fields: [businessId], references: [id])
-  moves    CashMove[]
+  business      Business    @relation(fields: [businessId], references: [id])
+  moves         CashMove[]  @relation("SessionMoves")
+  pendingMoves  CashMove[]  @relation("PendingForSession")
 
   @@unique([businessId, localDate])
   @@unique([businessId, requestId])
@@ -356,13 +359,36 @@ model CashMove {
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   legacyDexieId Int?          @map("legacy_dexie_id")
 
-  business Business     @relation(fields: [businessId], references: [id])
-  session  CashSession? @relation(fields: [sessionId], references: [id])
+  pendingForSessionId String? @map("pending_for_session_id") @db.Uuid
+
+  business         Business     @relation(fields: [businessId], references: [id])
+  session          CashSession? @relation("SessionMoves", fields: [sessionId], references: [id])
+  pendingForSession CashSession? @relation("PendingForSession", fields: [pendingForSessionId], references: [id])
 
   @@unique([businessId, requestId])
   @@unique([businessId, legacyDexieId])
   @@index([businessId, occurredOn])
+  @@index([businessId, pendingForSessionId])
   @@map("cash_moves")
+}
+
+model CashCarry {
+  id                String   @id @db.Uuid
+  businessId        String   @map("business_id") @db.Uuid
+  requestId         String   @map("request_id") @db.Uuid
+  previousSessionId String?  @map("previous_session_id") @db.Uuid
+  currentSessionId  String   @map("current_session_id") @db.Uuid
+  mode              String
+  countedEfectivo   BigInt?  @map("counted_efectivo")
+  openingFloat      BigInt   @map("opening_float")
+  reassignedCount   Int      @map("reassigned_count")
+  reassignedIds     String[] @default([]) @map("reassigned_ids")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@unique([businessId, requestId])
+  @@map("cash_carries")
 }
 
 model Expense {

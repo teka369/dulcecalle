@@ -271,11 +271,23 @@ export function mapSession(raw: Record<string, unknown>): RemoteSession {
   };
 }
 
+export type RemotePendingSession = {
+  id: string;
+  localDate: string;
+  openedAt: number;
+  openingFloat: number;
+};
+
 export type RemoteToday = {
   localDate: string;
   session: RemoteSession | null;
   expected: { efectivo: number; nequi: number; total: number };
   closed: boolean;
+  pendingCount: number;
+  pendingSessions: RemotePendingSession[];
+  needsReviewCount: number;
+  conflict: boolean;
+  canOpen: boolean;
   moves: RemoteCashMove[];
 };
 
@@ -294,6 +306,21 @@ export function mapToday(raw: Record<string, unknown>): RemoteToday {
       total: asCopJson(expected.total, "expected.total"),
     },
     closed: Boolean(raw.closed),
+    pendingCount: Number(raw.pendingCount ?? 0),
+    pendingSessions: Array.isArray(raw.pendingSessions)
+      ? raw.pendingSessions.map((row) => {
+          const item = row as Record<string, unknown>;
+          return {
+            id: asUuid(item.id, "pending.id"),
+            localDate: asDateKey(item.localDate),
+            openedAt: asIsoEpoch(item.openedAt),
+            openingFloat: asCopJson(item.openingFloat, "pending.openingFloat"),
+          };
+        })
+      : [],
+    needsReviewCount: Number(raw.needsReviewCount ?? 0),
+    conflict: Boolean(raw.conflict),
+    canOpen: raw.canOpen == null ? raw.session == null && !raw.closed : Boolean(raw.canOpen),
     moves: movesRaw.map((m) => mapCashMove(m as Record<string, unknown>)),
   };
 }

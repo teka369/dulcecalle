@@ -9,8 +9,11 @@ import {
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { CashService } from "./cash.service";
+import { CashManagerService } from "./cash-manager.service";
 import {
   CashOwnerMoveDto,
+  AssignMoveDto,
+  CarrySessionDto,
   CloseSessionDto,
   CreateExpenseDto,
   OpenSessionDto,
@@ -22,7 +25,10 @@ import { resolveIdempotencyKey } from "../shared/idempotency";
 
 @Controller()
 export class CashController {
-  constructor(private readonly cash: CashService) {}
+  constructor(
+    private readonly cash: CashService,
+    private readonly manager: CashManagerService,
+  ) {}
 
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post("cash/sessions")
@@ -47,6 +53,47 @@ export class CashController {
   @Get("cash/today")
   today(@CurrentBusiness() ctx: BusinessContext) {
     return this.cash.today(ctx);
+  }
+
+  @Get("cash/sessions")
+  list(@CurrentBusiness() ctx: BusinessContext, @Query("status") status?: string) {
+    return this.manager.list(ctx, status);
+  }
+
+  @Get("cash/sessions/:id")
+  detail(@CurrentBusiness() ctx: BusinessContext, @Param("id") id: string) {
+    return this.manager.detail(ctx, id);
+  }
+
+  @Get("cash/unassigned-moves")
+  unassigned(@CurrentBusiness() ctx: BusinessContext) {
+    return this.manager.unassigned(ctx);
+  }
+
+  @Post("cash/moves/:id/assign")
+  assign(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+    @Body() dto: AssignMoveDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.manager.assign(ctx, id, dto.sessionId, resolveIdempotencyKey(key, dto.requestId));
+  }
+
+  @Post("cash/sessions/:id/carry")
+  carry(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Param("id") id: string,
+    @Body() dto: CarrySessionDto,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    return this.manager.carry(
+      ctx,
+      id,
+      dto.mode,
+      dto.countedEfectivo,
+      resolveIdempotencyKey(key, dto.requestId),
+    );
   }
 
   @Get("cash/moves")

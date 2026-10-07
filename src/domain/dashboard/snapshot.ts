@@ -11,7 +11,7 @@ import type {
   StockMove,
 } from "@/domain/types";
 
-export type DashboardCajaState = "open" | "closed" | "none";
+export type DashboardCajaState = "open" | "closed" | "none" | "pending" | "conflict";
 
 export type DashboardActivity = {
   id: string;
@@ -46,6 +46,7 @@ export type DashboardSnapshot = {
   debtorCount: number;
   debtors: Array<{ id: number | string; name: string; debt: number }>;
   cajaState: DashboardCajaState;
+  pendingCount: number;
   cajaExpectedEfectivo: number | null;
   productCount: number;
   lowStockCount: number;
@@ -102,6 +103,8 @@ export function buildDashboardSnapshot(input: {
   stockMoves: StockMove[];
   session: CashSession | null;
   cajaExpectedEfectivo: number | null;
+  pendingCount?: number;
+  conflict?: boolean;
   emptyDb: boolean;
 }): DashboardSnapshot {
   const now = input.now ?? Date.now();
@@ -126,7 +129,9 @@ export function buildDashboardSnapshot(input: {
     .sort((a, b) => a.stock - b.stock);
 
   let cajaState: DashboardCajaState = "none";
-  if (input.session) {
+  if (input.conflict) cajaState = "conflict";
+  else if ((input.pendingCount ?? 0) > 0) cajaState = "pending";
+  else if (input.session) {
     cajaState = input.session.closedAt != null ? "closed" : "open";
   }
 
@@ -264,6 +269,7 @@ export function buildDashboardSnapshot(input: {
     debtorCount: debtors.length,
     debtors: debtors.slice(0, 5),
     cajaState,
+    pendingCount: input.pendingCount ?? 0,
     cajaExpectedEfectivo: input.session ? input.cajaExpectedEfectivo : null,
     productCount: input.products.length,
     lowStockCount: lowStock.length,

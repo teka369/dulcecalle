@@ -57,3 +57,26 @@ export class CreateExpenseDto {
   @IsUUID()
   requestId?: string;
 }
+
+export class CarrySessionDto {
+  @IsEnum(["counted", "assumed"])
+  mode!: "counted" | "assumed";
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  countedEfectivo?: number;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
+}
+
+export class AssignMoveDto {
+  @IsUUID()
+  sessionId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
+}

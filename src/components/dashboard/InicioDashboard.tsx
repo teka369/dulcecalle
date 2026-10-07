@@ -107,6 +107,16 @@ function bogotaWeekdayIndex(date = new Date()): number {
 }
 
 function cajaCopy(snap: DashboardSnapshot): { value: string; label: string } {
+  if (snap.cajaState === "conflict") {
+    return { value: "Revisa la caja en este teléfono", label: "Caja" };
+  }
+  if (snap.cajaState === "pending") {
+    const count = snap.pendingCount ?? 1;
+    return {
+      value: count === 1 ? "Tienes una caja pendiente de gestionar" : `Tienes ${count} cajas pendientes`,
+      label: "Caja",
+    };
+  }
   if (snap.cajaState === "open") {
     return {
       value: formatCop(snap.cajaExpectedEfectivo ?? 0),
@@ -365,7 +375,7 @@ export function InicioDashboard({
             tone={snap.debtTotal > 0 ? "danger" : "neutral"}
           />
           <MetricCard
-            href="/mas/caja"
+            href={snap.cajaState === "pending" ? "/mas/caja/gestionar" : "/mas/caja"}
             icon="cash"
             value={caja.value}
             label={caja.label}

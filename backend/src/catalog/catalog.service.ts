@@ -24,6 +24,7 @@ import {
 } from "../shared/inventory";
 import { asCop, copToJson, mulCop } from "../shared/money";
 import { occurredOnDate, dateKey } from "../shared/clock";
+import { linkForNewMove } from "../cash/session-link";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
 import { nextCodeFromExisting } from "../shared/customer-code";
@@ -769,13 +770,11 @@ export class CatalogService {
         });
 
         if (totalCost > 0n) {
-          const open = await tx.cashSession.findFirst({
-            where: {
-              businessId: ctx.businessId,
-              localDate: occurredOn,
-              closedAt: null,
-            },
+          const opens = await tx.cashSession.findMany({
+            where: { businessId: ctx.businessId, closedAt: null },
           });
+          const link = linkForNewMove(opens, occurredOn);
+          const open = opens.find((row) => row.id === link.sessionId) ?? null;
           await tx.cashMove.create({
             data: {
               id: randomUUID(),
@@ -784,7 +783,8 @@ export class CatalogService {
               direction: "out",
               method: dto.method,
               kind: "compra",
-              sessionId: open?.id ?? null,
+              sessionId: link.sessionId,
+              pendingForSessionId: link.pendingForSessionId,
               refType: "stockMove",
               refId: id,
               note: dto.note,

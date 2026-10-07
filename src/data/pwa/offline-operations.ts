@@ -17,9 +17,13 @@ function businessId(): string {
   return id;
 }
 
-export function todayLocal(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+export function todayLocal(at: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(at);
 }
 
 export function clean(value?: string): string | undefined {
@@ -81,6 +85,9 @@ export async function getLocalCashSnapshot(): Promise<{
     .where("[businessId+localDate]")
     .equals([business, date])
     .first();
+  const openRows = (await db.cashSessions.where("businessId").equals(business).toArray())
+    .filter((row) => row.closedAt == null);
+  const pendingRows = openRows.filter((row) => row.localDate < date || openRows.length > 1);
   const moves = (await db.cashMoves.where("businessId").equals(business).toArray())
     .filter((row) => row.occurredOn === date)
     .sort((a, b) => a.createdAt - b.createdAt);
@@ -135,6 +142,16 @@ export async function getLocalCashSnapshot(): Promise<{
         total: expected.total,
       },
       closed: session?.closedAt != null,
+      pendingCount: pendingRows.length,
+      pendingSessions: pendingRows.map((row) => ({
+        id: row.id,
+        localDate: row.localDate,
+        openedAt: row.openedAt,
+        openingFloat: row.openingFloat,
+      })),
+      needsReviewCount: 0,
+      conflict: false,
+      canOpen: openRows.length === 0 && session?.closedAt == null,
       moves: moves.map((move) => ({
         id: move.id,
         amount: move.amount,
