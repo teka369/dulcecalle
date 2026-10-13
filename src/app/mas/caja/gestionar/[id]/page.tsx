@@ -1,12 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Spinner } from "@/components/ui/Spinner";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { Sheet } from "@/components/ui/Sheet";
+import { SectionHead } from "@/components/ui/SectionHead";
+import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
+import { Row } from "@/components/ui/Row";
+import { AmountField } from "@/components/ui/AmountField";
+import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
+import { ActionBar } from "@/components/ui/ActionBar";
+import { kindLabel, moveSign } from "@/components/cash/cash";
 import { formatCop } from "@/domain/money";
 import { getPwaApi } from "@/data/pwa/api";
 import { carryCashWithOfflineFallback } from "@/data/pwa/offline-operations";
@@ -36,6 +42,7 @@ export default function GestionarCajaDetailPage() {
   const [counted, setCounted] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<"contar" | "saldo" | null>(null);
 
   useEffect(() => {
     void getPwaApi().cash.session(params.id).then((row) => setDetail(row as Detail));
@@ -70,52 +77,117 @@ export default function GestionarCajaDetailPage() {
     }
   }
 
-  if (!detail) return <div className="flex justify-center py-10"><Spinner /></div>;
+  if (!detail) {
+    return (
+      <div className="flex flex-col gap-4">
+        <SkeletonHero />
+        <SkeletonRows />
+      </div>
+    );
+  }
+
+  const choice = mode ?? (detail.canCountClose ? "contar" : "saldo");
+  const saldoLabel = detail.requiresCarry ? "Cerrar por paso de saldo" : "Continuar saldo";
+  const moveRows = (list: Detail["moves"]) =>
+    list.map((move) => {
+      const sg = moveSign(move);
+      return (
+        <Row
+          key={move.id}
+          title={`${kindLabel(move.kind)} · ${move.method}`}
+          meta={move.occurredOn}
+          trailing={
+            <>
+              <span className={`text-[15px] font-semibold tabular-nums ${sg.tone === "ok" ? "text-ok" : "text-danger"}`}>
+                {sg.sign} {formatCop(move.amount)}
+              </span>
+              <span className="text-xs text-ink-muted">{sg.word}</span>
+            </>
+          }
+        />
+      );
+    });
 
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <Link href="/mas/caja/gestionar" className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg" aria-label="Volver">←</Link>
-        <h1 className="text-[22px] font-semibold">Caja del {detail.localDate}</h1>
-      </header>
-      <Card className="flex flex-col gap-1">
-        <p>Efectivo inicial: {formatCop(detail.openingFloat)}</p>
-        <p>Efectivo esperado: {formatCop(detail.expectedEfectivo)}</p>
-        <p>Nequi esperado: {formatCop(detail.expectedNequi)}</p>
-        <p>{detail.moveCount} movimientos</p>
-        {detail.hasLaterOpenSession && <p>Esta caja tiene una caja posterior abierta. Su efectivo inicial no se va a sumar.</p>}
-        {detail.closeMode === "assumed" && <p>{detail.note}</p>}
-      </Card>
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">Movimientos de esta caja</h2>
-        {detail.moves.map((move) => (
-          <p key={move.id} className="text-sm">{move.occurredOn} · {move.kind} · {move.method} · {move.direction === "in" ? "+" : "−"}{formatCop(move.amount)}</p>
-        ))}
-      </section>
-      {detail.stampedMoves.length > 0 && (
+    <div className="flex flex-col pb-[calc(var(--actionbar-h)+4.75rem+1.5rem)]">
+      <HeroBlock
+        size="medium"
+        back={{ href: "/mas/caja/gestionar", label: "Volver a Gestionar cajas" }}
+        title={`Caja del ${detail.localDate}`}
+        subtitle={`Efectivo inicial ${formatCop(detail.openingFloat)} · ${detail.moveCount} movimientos`}
+      >
+        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-on-hero-muted">Esperado efectivo</p>
+        <p className="mt-1 text-4xl font-semibold tabular-nums">{formatCop(detail.expectedEfectivo)}</p>
+        <p className="mt-1 text-sm text-on-hero-muted">Nequi {formatCop(detail.expectedNequi)}</p>
+      </HeroBlock>
+      <Sheet>
+        {detail.hasLaterOpenSession ? (
+          <StateBlock
+            kind="offline-miss"
+            title="Esta caja tiene una caja posterior abierta."
+            body="Su efectivo inicial no se va a sumar."
+          />
+        ) : null}
+        {detail.closeMode === "assumed" && detail.note ? <RowGroupNote>{detail.note}</RowGroupNote> : null}
+
+        {!detail.regularized ? (
+          <section className="flex flex-col gap-3">
+            <ChoiceSegmented<"contar" | "saldo">
+              label="Cómo cerrar"
+              options={[
+                { id: "contar", label: "Cerrar contando" },
+                { id: "saldo", label: "Continuar saldo" },
+              ]}
+              value={choice}
+              onChange={(id) => {
+                if (id === "contar" && !detail.canCountClose) return;
+                setMode(id);
+              }}
+            />
+            {!detail.canCountClose ? (
+              <p className="text-sm text-ink-muted">Cerrar contando no está disponible: hay que pasar el saldo.</p>
+            ) : null}
+            {choice === "contar" ? (
+              <AmountField label="¿Cuánto efectivo había en esta caja?" value={counted} onChange={setCounted} />
+            ) : (
+              <p className="text-sm text-ink-muted">
+                Cerrar por paso de saldo no es un conteo físico. Se usa el efectivo esperado como continuidad. El faltante se
+                ve cuando cuentes una caja posterior.
+              </p>
+            )}
+          </section>
+        ) : null}
+
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold">Esto pasa al continuar el saldo</h2>
-          {detail.stampedMoves.map((move) => (
-            <p key={move.id} className="text-sm">{move.occurredOn} · {move.kind} · {move.method} · {move.direction === "in" ? "+" : "−"}{formatCop(move.amount)}</p>
-          ))}
-        </section>
-      )}
-      {!detail.regularized && (
-        <Card className="flex flex-col gap-3">
-          {detail.canCountClose && (
-            <>
-              <label className="text-sm font-medium">¿Cuánto efectivo había en esta caja?</label>
-              <Input inputMode="numeric" value={counted} onChange={(e) => setCounted(e.target.value.replace(/\D/g, ""))} />
-              <Button type="button" disabled={busy} onClick={() => void closeCounted()}>Cerrar contando</Button>
-            </>
+          <SectionHead title="Movimientos de esta caja" />
+          {detail.moves.length === 0 ? (
+            <RowGroupNote>Aún no hay movimientos.</RowGroupNote>
+          ) : (
+            <RowGroup label="Movimientos de esta caja">{moveRows(detail.moves)}</RowGroup>
           )}
-          <p className="text-sm text-ink-muted">Cerrar por paso de saldo no es un conteo físico. Se usa el efectivo esperado como continuidad. El faltante se ve cuando cuentes una caja posterior.</p>
-          <Button type="button" variant="primary" disabled={busy} onClick={() => void carry(detail.requiresCarry ? "assumed" : "counted")}>
-            {detail.requiresCarry ? "Cerrar por paso de saldo" : "Continuar saldo"}
-          </Button>
-        </Card>
-      )}
-      {error && <p className="text-sm text-danger">{error}</p>}
+        </section>
+        {detail.stampedMoves.length > 0 ? (
+          <section className="flex flex-col gap-2">
+            <SectionHead title="Esto pasa al continuar el saldo" />
+            <RowGroup label="Esto pasa al continuar el saldo">{moveRows(detail.stampedMoves)}</RowGroup>
+          </section>
+        ) : null}
+        {error ? <StateBlock kind="error" title={error} /> : null}
+      </Sheet>
+      {!detail.regularized ? (
+        <ActionBar
+          aboveNav
+          primary={
+            choice === "contar"
+              ? { label: "Cerrar contando", onClick: () => void closeCounted(), disabled: counted === "", busy }
+              : {
+                  label: saldoLabel,
+                  onClick: () => void carry(detail.requiresCarry ? "assumed" : "counted"),
+                  busy,
+                }
+          }
+        />
+      ) : null}
     </div>
   );
 }
