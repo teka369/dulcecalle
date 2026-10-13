@@ -82,11 +82,10 @@ export function isGestionarCajaDetail(href: string): boolean {
 
 /**
  * Online-only exceptions: entity URLs that a cold offline load does NOT
- * restore (they still get /offline). /clientes/[id]/deuda-inicial records
- * an opening balance and stays online-only on a cold load; in an already
- * loaded shell it still opens from IndexedDB.
+ * restore (they get /offline). Currently none: /clientes/[id]/deuda-inicial
+ * is served /clientes and shows its own offline state.
  */
-export const COLD_LOAD_ONLINE_ONLY: readonly EntityAction[] = ["deuda-inicial"];
+export const COLD_LOAD_ONLINE_ONLY: readonly EntityAction[] = [];
 
 /**
  * Parent document a cold offline navigation to `href` is served from,
@@ -104,7 +103,7 @@ export function coldLoadParentPath(href: string): string | null {
 export function bootEntityPatternSources(): string[] {
   return [
     `^/inventario/${UUID}(?:/(?:${PRODUCT_ACTIONS.join("|")}))?$`,
-    `^/clientes/${UUID}(?:/abono)?$`,
+    `^/clientes/${UUID}(?:/(?:abono|deuda-inicial))?$`,
     `^/inventario/proveedores/${UUID}$`,
     `^/ventas/${UUID}(?:/devolver)?$`,
   ];

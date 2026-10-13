@@ -2,6 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  COLD_LOAD_ONLINE_ONLY,
   coldLoadParentPath,
   entityParentPath,
   bootEntityPatternSources,
@@ -17,7 +18,6 @@ const APP = join(__dirname, "../../app");
 
 /** Documented online-only exceptions (cold offline load -> /offline). */
 const ONLINE_ONLY: Record<string, string> = {
-  "/clientes/[id]/deuda-inicial": "opening balance: online-only on a cold load (in-shell ficha still works)",
   "/cliente/compras/[id]": "customer portal (separate session, not the business shell)",
   "/cliente/productos/[id]": "customer portal (separate session, not the business shell)",
 };
@@ -38,6 +38,7 @@ function dynamicRoutes(dir = APP): string[] {
 const TABLE: Array<[string, string]> = [
   [`/clientes/${ID}`, "/clientes"],
   [`/clientes/${ID}/abono`, "/clientes"],
+  [`/clientes/${ID}/deuda-inicial`, "/clientes"],
   [`/ventas/${ID}`, "/ventas"],
   [`/ventas/${ID}/devolver`, "/ventas"],
   [`/inventario/${ID}`, "/inventario"],
@@ -78,14 +79,14 @@ describe("SW routing table", () => {
     expect(swNavigationRoute(url)).toEqual({ kind: "entity", fallback: parent });
   });
 
-  it("has exactly 11 entity patterns", () => {
-    expect(TABLE).toHaveLength(11);
-    expect(new Set(TABLE.map(([u]) => u.replace(ID, ":id"))).size).toBe(11);
+  it("has exactly 12 entity patterns", () => {
+    expect(TABLE).toHaveLength(12);
+    expect(new Set(TABLE.map(([u]) => u.replace(ID, ":id"))).size).toBe(12);
   });
 
-  it("gestionar detail -> gestionar list; deuda-inicial -> /offline", () => {
+  it("gestionar detail -> gestionar list; no entity falls to /offline", () => {
     expect(swNavigationRoute(`/mas/caja/gestionar/${ID}`)).toEqual({ kind: "entity", fallback: "/mas/caja/gestionar" });
-    expect(swNavigationRoute(`/clientes/${ID}/deuda-inicial`)).toEqual({ kind: "entity", fallback: null });
+    expect(COLD_LOAD_ONLINE_ONLY).toEqual([]);
   });
 
   it("leaves /api, /_next, /offline, /sw.js untouched", () => {
@@ -141,7 +142,7 @@ describe("boot restore", () => {
     });
     expect(bootRestoreTarget(`/clientes/${ID}`, false)).toBeNull();
     expect(bootRestoreTarget("/clientes", true)).toBeNull();
-    expect(bootRestoreTarget(`/clientes/${ID}/deuda-inicial`, true)).toBeNull();
+    expect(bootRestoreTarget(`/clientes/${ID}/deuda-inicial`, true)).toEqual({ kind: "entity", path: `/clientes/${ID}/deuda-inicial` });
     expect(bootRestoreTarget(undefined, true)).toBeNull();
   });
 
@@ -158,6 +159,7 @@ describe("boot restore", () => {
     expect(off.win.__DC_BOOT_PATH).toBe(`/ventas/${ID}/devolver`);
     expect(BOOT_ENTITY_ATTR in off.attrs).toBe(true);
     expect(BOOT_ENTITY_ATTR in runScript(`/ventas/${ID}`, true).attrs).toBe(false);
+    expect(BOOT_ENTITY_ATTR in runScript(`/clientes/${ID}/deuda-inicial`, false).attrs).toBe(true);
     expect(BOOT_ENTITY_ATTR in runScript("/ventas", false).attrs).toBe(false);
     expect(BOOT_ENTITY_ATTR in runScript(`/mas/caja/gestionar/${ID}`, false).attrs).toBe(false);
   });

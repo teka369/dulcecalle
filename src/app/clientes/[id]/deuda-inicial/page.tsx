@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { navigateOfflineAware } from "@/data/pwa/offline-nav";
+import { isOffline, navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   INITIAL_DEBT_TOAST,
@@ -22,6 +22,8 @@ import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
 import { ActionToast } from "@/components/ui/ActionToast";
 
+const INITIAL_DEBT_OFFLINE_TEXT = "Necesitas internet para registrar deuda inicial";
+
 export default function AgregarDeudaAnteriorPage() {
   const router = useRouter();
   const id = useEntityId();
@@ -32,6 +34,19 @@ export default function AgregarDeudaAnteriorPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const requestIdRef = useRef<string | null>(null);
+  const [offline, setOffline] = useState(false);
+
+  // Registering an opening balance needs the server: offline shows its own state.
+  useEffect(() => {
+    const sync = () => setOffline(isOffline());
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -91,6 +106,30 @@ export default function AgregarDeudaAnteriorPage() {
       );
       setBusy(false);
     }
+  }
+
+  if (offline && id) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock
+          size="compact"
+          back={{ href: `/clientes/${id}`, label: "Volver al cliente", entity: true }}
+          title="Agregar deuda anterior"
+        />
+        <Sheet>
+          <div role="status" className="flex flex-col gap-4 py-2" data-testid="deuda-inicial-offline">
+            <p className="text-base font-semibold text-ink">{INITIAL_DEBT_OFFLINE_TEXT}</p>
+            <button
+              type="button"
+              onClick={() => navigateOfflineAware(router, `/clientes/${id}`, { replace: true })}
+              className="inline-flex h-11 min-h-11 w-full items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg hover:opacity-[0.92]"
+            >
+              Volver al cliente
+            </button>
+          </div>
+        </Sheet>
+      </div>
+    );
   }
 
   if (!ready) {

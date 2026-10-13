@@ -2,9 +2,10 @@ import { expect, test } from "@playwright/test";
 import { C0, CSESS, CUS, INSUMO, P1, P2, PROD, SALE, SU, SUP, installFakeApi, readiness } from "./fixtures";
 
 /** route, text that proves the entity's Dexie data rendered */
-const ROUTES: Array<{ path: string; data: string | RegExp; kind: "entity" | "gestionar" }> = [
+const ROUTES: Array<{ path: string; data: string | RegExp; kind: "entity" | "gestionar"; button?: string }> = [
   { path: `/clientes/${C0}`, data: CUS.name, kind: "entity" },
   { path: `/clientes/${C0}/abono`, data: CUS.name, kind: "entity" },
+  { path: `/clientes/${C0}/deuda-inicial`, data: "Necesitas internet para registrar deuda inicial", kind: "entity", button: "Volver al cliente" },
   { path: `/ventas/${SALE}`, data: PROD.name, kind: "entity" },
   { path: `/ventas/${SALE}/devolver`, data: PROD.name, kind: "entity" },
   { path: `/inventario/${P1}`, data: PROD.name, kind: "entity" },
@@ -52,6 +53,7 @@ test("full PREP, then offline cold loads of never-visited entity URLs keep the U
         // Designer (b): the record's view owns the screen; the list underneath is not visible.
         await expect(p.locator("main")).toBeHidden();
         await expect(scope.locator("h1").first()).toBeAttached();
+        if (r.button) await expect(scope.getByRole("button", { name: r.button }).last()).toBeVisible();
       } else {
         await expect(p.getByRole("link", { name: "Volver a Caja" }).last()).toBeVisible();
       }
@@ -63,11 +65,5 @@ test("full PREP, then offline cold loads of never-visited entity URLs keep the U
     results.push(`${r.path} -> ${new URL(p.url()).pathname} -> data OK`);
     await p.close();
   }
-  // Documented online-only exception: deuda-inicial cold load -> /offline.
-  const ex = await context.newPage();
-  await ex.goto(`/clientes/${C0}/deuda-inicial`);
-  await expect(ex.getByText("Puedes seguir trabajando. Lo que guardes")).toBeVisible({ timeout: 15_000 });
-  results.push(`/clientes/${C0}/deuda-inicial -> /offline (documented online-only)`);
-  await ex.close();
   console.log(`E2E (${baseURL})\n` + results.join("\n"));
 });
