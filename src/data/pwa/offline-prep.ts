@@ -397,11 +397,48 @@ export function runPreparation(
   return task;
 }
 
+/** How long first-install prep waits for the service worker to take control. */
+export const SW_CONTROL_WAIT_MS = 20_000;
+
+/**
+ * B6: on a first install the SW registers, activates and claims the page a
+ * few seconds after load. Prep must not start its document tasks before the
+ * page is controlled (they would all fail with "Service Worker aún no
+ * activo"). Waits for navigator.serviceWorker.ready, then for a controller
+ * (clientsClaim → controllerchange), bounded by `timeoutMs`. Resolves
+ * whether or not control arrived; the doc tasks still report honestly.
+ */
+export async function waitForServiceWorkerControl(timeoutMs = SW_CONTROL_WAIT_MS): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  const sw = (window as unknown as { navigator?: Navigator }).navigator?.serviceWorker;
+  if (!sw) return false;
+  if (sw.controller) return true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<false>((resolve) => {
+    timer = setTimeout(() => resolve(false), timeoutMs);
+  });
+  const controlled = (async () => {
+    if (sw.ready) await sw.ready;
+    if (sw.controller) return true;
+    await new Promise<void>((resolve) => {
+      if (typeof sw.addEventListener !== "function") return;
+      sw.addEventListener("controllerchange", () => resolve(), { once: true });
+    });
+    return true;
+  })();
+  try {
+    return await Promise.race([controlled, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function runPreparationInternal(
   businessId: string,
   onProgress?: (progress: PrepProgress) => void,
   refresh = false,
 ): Promise<PrepReadiness> {
+  await waitForServiceWorkerControl();
   const db = getLocalDb();
   const { defs, details } = await buildPrepTaskDefs(businessId);
   const records: PrepTaskRecord[] = [];
