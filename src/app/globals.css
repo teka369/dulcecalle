@@ -2,11 +2,11 @@
 
 /* Shared light semantics + space / radii / shadow (Spec §2.5) */
 :root {
-  --ok: #15803d;
+  --ok: #15703d;
   --ok-soft: #d8f3e7;
-  --warning: #d97706;
+  --warning: #9a5a00;
   --warning-soft: #fde8c8;
-  --danger: #dc2626;
+  --danger: #c81e1e;
   --danger-soft: #fee2e2;
   --info: #6b5b95;
   --info-soft: #ede7f6;
@@ -30,6 +30,8 @@
 
   /* Fixed ActionBar: 12px top pad + 52px button + bottom pad (≥12px / safe-area). */
   --actionbar-h: calc(4rem + max(0.75rem, env(safe-area-inset-bottom)));
+  /* SyncPill button height (min-h-11). Toasts stack above it. */
+  --syncpill-h: 2.75rem;
 
   --shadow-sm: 0 1px 2px rgba(59, 36, 28, 0.06);
   --shadow-md: 0 4px 12px rgba(59, 36, 28, 0.08);
@@ -309,4 +311,13 @@ body {
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+}
+
+/* SyncPill sits above a fixed ActionBar (+ gap); screens without a bar keep
+   the pill's own bottom offset. aboveNav bars stack over the nav (4.75rem). */
+html[data-actionbar="on"] .sync-pill {
+  bottom: calc(var(--actionbar-h) + 0.5rem);
+}
+html[data-actionbar="nav"] .sync-pill {
+  bottom: calc(var(--actionbar-h) + 4.75rem + 0.5rem);
 }
