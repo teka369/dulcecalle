@@ -86,3 +86,17 @@ export function dmy(dateKey: string | null | undefined): string {
 export function moveMeta(m: { note?: string | null; occurredOn?: string | null }): string {
   return [m.note, m.occurredOn ? dmy(m.occurredOn) : null].filter(Boolean).join(" · ");
 }
+
+/**
+ * TICKET-A (J-A3): only a combo is a preparation source. A cached row with no
+ * `kind` (pre-TICKET-A cache) falls back to the old insumo rule; the server
+ * rejects it if it is really a standard.
+ */
+export function canPrepareFrom(p: { kind?: "standard" | "combo"; sellable?: boolean }): boolean {
+  if (p.kind) return p.kind === "combo";
+  return p.sellable === false;
+}
+
+export function isCombo(p: { kind?: "standard" | "combo" }): boolean {
+  return p.kind === "combo";
+}

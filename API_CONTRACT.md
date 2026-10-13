@@ -29,6 +29,7 @@ Error envelope:
 | 409 | `RETURN_EXCEEDS` | |
 | 409 | `NEED_COST` | stock>0, cost 0, not gifted |
 | 409 | `STOCK_VIA_MOVES` | patch stock |
+| 409 | `KIND_LOCKED` | patch `kind` on a product with stock > 0 or any stock move (TICKET-A) |
 | 200 | *(idempotent hit)* | same request_id; body = original resource |
 | 429 | `RATE_LIMIT` | |
 | 500 | `INTERNAL` | |
@@ -97,7 +98,25 @@ Server sets: id, businessId, avgCost (0 if gifted), inicial move, **not** cash.
 Reject: stock>0 and avgCost<=0 and gifted≠true → `NEED_COST`.  
 Reject: client `id`, `businessId`.
 
-No PATCH stock. PATCH name/price/lowStockAt only.
+No PATCH stock. PATCH name/price/lowStockAt/sellable/kind only.
+
+**Product kind (TICKET-A).** Every product JSON carries `kind: "standard" | "combo"`
+(clients must treat a missing `kind` as unknown — older servers).
+
+- `CreateProductDto.kind?` (default `standard`). `kind=combo` **forces** `sellable=false`
+  whatever the client sent. DB CHECK `products_combo_not_sellable` enforces it too.
+- A combo is never sold: `POST /v1/sales` with a combo line → 400 `VALIDATION`;
+  the portal catalog only lists `sellable=true AND kind=standard`.
+- `PATCH kind` → 409 `KIND_LOCKED` once the product has stock > 0 or any stock move
+  (kind changes cost semantics). `PATCH {sellable:true}` on a combo → 400.
+- `POST /v1/preparations`: the source must be `kind=combo`, otherwise 400
+  "Solo se prepara desde un combo." Cost rules unchanged (lot value; excess rejected;
+  weighted average on the target; same `Idempotency-Key` applies once).
+- Cost semantics stay keyed on `sellable=false` (lot value in `avgCost`), so legacy
+  non-sellable `standard` insumos behave exactly as before.
+- Backfill (manual, never automatic, not part of `migrate deploy`):
+  `backend/migration/combo-kind.ts list` (read-only candidates) and
+  `apply --ids=… --confirm` (only `standard`+`sellable=false` rows; refuses prod-looking envs).
 
 ### Customers
 POST name, phone?. `Idempotency-Key` required (M6.0). Debt starts at 0. `code` (`DC-NNNN`) is assigned by the server, including archived, never reused. Client must not invent a code. Same requestId → same customer. Initial debt is a **separate** POST.

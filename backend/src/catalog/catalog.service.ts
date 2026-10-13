@@ -39,6 +39,7 @@ function productJson(p: {
   stock: number;
   lowStockAt: number;
   sellable: boolean;
+  kind: "standard" | "combo";
   archivedAt: Date | null;
   createdAt: Date;
   images?: Array<{
@@ -66,6 +67,7 @@ function productJson(p: {
     stock: p.stock,
     lowStockAt: p.lowStockAt,
     sellable: p.sellable,
+    kind: p.kind,
     archivedAt: p.archivedAt,
     createdAt: p.createdAt,
     images: (p.images ?? []).map(imageJson),
@@ -112,7 +114,9 @@ export class CatalogService {
     const stock = dto.stock ?? 0;
     const gifted = Boolean(dto.gifted);
     const unitCost = gifted ? 0n : asCop(dto.avgCost ?? 0);
-    const sellable = dto.sellable ?? true;
+    const kind = dto.kind ?? "standard";
+    // AC1: a combo is never sellable, whatever the client sent.
+    const sellable = kind === "combo" ? false : (dto.sellable ?? true);
     const avgCost = openingStoredAvgCost({ sellable, stock, unitCost });
     if (stock > 0 && avgCost <= 0n && !gifted) {
       throw new AppError(ERROR_CODES.NEED_COST, MESSAGES.needCost);
@@ -135,6 +139,7 @@ export class CatalogService {
             stock,
             lowStockAt: dto.lowStockAt ?? 5,
             sellable,
+            kind,
             requestId,
           },
         });
@@ -211,13 +216,32 @@ export class CatalogService {
     if (dto.stock !== undefined || dto.avgCost !== undefined) {
       throw new AppError(ERROR_CODES.STOCK_VIA_MOVES, MESSAGES.stockViaMoves);
     }
+    const nextKind = dto.kind ?? p.kind;
+    if (dto.kind != null && dto.kind !== p.kind) {
+      // AC3: kind changes cost semantics (lot value vs unit average), so it is
+      // only allowed on a product with no stock and no history at all.
+      const moves = await this.prisma.stockMove.count({
+        where: { businessId: ctx.businessId, productId: id },
+      });
+      if (p.stock > 0 || moves > 0) {
+        throw new AppError(
+          ERROR_CODES.KIND_LOCKED,
+          "No se puede cambiar el tipo: el producto ya tiene stock o movimientos.",
+        );
+      }
+    }
+    if (nextKind === "combo" && dto.sellable === true) {
+      throw new AppError(ERROR_CODES.VALIDATION, "Un combo no se puede vender.");
+    }
     const updated = await this.prisma.product.update({
       where: { id },
       data: {
+        ...(dto.kind != null ? { kind: dto.kind } : {}),
         ...(dto.name != null ? { name: dto.name.trim() } : {}),
         ...(dto.price != null ? { price: asCop(dto.price) } : {}),
         ...(dto.lowStockAt != null ? { lowStockAt: dto.lowStockAt } : {}),
         ...(dto.sellable != null ? { sellable: dto.sellable } : {}),
+        ...(nextKind === "combo" ? { sellable: false } : {}),
       },
       include: { images: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } },
     });
@@ -305,6 +329,10 @@ export class CatalogService {
           where: { id: dto.sourceId, businessId: ctx.businessId, archivedAt: null },
         });
         if (!source) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+        // J-A3: preparation only from combos.
+        if (source.kind !== "combo") {
+          throw new AppError(ERROR_CODES.VALIDATION, "Solo se prepara desde un combo.");
+        }
         const target = await tx.product.findFirst({
           where: { id: dto.targetId, businessId: ctx.businessId, archivedAt: null },
         });

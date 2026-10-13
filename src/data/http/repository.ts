@@ -1,3 +1,4 @@
+import type { ProductKind } from "../../domain/types";
 /**
  * HTTP repository adapter. Transport only — no financial formulas.
  * Server remains the authority for stock, debt, totals, cost, caja.
@@ -44,6 +45,7 @@ export type CreateProductInput = {
   lowStockAt?: number;
   gifted?: boolean;
   sellable?: boolean;
+  kind?: ProductKind;
 };
 
 export type PatchProductInput = {
@@ -51,6 +53,7 @@ export type PatchProductInput = {
   price?: number;
   lowStockAt?: number;
   sellable?: boolean;
+  kind?: ProductKind;
   stock?: unknown;
   avgCost?: unknown;
 };
@@ -201,6 +204,7 @@ export class HttpRepository {
         "lowStockAt",
         "gifted",
         "sellable",
+        "kind",
       ]);
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
@@ -220,6 +224,7 @@ export class HttpRepository {
         "price",
         "lowStockAt",
         "sellable",
+        "kind",
         "stock",
         "avgCost",
       ]);

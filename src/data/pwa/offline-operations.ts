@@ -673,7 +673,7 @@ export async function surtirWithOfflineFallback(
         ...product,
         stock: product.stock + input.qty,
         avgCost: nextAvgCostAfterSurtir({
-          sellable: product.sellable !== false,
+          sellable: product.sellable !== false && product.kind !== "combo",
           stock: product.stock,
           avgCost: product.avgCost,
           qty: input.qty,

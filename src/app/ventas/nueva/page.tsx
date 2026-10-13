@@ -39,7 +39,7 @@ export default function NuevaVentaPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products.filter((p) => {
-      if (p.sellable === false) return false;
+      if (p.sellable === false || p.kind === "combo") return false;
       const matchCat = !category || p.category === category;
       const matchQ =
         !q ||
@@ -96,7 +96,7 @@ export default function NuevaVentaPage() {
     setPendingPrices((prev) => ({ ...prev, [product.id]: parsed.unitPrice }));
   }
 
-  const sellable = products.filter((p) => p.sellable !== false);
+  const sellable = products.filter((p) => p.sellable !== false && p.kind !== "combo");
 
   return (
     <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>

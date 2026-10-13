@@ -8,6 +8,7 @@ import { assertUuid } from "@/data/local/ids";
 import { customerToLocal, productToLocal, supplierToLocal } from "@/data/local/read-cache";
 import { pendingDebtAdjustment } from "./pending-debt";
 import { addCop } from "@/domain/money";
+import type { ProductKind } from "@/domain/types";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
 
 export type CustomerInput = { name: string; phone?: string };
@@ -21,6 +22,8 @@ export type ProductInput = {
   lowStockAt?: number;
   gifted?: boolean;
   sellable?: boolean;
+  /** TICKET-A. combo forces sellable=false. */
+  kind?: ProductKind;
 };
 
 /**
@@ -166,7 +169,7 @@ export async function createSupplierWithOfflineFallback(input: SupplierInput, re
 }
 
 function normalizeProductInput(input: ProductInput): Required<
-  Pick<ProductInput, "name" | "price" | "stock" | "avgCost" | "lowStockAt" | "gifted" | "sellable">
+  Pick<ProductInput, "name" | "price" | "stock" | "avgCost" | "lowStockAt" | "gifted" | "sellable" | "kind">
 > {
   const name = validateCatalogName(input.name);
   const price = input.price;
@@ -182,7 +185,9 @@ function normalizeProductInput(input: ProductInput): Required<
   if (!Number.isInteger(unitCost) || unitCost < 0) {
     throw new Error(INVENTORY_ERRORS.badCost);
   }
-  const sellable = input.sellable ?? true;
+  const kind: ProductKind = input.kind ?? "standard";
+  // AC1: a combo is never sellable, mirroring the server.
+  const sellable = kind === "combo" ? false : (input.sellable ?? true);
   const storedAvg = openingStoredAvgCost({ sellable, stock, unitCost });
   if (stock > 0 && storedAvg <= 0 && !gifted) {
     throw new Error(INVENTORY_ERRORS.needCost);
@@ -199,10 +204,14 @@ function normalizeProductInput(input: ProductInput): Required<
     lowStockAt,
     gifted,
     sellable,
+    kind,
   };
 }
 
-/** Whitelist-only CreateProductDto body (no id / productId / kind). */
+/**
+ * Whitelist-only CreateProductDto body (no id / productId). `kind` is sent
+ * only for combos so standard payloads stay byte-identical to pre-TICKET-A.
+ */
 function productCreatePayload(
   normalized: ReturnType<typeof normalizeProductInput>,
 ): Record<string, unknown> {
@@ -214,6 +223,7 @@ function productCreatePayload(
     lowStockAt: normalized.lowStockAt,
     gifted: normalized.gifted,
     sellable: normalized.sellable,
+    ...(normalized.kind === "combo" ? { kind: "combo" as const } : {}),
   };
 }
 
@@ -253,6 +263,7 @@ async function createLocalProduct(
     stock: input.stock,
     lowStockAt: input.lowStockAt,
     sellable,
+    kind: input.kind,
     archivedAt: null,
     requestId,
     createdAt: now,
@@ -297,6 +308,7 @@ export async function createProductWithOfflineFallback(
         lowStockAt?: number;
         gifted?: boolean;
         sellable?: boolean;
+        kind?: ProductKind;
       },
       requestId,
     );
@@ -591,7 +603,17 @@ async function reconcileStrandedSuppliers(
 
 export type CustomerPatchInput = { name?: string; phone?: string | null };
 export type SupplierPatchInput = { name?: string; phone?: string | null; notes?: string | null };
-export type ProductPatchInput = { name?: string; price?: number; lowStockAt?: number; sellable?: boolean };
+export const KIND_LOCKED_MESSAGE =
+  "No se puede cambiar el tipo: el producto ya tiene stock o movimientos.";
+
+export type ProductPatchInput = {
+  name?: string;
+  price?: number;
+  lowStockAt?: number;
+  sellable?: boolean;
+  /** TICKET-A: server rejects with 409 KIND_LOCKED once there is stock/history. */
+  kind?: ProductKind;
+};
 
 export type PatchOfflineResult =
   | { mode: "online" }
@@ -727,11 +749,23 @@ export async function patchProductWithOfflineFallback(
 ): Promise<PatchOfflineResult> {
   const name = assertPatchName(input.name);
   assertProductPatch(input);
+  if (input.kind !== undefined) {
+    // AC3 local guard; the server is authoritative (409 KIND_LOCKED).
+    const current = await getLocalStore().products.get(businessId(), id);
+    if (current && (current.kind ?? "standard") !== input.kind && current.stock > 0) {
+      throw new Error(KIND_LOCKED_MESSAGE);
+    }
+  }
+  if (input.kind === "combo" && input.sellable === true) {
+    throw new Error("Un combo no se puede vender.");
+  }
   const normalized = {
     ...(name !== undefined ? { name } : {}),
     ...(input.price !== undefined ? { price: input.price } : {}),
     ...(input.lowStockAt !== undefined ? { lowStockAt: input.lowStockAt } : {}),
     ...(input.sellable !== undefined ? { sellable: input.sellable } : {}),
+    ...(input.kind !== undefined ? { kind: input.kind } : {}),
+    ...(input.kind === "combo" ? { sellable: false } : {}),
   };
   try {
     await getPwaApi().products.patch(id, normalized, requestId);
@@ -849,6 +883,7 @@ export async function syncPendingProducts(businessId: string) {
           lowStockAt?: number;
           gifted?: boolean;
           sellable?: boolean;
+          kind?: ProductKind;
         };
         const remote = await api.products.create(payload, item.requestId);
         return { remoteId: remote.id };
@@ -860,6 +895,7 @@ export async function syncPendingProducts(businessId: string) {
           price?: number;
           lowStockAt?: number;
           sellable?: boolean;
+          kind?: ProductKind;
         };
         const id = await resolveProductEntityId(businessId, item, payload.id);
         const remote = await api.products.patch(id, payload, item.requestId);

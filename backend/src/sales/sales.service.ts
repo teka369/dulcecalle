@@ -177,7 +177,7 @@ export class SalesService {
           if (!product) {
             throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
           }
-          if (product.sellable === false) {
+          if (product.sellable === false || product.kind === "combo") {
             throw new AppError(
               ERROR_CODES.VALIDATION,
               `El producto "${product.name}" es un insumo y no se puede vender.`,

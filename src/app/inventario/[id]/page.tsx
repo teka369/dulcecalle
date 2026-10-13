@@ -16,7 +16,7 @@ import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { primaryImageUrl } from "@/data/media/urls";
-import { dmy, inventoryValue, isLowStock, moveDelta, moveMeta, units } from "@/components/inventory/inventory";
+import { canPrepareFrom, dmy, inventoryValue, isCombo, isLowStock, moveDelta, moveMeta, units } from "@/components/inventory/inventory";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import type {
@@ -171,7 +171,11 @@ export default function ProductoFichaPage() {
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold leading-tight tracking-tight">{product.name}</h1>
             <div className="mt-1 flex flex-wrap gap-1.5">
-              {isInsumo ? <Badge tone="warning">Insumo</Badge> : null}
+              {isCombo(product) ? (
+                <Badge tone="warning">Combo</Badge>
+              ) : isInsumo ? (
+                <Badge tone="warning">Insumo</Badge>
+              ) : null}
               {product.archivedAt ? <Badge tone="danger">Archivado</Badge> : null}
             </div>
           </div>
@@ -191,7 +195,7 @@ export default function ProductoFichaPage() {
         {!product.archivedAt ? (
           <div className="mt-4 flex flex-wrap gap-2">
             <HeroPill primary label="Surtir" href={`/inventario/${product.id}/surtir`} />
-            {isInsumo ? <HeroPill label="Preparar" href={`/inventario/${product.id}/preparar`} /> : null}
+            {canPrepareFrom(product) ? <HeroPill label="Preparar" href={`/inventario/${product.id}/preparar`} /> : null}
           </div>
         ) : null}
       </HeroBlock>
@@ -325,20 +329,26 @@ export default function ProductoFichaPage() {
                 onChange={(e) => setEditLow(e.target.value.replace(/\D/g, ""))}
                 className="mt-2"
               />
-              <label className="mt-3 flex min-h-11 items-start gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={!editSellable}
-                  onChange={(e) => setEditSellable(!e.target.checked)}
-                  className="mt-1 h-5 w-5 shrink-0 rounded border-border"
-                />
-                <span>
-                  <span className="font-medium">Es insumo o combo</span>
-                  <span className="mt-1 block text-ink-muted">
-                    No aparece para vender ni en el catálogo de clientes. Sirve como origen de preparaciones.
+              {isCombo(product) ? (
+                <p className="mt-3 text-sm text-ink-muted">
+                  Es un combo: nunca se vende y es el origen de Preparar.
+                </p>
+              ) : (
+                <label className="mt-3 flex min-h-11 items-start gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={!editSellable}
+                    onChange={(e) => setEditSellable(!e.target.checked)}
+                    className="mt-1 h-5 w-5 shrink-0 rounded border-border"
+                  />
+                  <span>
+                    <span className="font-medium">Es insumo (no se vende)</span>
+                    <span className="mt-1 block text-ink-muted">
+                      No aparece para vender ni en el catálogo de clientes. Para preparar, debe ser combo.
+                    </span>
                   </span>
-                </span>
-              </label>
+                </label>
+              )}
               {editError && !confirmArchive && <p className="mt-2 text-sm text-danger">{editError}</p>}
               <Button type="button" variant="primary" disabled={editBusy} onClick={saveEdit} className="mt-3 w-full">
                 Guardar cambios

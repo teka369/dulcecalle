@@ -10,7 +10,7 @@ import { AmountField } from "@/components/ui/AmountField";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { QtyStepper } from "@/components/inventory/QtyStepper";
-import { units } from "@/components/inventory/inventory";
+import { canPrepareFrom, units } from "@/components/inventory/inventory";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useEffect, useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
@@ -57,8 +57,8 @@ export default function PrepararPage() {
     };
   }, [sourceId]);
 
-  // Preparar only exists for insumo/combo (sellable === false). Sellable → back to the product.
-  const sellable = source != null && source.sellable !== false;
+  // Preparar only exists for kind=combo (TICKET-A J-A3). Anything else → back to the product.
+  const sellable = source != null && !canPrepareFrom(source);
   useEffect(() => {
     if (sellable && sourceId) router.replace(`/inventario/${sourceId}`);
   }, [sellable, sourceId, router]);
