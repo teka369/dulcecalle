@@ -1,13 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useState } from "react";
 import { CUSTOMER_ERRORS } from "@/domain/abono";
 import { useCustomers } from "@/store/customerStore";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { Sheet } from "@/components/ui/Sheet";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { ActionToast } from "@/components/customers/Toast";
 import { Input } from "@/components/ui/Input";
 
 export default function AgregarClientePage() {
@@ -40,52 +41,28 @@ export default function AgregarClientePage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <Link
-          href="/clientes"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </Link>
-        <h1 className="text-[22px] font-semibold">Agregar cliente</h1>
-      </header>
-
-      <Card>
-        <label className="text-sm font-medium" htmlFor="nombre">
-          Nombre
-        </label>
-        <Input
-          id="nombre"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="mt-2"
-          autoComplete="name"
-          autoFocus
-        />
-        {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-      </Card>
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-lg">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={busy}
-            onClick={() => void onSave()}
-            className="w-full"
-          >
-            Guardar cliente
-          </Button>
+    <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
+      <HeroBlock size="compact" back={{ href: "/clientes", label: "Volver a Clientes" }} title="Agregar cliente" />
+      <Sheet>
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide text-ink-muted" htmlFor="nombre">
+            Nombre
+          </label>
+          <Input
+            id="nombre"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="mt-2 h-14 text-lg"
+            autoComplete="name"
+            aria-invalid={error ? true : undefined}
+            autoFocus
+          />
+          {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+          <p className="mt-2 text-sm text-ink-muted">El código lo asigna el sistema. El teléfono se edita en el detalle.</p>
         </div>
-      </div>
-
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white">
-          {toast}
-        </div>
-      )}
+      </Sheet>
+      <ActionBar primary={{ label: "Guardar cliente", onClick: () => void onSave(), busy }} />
+      <ActionToast text={toast} />
     </div>
   );
 }
