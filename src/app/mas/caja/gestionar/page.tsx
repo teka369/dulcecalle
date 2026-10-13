@@ -90,7 +90,7 @@ export default function GestionarCajasPage() {
                     <UiRow
                       key={move.id}
                       title={`${kindLabel(move.kind)} · ${move.method}`}
-                      meta={move.occurredOn}
+                      meta={shortDay(move.occurredOn)}
                       trailing={
                         <>
                           <span className="text-[15px] font-semibold tabular-nums">{formatCop(move.amount)}</span>
