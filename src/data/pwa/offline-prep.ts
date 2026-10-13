@@ -141,7 +141,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
       group: "resumen" as const,
       label: `Estadísticas ${period}`,
       run: async () => {
-        await loadStatsWithOfflineFallback(period);
+        await loadStatsWithOfflineFallback(period, getPrepPwaApi());
       },
     })),
   ];

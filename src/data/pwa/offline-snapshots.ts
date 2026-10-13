@@ -136,10 +136,11 @@ async function saveSnapshot<T>(kind: string, data: T): Promise<SnapshotResult<T>
 
 export function loadStatsWithOfflineFallback(
   period: "hoy" | "semana" | "mes",
+  api?: HttpRepository,
 ): Promise<SnapshotResult<RemoteStats>> {
   return loadWithSnapshot({
     kind: statsSnapshotKind(period),
-    fetch: () => getPwaApi().stats.get(period),
+    fetch: () => (api ?? getPwaApi()).stats.get(period),
     validate: isRemoteStats,
   });
 }
