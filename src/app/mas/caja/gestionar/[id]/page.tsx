@@ -16,6 +16,7 @@ import { kindLabel, moveSign, shortDay } from "@/components/cash/cash";
 import { formatCop } from "@/domain/money";
 import { getPwaApi } from "@/data/pwa/api";
 import { carryCashWithOfflineFallback } from "@/data/pwa/offline-operations";
+import { normalizeSessionDetail } from "@/components/cash/gestionar-offline";
 
 type Detail = {
   id: string;
@@ -54,7 +55,7 @@ export default function GestionarCajaDetailPage() {
     setLoadError(null);
     void getPwaApi()
       .cash.session(params.id)
-      .then((row) => setDetail(row as Detail))
+      .then((row) => setDetail(normalizeSessionDetail<Detail>(row)))
       .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : "No se pudo cargar."));
   }
 

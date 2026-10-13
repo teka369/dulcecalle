@@ -24,3 +24,13 @@ export function GestionarOfflineState() {
     </div>
   );
 }
+
+/** B4 guard: older/partial API shapes may omit the move arrays; never crash Gestionar detalle. */
+export function normalizeSessionDetail<T extends { moves: unknown[]; stampedMoves: unknown[] }>(row: unknown): T {
+  const d = (row ?? {}) as Partial<T>;
+  return {
+    ...(d as T),
+    moves: Array.isArray(d.moves) ? d.moves : [],
+    stampedMoves: Array.isArray(d.stampedMoves) ? d.stampedMoves : [],
+  };
+}
