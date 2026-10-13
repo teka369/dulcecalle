@@ -2,6 +2,7 @@ import {
   ApiError,
   apiErrorFromBody,
   isNetworkError,
+  NetworkError,
   toNetworkError,
 } from "../errors";
 
@@ -86,6 +87,11 @@ export class HttpClient {
     opts: RequestOptions,
     retried: boolean,
   ): Promise<T> {
+    // B8: the browser says it is offline → fail fast as a transport error
+    // without issuing a request (each one logs "Failed to load resource").
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      throw new NetworkError("Sin conexión.");
+    }
     const url = `${this.baseUrl.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
     const headers: Record<string, string> = {};
     if (opts.body !== undefined) headers["Content-Type"] = "application/json";

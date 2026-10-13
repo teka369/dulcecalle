@@ -120,3 +120,15 @@ describe("offline prep uses the 30s API", () => {
     expect(prep).toContain("PREP_VERSION = 9");
   });
 });
+
+describe("B8: offline fast-fail", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("navigator.onLine === false throws NetworkError without calling fetch", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+    const fetchSpy = vi.fn();
+    const http = new HttpClient("http://x.test/v1", new HttpSession(), fetchSpy as unknown as typeof fetch);
+    await expect(http.request("GET", "/customers")).rejects.toBeInstanceOf(NetworkError);
+    await expect(http.request("POST", "/sales", { body: {} })).rejects.toBeInstanceOf(NetworkError);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
