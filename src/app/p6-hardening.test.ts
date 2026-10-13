@@ -67,3 +67,24 @@ describe("PrepModal failed card AA", () => {
     expect(card).not.toContain("text-ink-muted");
   });
 });
+
+describe("Final visual pass fixes", () => {
+  it("H2: Te deben amount uses text-danger, not accent", () => {
+    const s = read(join(ROOT, "components/dashboard/InicioDashboard.tsx"));
+    expect(s).toContain("tabular-nums text-danger\">{formatCop(c.debt)}");
+    expect(s).not.toContain("tabular-nums text-accent\">{formatCop(c.debt)}");
+  });
+  it("(b) /acceso-tienda hides admin chrome", async () => {
+    const { shellHidesChrome } = await import("@/components/shell/shell-chrome");
+    expect(shellHidesChrome("/acceso-tienda")).toBe(true);
+  });
+  it("(c) Pendiente tab sits in the SyncPill row, not mid-sheet", () => {
+    const s = read(join(ROOT, "components/shell/PrepIndicator.tsx"));
+    expect(s).not.toContain("vertical-rl");
+    expect(s).not.toContain("9.5rem");
+    expect(read(join(ROOT, "components/shell/SyncPill.tsx"))).toContain("calc(100%_-_7rem)");
+  });
+  it("(d) metric values shrink to fit at 320", () => {
+    expect(read(join(ROOT, "components/ui/SegmentedMetrics.tsx"))).toContain("text-[clamp(0.75rem,3.9vw,1rem)]");
+  });
+});

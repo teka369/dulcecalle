@@ -219,4 +219,16 @@ describe("WCAG AA contrast from globals.css tokens", () => {
     }
     console.info(report.join("\n"));
   });
+
+  it("H2: Inicio «Te deben» amount (text-danger on surface) reaches AA", () => {
+    const report: string[] = [];
+    for (const [id, mode] of combos) {
+      const t = tokens(id, mode);
+      const r = ratio(resolveMix(t["--danger"]), resolveMix(t["--surface"]));
+      const before = ratio(resolveMix(t["--accent"]), resolveMix(t["--surface"]));
+      report.push(`${id}:${mode} danger ${r.toFixed(2)} accent(before) ${before.toFixed(2)}`);
+      expect(r, `${id}:${mode}`).toBeGreaterThanOrEqual(4.5);
+    }
+    console.info(report.join("\n"));
+  });
 });

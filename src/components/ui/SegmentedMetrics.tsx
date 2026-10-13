@@ -18,13 +18,13 @@ const WELL = {
 } as const;
 
 function Cell({ icon, label, value, detail, href, tone = "neutral" }: MetricItem) {
-  const cls = "flex min-h-[4.5rem] min-w-0 flex-col justify-center gap-1.5 px-3 py-3";
+  const cls = "flex min-h-[4.5rem] min-w-0 flex-col justify-center gap-1.5 px-2 py-3 min-[380px]:px-3";
   const inner = (
     <>
       <span className={`flex size-8 items-center justify-center rounded-[var(--r-sm)] ${WELL[tone]}`}>
         <GlyphIcon name={icon} />
       </span>
-      <span className="block truncate text-base font-semibold leading-tight tabular-nums text-ink">{value}</span>
+      <span className="block truncate text-[clamp(0.75rem,3.9vw,1rem)] font-semibold leading-tight tracking-tight tabular-nums text-ink" title={value}>{value}</span>
       <span className="block text-xs leading-tight text-ink-muted">
         {label}
         {detail ? <span className="block">{detail}</span> : null}

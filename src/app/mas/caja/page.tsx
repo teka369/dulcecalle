@@ -15,7 +15,7 @@ import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
-import { CASH_OFFLINE_NOCACHE, cashOfflineView, kindLabel, moveSign, shortDay } from "@/components/cash/cash";
+import { CASH_OFFLINE_NOCACHE, cashOfflineView, cashPageGate, kindLabel, moveSign, shortDay } from "@/components/cash/cash";
 import { useSync } from "@/store/syncStore";
 import { usePrep } from "@/store/prepStore";
 import { useCallback, useEffect, useState } from "react";
@@ -89,7 +89,8 @@ export default function CajaPage() {
   const hasLocalData = summary != null && (summary.session != null || summary.moves.length > 0 || summary.pendingCount > 0);
   const offlineView = cashOfflineView({ online, preparedAt: lastReadyAt, hasLocalData });
 
-  if (ready && (loadError || offlineView === "offline-nocache") && (!summary || !hasLocalData)) {
+  const gate = cashPageGate({ source: cashStore.getSnapshot().source, loadError, offlineView, hasLocalData });
+  if (ready && gate !== "ok") {
     return (
       <div className="flex flex-col pb-6">
         <HeroBlock
@@ -99,7 +100,7 @@ export default function CajaPage() {
           offline={online ? null : { text: "Sin conexión" }}
         />
         <Sheet>
-          {offlineView === "offline-nocache" ? (
+          {gate === "offline" ? (
             <StateBlock kind="offline-miss" title={CASH_OFFLINE_NOCACHE.title} body={CASH_OFFLINE_NOCACHE.body} action={retryButton} />
           ) : (
             <StateBlock kind="error" title="No se pudo cargar." body={loadError ?? undefined} action={retryButton} />

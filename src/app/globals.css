@@ -327,10 +327,10 @@ html[data-actionbar="nav"] .sync-pill {
 /* PrepIndicator edge tab: same low anchor on every route (no mid-sheet float);
    lifts with the SyncPill when a fixed ActionBar is present. */
 html[data-actionbar="on"] .prep-tab {
-  bottom: calc(var(--actionbar-h) + var(--syncpill-h) + 1rem);
+  bottom: calc(var(--actionbar-h) + 0.5rem);
 }
 html[data-actionbar="nav"] .prep-tab {
-  bottom: calc(var(--actionbar-h) + var(--nav-h) + var(--syncpill-h) + 1rem);
+  bottom: calc(var(--actionbar-h) + var(--nav-h) + 0.5rem);
 }
 
 /* P6 hardening: visible focus on hero and sheet in every theme. */

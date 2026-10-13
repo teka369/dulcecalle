@@ -51,10 +51,12 @@ export function PrepIndicator() {
           aria-label={label}
           aria-expanded={false}
           aria-controls="prep-panel"
-          className={`prep-tab fixed z-[65] flex min-h-11 items-center bottom-[calc(9.5rem+env(safe-area-inset-bottom))] rounded-l-[var(--r-md)] border border-r-0 bg-surface py-2 pl-1.5 pr-1 text-[11px] font-semibold shadow-[var(--shadow-md)] ${TAB_TONE[phase] ?? "border-border text-ink"}`}
-          style={{ right: "env(safe-area-inset-right)" }}
+          className={`prep-tab fixed z-50 flex min-h-11 max-w-[6rem] items-center gap-1 rounded-[var(--r-pill)] border bg-surface px-3 text-xs font-semibold shadow-[var(--shadow-md)] bottom-[calc(5.5rem+env(safe-area-inset-bottom))] ${TAB_TONE[phase] ?? "border-border text-ink"}`}
+          style={{ right: "max(calc(0.75rem + env(safe-area-inset-right)), calc((100vw - 32rem) / 2 + 0.75rem))" }}
         >
-          <span aria-hidden className="[writing-mode:vertical-rl] rotate-180">
+          {/* Same row as the SyncPill (right slot it leaves free), inside the
+              reserved bottom padding — never a mid-sheet tab over the rows. */}
+          <span aria-hidden className="truncate">
             {mark} {shortFor(phase, stale)}
           </span>
         </button>

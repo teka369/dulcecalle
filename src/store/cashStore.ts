@@ -45,6 +45,8 @@ type CashState = {
   expenses: RemoteExpense[];
   loading: boolean;
   lastToast: string | null;
+  /** server = real API response; local = fallback snapshot after a network error/timeout/offline. */
+  source: "server" | "local" | null;
 };
 
 const listeners = new Set<() => void>();
@@ -54,6 +56,7 @@ let state: CashState = {
   expenses: [],
   loading: false,
   lastToast: null,
+  source: null,
 };
 
 function emit() {
@@ -87,13 +90,13 @@ export const cashStore = {
       const api = getPwaApi();
       const [today, expenses] = await Promise.all([api.cash.today(), api.cash.expenses()]);
       const summary = toSummary(today);
-      setState({ summary, expenses, loading: false });
+      setState({ summary, expenses, loading: false, source: "server" });
       return summary;
     } catch (e) {
       if (e instanceof NetworkError) {
         try {
           const local = await getLocalCashSnapshot();
-          setState({ summary: local.summary, expenses: local.expenses, loading: false });
+          setState({ summary: local.summary, expenses: local.expenses, loading: false, source: "local" });
           return local.summary;
         } catch (localError) {
           setState({ loading: false });
