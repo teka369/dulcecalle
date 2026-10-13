@@ -91,3 +91,21 @@ test("inicio: totals and shortcuts are divided rows in the sheet, not cards/tile
   for (const name of ["Cuenta", "Compras", "Pagos"]) await expect(shortcuts.getByRole("link", { name: new RegExp(name) })).toBeVisible();
   await expect(shortcuts).toHaveClass(/divide-y/);
 });
+
+test("B7: at 320px every portal tab is fully visible (no tab cut off)", async ({ context, page }) => {
+  await portal(context);
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto("/cliente");
+  const tabs = page.getByTestId("portal-tabs").getByRole("link");
+  await expect(tabs).toHaveCount(6);
+  const vw = 320;
+  for (const box of await tabs.evaluateAll((els) => els.map((e) => {
+    const r = e.getBoundingClientRect();
+    return { l: r.left, r: r.right, sw: e.scrollWidth, cw: e.clientWidth };
+  }))) {
+    expect(box.l).toBeGreaterThanOrEqual(0);
+    expect(box.r).toBeLessThanOrEqual(vw);
+    expect(box.sw).toBeLessThanOrEqual(box.cw + 1);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
