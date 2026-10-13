@@ -24,6 +24,31 @@ export type RequestOptions = {
   skipRefresh?: boolean;
 };
 
+/** GET reads give up after this long and surface as NetworkError (writes are never timed out). */
+export const READ_TIMEOUT_MS = 10_000;
+
+/**
+ * Timeout signal for reads. Built on a plain timer (same effect as
+ * AbortSignal.timeout, but works on every runtime and under fake timers).
+ * `expired` rejects with a TimeoutError so a fetch that ignores the signal
+ * still cannot hang the caller.
+ */
+function readTimeout(ms: number): { signal: AbortSignal; expired: Promise<never>; clear: () => void } {
+  const ctrl = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const err = typeof DOMException !== "undefined"
+        ? new DOMException("The operation timed out.", "TimeoutError")
+        : Object.assign(new Error("The operation timed out."), { name: "TimeoutError" });
+      ctrl.abort(err);
+      reject(err);
+    }, ms);
+  });
+  expired.catch(() => undefined);
+  return { signal: ctrl.signal, expired, clear: () => clearTimeout(timer) };
+}
+
 function isAuthRefreshPath(path: string): boolean {
   return (
     /\/auth\/(refresh|login|register)$/.test(path) ||
@@ -71,18 +96,26 @@ export class HttpClient {
     const body =
       opts.body !== undefined ? JSON.stringify(opts.body) : undefined;
 
+    // Only GET reads are timed out; POST/PUT/PATCH/DELETE keep no deadline.
+    const timeout = method === "GET" ? readTimeout(READ_TIMEOUT_MS) : null;
     let res: Response;
+    let text!: string;
     try {
-      res = await this.fetchImpl(url, {
+      const request = this.fetchImpl(url, {
         method,
         headers,
         body,
+        ...(timeout ? { signal: timeout.signal } : {}),
       });
+      res = timeout ? await Promise.race([request, timeout.expired]) : await request;
+      if (timeout) text = await Promise.race([res.text(), timeout.expired]);
     } catch (e) {
+      timeout?.clear();
       throw toNetworkError(e);
     }
+    if (timeout) timeout.clear();
+    else text = await res.text();
 
-    const text = await res.text();
     let parsed: unknown = null;
     if (text) {
       try {
