@@ -15,7 +15,7 @@ import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
-import { kindLabel, moveSign } from "@/components/cash/cash";
+import { kindLabel, moveSign, shortDay } from "@/components/cash/cash";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import {
@@ -119,7 +119,7 @@ export default function CajaPage() {
   if (noSession) {
     return (
       <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
-        <HeroBlock size="medium" back={{ href: "/mas", label: "Volver a Más" }} title={CASH_COPY.titleCaja} subtitle={summary.localDate}>
+        <HeroBlock size="medium" back={{ href: "/mas", label: "Volver a Más" }} title={CASH_COPY.titleCaja} subtitle={shortDay(summary.localDate)}>
           <p className="mt-5 text-2xl font-semibold">{CASH_COPY.estadoCerrada}</p>
           <p className="mt-1 text-sm text-on-hero-muted">{CASH_COPY.emptyCerrada}</p>
         </HeroBlock>
@@ -133,7 +133,7 @@ export default function CajaPage() {
             error={error}
           />
         </Sheet>
-        <ActionBar primary={{ label: CASH_COPY.abrirCaja, onClick: () => void onAbrir(), busy }} />
+        <ActionBar aboveNav primary={{ label: CASH_COPY.abrirCaja, onClick: () => void onAbrir(), busy }} />
         <ActionToast text={toast} />
       </div>
     );
@@ -145,7 +145,7 @@ export default function CajaPage() {
         size="medium"
         back={{ href: "/mas", label: "Volver a Más" }}
         title={CASH_COPY.titleCaja}
-        subtitle={`${summary.localDate} · ${closed ? CASH_COPY.estadoCerrada : CASH_COPY.estadoAbierta}`}
+        subtitle={`${shortDay(summary.localDate)} · ${closed ? CASH_COPY.estadoCerrada : CASH_COPY.estadoAbierta}`}
         action={open ? <HeroPill label={CASH_COPY.cerrarCaja} href="/mas/caja/cerrar" /> : undefined}
       >
         <div className="mt-5">

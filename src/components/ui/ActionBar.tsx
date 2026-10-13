@@ -33,7 +33,7 @@ export function useActionBarMark(aboveNav: boolean) {
 export function ActionBar({ primary, summary, aboveNav = false }: ActionBarProps) {
   useActionBarMark(aboveNav);
   const bottom = aboveNav
-    ? "bottom-[calc(4.75rem+max(0.75rem,env(safe-area-inset-bottom)))]"
+    ? "bottom-[calc(var(--nav-h)+max(0.75rem,env(safe-area-inset-bottom)))]"
     : "bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]";
   return (
     <div className={`fixed inset-x-0 z-40 ${bottom}`}>

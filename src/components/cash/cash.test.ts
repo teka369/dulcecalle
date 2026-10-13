@@ -66,3 +66,12 @@ describe("cerrar caja difference", () => {
     expect(sumAmounts([{ amount: 3000 }, { amount: 4500 }])).toBe(7500);
   });
 });
+
+import { shortDay } from "./cash";
+describe("shortDay (§3.22)", () => {
+  it("formats local dates as «mar 13 oct»", () => {
+    expect(shortDay("2026-10-13")).toBe("mar 13 oct");
+    expect(shortDay("2026-01-04")).toBe("dom 4 ene");
+    expect(shortDay("bad")).toBe("bad");
+  });
+});

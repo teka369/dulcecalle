@@ -92,3 +92,15 @@ export function dineroCells(s: StatsLike) {
 export function sumAmounts(list: ReadonlyArray<{ amount: number }>): number {
   return list.reduce((a, b) => a + b.amount, 0);
 }
+
+const WD = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const MO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic"];
+
+/** §3.22 short Bogotá day label from a YYYY-MM-DD local date: «mar 13 oct». */
+export function shortDay(localDate: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(localDate ?? "");
+  if (!m) return localDate ?? "";
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const wd = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+  return `${WD[wd]} ${d} ${MO[mo - 1]}`;
+}
