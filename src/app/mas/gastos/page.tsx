@@ -62,7 +62,7 @@ export default function GastosPage() {
   const canAdd = !closed && hasSession;
   const offlineView = cashOfflineView({ online, preparedAt: lastReadyAt, hasLocalData: hasSession || expenses.length > 0 });
 
-  const gate = cashPageGate({ loadError, offlineView, hasLocalData: hasSession || expenses.length > 0 });
+  const gate = cashPageGate({ source: cashStore.getSnapshot().source, loadError, offlineView, hasLocalData: hasSession || expenses.length > 0 });
   if (gate !== "ok") {
     return (
       <div className="flex flex-col pb-6">

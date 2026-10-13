@@ -89,7 +89,7 @@ export default function CajaPage() {
   const hasLocalData = summary != null && (summary.session != null || summary.moves.length > 0 || summary.pendingCount > 0);
   const offlineView = cashOfflineView({ online, preparedAt: lastReadyAt, hasLocalData });
 
-  const gate = cashPageGate({ loadError, offlineView, hasLocalData });
+  const gate = cashPageGate({ source: cashStore.getSnapshot().source, loadError, offlineView, hasLocalData });
   if (ready && gate !== "ok") {
     return (
       <div className="flex flex-col pb-6">

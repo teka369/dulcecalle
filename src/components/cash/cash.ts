@@ -145,8 +145,11 @@ export function cashPageGate(input: {
   loadError: string | null;
   offlineView: CashOfflineView;
   hasLocalData: boolean;
+  /** cashStore source: a local fallback with nothing in it is unknown, not «no caja». */
+  source?: "server" | "local" | null;
 }): "error" | "offline" | "ok" {
   if (input.hasLocalData) return "ok";
+  if (input.source === "local") return input.offlineView === "online" ? "error" : "offline";
   if (input.offlineView === "offline-nocache") return "offline";
   if (input.loadError) return "error";
   return "ok";
