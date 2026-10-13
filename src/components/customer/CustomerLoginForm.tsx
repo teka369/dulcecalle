@@ -6,7 +6,6 @@ import { ApiError } from "@/data/errors";
 import { getCustomerApi } from "@/data/http/customer-api";
 import { validateCustomerLoginInput } from "@/domain/customer-code";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 
 export function CustomerLoginForm({ showBack = false }: { showBack?: boolean }) {
@@ -49,7 +48,8 @@ export function CustomerLoginForm({ showBack = false }: { showBack?: boolean }) 
         </p>
       </div>
 
-      <Card>
+      {/* Fields sit directly on the sheet (no nested card). */}
+      <div data-testid="login-fields">
         <label className="text-sm font-medium" htmlFor="codigo-cliente">
           Código de cliente
         </label>
@@ -75,7 +75,7 @@ export function CustomerLoginForm({ showBack = false }: { showBack?: boolean }) 
           maxLength={6}
         />
         {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-      </Card>
+      </div>
 
       <Button
         type="button"

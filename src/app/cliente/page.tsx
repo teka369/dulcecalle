@@ -6,8 +6,8 @@ import { debtHero } from "@/components/customer/portal";
 import { customerPortalSummary, customerPortalTotals } from "@/data/pwa/customer-portal";
 import { formatCop } from "@/domain/money";
 import { HeroAmount } from "@/components/ui/HeroAmount";
-import { SegmentedMetrics } from "@/components/ui/SegmentedMetrics";
-import { QuickTiles } from "@/components/ui/QuickTiles";
+import { RowGroup } from "@/components/ui/RowGroup";
+import { Row } from "@/components/ui/Row";
 
 export default function CustomerHomePage() {
   // loadCachedCustomerLedger via usePortalLedger (server, else own cache; capturedAt → offline band).
@@ -50,20 +50,22 @@ export default function CustomerHomePage() {
         </div>
       }
     >
-      <SegmentedMetrics
-        label="Tus totales"
-        items={[
-          { icon: "bag", label: "Total comprado", value: formatCop(totalComprado) },
-          { icon: "cash", label: "Total abonado", value: formatCop(totalAbonado), tone: "ok" },
-        ]}
-      />
-      <QuickTiles
-        tiles={[
-          { href: "/cliente/cuenta", label: "Cuenta", icon: "clock" },
-          { href: "/cliente/compras", label: "Compras", icon: "bag" },
-          { href: "/cliente/pagos", label: "Pagos", icon: "cash" },
-        ]}
-      />
+      {/* Metrics and shortcuts are rows with dividers in the sheet, not floating cards. */}
+      <RowGroup label="Tus totales">
+        <Row
+          title="Total comprado"
+          trailing={<span className="text-[15px] font-semibold tabular-nums">{formatCop(totalComprado)}</span>}
+        />
+        <Row
+          title="Total abonado"
+          trailing={<span className="text-[15px] font-semibold tabular-nums text-ok">{formatCop(totalAbonado)}</span>}
+        />
+      </RowGroup>
+      <RowGroup label="Accesos">
+        <Row href="/cliente/cuenta" title="Cuenta" meta="Movimientos y saldo" />
+        <Row href="/cliente/compras" title="Compras" meta="Lo que has comprado" />
+        <Row href="/cliente/pagos" title="Pagos" meta="Abonos y deuda anterior" />
+      </RowGroup>
       <p className="text-xs text-ink-muted">
         Última actualización{" "}
         {capturedAt ? new Date(capturedAt).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
