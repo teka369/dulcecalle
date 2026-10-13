@@ -4,13 +4,12 @@ import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  abonoRemainingHelper,
   parseAbonoAmount,
   validateAbono,
 } from "@/domain/abono";
 import { formatCop } from "@/domain/money";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
-import { ABONO_METHODS } from "@/components/customers/clientes";
+import { ABONO_METHODS, abonoView } from "@/components/customers/clientes";
 import type { PayMethod } from "@/domain/types";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import { useEntityId } from "@/components/shell/entity-route";
@@ -66,8 +65,8 @@ export default function RegistrarAbonoPage() {
 
   const helper = useMemo(() => {
     if (!customer || amount == null) return null;
-    return abonoRemainingHelper(customer.debt, amount);
-  }, [customer, amount]);
+    return abonoView(customer.debt, amountRaw, method).remainingText;
+  }, [customer, amount, amountRaw, method]);
 
   const canSubmit = useMemo(() => {
     if (!customer) return false;
