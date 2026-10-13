@@ -59,3 +59,11 @@ describe("P6 tester fixes", () => {
     expect(read(join(ROOT, "components/shell/PrepModal.tsx"))).toContain('<span className="min-w-0 truncate">{task.label}</span>');
   });
 });
+
+describe("PrepModal failed card AA", () => {
+  it("no ink-muted text inside the danger-soft card", () => {
+    const s = read(join(ROOT, "components/shell/PrepModal.tsx"));
+    const card = s.slice(s.indexOf("bg-danger-soft"), s.indexOf("Reintentar", s.indexOf("bg-danger-soft")));
+    expect(card).not.toContain("text-ink-muted");
+  });
+});

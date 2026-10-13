@@ -204,4 +204,19 @@ describe("WCAG AA contrast from globals.css tokens", () => {
     }
     console.info(report.join("\n"));
   });
+
+  it("PrepModal «Preparación incompleta» card: body text on danger-soft reaches AA (muted was <4.5)", () => {
+    const report: string[] = [];
+    for (const [id, mode] of combos) {
+      const t = tokens(id, mode);
+      const bg = resolveMix(t["--danger-soft"]);
+      const ink = ratio(resolveMix(t["--ink"]), bg);
+      const muted = ratio(resolveMix(t["--ink-muted"]), bg);
+      const danger = ratio(resolveMix(t["--danger"]), bg);
+      report.push(`${id}:${mode} ink ${ink.toFixed(2)} muted(before) ${muted.toFixed(2)} danger ${danger.toFixed(2)}`);
+      expect(ink, `${id}:${mode} ink/danger-soft`).toBeGreaterThanOrEqual(4.5);
+      expect(danger, `${id}:${mode} danger/danger-soft`).toBeGreaterThanOrEqual(4.5);
+    }
+    console.info(report.join("\n"));
+  });
 });

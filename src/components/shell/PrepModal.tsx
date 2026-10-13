@@ -138,7 +138,7 @@ export function PrepModal() {
             {phase === "failed" && (
               <div className="mt-4 rounded-[var(--r-lg)] border border-danger/30 bg-danger-soft p-3">
                 <p className="text-sm font-semibold">Preparación incompleta</p>
-                <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                <p className="mt-1 text-xs leading-relaxed text-ink">
                   {completed} de {total} tareas completadas. Faltan datos
                   necesarios:
                 </p>
@@ -150,7 +150,7 @@ export function PrepModal() {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+                <p className="mt-2 text-xs leading-relaxed text-ink">
                   No estás listo para trabajar sin conexión.
                 </p>
                 <button
