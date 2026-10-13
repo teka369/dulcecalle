@@ -6,7 +6,13 @@ import { formatCop } from "@/domain/money";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import { weekTotal, type WeekDay } from "@/domain/dashboard/week";
 import { loadWeekSeries } from "./week-source";
-import { syncThemeColor } from "@/theme/storage";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { HeroPill } from "@/components/ui/HeroPill";
+import { Sheet } from "@/components/ui/Sheet";
+import { SectionHead } from "@/components/ui/SectionHead";
+import { SegmentedMetrics } from "@/components/ui/SegmentedMetrics";
+import { QuickTiles } from "@/components/ui/QuickTiles";
+import { Chevron, Cloud, GlyphIcon } from "@/components/ui/icons";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
@@ -17,88 +23,6 @@ const QUICK_LINKS = [
   { href: "/mas/gastos", label: "Gastos", icon: "bag" },
 ] as const;
 
-type Glyph = "alert" | "package" | "users" | "cash" | "bag" | "plus";
-
-function GlyphIcon({ name }: { name: Glyph }) {
-  const common = {
-    width: 20,
-    height: 20,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.75,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    "aria-hidden": true as const,
-  };
-  switch (name) {
-    case "alert":
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="8" />
-          <path d="M12 8v5" />
-          <path d="M12 16.5h.01" />
-        </svg>
-      );
-    case "package":
-      return (
-        <svg {...common}>
-          <path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3z" />
-          <path d="M12 12 20 7.5M12 12v9M12 12 4 7.5" />
-        </svg>
-      );
-    case "users":
-      return (
-        <svg {...common}>
-          <circle cx="9" cy="8" r="3.25" />
-          <path d="M2.5 19c.6-3.2 2.9-5 6.5-5s5.9 1.8 6.5 5" />
-          <circle cx="17" cy="9" r="2.5" />
-          <path d="M16 14c2.4.3 4.2 1.5 4.8 4" />
-        </svg>
-      );
-    case "cash":
-      return (
-        <svg {...common}>
-          <rect x="3" y="6" width="18" height="12" rx="2" />
-          <circle cx="12" cy="12" r="2.25" />
-          <path d="M6 10v.01M18 14v.01" />
-        </svg>
-      );
-    case "bag":
-      return (
-        <svg {...common}>
-          <path d="M6 8h12l-1 12H7L6 8z" />
-          <path d="M9 8V7a3 3 0 0 1 6 0v1" />
-        </svg>
-      );
-    case "plus":
-      return (
-        <svg {...common}>
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      );
-  }
-}
-
-function Chevron() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      className="shrink-0 opacity-70"
-    >
-      <path d="m9 6 6 6-6 6" />
-    </svg>
-  );
-}
-
 function salesCaption(count: number): string {
   if (count === 0) return "Sin ventas registradas hoy";
   return `${count} ${count === 1 ? "venta" : "ventas"}`;
@@ -108,15 +32,15 @@ function salesCaption(count: number): string {
 function cajaPill(snap: DashboardSnapshot): {
   href: string;
   label: string;
-  dot: string | null;
+  dot: "ok" | "warning" | "danger" | null;
 } {
   switch (snap.cajaState) {
     case "open":
-      return { href: "/mas/caja", label: "Caja abierta", dot: "bg-ok" };
+      return { href: "/mas/caja", label: "Caja abierta", dot: "ok" };
     case "pending":
-      return { href: "/mas/caja/gestionar", label: "Caja pendiente", dot: "bg-warning" };
+      return { href: "/mas/caja/gestionar", label: "Caja pendiente", dot: "warning" };
     case "conflict":
-      return { href: "/mas/caja", label: "Revisar caja", dot: "bg-danger" };
+      return { href: "/mas/caja", label: "Revisar caja", dot: "danger" };
     default:
       return { href: "/mas/caja", label: "Abrir caja", dot: null };
   }
@@ -196,82 +120,9 @@ function WeekChart({ days }: { days: WeekDay[] }) {
   );
 }
 
-function Cloud() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.5A3.3 3.3 0 0 0 7 18z" />
-      <path d="m4 4 16 16" />
-    </svg>
-  );
-}
-
 /** Full-bleed hero shell shared by dashboard, skeleton and error states. */
 export function InicioHero({ children, busy }: { children: ReactNode; busy?: boolean }) {
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.hero = "on";
-    syncThemeColor();
-    return () => {
-      delete root.dataset.hero;
-      syncThemeColor();
-    };
-  }, []);
-  return (
-    <section
-      className="-mx-4 -mt-4 bg-hero px-4 pb-10 pt-[max(1rem,env(safe-area-inset-top))] text-on-hero lg:mt-0 lg:rounded-t-[28px] lg:pt-6"
-      aria-busy={busy || undefined}
-    >
-      {children}
-    </section>
-  );
-}
-
-function MetricCell({
-  href,
-  icon,
-  value,
-  label,
-  detail,
-  tone = "neutral",
-}: {
-  href: string;
-  icon: Glyph;
-  value: string;
-  label: string;
-  detail?: string;
-  tone?: "neutral" | "danger" | "accent";
-}) {
-  const well =
-    tone === "danger"
-      ? "bg-danger-soft text-danger"
-      : tone === "accent"
-        ? "bg-info-soft text-accent"
-        : "bg-surface-2 text-ink";
-  return (
-    <Link href={href} className="flex min-h-[4.5rem] min-w-0 flex-col justify-center gap-1.5 px-3 py-3">
-      <span className={`flex size-8 items-center justify-center rounded-[var(--r-sm)] ${well}`}>
-        <GlyphIcon name={icon} />
-      </span>
-      <span className="block truncate text-base font-semibold leading-tight tabular-nums text-ink">
-        {value}
-      </span>
-      <span className="block text-xs leading-tight text-ink-muted">
-        {label}
-        {detail ? <span className="block">{detail}</span> : null}
-      </span>
-    </Link>
-  );
-}
-
-function SectionHead({ title, href, link }: { title: string; href: string; link: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-2">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{title}</h2>
-      <Link href={href} className="text-xs font-semibold text-ink underline underline-offset-2">
-        {link}
-      </Link>
-    </div>
-  );
+  return <HeroBlock busy={busy}>{children}</HeroBlock>;
 }
 
 export function InicioDashboard({
@@ -322,13 +173,7 @@ export function InicioDashboard({
             ) : null}
             <p className="mt-0.5 text-xs text-on-hero-muted">{snap.dateLabel}</p>
           </div>
-          <Link
-            href={pill.href}
-            className="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[var(--r-pill)] border border-[color-mix(in_srgb,var(--on-hero)_20%,transparent)] bg-[color-mix(in_srgb,var(--on-hero)_12%,transparent)] px-3 text-sm font-semibold"
-          >
-            {pill.dot ? <span className={`size-2 rounded-full ${pill.dot}`} aria-hidden /> : null}
-            {pill.label}
-          </Link>
+          <HeroPill href={pill.href} label={pill.label} dot={pill.dot} />
         </header>
 
         <div className="mt-7" aria-label="Ventas de hoy">
@@ -363,49 +208,35 @@ export function InicioDashboard({
         </div>
       </InicioHero>
 
-      <section className="-mx-4 -mt-6 flex flex-col gap-6 rounded-t-[28px] bg-bg px-4 pb-2 pt-5 shadow-[0_-8px_24px_rgba(0,0,0,.12)]">
-        <div
-          className="grid grid-cols-3 divide-x divide-border overflow-hidden rounded-[var(--r-lg)] border border-border bg-surface"
-          aria-label="Señales del día"
-        >
-          <MetricCell
-            href="/inventario"
-            icon="alert"
-            value={String(snap.lowStockCount)}
-            label="Stock bajo"
-            tone={snap.lowStockCount > 0 ? "danger" : "neutral"}
-          />
-          <MetricCell href="/inventario" icon="package" value={String(snap.productCount)} label="Productos" />
-          <MetricCell
-            href="/clientes"
-            icon="users"
-            value={formatCop(snap.debtTotal)}
-            label="Por cobrar"
-            detail={
-              snap.debtorCount > 0
-                ? `${snap.debtorCount} ${snap.debtorCount === 1 ? "fiado" : "fiados"}`
-                : undefined
-            }
-            tone={snap.debtTotal > 0 ? "accent" : "neutral"}
-          />
-        </div>
+      <Sheet>
+        <SegmentedMetrics
+          label="Señales del día"
+          items={[
+            {
+              href: "/inventario",
+              icon: "alert",
+              value: String(snap.lowStockCount),
+              label: "Stock bajo",
+              tone: snap.lowStockCount > 0 ? "danger" : "neutral",
+            },
+            { href: "/inventario", icon: "package", value: String(snap.productCount), label: "Productos" },
+            {
+              href: "/clientes",
+              icon: "users",
+              value: formatCop(snap.debtTotal),
+              label: "Por cobrar",
+              detail:
+                snap.debtorCount > 0
+                  ? `${snap.debtorCount} ${snap.debtorCount === 1 ? "fiado" : "fiados"}`
+                  : undefined,
+              tone: snap.debtTotal > 0 ? "accent" : "neutral",
+            },
+          ]}
+        />
 
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Accesos rápidos</h2>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {quick.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex min-h-[5.75rem] flex-col items-center justify-center gap-2 rounded-[var(--r-lg)] border border-border bg-surface px-2 py-3 text-center"
-              >
-                <span className="flex size-11 items-center justify-center rounded-full bg-primary/25 text-ink">
-                  <GlyphIcon name={item.icon} />
-                </span>
-                <span className="text-xs font-semibold leading-tight text-ink">{item.label}</span>
-              </Link>
-            ))}
-          </div>
+          <QuickTiles tiles={quick} />
         </div>
 
         <Link
@@ -423,7 +254,7 @@ export function InicioDashboard({
         </Link>
 
         <section className="flex flex-col gap-2" aria-label="Fiados pendientes">
-          <SectionHead title="Fiados pendientes" href="/clientes" link="Ver todos" />
+          <SectionHead title="Fiados pendientes" link={{ href: "/clientes", label: "Ver todos" }} />
           <div className="overflow-hidden rounded-[var(--r-lg)] border border-border bg-surface">
             {snap.debtorCount === 0 ? (
               <p className="px-3 py-2.5 text-sm text-ink-muted">Nadie debe…</p>
@@ -447,7 +278,7 @@ export function InicioDashboard({
         </section>
 
         <section className="flex flex-col gap-2" aria-label="Atención en inventario">
-          <SectionHead title="Atención en inventario" href="/inventario" link="Ver inventario" />
+          <SectionHead title="Atención en inventario" link={{ href: "/inventario", label: "Ver inventario" }} />
           <div className="overflow-hidden rounded-[var(--r-lg)] border border-border bg-surface">
             {snap.lowStockCount === 0 ? (
               <p className="px-3 py-2.5 text-sm text-ink-muted">Nada en poco stock</p>
@@ -477,7 +308,7 @@ export function InicioDashboard({
             Cargar demo
           </Button>
         ) : null}
-      </section>
+      </Sheet>
 
       {toast && (
         <div className="fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] left-1/2 z-[70] max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-center text-sm text-bg">

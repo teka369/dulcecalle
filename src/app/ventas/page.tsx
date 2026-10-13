@@ -3,14 +3,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Empty } from "@/components/ui/Empty";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Spinner } from "@/components/ui/Spinner";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { HeroAmount } from "@/components/ui/HeroAmount";
+import { HeroPill } from "@/components/ui/HeroPill";
+import { HeroSegmented } from "@/components/ui/HeroSegmented";
+import { Sheet } from "@/components/ui/Sheet";
+import { SectionHead } from "@/components/ui/SectionHead";
+import { RowGroup } from "@/components/ui/RowGroup";
+import { Row } from "@/components/ui/Row";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { SkeletonRows } from "@/components/ui/Skeleton";
+import { PendingBadge } from "@/components/ui/StatusBadge";
 import { formatCop } from "@/domain/money";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import { listCachedCustomers } from "@/data/pwa/catalog";
 import { listSalesWithOfflineFallback, type LocalSaleRow } from "@/data/pwa/offline-sales";
+import { summarizeSales } from "@/components/sale/checkout";
+import { bogotaKey, dayHeading, groupByDay, saleTime } from "@/components/sale/sales-list";
 
 const kindLabel: Record<string, string> = {
   paid: "Pagada",
@@ -33,20 +42,6 @@ function kindTone(kind: string): BadgeTone {
   return "info";
 }
 
-function todayLocalKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function saleDateLabel(sale: LocalSaleRow): string {
-  if (sale.occurredOn) return sale.occurredOn;
-  if (sale.createdAt) {
-    const d = new Date(sale.createdAt);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }
-  return "";
-}
-
 export default function VentasPage() {
   const [sales, setSales] = useState<LocalSaleRow[]>([]);
   const [customers, setCustomers] = useState<RemoteCustomer[]>([]);
@@ -55,7 +50,8 @@ export default function VentasPage() {
   const [ready, setReady] = useState(false);
   const [filter, setFilter] = useState<FilterKind>("all");
 
-  useEffect(() => {
+  function load() {
+    setError(null);
     void listSalesWithOfflineFallback()
       .then((result) => {
         setSales(result.sales);
@@ -65,6 +61,10 @@ export default function VentasPage() {
         setError(e instanceof Error ? e.message : "No se pudo cargar.");
       })
       .finally(() => setReady(true));
+  }
+
+  useEffect(() => {
+    load();
     void listCachedCustomers()
       .then(setCustomers)
       .catch(() => setCustomers([]));
@@ -76,120 +76,132 @@ export default function VentasPage() {
     return map;
   }, [customers]);
 
-  const todayKey = useMemo(() => todayLocalKey(), []);
+  const [todayKey] = useState(() => bogotaKey(Date.now()));
 
-  const todayCount = useMemo(
-    () => sales.filter((s) => saleDateLabel(s) === todayKey).length,
-    [sales, todayKey],
+  const filtered = useMemo(
+    () => (filter === "all" ? sales : sales.filter((s) => s.paymentKind === filter)),
+    [sales, filter],
   );
-
-  const filtered = useMemo(() => {
-    if (filter === "all") return sales;
-    return sales.filter((s) => s.paymentKind === filter);
-  }, [sales, filter]);
-
-  const subtitle = !ready
-    ? "Cargando…"
-    : sales.length === 0
-      ? "Sin ventas aún"
-      : todayCount > 0
-        ? `${sales.length} ventas · ${todayCount} hoy`
-        : `${sales.length} ventas`;
+  const totals = useMemo(() => summarizeSales(filtered), [filtered]);
+  const groups = useMemo(() => groupByDay(filtered), [filtered]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="Ventas" subtitle={subtitle}>
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Filtrar por cobro">
-          {FILTERS.map((f) => (
-            <Button
-              key={f.id}
-              type="button"
-              variant={filter === f.id ? "primary" : "secondary"}
-              onClick={() => setFilter(f.id)}
-              className={`shrink-0 rounded-full px-4 ${
-                filter === f.id
-                  ? "bg-primary text-ink hover:opacity-[0.92]"
-                  : "text-ink-muted"
-              }`}
-              aria-pressed={filter === f.id}
-            >
-              {f.label}
-            </Button>
-          ))}
+    <div className="flex flex-col">
+      <HeroBlock
+        title="Ventas"
+        action={<HeroPill href="/ventas/nueva" label="Nueva venta" />}
+        offline={fromCache ? { text: "Sin conexión · mostrando ventas guardadas en este dispositivo." } : null}
+        busy={!ready}
+      >
+        {error && sales.length === 0 ? (
+          <StateBlock
+            kind="error"
+            onHero
+            title={error}
+            action={
+              <button
+                type="button"
+                onClick={load}
+                className="inline-flex min-h-11 items-center rounded-[var(--r-pill)] bg-on-hero px-4 text-sm font-semibold text-hero"
+              >
+                Reintentar
+              </button>
+            }
+          />
+        ) : (
+          <>
+            <HeroAmount
+              className="mt-6"
+              label="Total listado"
+              value={formatCop(totals.ventas)}
+              caption={`${totals.count} ${totals.count === 1 ? "venta" : "ventas"}`}
+            />
+            <p className="mt-2 text-sm tabular-nums text-on-hero-muted">
+              Recibido {formatCop(totals.recibido)} · Fiado {formatCop(totals.fiado)}
+            </p>
+          </>
+        )}
+        <div className="mt-5">
+          <HeroSegmented label="Filtrar por cobro" options={FILTERS} value={filter} onChange={setFilter} />
         </div>
-      </PageHeader>
+      </HeroBlock>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
-
-      {fromCache && sales.length > 0 && (
-        <p className="text-xs text-ink-muted">
-          Sin conexión · mostrando ventas guardadas en este dispositivo.
-        </p>
-      )}
-
-      {!ready && !error ? (
-        <div className="flex justify-center py-10">
-          <Spinner />
-        </div>
-      ) : sales.length === 0 && !error ? (
-        <Empty
-          title={
-            fromCache
-              ? "Este historial todavía se está preparando para uso sin conexión, o no hay ventas de los últimos 90 días en este teléfono."
-              : "Aún no hay ventas hoy."
-          }
-          action={
-            <OfflineLink
-              href="/ventas/nueva"
-              className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
-            >
-              + Nueva venta
-            </OfflineLink>
-          }
-        />
-      ) : filtered.length === 0 ? (
-        <Empty title="No hay ventas con ese filtro." />
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {filtered.map((s) => {
-            const name = s.customerId ? customerName.get(s.customerId) : null;
-            const date = saleDateLabel(s);
-            const secondary: string[] = [];
-            if (date) secondary.push(date);
-            if (name) secondary.push(name);
-            if (s.method) secondary.push(s.method);
-            return (
-              <li key={s.id}>
-                <OfflineLink
-                  href={`/ventas/${s.id}`}
-                  className="block rounded-[var(--r-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)]"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="flex min-w-0 flex-wrap items-center gap-2">
-                      <Badge tone={kindTone(s.paymentKind)}>
-                        {kindLabel[s.paymentKind] ?? s.paymentKind}
-                      </Badge>
-                      {s.pending && <Badge tone="warning">⏳ Pendiente</Badge>}
-                    </span>
-                    <span className="shrink-0 text-base font-semibold tabular-nums">
-                      {formatCop(s.saleTotal)}
-                    </span>
-                  </div>
-                  {secondary.length > 0 && (
-                    <p className="mt-1 text-xs text-ink-muted">
-                      {secondary.join(" · ")}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-ink-muted">
-                    Recibido {formatCop(s.amountReceived)} · Fiado{" "}
-                    {formatCop(s.credit)}
-                  </p>
-                </OfflineLink>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <Sheet>
+        {!ready ? (
+          <SkeletonRows rows={4} />
+        ) : sales.length === 0 && !error ? (
+          <StateBlock
+            kind="empty"
+            title={
+              fromCache
+                ? "Este historial todavía se está preparando para uso sin conexión, o no hay ventas de los últimos 90 días en este teléfono."
+                : "Aún no hay ventas hoy."
+            }
+            action={
+              <OfflineLink
+                href="/ventas/nueva"
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
+              >
+                Registrar venta
+              </OfflineLink>
+            }
+          />
+        ) : filtered.length === 0 ? (
+          <StateBlock
+            kind="empty"
+            title="No hay ventas con ese filtro."
+            action={
+              <button
+                type="button"
+                onClick={() => setFilter("all")}
+                className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2"
+              >
+                Ver todas
+              </button>
+            }
+          />
+        ) : (
+          groups.map((g) => (
+            <section key={g.key} className="flex flex-col gap-2" aria-label={dayHeading(g.key, todayKey)}>
+              <SectionHead title={dayHeading(g.key, todayKey)} />
+              <RowGroup>
+                {g.rows.map((s) => {
+                  const name = s.customerId ? customerName.get(s.customerId) : null;
+                  const time = saleTime(s.createdAt);
+                  const who = name ?? "Venta";
+                  const title = [time, [who, s.method].filter(Boolean).join(" · ")].filter(Boolean).join("  ");
+                  const meta =
+                    s.paymentKind === "partial"
+                      ? `Recibió ${formatCop(s.amountReceived)} · Fía ${formatCop(s.credit)}`
+                      : s.paymentKind === "credit"
+                        ? `Fía ${formatCop(s.credit)}`
+                        : undefined;
+                  return (
+                    <Row
+                      key={s.id}
+                      href={`/ventas/${s.id}`}
+                      title={title}
+                      meta={
+                        <span className="flex flex-col gap-1">
+                          {meta ? <span>{meta}</span> : null}
+                          <span className="flex flex-wrap gap-1.5">
+                            <Badge tone={kindTone(s.paymentKind)}>{kindLabel[s.paymentKind] ?? s.paymentKind}</Badge>
+                            {s.pending && <PendingBadge />}
+                          </span>
+                        </span>
+                      }
+                      trailing={
+                        <span className="text-base font-semibold tabular-nums text-ink">{formatCop(s.saleTotal)}</span>
+                      }
+                    />
+                  );
+                })}
+              </RowGroup>
+            </section>
+          ))
+        )}
+        {error && sales.length > 0 && <StateBlock kind="error" title={error} />}
+      </Sheet>
     </div>
   );
 }

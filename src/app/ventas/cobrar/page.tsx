@@ -1,14 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { Input } from "@/components/ui/Input";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import { useRouter } from "next/navigation";
-import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatCop, mulCop, addCop, subCop } from "@/domain/money";
-import type { PaymentKind } from "@/domain/types";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
+import { formatCop, mulCop } from "@/domain/money";
+import type { PayMethod, PaymentKind } from "@/domain/types";
 import type { RemoteCustomer, RemoteProduct } from "@/data/http/mappers";
 import { createSaleWithOfflineFallback } from "@/data/pwa/offline-sales";
 import { primaryImageUrl } from "@/data/media/urls";
@@ -16,6 +12,36 @@ import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { listCachedCustomers, listCachedProducts } from "@/data/pwa/catalog";
 import { useCart } from "@/store/cartStore";
+import { CustomerPicker } from "@/components/customers/CustomerPicker";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { HeroAmount } from "@/components/ui/HeroAmount";
+import { Sheet } from "@/components/ui/Sheet";
+import { SectionHead } from "@/components/ui/SectionHead";
+import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
+import { AmountField } from "@/components/ui/AmountField";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { StateBlock } from "@/components/ui/StateBlock";
+import {
+  buildSaleRequest,
+  canRegister,
+  checkoutReducer,
+  fiadoFor,
+  linesTotal,
+  showsMethod,
+  type CheckoutAction,
+  type CheckoutState,
+} from "@/components/sale/checkout";
+
+const KIND_OPTIONS: ReadonlyArray<{ id: PaymentKind; label: string }> = [
+  { id: "paid", label: "Pagada" },
+  { id: "partial", label: "Parcial" },
+  { id: "credit", label: "Fiada" },
+];
+const METHOD_OPTIONS: ReadonlyArray<{ id: PayMethod; label: string }> = [
+  { id: "Efectivo", label: "Efectivo" },
+  { id: "Nequi", label: "Nequi" },
+];
+const KIND_LABEL: Record<PaymentKind, string> = { paid: "Pagada", partial: "Parcial", credit: "Fiada" };
 
 export default function CobrarPage() {
   const router = useRouter();
@@ -24,7 +50,6 @@ export default function CobrarPage() {
     hydrated,
     paymentKind,
     customerId,
-    amountReceived,
     method,
     setPaymentKind,
     setCustomerId,
@@ -37,6 +62,7 @@ export default function CobrarPage() {
   const [pendingCustomerIds, setPendingCustomerIds] = useState<string[]>([]);
   const [abonoInput, setAbonoInput] = useState("");
   const [note, setNote] = useState("");
+  const [showLines, setShowLines] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,41 +71,20 @@ export default function CobrarPage() {
   useEffect(() => {
     void listCachedProducts()
       .then(setProducts)
-      .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "Sin conexión.");
-      });
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Sin conexión."));
     void listCachedCustomers()
       .then(setCustomers)
-      .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "Sin conexión.");
-      });
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Sin conexión."));
     void getPendingCustomerIds().then(setPendingCustomerIds);
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    if (items.length === 0) {
-      navigateOfflineAware(router, "/ventas/nueva", { replace: true });
-    }
+    if (items.length === 0) navigateOfflineAware(router, "/ventas/nueva", { replace: true });
   }, [hydrated, items.length, router]);
 
   const lines = useMemo(() => {
-    return items
-      .map((item) => {
-        const p = products.find((x) => x.id === item.productId);
-        if (!p) return null;
-        const unitPrice = item.unitPrice ?? p.price;
-        return {
-          productId: p.id,
-          name: p.name,
-          imageUrl: primaryImageUrl(p.images),
-          qty: item.qty,
-          unitPrice,
-          catalogPrice: p.price,
-          lineTotal: mulCop(unitPrice, item.qty),
-        };
-      })
-      .filter(Boolean) as Array<{
+    const out: Array<{
       productId: string;
       name: string;
       imageUrl: string | null;
@@ -87,382 +92,182 @@ export default function CobrarPage() {
       unitPrice: number;
       catalogPrice: number;
       lineTotal: number;
-    }>;
+    }> = [];
+    for (const item of items) {
+      const p = products.find((x) => x.id === item.productId);
+      if (!p) continue;
+      const unitPrice = item.unitPrice ?? p.price;
+      out.push({
+        productId: p.id,
+        name: p.name,
+        imageUrl: primaryImageUrl(p.images),
+        qty: item.qty,
+        unitPrice,
+        catalogPrice: p.price,
+        lineTotal: mulCop(unitPrice, item.qty),
+      });
+    }
+    return out;
   }, [items, products]);
 
-  const total = useMemo(
-    () => lines.reduce((s, l) => addCop(s, l.lineTotal), 0),
-    [lines],
-  );
+  const state: CheckoutState = { paymentKind, method, customerId, abonoInput };
+  const total = linesTotal(lines);
+  const itemCount = lines.reduce((s, l) => s + l.qty, 0);
+  const valid = canRegister(state, total, lines.length);
+  const fiado = fiadoFor(state, total);
 
-  const itemCount = useMemo(
-    () => lines.reduce((s, l) => s + l.qty, 0),
-    [lines],
-  );
-
-  const abono =
-    paymentKind === "partial"
-      ? Number.parseInt(abonoInput || "0", 10) || 0
-      : paymentKind === "paid"
-        ? total
-        : 0;
-
-  const quedaDebiendo =
-    paymentKind === "partial" && abono > 0 && abono < total
-      ? subCop(total, abono)
-      : paymentKind === "credit"
-        ? total
-        : 0;
-
-  const valid = useMemo(() => {
-    if (total <= 0 || lines.length === 0) return false;
-    if (paymentKind === "paid") return true;
-    if (paymentKind === "partial") {
-      return abono > 0 && abono < total && customerId != null;
+  function dispatch(action: CheckoutAction) {
+    const next = checkoutReducer(state, action);
+    if (next.paymentKind !== state.paymentKind) {
+      setPaymentKind(next.paymentKind);
+      setAmountReceived(next.paymentKind === "credit" ? 0 : null);
     }
-    if (paymentKind === "credit") {
-      return customerId != null;
-    }
-    return false;
-  }, [total, lines.length, paymentKind, abono, customerId]);
+    if (next.customerId !== state.customerId) setCustomerId(next.customerId);
+    if (next.method !== state.method) setMethod(next.method);
+    if (next.abonoInput !== state.abonoInput) setAbonoInput(next.abonoInput);
+  }
 
   async function confirm() {
     if (!valid || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const received =
-        paymentKind === "paid"
-          ? total
-          : paymentKind === "partial"
-            ? abono
-            : 0;
-
-      if (!requestIdRef.current) {
-        requestIdRef.current = crypto.randomUUID();
-      }
-
-      const trimmedNote = note.trim();
+      if (!requestIdRef.current) requestIdRef.current = crypto.randomUUID();
       const result = await createSaleWithOfflineFallback(
-        {
-          lines: lines.map((l) => ({
-            productId: l.productId,
-            qty: l.qty,
-            unitPrice: l.unitPrice,
-          })),
-          paymentKind,
-          customerId:
-            paymentKind === "paid" ? undefined : (customerId ?? undefined),
-          amountReceived: received,
-          method: received > 0 ? method : undefined,
-          ...(trimmedNote ? { note: trimmedNote } : {}),
-        },
+        buildSaleRequest(state, lines, note),
         requestIdRef.current,
       );
-
       clear();
       setToast(
         result.mode === "offline"
           ? "Venta guardada en este dispositivo · se sincronizará automáticamente."
           : "Venta registrada",
       );
-      setTimeout(() => {
-        navigateOfflineAware(router, "/");
-      }, 700);
+      setTimeout(() => navigateOfflineAware(router, "/"), 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar venta");
       setBusy(false);
     }
   }
 
-  function selectKind(kind: PaymentKind) {
-    setPaymentKind(kind);
-    setAmountReceived(kind === "credit" ? 0 : null);
-    if (kind === "paid") setCustomerId(null);
-    if (kind !== "partial") setAbonoInput("");
-  }
+  const summary = [formatCop(total), KIND_LABEL[paymentKind], showsMethod(state) ? method : null]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <Link
-          href="/ventas/nueva"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </Link>
-        <h1 className="text-[22px] font-semibold">Cobrar</h1>
-      </header>
-
-      {/* Compact total summary */}
-      <Card className="p-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-              Total
-            </p>
-            <p className="mt-0.5 text-2xl font-semibold tabular-nums">
-              {formatCop(total)}
-            </p>
-          </div>
-          <p className="shrink-0 text-sm text-ink-muted">
-            {itemCount} {itemCount === 1 ? "ítem" : "ítems"}
-          </p>
-        </div>
-        {lines.length > 0 && (
-          <ul className="mt-3 flex flex-col gap-1 border-t border-border pt-2">
-            {lines.map((l) => (
-              <li
-                key={l.productId}
-                className="flex items-center justify-between gap-2 text-xs text-ink-muted"
+    <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
+      <HeroBlock size="compact" back={{ href: "/ventas/nueva", label: "Volver" }} title="Cobrar">
+        <div className="mt-5">
+          <HeroAmount
+            label="Total"
+            value={formatCop(total)}
+            caption={
+              <button
+                type="button"
+                onClick={() => setShowLines((v) => !v)}
+                aria-expanded={showLines}
+                aria-controls="cobrar-lineas"
+                className="min-h-11 underline underline-offset-2"
               >
-                <span className="flex min-w-0 items-center gap-2">
-                  <ProductThumbnail
-                    secureUrl={l.imageUrl}
-                    alt={l.name}
-                    size="xs"
-                  />
-                  <span className="min-w-0 truncate">
-                    {l.name} ×{l.qty}
-                    {l.unitPrice !== l.catalogPrice && (
-                      <span className="ml-1">({formatCop(l.unitPrice)})</span>
-                    )}
-                  </span>
-                </span>
-                <span className="shrink-0 tabular-nums">
-                  {formatCop(l.lineTotal)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* PRIMARY: payment kind before method */}
-      <section>
-        <h2 className="mb-2 text-base font-semibold">¿Cómo pagan?</h2>
-        <div className="grid grid-cols-3 gap-2">
-          <ModeButton
-            label="Pagada"
-            active={paymentKind === "paid"}
-            color="ok"
-            onClick={() => selectKind("paid")}
-          />
-          <ModeButton
-            label="Parcial"
-            active={paymentKind === "partial"}
-            color="primary"
-            onClick={() => selectKind("partial")}
-          />
-          <ModeButton
-            label="Fiada"
-            active={paymentKind === "credit"}
-            color="accent"
-            onClick={() => selectKind("credit")}
-          />
-        </div>
-      </section>
-
-      {/* SECONDARY: method only if not Fiada */}
-      {paymentKind !== "credit" && (
-        <section>
-          <p className="mb-2 text-sm font-medium text-ink-muted">
-            ¿Cómo recibes?
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <MethodButton
-              label="Efectivo"
-              active={method === "Efectivo"}
-              onClick={() => setMethod("Efectivo")}
-            />
-            <MethodButton
-              label="Nequi"
-              active={method === "Nequi"}
-              onClick={() => setMethod("Nequi")}
-            />
-          </div>
-        </section>
-      )}
-
-      {paymentKind === "partial" && (
-        <Card>
-          <label className="text-sm font-medium" htmlFor="abono">
-            Abono
-          </label>
-          <Input
-            id="abono"
-            inputMode="numeric"
-            value={abonoInput}
-            onChange={(e) =>
-              setAbonoInput(e.target.value.replace(/\D/g, ""))
+                {itemCount} {itemCount === 1 ? "producto" : "productos"}
+              </button>
             }
-            className="mt-2"
-            placeholder="0"
           />
-          {abono > 0 && abono < total && (
-            <p className="mt-2 text-sm text-ink-muted">
-              Queda debiendo {formatCop(quedaDebiendo)}
-            </p>
-          )}
-          <CustomerPicker
-            customers={customers}
-            customerId={customerId}
-            pendingIds={pendingCustomerIds}
-            onChange={setCustomerId}
-          />
-        </Card>
-      )}
-
-      {paymentKind === "credit" && (
-        <Card>
-          <CustomerPicker
-            customers={customers}
-            customerId={customerId}
-            pendingIds={pendingCustomerIds}
-            onChange={setCustomerId}
-          />
-        </Card>
-      )}
-
-      {/* G6: optional note — field already on CreateSaleInput */}
-      <Card>
-        <label className="text-sm font-medium" htmlFor="nota">
-          Nota <span className="font-normal text-ink-muted">(opcional)</span>
-        </label>
-        <Input
-          id="nota"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          className="mt-2"
-          placeholder="Ej. entrega en la tarde"
-          maxLength={200}
-        />
-      </Card>
-
-      {error && <p className="text-sm text-danger">{error}</p>}
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-lg">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={!valid || busy}
-            onClick={() => void confirm()}
-            className="w-full"
-          >
-            Confirmar venta
-          </Button>
         </div>
-      </div>
+      </HeroBlock>
+
+      <Sheet>
+        <section className="flex flex-col gap-2">
+          <SectionHead title="¿Cómo pagan?" />
+          <ChoiceSegmented
+            label="¿Cómo pagan?"
+            options={KIND_OPTIONS}
+            value={paymentKind}
+            onChange={(kind) => dispatch({ type: "kind", kind })}
+          />
+        </section>
+
+        {showsMethod(state) && (
+          <section className="flex flex-col gap-2">
+            <SectionHead title="Método" />
+            <ChoiceSegmented
+              label="¿Cómo recibes?"
+              options={METHOD_OPTIONS}
+              value={method}
+              onChange={(m) => dispatch({ type: "method", method: m })}
+            />
+          </section>
+        )}
+
+        {paymentKind !== "paid" && (
+          <CustomerPicker
+            customers={customers}
+            customerId={customerId}
+            pendingIds={pendingCustomerIds}
+            onChange={(id) => dispatch({ type: "customer", customerId: id })}
+          />
+        )}
+
+        {paymentKind === "partial" && (
+          <AmountField
+            label="Recibido"
+            value={abonoInput}
+            onChange={(digits) => dispatch({ type: "abono", digits })}
+            hint={fiado > 0 ? `Queda debiendo ${formatCop(fiado)}` : undefined}
+          />
+        )}
+
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide text-ink-muted" htmlFor="nota">
+            Nota <span className="font-normal normal-case">(opcional)</span>
+          </label>
+          <input
+            id="nota"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Ej. entrega en la tarde"
+            maxLength={200}
+            className="mt-2 h-11 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]"
+          />
+        </div>
+
+        {showLines && lines.length > 0 && (
+          <section className="flex flex-col gap-2" id="cobrar-lineas">
+            <SectionHead title="Productos" />
+            <div className="overflow-hidden rounded-[var(--r-lg)] border border-border bg-surface">
+              <ul className="divide-y divide-border">
+                {lines.map((l) => (
+                  <li key={l.productId} className="flex min-h-14 items-center gap-3 px-3 py-2">
+                    <ProductThumbnail secureUrl={l.imageUrl} alt={l.name} size="xs" />
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                      {l.name} ×{l.qty}
+                      {l.unitPrice !== l.catalogPrice && (
+                        <span className="ml-1 text-ink-muted">({formatCop(l.unitPrice)})</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums">{formatCop(l.lineTotal)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
+
+        {error && <StateBlock kind="error" title={error} />}
+      </Sheet>
+
+      <ActionBar
+        summary={summary}
+        primary={{ label: "Registrar", onClick: () => void confirm(), disabled: !valid, busy }}
+      />
 
       {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white">
+        <div
+          role="status"
+          className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 z-50 max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-center text-sm text-bg"
+        >
           {toast}
         </div>
-      )}
-
-      <span className="hidden">{amountReceived}</span>
-    </div>
-  );
-}
-
-function ModeButton({
-  label,
-  active,
-  color,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  color: "ok" | "primary" | "accent";
-  onClick: () => void;
-}) {
-  const activeClass =
-    color === "ok"
-      ? "border-ok bg-ok text-white hover:opacity-[0.92]"
-      : color === "primary"
-        ? "border-primary bg-primary text-ink hover:opacity-[0.92]"
-        : "border-accent bg-accent text-white hover:opacity-[0.92]";
-
-  return (
-    <Button
-      type="button"
-      variant="secondary"
-      onClick={onClick}
-      className={`w-full px-2 ${active ? activeClass : "text-ink-muted"}`}
-    >
-      {label}
-    </Button>
-  );
-}
-
-function MethodButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="secondary"
-      onClick={onClick}
-      className={`w-full px-2 ${
-        active
-          ? "border-primary bg-primary text-ink hover:opacity-[0.92]"
-          : "text-ink-muted"
-      }`}
-    >
-      {label}
-    </Button>
-  );
-}
-
-function CustomerPicker({
-  customers,
-  customerId,
-  pendingIds,
-  onChange,
-}: {
-  customers: RemoteCustomer[];
-  customerId: string | null;
-  pendingIds: string[];
-  onChange: (id: string | null) => void;
-}) {
-  const pending = new Set(pendingIds);
-  return (
-    <div className="mt-3">
-      <label className="text-sm font-medium" htmlFor="cliente">
-        Cliente
-      </label>
-      <select
-        id="cliente"
-        className="mt-2 h-11 min-h-11 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        value={customerId ?? ""}
-        onChange={(e) => onChange(e.target.value ? e.target.value : null)}
-      >
-        <option value="">Selecciona cliente</option>
-        {customers.map((c) =>
-          pending.has(c.id) ? (
-            <option key={c.id} value={c.id} disabled>
-              {c.name} (sincronizando…)
-            </option>
-          ) : (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ),
-        )}
-      </select>
-      {pendingIds.length > 0 && (
-        <p className="mt-2 text-xs text-ink-muted">
-          Los clientes marcados se están sincronizando y estarán disponibles
-          en cuanto terminen.
-        </p>
       )}
     </div>
   );

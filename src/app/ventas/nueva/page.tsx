@@ -7,12 +7,15 @@ import { formatCop, mulCop, addCop } from "@/domain/money";
 import { parseSaleUnitPrice } from "@/domain/sale/validate";
 import type { RemoteProduct } from "@/data/http/mappers";
 import { primaryImageUrl } from "@/data/media/urls";
-import { ProductThumbnail } from "@/components/product/ProductThumbnail";
+import { ProductTile } from "@/components/product/ProductTile";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { listCachedProducts } from "@/data/pwa/catalog";
 import { useCart } from "@/store/cartStore";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { HeroSearch } from "@/components/ui/HeroSearch";
+import { Sheet } from "@/components/ui/Sheet";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 
 export default function NuevaVentaPage() {
   const router = useRouter();
@@ -93,158 +96,88 @@ export default function NuevaVentaPage() {
     setPendingPrices((prev) => ({ ...prev, [product.id]: parsed.unitPrice }));
   }
 
+  const sellable = products.filter((p) => p.sellable !== false);
+
   return (
-    <div className="flex min-h-[calc(100dvh-2rem)] flex-col gap-3">
-      <header className="flex items-center gap-2">
-        <Link
-          href="/"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </Link>
-        <h1 className="text-[22px] font-semibold">Nueva venta</h1>
-      </header>
+    <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
+      <HeroBlock size="compact" back={{ href: "/", label: "Volver" }} title="Nueva venta">
+        <div className="mt-4 flex flex-col gap-3">
+          <HeroSearch value={query} onChange={setQuery} placeholder="Buscar dulce..." />
+          {categories.length > 0 && (
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Categorías">
+              <Chip active={category === null} onClick={() => setCategory(null)} label="Todos" />
+              {categories.map((c) => (
+                <Chip key={c} active={category === c} onClick={() => setCategory(c)} label={c} />
+              ))}
+            </div>
+          )}
+        </div>
+      </HeroBlock>
 
-      {/* Zona tarea — buscar + categorías */}
-      <Input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Buscar dulce..."
-      />
-
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Categorías">
-        <Chip
-          active={category === null}
-          onClick={() => setCategory(null)}
-          label="Todos"
-        />
-        {categories.map((c) => (
-          <Chip
-            key={c}
-            active={category === c}
-            onClick={() => setCategory(c)}
-            label={c}
+      <Sheet>
+        {sellable.length === 0 ? (
+          <StateBlock
+            kind="empty"
+            title="Aún no tienes productos para vender"
+            action={
+              <Link href="/inventario/nuevo" className="text-sm font-semibold text-ink underline underline-offset-2">
+                Agregar producto
+              </Link>
+            }
           />
-        ))}
-      </div>
-
-      {products.length === 0 ? (
-        <p className="text-sm text-ink-muted">
-          No hay productos. Súbelos en Inventario.
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 pb-28">
-          {filtered.map((p) => {
-            const qty = qtyOf(p.id);
-            const price = linePrice(p);
-            const custom = qty > 0 && price !== p.price;
-            return (
-              <article
+        ) : filtered.length === 0 ? (
+          <StateBlock kind="empty" title="No hay productos con ese nombre." />
+        ) : (
+          <div className="grid grid-cols-2 gap-3 min-[560px]:grid-cols-3">
+            {filtered.map((p) => (
+              <ProductTile
                 key={p.id}
-                className="flex flex-col rounded-[var(--r-lg)] border border-border bg-surface p-3 shadow-[var(--shadow-sm)]"
-              >
-                <div className="flex items-start gap-2">
-                  <ProductThumbnail
-                    secureUrl={primaryImageUrl(p.images)}
-                    alt={p.name}
-                    size="md"
-                  />
-                  <p className="line-clamp-2 min-h-10 flex-1 text-sm font-medium">
-                    {p.name}
-                  </p>
-                </div>
-                <label className="mt-1 text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-                  Precio de esta venta
-                </label>
-                <Input
-                  inputMode="numeric"
-                  aria-label={`Precio de ${p.name}`}
-                  value={String(price)}
-                  onChange={(e) => onPriceChange(p, e.target.value)}
-                  className="mt-1 px-2 text-sm font-semibold"
-                />
-                {custom && (
-                  <p className="mt-1 text-[11px] text-ink-muted">
-                    Normal {formatCop(p.price)}
-                  </p>
-                )}
-                <div className="mt-auto flex items-center justify-between pt-3">
-                  <Button
-                    type="button"
-                    variant="icon"
-                    className="bg-bg text-lg font-semibold"
-                    onClick={() => bump(p, -1)}
-                    aria-label="Menos"
-                  >
-                    −
-                  </Button>
-                  <span className="min-w-6 text-center text-sm font-semibold">
-                    {qty}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="icon"
-                    className="bg-bg text-lg font-semibold"
-                    onClick={() => bump(p, 1)}
-                    aria-label="Más"
-                  >
-                    +
-                  </Button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-      {stockError && (
-        <p className="text-center text-sm text-danger">{stockError}</p>
-      )}
-
-      {/* Sticky: N ítems · $ total · Cobrar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
-          <p className="text-sm font-medium tabular-nums">
-            {totalQty} ítems · {formatCop(total)}
+                name={p.name}
+                imageUrl={primaryImageUrl(p.images)}
+                price={linePrice(p)}
+                catalogPrice={p.price}
+                stock={p.stock}
+                lowStockAt={p.lowStockAt}
+                qty={qtyOf(p.id)}
+                onAdd={() => bump(p, 1)}
+                onRemove={() => bump(p, -1)}
+                onPriceChange={(raw) => onPriceChange(p, raw)}
+              />
+            ))}
+          </div>
+        )}
+        {stockError && (
+          <p role="alert" className="text-center text-sm text-danger">
+            {stockError}
           </p>
-          <Button
-            type="button"
-            variant="primary"
-            disabled={total === 0}
-            onClick={() => navigateOfflineAware(router, "/ventas/cobrar")}
-            className="px-5"
-          >
-            Cobrar
-          </Button>
-        </div>
-      </div>
+        )}
+      </Sheet>
+
+      <ActionBar
+        summary={`${totalQty} ${totalQty === 1 ? "producto" : "productos"} · ${formatCop(total)}`}
+        primary={{
+          label: "Cobrar",
+          disabled: total === 0,
+          onClick: () => navigateOfflineAware(router, "/ventas/cobrar"),
+        }}
+      />
     </div>
   );
 }
 
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <Button
+    <button
       type="button"
-      variant={active ? "primary" : "secondary"}
       onClick={onClick}
-      className={`shrink-0 rounded-full px-4 ${
+      aria-pressed={active}
+      className={`min-h-11 shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-semibold ${
         active
-          ? "bg-primary text-ink hover:opacity-[0.92]"
-          : "text-ink-muted"
+          ? "bg-nav-active-bg text-nav-active-ink"
+          : "bg-[color-mix(in_srgb,var(--on-hero)_12%,transparent)] text-on-hero"
       }`}
     >
       {label}
-    </Button>
+    </button>
   );
 }
