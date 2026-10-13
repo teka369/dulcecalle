@@ -11,10 +11,12 @@ export type ActionBarProps = {
 
 /**
  * Fixed bottom action bar inside the max-w-lg column. Respects safe-area.
- * Pages using it reserve space with ACTION_BAR_SPACE so content (and
- * SyncPill, which floats over content) is not hidden.
+ * Height is the --actionbar-h CSS variable (globals.css); pages reserve it
+ * with ACTION_BAR_SPACE so content (and SyncPill over content) is not hidden.
  */
-export const ACTION_BAR_SPACE = "pb-[calc(6.5rem+env(safe-area-inset-bottom))]";
+export const ACTION_BAR_SPACE = "pb-[calc(var(--actionbar-h)+1.5rem)]";
+/** Toast/feedback offset that clears the bar. */
+export const ABOVE_ACTION_BAR = "bottom-[calc(var(--actionbar-h)+0.75rem)]";
 
 export function ActionBar({ primary, summary, aboveNav = false }: ActionBarProps) {
   const bottom = aboveNav

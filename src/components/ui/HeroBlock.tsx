@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { OfflineLink } from "@/components/shell/OfflineLink";
+import { EntityBackLink } from "@/components/shell/entity-route";
 import { syncThemeColor } from "@/theme/storage";
 import { Cloud, GlyphIcon } from "./icons";
 
@@ -9,7 +10,8 @@ export type HeroSize = "tall" | "medium" | "compact";
 
 export type HeroBlockProps = {
   size?: HeroSize;
-  back?: { href: string; label: string };
+  /** `entity`: inside an entity ficha (may be an offline overlay) → EntityBackLink. */
+  back?: { href: string; label: string; entity?: boolean };
   title?: ReactNode;
   subtitle?: ReactNode;
   action?: ReactNode;
@@ -30,7 +32,17 @@ export function offlineBandText(capturedAt: number): string {
 }
 
 /** Hero back button (44px, on-hero tint). */
-export function HeroBack({ href, label }: { href: string; label: string }) {
+const BACK_CLASS =
+  "flex size-11 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--on-hero)_12%,transparent)] text-on-hero";
+
+export function HeroBack({ href, label, entity }: { href: string; label: string; entity?: boolean }) {
+  if (entity) {
+    return (
+      <EntityBackLink href={href} ariaLabel={label} className={BACK_CLASS}>
+        <GlyphIcon name="back" />
+      </EntityBackLink>
+    );
+  }
   return (
     <OfflineLink
       href={href}
@@ -81,7 +93,7 @@ export function HeroBlock({
       {hasHead ? (
         <header className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2">
-            {back ? <HeroBack href={back.href} label={back.label} /> : null}
+            {back ? <HeroBack href={back.href} label={back.label} entity={back.entity} /> : null}
             <div className={`min-w-0 ${back ? "pt-1.5" : ""}`}>
               {title != null ? (
                 <h1

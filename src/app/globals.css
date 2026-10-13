@@ -28,6 +28,9 @@
   --r-lg: 16px;
   --r-pill: 999px;
 
+  /* Fixed ActionBar: 12px top pad + 52px button + bottom pad (≥12px / safe-area). */
+  --actionbar-h: calc(4rem + max(0.75rem, env(safe-area-inset-bottom)));
+
   --shadow-sm: 0 1px 2px rgba(59, 36, 28, 0.06);
   --shadow-md: 0 4px 12px rgba(59, 36, 28, 0.08);
   --shadow-lg: 0 12px 32px rgba(59, 36, 28, 0.12);

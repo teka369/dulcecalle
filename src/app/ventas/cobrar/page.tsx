@@ -19,7 +19,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { AmountField } from "@/components/ui/AmountField";
-import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { ActionBar, ACTION_BAR_SPACE, ABOVE_ACTION_BAR } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
 import {
   buildSaleRequest,
@@ -264,7 +264,7 @@ export default function CobrarPage() {
       {toast && (
         <div
           role="status"
-          className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 z-50 max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-center text-sm text-bg"
+          className={`fixed ${ABOVE_ACTION_BAR} left-1/2 z-50 max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-center text-sm text-bg`}
         >
           {toast}
         </div>

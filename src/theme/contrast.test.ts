@@ -80,6 +80,24 @@ function lum(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+function mix(fg: string, bg: string, pct: number): string {
+  const p = (h: string) => [0, 2, 4].map((i) => parseInt(h.replace("#", "").slice(i, i + 2), 16));
+  const [a, b] = [p(fg), p(bg)];
+  return (
+    "#" +
+    a
+      .map((v, i) => Math.round(v * pct + b[i] * (1 - pct)))
+      .map((v) => v.toString(16).padStart(2, "0"))
+      .join("")
+  );
+}
+
+/** Resolves `color-mix(in srgb, #a P%, #b)` (the only form globals.css uses). */
+function resolveMix(v: string): string {
+  const m = /^color-mix\(in srgb,\s*(#[0-9a-fA-F]{6})\s+(\d+(?:\.\d+)?)%,\s*(#[0-9a-fA-F]{6})\s*\)$/.exec(v.trim());
+  return m ? mix(m[1], m[3], Number(m[2]) / 100) : v;
+}
+
 export function ratio(a: string, b: string): number {
   const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
   return (x + 0.05) / (y + 0.05);
@@ -97,6 +115,8 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ["--on-hero", "--hero"],
   ["--on-nav", "--nav-pill"],
   ["--nav-active-ink", "--nav-active-bg"],
+  // V2 P1: debt/negative amounts in the sheet.
+  ["--danger", "--surface"],
 ];
 const UI_PAIRS: Array<[string, string]> = [
   ["--cta", "--bg"],
@@ -133,6 +153,12 @@ describe("WCAG AA contrast from globals.css tokens", () => {
         if (!/^#/.test(t[fg] ?? "") || !/^#/.test(t[bg] ?? "")) continue;
         expect(ratio(t[fg], t[bg]), `${id}/${mode} ${fg} vs ${bg}`).toBeGreaterThanOrEqual(3);
       }
+      // V2 hero pills / back / segmented track: on-hero text on
+      // color-mix(on-hero 12%, hero) — must stay ≥ 4.5 (and muted ≥ 4.5).
+      const tint = mix(t["--on-hero"], t["--hero"], 0.12);
+      const muted = resolveMix(t["--on-hero-muted"]);
+      expect(ratio(t["--on-hero"], tint), `${id}/${mode} on-hero on 12% tint`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(muted, tint), `${id}/${mode} on-hero-muted on 12% tint`).toBeGreaterThanOrEqual(4.5);
       expect(t["--cta-fg"], `${id}/${mode} cta-fg`).toMatch(/^#/);
       expect(t["--cta"], `${id}/${mode} cta`).toMatch(/^#/);
     });

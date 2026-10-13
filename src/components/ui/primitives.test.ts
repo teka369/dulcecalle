@@ -17,7 +17,9 @@ import { SegmentedMetrics } from "./SegmentedMetrics";
 import { QuickTiles } from "./QuickTiles";
 import { ChoiceSegmented } from "./ChoiceSegmented";
 import { AmountField, digitsOnly } from "./AmountField";
-import { ActionBar } from "./ActionBar";
+import { ActionBar, ACTION_BAR_SPACE, ABOVE_ACTION_BAR } from "./ActionBar";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { StateBlock } from "./StateBlock";
 import { SkeletonHero, SkeletonRows } from "./Skeleton";
 import { PendingBadge } from "./StatusBadge";
@@ -130,6 +132,13 @@ describe("V2 primitives", () => {
     const off = html(h(ActionBar, { primary: { label: "Cobrar", onClick: () => {}, disabled: true } }));
     expect(off).toContain('disabled=""');
     expect(html(h(ActionBar, { aboveNav: true, primary: { label: "x", onClick: () => {} } }))).toContain("4.75rem");
+  });
+
+  it("ActionBar space comes from the --actionbar-h CSS variable", () => {
+    expect(ACTION_BAR_SPACE).toContain("var(--actionbar-h)");
+    expect(ABOVE_ACTION_BAR).toContain("var(--actionbar-h)");
+    const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+    expect(css).toMatch(/--actionbar-h:\s*calc\([^;]*safe-area-inset-bottom/);
   });
 
   it("StateBlock roles, skeletons busy, PendingBadge without emoji", () => {
