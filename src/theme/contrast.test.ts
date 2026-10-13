@@ -150,6 +150,16 @@ describe("WCAG AA contrast from globals.css tokens", () => {
     expect(tokens("ocean", "light")["--cta-fg"]).toBe("#ffffff");
   });
 
+  it("amber light: disabled ActionBar label (ink-muted on surface-2) reaches AA, still passes on bg/surface", () => {
+    const t = tokens("amber", "light");
+    expect(t["--ink-muted"]).toBe("#74645a");
+    expect(ratio(t["--ink-muted"], t["--surface-2"])).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(t["--ink-muted"], t["--bg"])).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(t["--ink-muted"], t["--surface"])).toBeGreaterThanOrEqual(4.5);
+    expect(t["--cta"]).toBe("#ff8c42");
+    expect(tokens("amber", "dark")["--ink-muted"]).not.toBe("#74645a");
+  });
+
   it("H1: light classic palettes use warning #92400e and ok #166534", () => {
     for (const id of ["amber", "ocean", "emerald", "violet", "rose", "slate"]) {
       const t = tokens(id, "light");
