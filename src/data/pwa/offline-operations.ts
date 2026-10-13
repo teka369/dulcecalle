@@ -3,7 +3,6 @@ import { getPwaApi } from "@/data/pwa/api";
 import { getPwaAuthSession } from "@/data/http/session";
 import { getLocalDb, type DulceCalleLocalDB } from "@/data/local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "@/data/local/outbox";
-import { PENDING_SUPPLIER_MESSAGE } from "@/data/pwa/offline-catalog";
 import { newEntityId, assertUuid } from "@/data/local/ids";
 import type { LocalCashMove, LocalCashSession, LocalExpense } from "@/data/local/types";
 import type { RemoteExpense, RemoteStockMove } from "@/data/http/mappers";
@@ -646,7 +645,9 @@ export async function surtirWithOfflineFallback(
       if (supplier.requestId) {
         const dependency = await getOutboxStore().getByRequestId(business, supplier.requestId);
         if (dependency?.entity === "supplier" && dependency.operation === "create") {
-          if (dependency.status !== "synced") throw new Error(PENDING_SUPPLIER_MESSAGE);
+          // Pending supplier:create → queue behind it (dependsOn). On sync the
+          // supplierId is remapped local → server (reconcileSupplier rewrites
+          // the payload; the handler below also resolves it from remoteId).
           dependsOn.push(dependency.operationId);
         }
       }
@@ -924,7 +925,23 @@ export async function syncPendingOperations(business: string) {
           supplierId?: string | null;
           note?: string;
         };
-        const remote = await getPwaApi().inventory.surtir(payload.productId, payload, item.requestId);
+        let supplierId = payload.supplierId;
+        for (const depId of item.dependsOn) {
+          const dependency = await getOutboxStore().get(business, depId);
+          if (
+            dependency?.entity === "supplier" &&
+            dependency.operation === "create" &&
+            dependency.remoteId
+          ) {
+            // Same remap as cashSession:close — never send a local supplier id.
+            supplierId = dependency.remoteId;
+          }
+        }
+        const remote = await getPwaApi().inventory.surtir(
+          payload.productId,
+          supplierId === payload.supplierId ? payload : { ...payload, supplierId },
+          item.requestId,
+        );
         return { remoteId: remote.id };
       }
       if (item.entity === "stockMove" && item.operation === "shrink") {
