@@ -266,7 +266,7 @@ export function InicioDashboard({
                       <span className="min-w-0 truncate font-medium">{c.name}</span>
                       <span className="flex shrink-0 items-center gap-2">
                         <Badge tone="info">Pendiente</Badge>
-                        <span className="text-sm font-semibold tabular-nums text-accent">{formatCop(c.debt)}</span>
+                        <span className="text-sm font-semibold tabular-nums text-danger">{formatCop(c.debt)}</span>
                         <Chevron />
                       </span>
                     </Link>

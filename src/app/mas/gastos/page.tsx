@@ -9,7 +9,7 @@ import { SectionHead } from "@/components/ui/SectionHead";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
-import { GASTOS_OFFLINE_NOCACHE, cashOfflineView, sumAmounts } from "@/components/cash/cash";
+import { GASTOS_OFFLINE_NOCACHE, cashOfflineView, cashPageGate, sumAmounts } from "@/components/cash/cash";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { useSync } from "@/store/syncStore";
 import { usePrep } from "@/store/prepStore";
@@ -62,15 +62,16 @@ export default function GastosPage() {
   const canAdd = !closed && hasSession;
   const offlineView = cashOfflineView({ online, preparedAt: lastReadyAt, hasLocalData: hasSession || expenses.length > 0 });
 
-  if (loadError || offlineView === "offline-nocache") {
+  const gate = cashPageGate({ loadError, offlineView, hasLocalData: hasSession || expenses.length > 0 });
+  if (gate !== "ok") {
     return (
       <div className="flex flex-col pb-6">
         <HeroBlock size="medium" back={{ href: "/mas", label: "Volver a Más" }} title={CASH_COPY.masGastos} offline={online ? null : { text: "Sin conexión" }} />
         <Sheet>
           <StateBlock
-            kind={offlineView === "offline-nocache" ? "offline-miss" : "error"}
-            title={offlineView === "offline-nocache" ? GASTOS_OFFLINE_NOCACHE.title : "No se pudo cargar."}
-            body={offlineView === "offline-nocache" ? GASTOS_OFFLINE_NOCACHE.body : (loadError ?? undefined)}
+            kind={gate === "offline" ? "offline-miss" : "error"}
+            title={gate === "offline" ? GASTOS_OFFLINE_NOCACHE.title : "No se pudo cargar."}
+            body={gate === "offline" ? GASTOS_OFFLINE_NOCACHE.body : (loadError ?? undefined)}
             action={
               <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg">
                 Reintentar

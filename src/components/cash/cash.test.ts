@@ -99,3 +99,19 @@ describe("kindLabel readable (S1)", () => {
     expect(kl("otro_tipo")).toBe("Otro tipo");
   });
 });
+
+import { cashPageGate } from "./cash";
+describe("cashPageGate (API down online, no cache)", () => {
+  it("5xx / HTTP error online with nothing local => error (no Abrir caja, no empty list)", () => {
+    expect(cashPageGate({ loadError: "Error del servidor (503)", offlineView: "online", hasLocalData: false })).toBe("error");
+  });
+  it("offline without cache => offline", () => {
+    expect(cashPageGate({ loadError: null, offlineView: "offline-nocache", hasLocalData: false })).toBe("offline");
+  });
+  it("local data present => ok even with an error", () => {
+    expect(cashPageGate({ loadError: "x", offlineView: "online", hasLocalData: true })).toBe("ok");
+  });
+  it("online, no error => ok (genuinely no caja yet)", () => {
+    expect(cashPageGate({ loadError: null, offlineView: "online", hasLocalData: false })).toBe("ok");
+  });
+});

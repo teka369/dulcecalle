@@ -135,3 +135,19 @@ export const GASTOS_OFFLINE_NOCACHE = {
   title: "Sin conexión",
   body: "No hay gastos guardados en este teléfono. Conéctate para verlos.",
 };
+
+/**
+ * Which body Caja/Gastos may render. Any load failure (5xx, HTTP error, or a
+ * network error without a local snapshot) and offline-without-cache must show
+ * error/offline + Reintentar — never «Abrir caja» or an empty list.
+ */
+export function cashPageGate(input: {
+  loadError: string | null;
+  offlineView: CashOfflineView;
+  hasLocalData: boolean;
+}): "error" | "offline" | "ok" {
+  if (input.hasLocalData) return "ok";
+  if (input.offlineView === "offline-nocache") return "offline";
+  if (input.loadError) return "error";
+  return "ok";
+}

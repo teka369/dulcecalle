@@ -6,14 +6,14 @@ const read = (p: string) => readFileSync(join(__dirname, "../../app", p), "utf8"
 describe("S5 offline without cache", () => {
   it("Caja shows offline/error before any Abrir caja branch", () => {
     const s = read("mas/caja/page.tsx");
-    const guard = s.indexOf('offlineView === "offline-nocache"');
+    const guard = s.indexOf('gate === "offline"');
     expect(guard).toBeGreaterThan(-1);
     expect(guard).toBeLessThan(s.indexOf("CASH_COPY.abrirCaja"));
     expect(s).toContain("CASH_OFFLINE_NOCACHE");
   });
   it("Gastos shows offline/error before «Aún no hay gastos»", () => {
     const s = read("mas/gastos/page.tsx");
-    expect(s.indexOf('offlineView === "offline-nocache"')).toBeLessThan(s.indexOf("Aún no hay gastos."));
+    expect(s.indexOf('gate === "offline"')).toBeLessThan(s.indexOf("Aún no hay gastos."));
     expect(s).toContain("GASTOS_OFFLINE_NOCACHE");
   });
   it("Cerrar contando is disabled when it cannot be used (S3)", () => {
