@@ -75,3 +75,9 @@ export function clampQty(raw: string, max?: number): string {
   const n = Number.parseInt(digits, 10);
   return n > max ? String(Math.max(0, max)) : digits;
 }
+
+/** «2026-10-13» → «13/10/2026». Anything else is returned unchanged. */
+export function dmy(dateKey: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateKey ?? "");
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : (dateKey ?? "");
+}

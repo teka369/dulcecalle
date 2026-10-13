@@ -15,7 +15,7 @@ import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { primaryImageUrl } from "@/data/media/urls";
-import { inventoryValue, isLowStock, moveDelta, units } from "@/components/inventory/inventory";
+import { dmy, inventoryValue, isLowStock, moveDelta, units } from "@/components/inventory/inventory";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import type {
@@ -196,18 +196,24 @@ export default function ProductoFichaPage() {
 
       <Sheet>
         <SegmentedMetrics
-          label="Precio, costo y valor"
-          items={[
-            { icon: "cash", label: "Precio", value: formatCop(product.price) },
-            product.avgCost > 0
-              ? { icon: "bag", label: isInsumo ? "Valor restante del lote" : "Costo prom.", value: formatCop(product.avgCost) }
-              : { icon: "clock", label: "Costo pendiente", value: "—", detail: product.stock > 0 ? "Se llena al surtir" : undefined },
-            {
-              icon: "package",
-              label: isInsumo ? "Valor del lote" : "Valor inventario",
-              value: formatCop(inventoryValue(product)),
-            },
-          ]}
+          label={isInsumo ? "Valor del lote" : "Precio, costo y valor"}
+          items={
+            isInsumo
+              ? [
+                  // Insumo: no sale price; avgCost already is the remaining lot value (shown once).
+                  product.avgCost > 0
+                    ? { icon: "bag", label: "Valor restante del lote", value: formatCop(product.avgCost) }
+                    : { icon: "clock", label: "Costo pendiente", value: "—", detail: product.stock > 0 ? "Se llena al surtir" : undefined },
+                  { icon: "alert", label: "Umbral stock bajo", value: units(product.lowStockAt) },
+                ]
+              : [
+                  { icon: "cash", label: "Precio", value: formatCop(product.price) },
+                  product.avgCost > 0
+                    ? { icon: "bag", label: "Costo prom.", value: formatCop(product.avgCost) }
+                    : { icon: "clock", label: "Costo pendiente", value: "—", detail: product.stock > 0 ? "Se llena al surtir" : undefined },
+                  { icon: "package", label: "Valor inventario", value: formatCop(inventoryValue(product)) },
+                ]
+          }
         />
 
         {!product.archivedAt ? (
@@ -223,10 +229,8 @@ export default function ProductoFichaPage() {
           </section>
         ) : null}
 
-        <section className="flex flex-col gap-2">
-          <SectionHead title="Fotos" />
-          <ProductImageManager productId={product.id} images={product.images} onChanged={() => void load()} />
-        </section>
+        {/* ProductImageManager renders its own «Fotos» heading. */}
+        <ProductImageManager productId={product.id} images={product.images} onChanged={() => void load()} />
 
         {hasPreps ? (
           <section className="flex flex-col gap-2">
@@ -236,7 +240,7 @@ export default function ProductoFichaPage() {
                 <Row
                   key={r.id}
                   title={`${units(r.qty)} → ${r.targetName}`}
-                  meta={[r.occurredOn, r.note].filter(Boolean).join(" · ")}
+                  meta={[dmy(r.occurredOn), r.note].filter(Boolean).join(" · ")}
                   trailing={
                     <span className="text-sm font-semibold tabular-nums">
                       {r.unitCost == null ? "Costo pendiente" : `${formatCop(r.unitCost)} c/u`}
@@ -248,7 +252,7 @@ export default function ProductoFichaPage() {
                 <Row
                   key={r.id}
                   title={`Desde ${r.sourceName} · ${units(r.qty)}`}
-                  meta={[r.occurredOn, r.note].filter(Boolean).join(" · ")}
+                  meta={[dmy(r.occurredOn), r.note].filter(Boolean).join(" · ")}
                   trailing={
                     <span className="text-sm font-semibold tabular-nums">
                       {r.unitCost == null ? "Costo pendiente" : `${formatCop(r.unitCost)} c/u`}
