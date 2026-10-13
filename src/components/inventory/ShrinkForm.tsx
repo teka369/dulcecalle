@@ -10,14 +10,21 @@ import {
   type ShrinkReason,
 } from "@/domain/inventory";
 import { newRequestId } from "@/domain/requestId";
-import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
+import { useEntityId } from "@/components/shell/entity-route";
 import { inventoryStore } from "@/store/inventoryStore";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { Spinner } from "@/components/ui/Spinner";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { Sheet } from "@/components/ui/Sheet";
+import { Row } from "@/components/ui/Row";
+import { RowGroup } from "@/components/ui/RowGroup";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { ActionToast } from "@/components/ui/ActionToast";
+import { QtyStepper } from "./QtyStepper";
+import { stockAfter, units } from "./inventory";
 
 export function ShrinkForm({
   title,
@@ -105,100 +112,61 @@ export function ShrinkForm({
 
   if (!ready) {
     return (
-      <div className="flex justify-center py-10">
-        <Spinner />
+      <div className="flex flex-col gap-4">
+        <SkeletonHero />
+        <SkeletonRows rows={3} />
       </div>
     );
   }
 
   if (!product) {
     return (
-      <div className="flex flex-col gap-4">
-        <EntityBackLink href="/inventario" className="text-sm text-ink-muted">
-          ← Inventario
-        </EntityBackLink>
-        <p className="text-sm text-ink-muted">No encontramos ese producto.</p>
-      </div>
+      <HeroBlock size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title={title}>
+        <StateBlock onHero kind="empty" title="No encontramos ese producto." />
+      </HeroBlock>
     );
   }
 
+  const after = stockAfter(product.stock, qtyRaw, -1);
+
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <EntityBackLink
-          href={`/inventario/${product.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </EntityBackLink>
-        <h1 className="text-[22px] font-semibold">{title}</h1>
-      </header>
-
-      <Card>
-        <div className="flex items-start gap-3">
-          <ProductThumbnail
-            secureUrl={primaryImageUrl(product.images)}
-            alt={product.name}
-            size="md"
-          />
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-              Producto
-            </p>
-            <p className="mt-1 font-semibold">{product.name}</p>
-            <p className="mt-1 text-sm text-ink-muted">Stock {product.stock}</p>
-          </div>
+    <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
+      <HeroBlock
+        size="compact"
+        back={{ href: `/inventario/${product.id}`, label: "Volver al producto", entity: true }}
+        title={title}
+      >
+        <div className="mt-3 flex items-center gap-3">
+          <ProductThumbnail secureUrl={primaryImageUrl(product.images)} alt={product.name} size="sm" decorative />
+          <p className="min-w-0 text-sm text-on-hero-muted">
+            <span className="font-semibold text-on-hero">{product.name}</span> · Stock {units(product.stock)}
+          </p>
         </div>
+      </HeroBlock>
 
-        <label className="mt-4 block text-sm font-medium" htmlFor="cantidad">
-          Cantidad
-        </label>
-        <Input
-          id="cantidad"
-          inputMode="numeric"
-          value={qtyRaw}
-          onChange={(e) => setQtyRaw(e.target.value.replace(/\D/g, ""))}
-          className="mt-2"
-          placeholder="0"
-        />
+      <Sheet>
+        <QtyStepper label="Cantidad" value={qtyRaw} onChange={setQtyRaw} max={product.stock} />
 
         {(showNote || requireMotivo) && (
-          <>
-            <label className="mt-4 block text-sm font-medium" htmlFor="nota">
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide text-ink-muted" htmlFor="nota">
               {requireMotivo ? "Motivo" : "Nota"}
             </label>
-            <Input
-              id="nota"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="mt-2"
-            />
-          </>
+            <Input id="nota" value={note} onChange={(e) => setNote(e.target.value)} className="mt-2" />
+          </div>
         )}
 
-        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      </Card>
+        {after != null ? (
+          <RowGroup label="Resultado">
+            <Row title={`Quedará ${units(after)}`} />
+          </RowGroup>
+        ) : null}
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-lg">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={!valid || busy}
-            onClick={() => void confirm()}
-            className="w-full"
-          >
-            {cta}
-          </Button>
-        </div>
-      </div>
+        {error ? <StateBlock kind="error" title={error} /> : null}
+      </Sheet>
 
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white">
-          {toast}
-        </div>
-      )}
+      <ActionBar primary={{ label: cta, onClick: () => void confirm(), disabled: !valid, busy }} />
+      <ActionToast text={toast} />
     </div>
   );
 }

@@ -1,14 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
 import { useInventory } from "@/store/inventoryStore";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { Sheet } from "@/components/ui/Sheet";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { ActionToast } from "@/components/ui/ActionToast";
 
 export default function AgregarProveedorPage() {
   const router = useRouter();
@@ -38,74 +40,35 @@ export default function AgregarProveedorPage() {
     }
   }
 
+  const label = "text-xs font-semibold uppercase tracking-wide text-ink-muted";
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <Link
-          href="/inventario"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </Link>
-        <h1 className="text-[22px] font-semibold">Agregar proveedor</h1>
-      </header>
-
-      <Card>
-        <label className="text-sm font-medium" htmlFor="nombre">
-          Nombre
-        </label>
-        <Input
-          id="nombre"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="mt-2"
-          autoFocus
-        />
-
-        <label className="mt-4 block text-sm font-medium" htmlFor="tel">
-          Teléfono
-        </label>
-        <Input
-          id="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="mt-2"
-          inputMode="tel"
-        />
-
-        <label className="mt-4 block text-sm font-medium" htmlFor="notas">
-          Notas
-        </label>
-        <Input
-          id="notas"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          className="mt-2"
-        />
-
-        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      </Card>
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-lg">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={busy}
-            onClick={() => void onSave()}
-            className="w-full"
-          >
-            Guardar proveedor
-          </Button>
+    <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
+      <HeroBlock size="compact" back={{ href: "/inventario", label: "Volver a Inventario" }} title="Agregar proveedor" />
+      <Sheet>
+        <div className="flex flex-col gap-4 rounded-[var(--r-lg)] border border-border bg-surface p-3">
+          <div>
+            <label className={label} htmlFor="nombre">
+              Nombre
+            </label>
+            <Input id="nombre" value={name} onChange={(e) => setName(e.target.value)} className="mt-2" autoFocus />
+          </div>
+          <div>
+            <label className={label} htmlFor="tel">
+              Teléfono
+            </label>
+            <Input id="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-2" inputMode="tel" />
+          </div>
+          <div>
+            <label className={label} htmlFor="notas">
+              Notas
+            </label>
+            <Input id="notas" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-2" />
+          </div>
         </div>
-      </div>
-
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white">
-          {toast}
-        </div>
-      )}
+        {error ? <StateBlock kind="error" title={error} /> : null}
+      </Sheet>
+      <ActionBar primary={{ label: "Guardar proveedor", onClick: () => void onSave(), busy }} />
+      <ActionToast text={toast} />
     </div>
   );
 }

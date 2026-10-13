@@ -1,11 +1,21 @@
 "use client";
 
-import { OfflineLink } from "@/components/shell/OfflineLink";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { Spinner } from "@/components/ui/Spinner";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { HeroPill } from "@/components/ui/HeroPill";
+import { Sheet } from "@/components/ui/Sheet";
+import { SectionHead } from "@/components/ui/SectionHead";
+import { SegmentedMetrics } from "@/components/ui/SegmentedMetrics";
+import { QuickTiles } from "@/components/ui/QuickTiles";
+import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
+import { Row } from "@/components/ui/Row";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
+import { primaryImageUrl } from "@/data/media/urls";
+import { inventoryValue, isLowStock, moveDelta, units } from "@/components/inventory/inventory";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import type {
@@ -13,7 +23,7 @@ import type {
   RemoteProduct,
   RemoteStockMove,
 } from "@/data/http/mappers";
-import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
+import { useEntityId } from "@/components/shell/entity-route";
 import { inventoryStore } from "@/store/inventoryStore";
 import { ProductImageManager } from "@/components/product/ProductImageManager";
 
@@ -76,150 +86,24 @@ export default function ProductoFichaPage() {
 
   if (!ready) {
     return (
-      <div className="flex justify-center py-10">
-        <Spinner />
+      <div className="flex flex-col gap-4">
+        <SkeletonHero />
+        <SkeletonRows />
       </div>
     );
   }
 
   if (!product) {
     return (
-      <div className="flex flex-col gap-4">
-        <EntityBackLink href="/inventario" className="text-sm text-ink-muted">
-          ← Inventario
-        </EntityBackLink>
-        <p className="text-sm text-ink-muted">No encontramos ese producto.</p>
-      </div>
+      <HeroBlock size="medium" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Inventario">
+        <StateBlock onHero kind="empty" title="No encontramos ese producto." />
+      </HeroBlock>
     );
   }
 
-  return (
-    <div className="flex flex-col gap-4">
-      <header className="flex items-center gap-2">
-        <EntityBackLink
-          href="/inventario"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </EntityBackLink>
-        <h1 className="text-[22px] font-semibold tracking-tight">
-          {product.name}
-        </h1>
-        {product.sellable === false && (
-          <Badge tone="warning">Insumo</Badge>
-        )}
-      </header>
-
-      <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-          {product.sellable === false ? "Lotes" : "Stock"}
-        </p>
-        <p className="mt-1 text-2xl font-semibold">{product.stock}</p>
-        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink-muted">
-          {product.sellable === false ? "Valor restante del lote" : "Precio venta"}
-        </p>
-        {product.sellable === false ? (
-          <p className="mt-1 text-lg font-semibold">{formatCop(product.avgCost)}</p>
-        ) : (
-          <p className="mt-1 text-lg font-semibold">{formatCop(product.price)}</p>
-        )}
-        {product.sellable === false ? null : product.avgCost > 0 ? (
-          <p className="mt-2 text-sm text-ink-muted">
-            Costo prom. {formatCop(product.avgCost)}
-          </p>
-        ) : product.stock > 0 ? (
-          <p className="mt-2 text-sm text-ink-muted">
-            Costo $0 (regalo o no se sabe). Se actualiza al surtir.
-          </p>
-        ) : null}
-      </Card>
-
-      <div className="flex gap-2">
-        <OfflineLink
-          href={`/inventario/${product.id}/surtir`}
-          className="flex min-h-11 flex-1 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
-        >
-          Surtir
-        </OfflineLink>
-        <OfflineLink
-          href={`/inventario/${product.id}/preparar`}
-          className="flex min-h-11 flex-1 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold"
-        >
-          Preparar
-        </OfflineLink>
-      </div>
-
-      <ProductImageManager
-        productId={product.id}
-        images={product.images}
-        onChanged={() => void load()}
-      />
-
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={() => {
-          setEditing((v) => !v);
-          setEditError(null);
-        }}
-        className="w-full"
-      >
-        {editing ? "Cerrar edición" : "Editar producto"}
-      </Button>
-
-      {editing && (
-        <Card>
-          <label className="text-sm font-medium" htmlFor="editar-nombre-prod">
-            Nombre
-          </label>
-          <Input
-            id="editar-nombre-prod"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            className="mt-2"
-          />
-          <label className="mt-3 block text-sm font-medium" htmlFor="editar-precio-prod">
-            Precio de venta
-          </label>
-          <Input
-            id="editar-precio-prod"
-            inputMode="numeric"
-            value={editPrice}
-            onChange={(e) => setEditPrice(e.target.value.replace(/\D/g, ""))}
-            className="mt-2"
-          />
-          <label className="mt-3 block text-sm font-medium" htmlFor="editar-low-prod">
-            Avisar cuando el stock sea menor o igual a
-          </label>
-          <Input
-            id="editar-low-prod"
-            inputMode="numeric"
-            value={editLow}
-            onChange={(e) => setEditLow(e.target.value.replace(/\D/g, ""))}
-            className="mt-2"
-          />
-          <label className="mt-3 flex min-h-11 items-start gap-3 text-sm">
-            <input
-              type="checkbox"
-              checked={!editSellable}
-              onChange={(e) => setEditSellable(!e.target.checked)}
-              className="mt-1 h-5 w-5 shrink-0 rounded border-border"
-            />
-            <span>
-              <span className="font-medium">Es insumo o combo</span>
-              <span className="mt-1 block text-ink-muted">
-                No aparece para vender ni en el catálogo de clientes. Sirve
-                como origen de preparaciones.
-              </span>
-            </span>
-          </label>
-          {editError && <p className="mt-2 text-sm text-danger">{editError}</p>}
-          <Button
-            type="button"
-            variant="primary"
-            disabled={editBusy}
-            onClick={() => {
+  const isInsumo = product.sellable === false;
+  const low = isLowStock(product);
+  const saveEdit = () => {
               if (editBusy) return;
               setEditBusy(true);
               setEditError(null);
@@ -246,50 +130,8 @@ export default function ProductoFichaPage() {
                   setEditError(e instanceof Error ? e.message : "No se pudo guardar.");
                 })
                 .finally(() => setEditBusy(false));
-            }}
-            className="mt-3 w-full"
-          >
-            Guardar cambios
-          </Button>
-          <p className="mt-2 text-xs text-ink-muted">
-            El stock y el costo solo cambian con movimientos. Las ventas
-            anteriores conservan el precio con el que se cobraron.
-          </p>
-        </Card>
-      )}
-
-      {!product.archivedAt && !confirmArchive && (
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => setConfirmArchive(true)}
-          className="w-full border-danger/30 text-danger"
-        >
-          Archivar producto
-        </Button>
-      )}
-
-      {!product.archivedAt && confirmArchive && (
-        <section className="rounded-[var(--r-lg)] border border-danger/20 bg-danger/5 p-4 shadow-[var(--shadow-sm)]">
-          <p className="text-sm font-semibold">¿Archivar este producto?</p>
-          <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-            Dejará de aparecer para vender o surtir, pero su historial se
-            conserva. Esta acción no se puede deshacer desde aquí.
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={editBusy}
-              onClick={() => setConfirmArchive(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              disabled={editBusy}
-              onClick={() => {
+            };
+  const doArchive = () => {
                 if (editBusy) return;
                 setEditBusy(true);
                 setEditError(null);
@@ -304,127 +146,236 @@ export default function ProductoFichaPage() {
                     setEditError(e instanceof Error ? e.message : "No se pudo archivar.");
                   })
                   .finally(() => setEditBusy(false));
-              }}
-            >
-              Archivar
-            </Button>
-          </div>
-          {editError && <p className="mt-2 text-sm text-danger">{editError}</p>}
-        </section>
-      )}
+              };
+  const hasPreps = fromPreparations.length > 0 || intoPreparations.length > 0;
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink-muted">
-          Ajustes de stock
-        </h2>
-        <div className="flex flex-col gap-2">
-          <ActionLink
-            href={`/inventario/${product.id}/me-lo-comi`}
-            label="Me lo comí"
-          />
-          <ActionLink
-            href={`/inventario/${product.id}/regalo`}
-            label="Regalo"
-          />
-          <ActionLink
-            href={`/inventario/${product.id}/perdido`}
-            label="Perdido / dañado"
-          />
-        </div>
-      </section>
-
-      {(fromPreparations.length > 0 || intoPreparations.length > 0) && (
-        <section>
-          <h2 className="mb-2 text-sm font-semibold text-ink-muted">
-            Preparaciones
-          </h2>
-          <ul className="flex flex-col gap-2">
-            {fromPreparations.map((r) => (
-              <li
-                key={r.id}
-                className="rounded-[var(--r-lg)] border border-border bg-surface px-4 py-3 text-sm shadow-[var(--shadow-sm)]"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">
-                    {r.qty} × {r.targetName}
-                  </span>
-                  <span className="font-semibold">
-                    {r.unitCost == null
-                      ? "Costo pendiente"
-                      : formatCop(r.unitCost * r.qty)}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-ink-muted">
-                  {r.occurredOn}
-                  {r.note ? ` · ${r.note}` : ""}
-                </p>
-              </li>
-            ))}
-            {intoPreparations.map((r) => (
-              <li
-                key={r.id}
-                className="rounded-[var(--r-lg)] border border-border bg-surface px-4 py-3 text-sm shadow-[var(--shadow-sm)]"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">
-                    Desde {r.sourceName}: {r.qty} uds
-                  </span>
-                  <span className="font-semibold">
-                    {r.unitCost == null
-                      ? "Costo pendiente"
-                      : formatCop(r.unitCost * r.qty)}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-ink-muted">
-                  {r.occurredOn}
-                  {r.note ? ` · ${r.note}` : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {moves.length > 0 ? (
-        <section>
-          <h2 className="mb-2 text-sm font-semibold text-ink-muted">Historial</h2>
-          <ul className="flex flex-col gap-2">
-            {moves.slice(0, 20).map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center justify-between rounded-[var(--r-lg)] border border-border bg-surface px-4 py-3 text-sm shadow-[var(--shadow-sm)]"
-              >
-                <span>
-                  {REASON_LABEL[m.reason] ?? m.reason}
-                  {m.note ? (
-                    <span className="mt-0.5 block text-xs text-ink-muted">
-                      {m.note}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="font-semibold">
-                  {m.delta > 0 ? `+${m.delta}` : m.delta}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : (
-        <p className="text-sm text-ink-muted">
-          Sin movimientos de los últimos 90 días. Uno más viejo no está disponible sin conexión.
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ActionLink({ href, label }: { href: string; label: string }) {
   return (
-    <OfflineLink
-      href={href}
-      className="flex min-h-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold text-ink"
-    >
-      {label}
-    </OfflineLink>
+    <div className="flex flex-col pb-6">
+      <HeroBlock
+        size="medium"
+        back={{ href: "/inventario", label: "Volver a Inventario", entity: true }}
+        action={
+          <HeroPill
+            label={editing ? "Cerrar" : "Editar"}
+            onClick={() => {
+              setEditing((v) => !v);
+              setEditError(null);
+            }}
+          />
+        }
+      >
+        <div className="mt-4 flex items-center gap-3">
+          <ProductThumbnail secureUrl={primaryImageUrl(product.images)} alt={product.name} size="md" decorative />
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold leading-tight tracking-tight">{product.name}</h1>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {isInsumo ? <Badge tone="warning">Insumo</Badge> : null}
+              {product.archivedAt ? <Badge tone="danger">Archivado</Badge> : null}
+            </div>
+          </div>
+        </div>
+        <div className="mt-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-on-hero-muted">Stock</p>
+          <div className="mt-2 flex flex-wrap items-baseline gap-3">
+            <p className="text-5xl font-semibold leading-none tracking-tight tabular-nums">{units(product.stock)}</p>
+            {low ? (
+              <p className="flex items-center gap-1.5 text-sm text-on-hero-muted">
+                <span aria-hidden className="size-2 rounded-full bg-danger" />
+                {product.stock <= 0 ? "Agotado" : "Stock bajo"} (umbral {product.lowStockAt})
+              </p>
+            ) : null}
+          </div>
+        </div>
+        {!product.archivedAt ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <HeroPill primary label="Surtir" href={`/inventario/${product.id}/surtir`} />
+            {isInsumo ? <HeroPill label="Preparar" href={`/inventario/${product.id}/preparar`} /> : null}
+          </div>
+        ) : null}
+      </HeroBlock>
+
+      <Sheet>
+        <SegmentedMetrics
+          label="Precio, costo y valor"
+          items={[
+            { icon: "cash", label: "Precio", value: formatCop(product.price) },
+            product.avgCost > 0
+              ? { icon: "bag", label: isInsumo ? "Valor restante del lote" : "Costo prom.", value: formatCop(product.avgCost) }
+              : { icon: "clock", label: "Costo pendiente", value: "—", detail: product.stock > 0 ? "Se llena al surtir" : undefined },
+            {
+              icon: "package",
+              label: isInsumo ? "Valor del lote" : "Valor inventario",
+              value: formatCop(inventoryValue(product)),
+            },
+          ]}
+        />
+
+        {!product.archivedAt ? (
+          <section className="flex flex-col gap-0">
+            <SectionHead title="Ajustes" />
+            <QuickTiles
+              tiles={[
+                { href: `/inventario/${product.id}/me-lo-comi`, label: "Me lo comí", icon: "bag" },
+                { href: `/inventario/${product.id}/regalo`, label: "Regalo", icon: "plus" },
+                { href: `/inventario/${product.id}/perdido`, label: "Perdido / dañado", icon: "alert" },
+              ]}
+            />
+          </section>
+        ) : null}
+
+        <section className="flex flex-col gap-2">
+          <SectionHead title="Fotos" />
+          <ProductImageManager productId={product.id} images={product.images} onChanged={() => void load()} />
+        </section>
+
+        {hasPreps ? (
+          <section className="flex flex-col gap-2">
+            <SectionHead title="Preparaciones" />
+            <RowGroup label="Preparaciones">
+              {fromPreparations.map((r) => (
+                <Row
+                  key={r.id}
+                  title={`${units(r.qty)} → ${r.targetName}`}
+                  meta={[r.occurredOn, r.note].filter(Boolean).join(" · ")}
+                  trailing={
+                    <span className="text-sm font-semibold tabular-nums">
+                      {r.unitCost == null ? "Costo pendiente" : `${formatCop(r.unitCost)} c/u`}
+                    </span>
+                  }
+                />
+              ))}
+              {intoPreparations.map((r) => (
+                <Row
+                  key={r.id}
+                  title={`Desde ${r.sourceName} · ${units(r.qty)}`}
+                  meta={[r.occurredOn, r.note].filter(Boolean).join(" · ")}
+                  trailing={
+                    <span className="text-sm font-semibold tabular-nums">
+                      {r.unitCost == null ? "Costo pendiente" : `${formatCop(r.unitCost)} c/u`}
+                    </span>
+                  }
+                />
+              ))}
+            </RowGroup>
+          </section>
+        ) : null}
+
+        <section className="flex flex-col gap-2">
+          <SectionHead title="Historial" />
+          {moves.length > 0 ? (
+            <RowGroup label="Historial">
+              {moves.slice(0, 20).map((m) => {
+                const d = moveDelta(m.delta);
+                return (
+                  <Row
+                    key={m.id}
+                    title={REASON_LABEL[m.reason] ?? m.reason}
+                    meta={[m.note, m.occurredOn].filter(Boolean).join(" · ")}
+                    trailing={
+                      <>
+                        <span className={`text-[15px] font-semibold tabular-nums ${d.tone === "ok" ? "text-ok" : "text-danger"}`}>
+                          {d.sign}
+                          {d.qty}
+                        </span>
+                        <span className="text-xs text-ink-muted">{d.word}</span>
+                      </>
+                    }
+                  />
+                );
+              })}
+            </RowGroup>
+          ) : (
+            <RowGroupNote>
+              Sin movimientos de los últimos 90 días. Uno más viejo no está disponible sin conexión.
+            </RowGroupNote>
+          )}
+        </section>
+
+        {editing ? (
+          <section className="flex flex-col gap-2">
+            <SectionHead title="Editar" />
+            <div className="rounded-[var(--r-lg)] border border-border bg-surface p-3">
+              <label className="text-sm font-medium" htmlFor="editar-nombre-prod">
+                Nombre
+              </label>
+              <Input id="editar-nombre-prod" value={editName} onChange={(e) => setEditName(e.target.value)} className="mt-2" />
+              <label className="mt-3 block text-sm font-medium" htmlFor="editar-precio-prod">
+                Precio de venta
+              </label>
+              <Input
+                id="editar-precio-prod"
+                inputMode="numeric"
+                value={editPrice}
+                onChange={(e) => setEditPrice(e.target.value.replace(/\D/g, ""))}
+                className="mt-2"
+              />
+              <label className="mt-3 block text-sm font-medium" htmlFor="editar-low-prod">
+                Umbral stock bajo (avisar cuando sea menor o igual a)
+              </label>
+              <Input
+                id="editar-low-prod"
+                inputMode="numeric"
+                value={editLow}
+                onChange={(e) => setEditLow(e.target.value.replace(/\D/g, ""))}
+                className="mt-2"
+              />
+              <label className="mt-3 flex min-h-11 items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={!editSellable}
+                  onChange={(e) => setEditSellable(!e.target.checked)}
+                  className="mt-1 h-5 w-5 shrink-0 rounded border-border"
+                />
+                <span>
+                  <span className="font-medium">Es insumo o combo</span>
+                  <span className="mt-1 block text-ink-muted">
+                    No aparece para vender ni en el catálogo de clientes. Sirve como origen de preparaciones.
+                  </span>
+                </span>
+              </label>
+              {editError && !confirmArchive && <p className="mt-2 text-sm text-danger">{editError}</p>}
+              <Button type="button" variant="primary" disabled={editBusy} onClick={saveEdit} className="mt-3 w-full">
+                Guardar cambios
+              </Button>
+              <p className="mt-2 text-xs text-ink-muted">
+                El stock y el costo solo cambian con movimientos. Las ventas anteriores conservan el precio con el que se
+                cobraron.
+              </p>
+            </div>
+          </section>
+        ) : null}
+
+        {!product.archivedAt ? (
+          <section className="flex flex-col gap-2" aria-label="Zona de riesgo">
+            {!confirmArchive ? (
+              <button
+                type="button"
+                onClick={() => setConfirmArchive(true)}
+                className="min-h-11 rounded-[var(--r-lg)] border border-border bg-surface px-3 text-left text-sm font-semibold text-danger"
+              >
+                Archivar producto
+              </button>
+            ) : (
+              <div className="rounded-[var(--r-lg)] border border-danger/30 bg-surface p-3">
+                <p className="text-sm font-semibold text-ink">¿Archivar este producto?</p>
+                <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                  Dejará de aparecer para vender o surtir, pero su historial se conserva. Esta acción no se puede deshacer
+                  desde aquí.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button type="button" variant="secondary" disabled={editBusy} onClick={() => setConfirmArchive(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="button" variant="danger" disabled={editBusy} onClick={doArchive}>
+                    Archivar
+                  </Button>
+                </div>
+                {editError && <p className="mt-2 text-sm text-danger">{editError}</p>}
+              </div>
+            )}
+          </section>
+        ) : null}
+      </Sheet>
+    </div>
   );
 }

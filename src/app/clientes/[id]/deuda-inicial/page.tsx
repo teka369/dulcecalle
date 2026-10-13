@@ -20,7 +20,7 @@ import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
-import { ActionToast } from "@/components/customers/Toast";
+import { ActionToast } from "@/components/ui/ActionToast";
 
 export default function AgregarDeudaAnteriorPage() {
   const router = useRouter();

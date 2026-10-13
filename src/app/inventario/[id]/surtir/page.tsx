@@ -1,9 +1,19 @@
 "use client";
 
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { Spinner } from "@/components/ui/Spinner";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { Sheet } from "@/components/ui/Sheet";
+import { AmountField } from "@/components/ui/AmountField";
+import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
+import { Row } from "@/components/ui/Row";
+import { RowGroup } from "@/components/ui/RowGroup";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { ActionToast } from "@/components/ui/ActionToast";
+import { QtyStepper } from "@/components/inventory/QtyStepper";
+import { stockAfter, units } from "@/components/inventory/inventory";
+import { ABONO_METHODS } from "@/components/customers/clientes";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -14,7 +24,7 @@ import type { RemoteProduct, RemoteSupplier } from "@/data/http/mappers";
 import { validateSurtirForm } from "@/domain/inventory";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
-import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
+import { useEntityId } from "@/components/shell/entity-route";
 import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
 import { inventoryStore } from "@/store/inventoryStore";
 
@@ -153,53 +163,74 @@ export default function SurtirPage() {
 
   if (!ready) {
     return (
-      <div className="flex justify-center py-10">
-        <Spinner />
+      <div className="flex flex-col gap-4">
+        <SkeletonHero />
+        <SkeletonRows rows={4} />
       </div>
     );
   }
 
   if (!product) {
     return (
-      <div className="flex flex-col gap-4">
-        <EntityBackLink href="/inventario" className="text-sm text-ink-muted">
-          ← Inventario
-        </EntityBackLink>
-        <p className="text-sm text-ink-muted">No encontramos ese producto.</p>
-      </div>
+      <HeroBlock size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Surtir">
+        <StateBlock onHero kind="empty" title="No encontramos ese producto." />
+      </HeroBlock>
     );
   }
 
-  return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <EntityBackLink
-          href={`/inventario/${product.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </EntityBackLink>
-        <h1 className="text-[22px] font-semibold">Surtir</h1>
-      </header>
+  const after = stockAfter(product.stock, qtyRaw, 1);
+  const label = "text-xs font-semibold uppercase tracking-wide text-ink-muted";
 
-      <Card className="flex flex-col gap-4">
-        <div className="flex items-start gap-3">
-          <ProductThumbnail
-            secureUrl={primaryImageUrl(product.images)}
-            alt={product.name}
-            size="md"
+  return (
+    <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
+      <HeroBlock
+        size="compact"
+        back={{ href: `/inventario/${product.id}`, label: "Volver al producto", entity: true }}
+        title="Surtir"
+      >
+        <div className="mt-3 flex items-center gap-3">
+          <ProductThumbnail secureUrl={primaryImageUrl(product.images)} alt={product.name} size="sm" decorative />
+          <p className="min-w-0 text-sm text-on-hero-muted">
+            <span className="font-semibold text-on-hero">{product.name}</span> · Stock {units(product.stock)}
+          </p>
+        </div>
+      </HeroBlock>
+
+      <Sheet>
+        <QtyStepper label="Cantidad" value={qtyRaw} onChange={onQtyChange} />
+
+        <AmountField
+          label="Costo total"
+          value={totalCostRaw}
+          onChange={onTotalChange}
+          hint={unitCostRaw ? `Costo unitario ${formatCop(Number.parseInt(unitCostRaw, 10) || 0)}` : undefined}
+        />
+        <div>
+          <label className={label} htmlFor="unit-cost">
+            Costo unitario
+          </label>
+          <Input
+            id="unit-cost"
+            inputMode="numeric"
+            value={unitCostRaw}
+            onChange={(e) => onUnitChange(e.target.value)}
+            className="mt-2"
+            placeholder="0"
           />
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-              Producto
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <p className={label}>¿Cómo pagaste?</p>
+          <ChoiceSegmented label="¿Cómo pagaste?" options={ABONO_METHODS} value={method} onChange={setMethod} />
+          {previewTotal > 0 && (
+            <p className="text-sm text-ink-muted">
+              Sale {formatCop(previewTotal)} de {method}. No es un gasto ni un retiro.
             </p>
-            <p className="mt-1 font-semibold">{product.name}</p>
-          </div>
+          )}
         </div>
 
         <div>
-          <label className="text-sm font-medium" htmlFor="proveedor">
+          <label className={label} htmlFor="proveedor">
             Proveedor
           </label>
           <select
@@ -209,7 +240,7 @@ export default function SurtirPage() {
               setSupplierId(e.target.value);
               setSupplierCreate("");
             }}
-            className="mt-2 h-11 min-h-11 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="mt-2 h-14 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]"
           >
             <option value="">Elegir o crear…</option>
             {suppliers.map((s) =>
@@ -226,8 +257,7 @@ export default function SurtirPage() {
           </select>
           {pendingSupplierIds.length > 0 && (
             <p className="mt-2 text-xs text-ink-muted">
-              Los proveedores marcados se están sincronizando y estarán
-              disponibles en cuanto terminen.
+              Los proveedores marcados se están sincronizando y estarán disponibles en cuanto terminen.
             </p>
           )}
           {supplierId === "" && (
@@ -235,138 +265,33 @@ export default function SurtirPage() {
               value={supplierCreate}
               onChange={(e) => setSupplierCreate(e.target.value)}
               placeholder="Escribir nombre nuevo"
+              aria-label="Nombre de proveedor nuevo"
               className="mt-2"
             />
           )}
         </div>
 
         <div>
-          <label className="text-sm font-medium" htmlFor="cantidad">
-            Cantidad
+          <label className={label} htmlFor="notas">
+            Nota
           </label>
-          <Input
-            id="cantidad"
-            inputMode="numeric"
-            value={qtyRaw}
-            onChange={(e) => onQtyChange(e.target.value)}
-            className="mt-2"
-            placeholder="0"
-          />
+          <Input id="notas" value={note} onChange={(e) => setNote(e.target.value)} className="mt-2" />
         </div>
 
-        <div>
-          <label className="text-sm font-medium" htmlFor="unit-cost">
-            Costo unitario
-          </label>
-          <Input
-            id="unit-cost"
-            inputMode="numeric"
-            value={unitCostRaw}
-            onChange={(e) => onUnitChange(e.target.value)}
-            className="mt-2"
-            placeholder="0"
-          />
-        </div>
+        {after != null ? (
+          <RowGroup label="Resultado">
+            <Row title={`Quedará ${units(after)}`} />
+          </RowGroup>
+        ) : null}
 
-        <div>
-          <label className="text-sm font-medium" htmlFor="total-cost">
-            Costo total
-          </label>
-          <Input
-            id="total-cost"
-            inputMode="numeric"
-            value={totalCostRaw}
-            onChange={(e) => onTotalChange(e.target.value)}
-            className="mt-2"
-            placeholder="0"
-          />
-          {previewTotal > 0 && (
-            <p className="mt-1 text-sm text-ink-muted">{formatCop(previewTotal)}</p>
-          )}
-        </div>
+        {error ? <StateBlock kind="error" title={error} /> : null}
+      </Sheet>
 
-        <div>
-          <p className="text-sm font-semibold">¿Cómo pagaste?</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <MethodButton
-              label="Efectivo"
-              active={method === "Efectivo"}
-              onClick={() => setMethod("Efectivo")}
-            />
-            <MethodButton
-              label="Nequi"
-              active={method === "Nequi"}
-              onClick={() => setMethod("Nequi")}
-            />
-          </div>
-          {previewTotal > 0 && (
-            <p className="mt-2 text-sm text-ink-muted">
-              Sale {formatCop(previewTotal)} de {method}. No es un gasto ni un
-              retiro.
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="text-sm font-medium" htmlFor="notas">
-            Notas
-          </label>
-          <Input
-            id="notas"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            className="mt-2"
-          />
-        </div>
-
-        {error && <p className="text-sm text-danger">{error}</p>}
-      </Card>
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-lg">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={!valid || busy}
-            onClick={() => void confirm()}
-            className="w-full"
-          >
-            {previewTotal > 0
-              ? `Confirmar surtir · ${formatCop(previewTotal)}`
-              : "Confirmar surtir"}
-          </Button>
-        </div>
-      </div>
-
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white">
-          {toast}
-        </div>
-      )}
+      <ActionBar
+        summary={previewTotal > 0 ? formatCop(previewTotal) : undefined}
+        primary={{ label: "Confirmar surtir", onClick: () => void confirm(), disabled: !valid, busy }}
+      />
+      <ActionToast text={toast} />
     </div>
-  );
-}
-
-function MethodButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-h-11 rounded-[var(--r-md)] border px-2 text-sm font-semibold ${
-        active
-          ? "border-primary bg-primary text-ink"
-          : "border-border bg-surface text-ink-muted"
-      }`}
-    >
-      {label}
-    </button>
   );
 }

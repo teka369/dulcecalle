@@ -8,7 +8,7 @@ import { useCustomers } from "@/store/customerStore";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
-import { ActionToast } from "@/components/customers/Toast";
+import { ActionToast } from "@/components/ui/ActionToast";
 import { Input } from "@/components/ui/Input";
 
 export default function AgregarClientePage() {
