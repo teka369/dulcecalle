@@ -16,7 +16,7 @@ import { kindLabel, moveSign, shortDay } from "@/components/cash/cash";
 import { formatCop } from "@/domain/money";
 import { getPwaApi } from "@/data/pwa/api";
 import { carryCashWithOfflineFallback } from "@/data/pwa/offline-operations";
-import { normalizeSessionDetail } from "@/components/cash/gestionar-offline";
+import { carryCountedEfectivo, normalizeSessionDetail } from "@/components/cash/gestionar-offline";
 
 type Detail = {
   id: string;
@@ -55,7 +55,12 @@ export default function GestionarCajaDetailPage() {
     setLoadError(null);
     void getPwaApi()
       .cash.session(params.id)
-      .then((row) => setDetail(normalizeSessionDetail<Detail>(row)))
+      .then((row) => {
+        const d = normalizeSessionDetail<Detail>(row);
+        setDetail(d);
+        // B9: prefill the counted field with the expected cash (user can edit it).
+        setCounted((prev) => (prev === "" && Number.isFinite(d.expectedEfectivo) ? String(Math.max(0, Math.round(d.expectedEfectivo))) : prev));
+      })
       .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : "No se pudo cargar."));
   }
 
@@ -73,13 +78,15 @@ export default function GestionarCajaDetailPage() {
   }
 
   async function carry(mode: "counted" | "assumed") {
+    const countedEfectivo = carryCountedEfectivo(mode, counted);
+    if (countedEfectivo === null) {
+      setError("Escribe cuánto efectivo había.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await carryCashWithOfflineFallback(params.id, {
-        mode,
-        countedEfectivo: mode === "counted" ? Number(counted) : undefined,
-      });
+      await carryCashWithOfflineFallback(params.id, { mode, countedEfectivo });
       router.push("/mas/caja");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo pasar el saldo.");
@@ -178,7 +185,7 @@ export default function GestionarCajaDetailPage() {
             {!detail.canCountClose ? (
               <p className="text-sm text-ink-muted">Cerrar contando no está disponible: hay que pasar el saldo.</p>
             ) : null}
-            {choice === "contar" ? (
+            {choice === "contar" || !detail.requiresCarry ? (
               <AmountField label="¿Cuánto efectivo había en esta caja?" value={counted} onChange={setCounted} />
             ) : (
               <p className="text-sm text-ink-muted">
@@ -210,10 +217,11 @@ export default function GestionarCajaDetailPage() {
           aboveNav
           primary={
             choice === "contar"
-              ? { label: "Cerrar contando", onClick: () => void closeCounted(), disabled: counted === "", busy }
+              ? { label: "Cerrar contando", onClick: () => void closeCounted(), disabled: carryCountedEfectivo("counted", counted) === null, busy }
               : {
                   label: saldoLabel,
                   onClick: () => void carry(detail.requiresCarry ? "assumed" : "counted"),
+                  disabled: carryCountedEfectivo(detail.requiresCarry ? "assumed" : "counted", counted) === null,
                   busy,
                 }
           }

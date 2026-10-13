@@ -3,6 +3,7 @@
  * Offline it shows its own state instead of the generic /offline page.
  */
 import { NetworkError } from "@/data/errors";
+import { parseCopAmount, validateCounted } from "@/domain/cash/validate";
 
 export const GESTIONAR_OFFLINE_TEXT = "Necesitas internet para gestionar cajas";
 
@@ -33,4 +34,14 @@ export function normalizeSessionDetail<T extends { moves: unknown[]; stampedMove
     moves: Array.isArray(d.moves) ? d.moves : [],
     stampedMoves: Array.isArray(d.stampedMoves) ? d.stampedMoves : [],
   };
+}
+
+/**
+ * B9: counted cash sent by "pasar saldo". "assumed" sends nothing; "counted" needs a
+ * valid, explicit amount (never an implicit 0 from an empty field). null = invalid.
+ */
+export function carryCountedEfectivo(mode: "counted" | "assumed", countedRaw: string): number | undefined | null {
+  if (mode === "assumed") return undefined;
+  if (validateCounted(countedRaw) !== null) return null;
+  return parseCopAmount(countedRaw);
 }
