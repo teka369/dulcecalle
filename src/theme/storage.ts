@@ -24,6 +24,19 @@ export function readCachedPalette(): PaletteId {
   }
 }
 
+/**
+ * Browser theme-color follows --bg, or --hero while a screen with a hero
+ * (Inicio) marks <html data-hero="on">.
+ */
+export function syncThemeColor(): void {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const token = root.dataset.hero === "on" ? "--hero" : "--bg";
+  const value = getComputedStyle(root).getPropertyValue(token).trim();
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta && value) meta.setAttribute("content", value);
+}
+
 export function applyPalette(id: PaletteId): void {
   if (typeof document === "undefined") return;
   document.documentElement.dataset.theme = id;
@@ -32,11 +45,7 @@ export function applyPalette(id: PaletteId): void {
   } catch {
     /* private mode */
   }
-  const bg = getComputedStyle(document.documentElement)
-    .getPropertyValue("--bg")
-    .trim();
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta && bg) meta.setAttribute("content", bg);
+  syncThemeColor();
 }
 
 export async function loadPalette(): Promise<PaletteId> {
@@ -71,11 +80,7 @@ export function applyMode(mode: ColorMode): void {
   } catch {
     /* private mode */
   }
-  const bg = getComputedStyle(document.documentElement)
-    .getPropertyValue("--bg")
-    .trim();
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta && bg) meta.setAttribute("content", bg);
+  syncThemeColor();
 }
 
 export async function loadMode(): Promise<ColorMode> {

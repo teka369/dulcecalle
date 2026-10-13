@@ -1,4 +1,5 @@
 import { addCop } from "@/domain/money";
+import { bogotaHour } from "./week";
 import { startOfLocalDay } from "@/domain/cash";
 import type {
   CashSession,
@@ -72,9 +73,9 @@ export function greetingForHour(hour: number): string {
 
 export function formatDashboardDate(ms: number): string {
   const d = new Date(ms);
-  const weekday = new Intl.DateTimeFormat("es-CO", { weekday: "long" }).format(d);
-  const day = new Intl.DateTimeFormat("es-CO", { day: "numeric" }).format(d);
-  const month = new Intl.DateTimeFormat("es-CO", { month: "long" }).format(d);
+  const weekday = new Intl.DateTimeFormat("es-CO", { weekday: "long", timeZone: "America/Bogota" }).format(d);
+  const day = new Intl.DateTimeFormat("es-CO", { day: "numeric", timeZone: "America/Bogota" }).format(d);
+  const month = new Intl.DateTimeFormat("es-CO", { month: "long", timeZone: "America/Bogota" }).format(d);
   return `${capitalizeEs(weekday)}, ${day} de ${capitalizeEs(month)}`;
 }
 
@@ -262,7 +263,7 @@ export function buildDashboardSnapshot(input: {
   const name = input.businessName?.trim() || null;
 
   return {
-    greeting: greetingForHour(new Date(now).getHours()),
+    greeting: greetingForHour(bogotaHour(now)),
     dateLabel: formatDashboardDate(now),
     businessLabel: name,
     todaySalesTotal,

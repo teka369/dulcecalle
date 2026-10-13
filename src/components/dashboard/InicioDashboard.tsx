@@ -1,18 +1,20 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState, type ReactNode } from "react";
 import { formatCop } from "@/domain/money";
-import { formatBogotaDateTime } from "@/domain/debt/statement";
-import { CASH_COPY } from "@/domain/cash";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
+import { weekTotal, type WeekDay } from "@/domain/dashboard/week";
+import { loadWeekSeries } from "./week-source";
+import { syncThemeColor } from "@/theme/storage";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-
-const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] as const;
 
 /** Existing home shortcuts only. Nueva venta stays the primary action. */
 const QUICK_LINKS = [
   { href: "/clientes", label: "Fiados", icon: "users" },
-  { href: "/mas/caja", label: "Caja", icon: "cash" },
-  { href: "/inventario", label: "Inventario", icon: "package" },
+  { href: "/inventario", label: "Surtir", icon: "package" },
+  { href: "/mas/gastos", label: "Gastos", icon: "bag" },
 ] as const;
 
 type Glyph = "alert" | "package" | "users" | "cash" | "bag" | "plus";
@@ -97,144 +99,178 @@ function Chevron() {
   );
 }
 
-function bogotaWeekdayIndex(date = new Date()): number {
-  const weekday = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Bogota",
-    weekday: "short",
-  }).format(date);
-  const index = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(weekday);
-  return index === -1 ? 0 : index;
-}
-
-function cajaCopy(snap: DashboardSnapshot): { value: string; label: string } {
-  if (snap.cajaState === "conflict") {
-    return { value: "Revisa la caja en este teléfono", label: "Caja" };
-  }
-  if (snap.cajaState === "pending") {
-    const count = snap.pendingCount ?? 1;
-    return {
-      value: count === 1 ? "Tienes una caja pendiente de gestionar" : `Tienes ${count} cajas pendientes de gestionar`,
-      label: "Caja",
-    };
-  }
-  if (snap.cajaState === "open") {
-    return {
-      value: formatCop(snap.cajaExpectedEfectivo ?? 0),
-      label: CASH_COPY.cajaEsperado,
-    };
-  }
-  if (snap.cajaState === "closed") {
-    return { value: CASH_COPY.estadoCerrada, label: "Caja" };
-  }
-  return { value: CASH_COPY.estadoSinAbrir, label: "Caja" };
-}
-
 function salesCaption(count: number): string {
   if (count === 0) return "Sin ventas registradas hoy";
   return `${count} ${count === 1 ? "venta" : "ventas"}`;
 }
 
-function WeekRail() {
-  const today = bogotaWeekdayIndex();
-  const name = WEEKDAYS[today];
+/** Hero pill: Caja state (existing data, existing routes). */
+function cajaPill(snap: DashboardSnapshot): {
+  href: string;
+  label: string;
+  dot: string | null;
+} {
+  switch (snap.cajaState) {
+    case "open":
+      return { href: "/mas/caja", label: "Caja abierta", dot: "bg-ok" };
+    case "pending":
+      return { href: "/mas/caja/gestionar", label: "Caja pendiente", dot: "bg-warning" };
+    case "conflict":
+      return { href: "/mas/caja", label: "Revisar caja", dot: "bg-danger" };
+    default:
+      return { href: "/mas/caja", label: "Abrir caja", dot: null };
+  }
+}
+
+/**
+ * 7-day series only when this business's local sales history is prepared;
+ * null → spec fallback (no chart, «Ventas de hoy»).
+ */
+function useWeekSeries(todayTotal: number): WeekDay[] | null {
+  const [days, setDays] = useState<WeekDay[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void loadWeekSeries(Date.now(), todayTotal)
+      .then((d) => {
+        if (alive) setDays(d);
+      })
+      .catch(() => {
+        if (alive) setDays(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [todayTotal]);
+  return days;
+}
+
+function WeekChart({ days }: { days: WeekDay[] }) {
+  const W = 320;
+  const H = 72;
+  const pad = 6;
+  const max = Math.max(1, ...days.map((d) => d.total));
+  const step = (W - pad * 2) / (days.length - 1);
+  const pts = days.map((d, i) => ({
+    x: pad + i * step,
+    y: pad + (H - pad * 2) * (1 - d.total / max),
+  }));
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${H} L${pts[0].x.toFixed(1)},${H} Z`;
+  const last = pts[pts.length - 1];
+  const label = `Ventas de los últimos 7 días: ${days
+    .map((d) => `${d.label} ${formatCop(d.total)}`)
+    .join(", ")}`;
   return (
-    <div aria-label={`Hoy es ${name}. Las ventas de esta pantalla son solo de hoy.`}>
-      <div className="grid grid-cols-7 gap-1.5">
-        {WEEKDAYS.map((label, i) => {
-          const active = i === today;
-          return (
-            <div key={label} className="flex min-w-0 flex-col items-center gap-2">
-              <span
-                className={`h-1.5 w-full rounded-full ${active || i < today ? "bg-cta" : "bg-border"}`}
-              />
-              <span
-                className={`truncate text-xs leading-none ${
-                  active ? "font-semibold text-ink" : "text-ink-muted"
-                }`}
-              >
-                {label}
-              </span>
-            </div>
-          );
-        })}
+    <div role="img" aria-label={label}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-[72px] w-full" aria-hidden>
+        <path d={area} fill="var(--hero-accent)" fillOpacity={0.12} />
+        <path
+          d={line}
+          fill="none"
+          stroke="var(--hero-accent)"
+          strokeWidth={2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      <div className="relative -mt-[72px] h-[72px]" aria-hidden>
+        <span
+          className="absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-on-hero"
+          style={{ left: `${(last.x / W) * 100}%`, top: `${(last.y / H) * 100}%` }}
+        />
+      </div>
+      <div className="mt-2 grid grid-cols-7 gap-1" aria-hidden>
+        {days.map((d) => (
+          <span
+            key={d.key}
+            className={`truncate text-center text-xs leading-none ${
+              d.isToday ? "font-semibold text-on-hero" : "text-on-hero-muted"
+            }`}
+          >
+            {d.label}
+          </span>
+        ))}
       </div>
     </div>
   );
 }
 
-function MetricCard({
+function Cloud() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.5A3.3 3.3 0 0 0 7 18z" />
+      <path d="m4 4 16 16" />
+    </svg>
+  );
+}
+
+/** Full-bleed hero shell shared by dashboard, skeleton and error states. */
+export function InicioHero({ children, busy }: { children: ReactNode; busy?: boolean }) {
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.hero = "on";
+    syncThemeColor();
+    return () => {
+      delete root.dataset.hero;
+      syncThemeColor();
+    };
+  }, []);
+  return (
+    <section
+      className="-mx-4 -mt-4 bg-hero px-4 pb-10 pt-[max(1rem,env(safe-area-inset-top))] text-on-hero lg:mt-0 lg:rounded-t-[28px] lg:pt-6"
+      aria-busy={busy || undefined}
+    >
+      {children}
+    </section>
+  );
+}
+
+function MetricCell({
   href,
   icon,
   value,
   label,
+  detail,
   tone = "neutral",
 }: {
   href: string;
   icon: Glyph;
   value: string;
   label: string;
-  tone?: "neutral" | "danger" | "ok";
+  detail?: string;
+  tone?: "neutral" | "danger" | "accent";
 }) {
   const well =
     tone === "danger"
       ? "bg-danger-soft text-danger"
-      : tone === "ok"
-        ? "bg-ok-soft text-ok"
+      : tone === "accent"
+        ? "bg-info-soft text-accent"
         : "bg-surface-2 text-ink";
   return (
-    <Link
-      href={href}
-      className="flex min-h-[4.5rem] min-w-0 items-center gap-3 rounded-[var(--r-lg)] bg-surface p-3 shadow-[var(--shadow-sm)]"
-    >
-      <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${well}`}>
+    <Link href={href} className="flex min-h-[4.5rem] min-w-0 flex-col justify-center gap-1.5 px-3 py-3">
+      <span className={`flex size-8 items-center justify-center rounded-[var(--r-sm)] ${well}`}>
         <GlyphIcon name={icon} />
       </span>
-      <span className="min-w-0">
-        <span className="block break-words text-lg font-semibold leading-tight tabular-nums text-ink">
-          {value}
-        </span>
-        <span className="mt-0.5 block truncate text-xs text-ink-muted">{label}</span>
+      <span className="block truncate text-base font-semibold leading-tight tabular-nums text-ink">
+        {value}
+      </span>
+      <span className="block text-xs leading-tight text-ink-muted">
+        {label}
+        {detail ? <span className="block">{detail}</span> : null}
       </span>
     </Link>
   );
 }
 
-function ActionBanner({
-  href,
-  icon,
-  title,
-  detail,
-  tone,
-}: {
-  href: string;
-  icon: Glyph;
-  title: string;
-  detail: string;
-  tone: "ink" | "surface";
-}) {
-  const surface = tone === "ink";
+function SectionHead({ title, href, link }: { title: string; href: string; link: string }) {
   return (
-    <Link
-      href={href}
-      className={`flex min-h-16 items-center gap-3 rounded-[var(--r-lg)] px-3 py-3 shadow-[var(--shadow-sm)] ${
-        surface ? "bg-ink text-bg" : "border border-border bg-surface text-ink"
-      }`}
-    >
-      <span
-        className={`flex size-11 shrink-0 items-center justify-center rounded-full ${
-          surface ? "bg-surface text-ink" : "bg-primary text-ink"
-        }`}
-      >
-        <GlyphIcon name={icon} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold leading-snug">{title}</span>
-        <span className={`mt-0.5 block text-xs leading-snug ${surface ? "opacity-75" : "text-ink-muted"}`}>
-          {detail}
-        </span>
-      </span>
-      <Chevron />
-    </Link>
+    <div className="flex items-baseline justify-between gap-2">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{title}</h2>
+      <Link href={href} className="text-xs font-semibold text-ink underline underline-offset-2">
+        {link}
+      </Link>
+    </div>
   );
 }
 
@@ -242,159 +278,128 @@ export function InicioDashboard({
   snap,
   onLoadDemo,
   toast,
+  fromCache = false,
+  capturedAt = null,
 }: {
   snap: DashboardSnapshot;
   onLoadDemo?: () => void;
   toast: string | null;
+  fromCache?: boolean;
+  capturedAt?: number | null;
 }) {
-  const caja = cajaCopy(snap);
+  const pill = cajaPill(snap);
   const ventas = salesCaption(snap.todaySalesCount);
+  const days = useWeekSeries(snap.todaySalesTotal);
   const quick = QUICK_LINKS.map((item) =>
     item.href === "/inventario" && snap.lowStockCount > 0
       ? { ...item, label: "Stock bajo" }
       : item,
   );
 
-  const primaryBanner =
-    snap.todaySalesCount === 0
-      ? {
-          href: "/ventas/nueva",
-          icon: "bag" as const,
-          title: "Registra una venta",
-          detail: "Todavía no hay ventas hoy",
-        }
-      : {
-          href: "/ventas",
-          icon: "bag" as const,
-          title: "Ventas de hoy",
-          detail: ventas,
-        };
-
-  const secondaryBanner =
+  const banner =
     snap.productCount === 0
-      ? {
-          href: "/inventario/nuevo",
-          icon: "plus" as const,
-          title: "Agrega el primer producto",
-          detail: "El catálogo está vacío",
-        }
-      : snap.debtTotal > 0
-        ? {
-            href: "/clientes",
-            icon: "users" as const,
-            title: "Por cobrar",
-            detail: `${formatCop(snap.debtTotal)} · ${snap.debtorCount} ${
-              snap.debtorCount === 1 ? "cliente" : "clientes"
-            }`,
-          }
-        : snap.lowStockCount > 0
-          ? {
-              href: "/inventario",
-              icon: "package" as const,
-              title: "Poco stock",
-              detail: `${snap.lowStockCount} ${
-                snap.lowStockCount === 1 ? "producto" : "productos"
-              } en el umbral`,
-            }
-          : {
-              href: "/mas/caja",
-              icon: "cash" as const,
-              title: caja.label,
-              detail: caja.value,
-            };
+      ? { href: "/inventario/nuevo", icon: "plus" as const, title: "Agrega tu primer producto", detail: "El catálogo está vacío" }
+      : snap.todaySalesCount === 0
+        ? { href: "/ventas/nueva", icon: "bag" as const, title: "Registra tu primera venta", detail: "Todavía no hay ventas hoy" }
+        : { href: "/ventas/nueva", icon: "bag" as const, title: "Venta rápida", detail: "Abre la caja registradora" };
 
   return (
     <div className="flex flex-col">
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold leading-tight tracking-tight text-ink">
-            {snap.greeting}
-          </h1>
-          {snap.businessLabel ? (
-            <p className="mt-1 truncate text-sm text-ink-muted">{snap.businessLabel}</p>
-          ) : null}
-          <p className="mt-0.5 text-xs text-ink-muted">{snap.dateLabel}</p>
-        </div>
-        <Link
-          href="/ventas/nueva"
-          className="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[var(--r-pill)] border border-border bg-surface px-3 text-sm font-semibold text-ink shadow-[var(--shadow-sm)]"
-        >
-          <GlyphIcon name="plus" />
-          <span className="max-[359px]:sr-only">Nueva venta</span>
-        </Link>
-      </header>
+      <InicioHero>
+        {fromCache && capturedAt != null ? (
+          <p className="mb-3 flex items-center gap-1.5 text-xs text-on-hero-muted">
+            <Cloud />
+            Sin conexión · actualizado {new Date(capturedAt).toLocaleString("es-CO")}
+          </p>
+        ) : null}
+        <header className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold leading-tight tracking-tight">
+              {snap.greeting}
+            </h1>
+            {snap.businessLabel ? (
+              <p className="mt-1 truncate text-sm text-on-hero-muted">{snap.businessLabel}</p>
+            ) : null}
+            <p className="mt-0.5 text-xs text-on-hero-muted">{snap.dateLabel}</p>
+          </div>
+          <Link
+            href={pill.href}
+            className="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[var(--r-pill)] border border-[color-mix(in_srgb,var(--on-hero)_20%,transparent)] bg-[color-mix(in_srgb,var(--on-hero)_12%,transparent)] px-3 text-sm font-semibold"
+          >
+            {pill.dot ? <span className={`size-2 rounded-full ${pill.dot}`} aria-hidden /> : null}
+            {pill.label}
+          </Link>
+        </header>
 
-      <section className="mt-8" aria-label="Ventas de hoy">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Hoy</p>
-          <p className="text-sm text-ink-muted">{ventas}</p>
+        <div className="mt-7" aria-label="Ventas de hoy">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-on-hero-muted">Hoy</p>
+            <p className="text-sm text-on-hero-muted">{ventas}</p>
+          </div>
+          <Link href="/ventas" className="mt-2 block">
+            <p className="break-all text-5xl font-semibold leading-none tracking-tight tabular-nums max-[359px]:text-4xl">
+              {formatCop(snap.todaySalesTotal)}
+            </p>
+          </Link>
         </div>
-        <Link href="/ventas" className="mt-2 block">
-          <p className="break-all text-5xl font-semibold leading-none tracking-tight tabular-nums text-ink max-[359px]:text-4xl">
-            {formatCop(snap.todaySalesTotal)}
+
+        {days ? (
+          <div className="mt-6">
+            <WeekChart days={days} />
+          </div>
+        ) : null}
+        <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-[color-mix(in_srgb,var(--on-hero)_20%,transparent)] pt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-on-hero-muted">
+            {days ? "Últimos 7 días" : "Ventas de hoy"}
           </p>
-        </Link>
-        <div className="mt-8">
-          <WeekRail />
-        </div>
-        <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-border pt-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Ventas de hoy
-          </p>
-          <p className="text-sm font-semibold tabular-nums text-ink">
-            {formatCop(snap.todaySalesTotal)}
+          <p className="text-sm font-semibold tabular-nums">
+            {formatCop(days ? weekTotal(days) : snap.todaySalesTotal)}
           </p>
         </div>
-        <div className="mt-2 flex justify-end">
-          <Link href="/mas/estadisticas" className="text-xs font-semibold text-cta">
+        <div className="mt-2 flex items-center justify-end gap-3">
+          <Link href="/mas/estadisticas" className="text-xs font-semibold underline underline-offset-2">
             Ver estadísticas
           </Link>
         </div>
-      </section>
+      </InicioHero>
 
-      <section className="-mx-4 mt-6 flex flex-col gap-6 rounded-t-3xl bg-surface-2 px-4 pb-2 pt-5">
-        <div className="grid grid-cols-2 gap-3" aria-label="Señales del día">
-          <MetricCard
+      <section className="-mx-4 -mt-6 flex flex-col gap-6 rounded-t-[28px] bg-bg px-4 pb-2 pt-5 shadow-[0_-8px_24px_rgba(0,0,0,.12)]">
+        <div
+          className="grid grid-cols-3 divide-x divide-border overflow-hidden rounded-[var(--r-lg)] border border-border bg-surface"
+          aria-label="Señales del día"
+        >
+          <MetricCell
             href="/inventario"
             icon="alert"
             value={String(snap.lowStockCount)}
             label="Stock bajo"
             tone={snap.lowStockCount > 0 ? "danger" : "neutral"}
           />
-          <MetricCard
-            href="/inventario"
-            icon="package"
-            value={String(snap.productCount)}
-            label="Productos"
-          />
-          <MetricCard
+          <MetricCell href="/inventario" icon="package" value={String(snap.productCount)} label="Productos" />
+          <MetricCell
             href="/clientes"
             icon="users"
             value={formatCop(snap.debtTotal)}
             label="Por cobrar"
-            tone={snap.debtTotal > 0 ? "danger" : "neutral"}
-          />
-          <MetricCard
-            href={snap.cajaState === "pending" ? "/mas/caja/gestionar" : "/mas/caja"}
-            icon="cash"
-            value={caja.value}
-            label={caja.label}
-            tone={snap.cajaState === "open" ? "ok" : "neutral"}
+            detail={
+              snap.debtorCount > 0
+                ? `${snap.debtorCount} ${snap.debtorCount === 1 ? "fiado" : "fiados"}`
+                : undefined
+            }
+            tone={snap.debtTotal > 0 ? "accent" : "neutral"}
           />
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Accesos rápidos
-          </h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Accesos rápidos</h2>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {quick.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex min-h-[5.75rem] flex-col items-center justify-center gap-2 rounded-[var(--r-lg)] bg-surface px-2 py-3 text-center shadow-[var(--shadow-sm)]"
+                className="flex min-h-[5.75rem] flex-col items-center justify-center gap-2 rounded-[var(--r-lg)] border border-border bg-surface px-2 py-3 text-center"
               >
-                <span className="flex size-11 items-center justify-center rounded-full bg-surface-2 text-cta">
+                <span className="flex size-11 items-center justify-center rounded-full bg-primary/25 text-ink">
                   <GlyphIcon name={item.icon} />
                 </span>
                 <span className="text-xs font-semibold leading-tight text-ink">{item.label}</span>
@@ -403,127 +408,68 @@ export function InicioDashboard({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3" aria-label="Acciones">
-          <ActionBanner {...primaryBanner} tone="ink" />
-          <ActionBanner {...secondaryBanner} tone="surface" />
-        </div>
+        <Link
+          href={banner.href}
+          className="flex min-h-16 items-center gap-3 rounded-[var(--r-lg)] bg-hero px-3 py-3 text-on-hero"
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-hero-accent text-hero">
+            <GlyphIcon name={banner.icon} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold leading-snug">{banner.title}</span>
+            <span className="mt-0.5 block text-xs leading-snug text-on-hero-muted">{banner.detail}</span>
+          </span>
+          <Chevron />
+        </Link>
 
         <section className="flex flex-col gap-2" aria-label="Fiados pendientes">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-              Fiados pendientes
-            </h2>
-            <Link href="/clientes" className="text-xs font-semibold text-cta">
-              Ver todos
-            </Link>
-          </div>
-          {snap.debtorCount === 0 ? (
-            <p className="rounded-[var(--r-lg)] bg-surface px-3 py-2.5 text-sm text-ink-muted shadow-[var(--shadow-sm)]">
-              Nadie debe…
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {snap.debtors.map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={`/clientes/${c.id}`}
-                    className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--r-lg)] bg-surface px-3 py-2.5 shadow-[var(--shadow-sm)]"
-                  >
-                    <span className="min-w-0 truncate font-medium">{c.name}</span>
-                    <span className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-sm font-semibold tabular-nums text-accent">
-                        {formatCop(c.debt)}
+          <SectionHead title="Fiados pendientes" href="/clientes" link="Ver todos" />
+          <div className="overflow-hidden rounded-[var(--r-lg)] border border-border bg-surface">
+            {snap.debtorCount === 0 ? (
+              <p className="px-3 py-2.5 text-sm text-ink-muted">Nadie debe…</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {snap.debtors.map((c) => (
+                  <li key={c.id}>
+                    <Link href={`/clientes/${c.id}`} className="flex min-h-11 items-center justify-between gap-3 px-3 py-2.5">
+                      <span className="min-w-0 truncate font-medium">{c.name}</span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <Badge tone="info">Pendiente</Badge>
+                        <span className="text-sm font-semibold tabular-nums text-accent">{formatCop(c.debt)}</span>
+                        <Chevron />
                       </span>
-                      <Badge tone="info">Pendiente</Badge>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </section>
 
         <section className="flex flex-col gap-2" aria-label="Atención en inventario">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-              Atención en inventario
-            </h2>
-            <Link href="/inventario" className="text-xs font-semibold text-cta">
-              Ver inventario
-            </Link>
+          <SectionHead title="Atención en inventario" href="/inventario" link="Ver inventario" />
+          <div className="overflow-hidden rounded-[var(--r-lg)] border border-border bg-surface">
+            {snap.lowStockCount === 0 ? (
+              <p className="px-3 py-2.5 text-sm text-ink-muted">Nada en poco stock</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {snap.lowStock.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/inventario/${p.id}`} className="flex min-h-11 items-center justify-between gap-3 px-3 py-2.5">
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{p.name}</span>
+                        <span className="text-xs text-danger">Poco stock · umbral {p.lowStockAt}</span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums">
+                        {p.stock} u.
+                        <Chevron />
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          {snap.lowStockCount === 0 ? (
-            <p className="rounded-[var(--r-lg)] bg-surface px-3 py-2.5 text-sm text-ink-muted shadow-[var(--shadow-sm)]">
-              Nada en poco stock
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {snap.lowStock.map((p) => (
-                <li key={p.id}>
-                  <Link
-                    href={`/inventario/${p.id}`}
-                    className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--r-lg)] bg-surface px-3 py-2.5 shadow-[var(--shadow-sm)]"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{p.name}</span>
-                      <span className="text-xs text-danger">
-                        Poco stock · umbral {p.lowStockAt}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-sm font-semibold tabular-nums">
-                      {p.stock} u.
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="flex flex-col gap-2" aria-label="Actividad reciente">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Actividad reciente
-          </h2>
-          {snap.activity.length === 0 ? (
-            <p className="rounded-[var(--r-lg)] bg-surface px-3 py-2.5 text-sm text-ink-muted shadow-[var(--shadow-sm)]">
-              Todavía no hay actividad registrada.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {snap.activity.map((row) => (
-                <li key={row.id}>
-                  <Link
-                    href={row.href ?? "/"}
-                    className="flex min-h-11 items-start justify-between gap-3 rounded-[var(--r-lg)] bg-surface px-3 py-2.5 shadow-[var(--shadow-sm)]"
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium">{row.title}</span>
-                      {row.detail ? (
-                        <span className="block truncate text-xs text-ink-muted">{row.detail}</span>
-                      ) : null}
-                      <span className="block text-xs text-ink-muted">
-                        {formatBogotaDateTime(row.at)}
-                      </span>
-                    </span>
-                    {row.amount != null ? (
-                      <span
-                        className={`shrink-0 text-sm font-semibold tabular-nums ${
-                          row.kind === "pago" || row.kind === "devolucion"
-                            ? "text-ok"
-                            : row.kind === "fiado" || row.kind === "inicial"
-                              ? "text-accent"
-                              : "text-ink"
-                        }`}
-                      >
-                        {row.kind === "pago" || row.kind === "devolucion" ? "−" : ""}
-                        {formatCop(row.amount)}
-                      </span>
-                    ) : null}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
         </section>
 
         {snap.emptyDb && onLoadDemo ? (
@@ -543,26 +489,23 @@ export function InicioDashboard({
 }
 
 export function InicioSkeleton() {
+  const bar = "rounded bg-[color-mix(in_srgb,var(--on-hero)_15%,transparent)] motion-safe:animate-pulse";
   return (
-    <div className="flex flex-col" aria-busy="true" aria-label="Cargando">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="h-7 w-40 rounded bg-surface-2" />
-          <div className="mt-2 h-4 w-28 rounded bg-surface-2" />
+    <div className="flex flex-col" aria-label="Cargando">
+      <InicioHero busy>
+        <div className={`h-7 w-40 ${bar}`} />
+        <div className={`mt-2 h-4 w-28 ${bar}`} />
+        <div className={`mt-7 h-4 w-16 ${bar}`} />
+        <div className={`mt-3 h-12 w-44 ${bar}`} />
+        <div className={`mt-6 h-[72px] w-full ${bar}`} />
+      </InicioHero>
+      <div className="-mx-4 -mt-6 flex flex-col gap-6 rounded-t-[28px] bg-bg px-4 pt-5">
+        <div className="h-[4.5rem] rounded-[var(--r-lg)] bg-surface-2" />
+        <div className="grid grid-cols-3 gap-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-[5.75rem] rounded-[var(--r-lg)] bg-surface-2" />
+          ))}
         </div>
-        <div className="h-11 w-28 rounded-full bg-surface-2" />
-      </div>
-      <div className="mt-8 h-4 w-16 rounded bg-surface-2" />
-      <div className="mt-3 h-12 w-40 rounded bg-surface-2" />
-      <div className="mt-8 grid grid-cols-7 gap-1.5">
-        {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className="h-1.5 rounded-full bg-surface-2" />
-        ))}
-      </div>
-      <div className="-mx-4 mt-6 grid grid-cols-2 gap-3 rounded-t-3xl bg-surface-2 px-4 py-5">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-[4.5rem] rounded-[var(--r-lg)] bg-surface" />
-        ))}
       </div>
     </div>
   );

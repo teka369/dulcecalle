@@ -4,6 +4,7 @@ import {
   DEFAULT_PALETTE,
   PALETTE_IDS,
   PALETTE_META,
+  isClosedPalette,
   parsePalette,
 } from "./palettes";
 import {
@@ -18,7 +19,7 @@ describe("palette system", () => {
     await __resetDbForTests();
   });
 
-  it("lists the six expected palettes", () => {
+  it("lists the six classic palettes plus four full themes", () => {
     expect([...PALETTE_IDS]).toEqual([
       "amber",
       "ocean",
@@ -26,6 +27,10 @@ describe("palette system", () => {
       "violet",
       "rose",
       "slate",
+      "cacao",
+      "menta",
+      "mora",
+      "contraste",
     ]);
     for (const id of PALETTE_IDS) {
       expect(PALETTE_META[id].label.length).toBeGreaterThan(0);
@@ -36,6 +41,12 @@ describe("palette system", () => {
     expect(parsePalette(undefined)).toBe(DEFAULT_PALETTE);
     expect(parsePalette("neon")).toBe("amber");
     expect(parsePalette("ocean")).toBe("ocean");
+    expect(parsePalette("cacao")).toBe("cacao");
+  });
+
+  it("marks only the four new themes as closed (ignore mode)", () => {
+    const closed = PALETTE_IDS.filter((id) => isClosedPalette(id));
+    expect(closed).toEqual(["cacao", "menta", "mora", "contraste"]);
   });
 
   it("persists the selected palette in Dexie settings", async () => {
