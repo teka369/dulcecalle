@@ -135,11 +135,12 @@ describe("customer portal routing", () => {
       "utf8",
     );
     expect(home).toContain("Hola, {summary.name}");
-    expect(home).toContain("Por cobrar");
+    expect(home).toContain("debtHero");
     expect(home).toContain("summary.debt");
-    expect(home).toContain("Cargando…");
+    expect(home).toContain("PortalLoading");
+    expect(readFileSync(join(__dirname, "../customer/CustomerChrome.tsx"), "utf8")).toContain("Cargando…");
     expect(home).toContain("loadCachedCustomerLedger");
-    expect(home).toContain("CustomerCacheNotice");
+    expect(home).toContain("capturedAt={fromCache ? capturedAt : null}");
 
     const compras = readFileSync(
       join(__dirname, "../../app/cliente/compras/page.tsx"),

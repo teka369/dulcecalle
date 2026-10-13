@@ -1,132 +1,73 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { CustomerChrome, CustomerCacheNotice } from "@/components/customer/CustomerChrome";
-import type { CustomerLedger } from "@/data/http/customer-api";
-import { loadCachedCustomerLedger } from "@/data/pwa/customer-ledger-cache";
-import {
-  customerPortalSummary,
-  customerPortalTotals,
-} from "@/data/pwa/customer-portal";
+import { CustomerChrome, PortalError, PortalLoading } from "@/components/customer/CustomerChrome";
+import { usePortalLedger } from "@/components/customer/usePortalLedger";
+import { debtHero } from "@/components/customer/portal";
+import { customerPortalSummary, customerPortalTotals } from "@/data/pwa/customer-portal";
 import { formatCop } from "@/domain/money";
-import { Card } from "@/components/ui/Card";
-import { Spinner } from "@/components/ui/Spinner";
+import { HeroAmount } from "@/components/ui/HeroAmount";
+import { SegmentedMetrics } from "@/components/ui/SegmentedMetrics";
+import { QuickTiles } from "@/components/ui/QuickTiles";
 
 export default function CustomerHomePage() {
-  const [ledger, setLedger] = useState<CustomerLedger | null>(null);
-  const [capturedAt, setCapturedAt] = useState<number | null>(null);
-  const [fromCache, setFromCache] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    void loadCachedCustomerLedger()
-      .then((result) => {
-        setLedger(result.ledger);
-        setCapturedAt(result.capturedAt);
-        setFromCache(result.source === "cache");
-      })
-      .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "No se pudo cargar.");
-      });
-  }, []);
+  // loadCachedCustomerLedger via usePortalLedger (server, else own cache; capturedAt → offline band).
+  const { ledger, capturedAt, fromCache, error, reload } = usePortalLedger();
 
   if (error) {
     return (
-      <CustomerChrome title="Tu consulta">
-        <p className="text-sm text-danger">{error}</p>
+      <CustomerChrome title="Tu consulta" size="tall">
+        <PortalError message={error} onRetry={reload} />
       </CustomerChrome>
     );
   }
-
   if (!ledger) {
     return (
-      <CustomerChrome title="Tu consulta">
-        <div className="flex flex-col items-center gap-2 py-10">
-          <Spinner />
-          <p className="text-sm text-ink-muted">Cargando…</p>
-        </div>
+      <CustomerChrome title="Tu consulta" size="tall">
+        <PortalLoading />
       </CustomerChrome>
     );
   }
 
   const summary = customerPortalSummary(ledger);
-  const { totalComprado, totalAbonado, movimientos } =
-    customerPortalTotals(ledger);
+  const debt = debtHero(ledger);
+  const { totalComprado, totalAbonado } = customerPortalTotals(ledger);
 
   return (
-    <CustomerChrome>
-      {fromCache && capturedAt != null && (
-        <CustomerCacheNotice capturedAt={capturedAt} />
-      )}
-      <h1 className="text-[22px] font-semibold tracking-tight">
-        Hola, {summary.name}
-      </h1>
-      <p className="text-sm text-ink-muted">{summary.code}</p>
-
-      <Card as="article" className="p-5">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-          Por cobrar
-        </p>
-        <p
-          className={`mt-1 text-[34px] font-semibold tabular-nums ${
-            summary.debt > 0 ? "text-accent" : "text-ok"
-          }`}
-        >
-          {formatCop(summary.debt)}
-        </p>
-        <p className="mt-1 text-sm text-ink-muted">
-          {summary.debt > 0
-            ? "Esto es lo que debes en este momento."
-            : "Estás al día. No debes nada."}
-        </p>
-      </Card>
-
-      <section className="grid grid-cols-2 gap-2">
-        <SummaryChip label="Total comprado" value={formatCop(totalComprado)} />
-        <SummaryChip label="Total abonado" value={formatCop(totalAbonado)} />
-        <SummaryChip label="Movimientos" value={String(movimientos)} />
-        <SummaryChip
-          label="Última actualización"
-          value={
-            capturedAt
-              ? new Date(capturedAt).toLocaleDateString("es-CO", {
-                  day: "numeric",
-                  month: "short",
-                })
-              : "—"
-          }
-        />
-      </section>
-
-      <nav className="flex flex-col gap-2">
-        <PortalLink href="/cliente/cuenta" label="Estado de cuenta" />
-        <PortalLink href="/cliente/compras" label="Compras" />
-        <PortalLink href="/cliente/pagos" label="Pagos" />
-      </nav>
-    </CustomerChrome>
-  );
-}
-
-function SummaryChip({ label, value }: { label: string; value: string }) {
-  return (
-    <Card as="article" className="p-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-        {label}
-      </p>
-      <p className="mt-1 text-base font-semibold tabular-nums">{value}</p>
-    </Card>
-  );
-}
-
-function PortalLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex min-h-11 items-center justify-between rounded-[var(--r-lg)] border border-border bg-surface px-4 text-sm font-semibold shadow-[var(--shadow-sm)]"
+    <CustomerChrome
+      title="Tu consulta"
+      size="tall"
+      capturedAt={fromCache ? capturedAt : null}
+      subtitle={<>Hola, {summary.name} · {summary.code}</>}
+      hero={
+        <div className="mt-5">
+          {/* summary.debt is the server balance, never totals of abonos */}
+          <HeroAmount
+            label={debt.label}
+            value={formatCop(summary.debt)}
+            tone={debt.owes ? "danger" : "ok"}
+          />
+          <p className="mt-2 text-sm text-on-hero-muted">{debt.caption}</p>
+        </div>
+      }
     >
-      {label}
-      <span aria-hidden>→</span>
-    </Link>
+      <SegmentedMetrics
+        label="Tus totales"
+        items={[
+          { icon: "bag", label: "Total comprado", value: formatCop(totalComprado) },
+          { icon: "cash", label: "Total abonado", value: formatCop(totalAbonado), tone: "ok" },
+        ]}
+      />
+      <QuickTiles
+        tiles={[
+          { href: "/cliente/cuenta", label: "Cuenta", icon: "clock" },
+          { href: "/cliente/compras", label: "Compras", icon: "bag" },
+          { href: "/cliente/pagos", label: "Pagos", icon: "cash" },
+        ]}
+      />
+      <p className="text-xs text-ink-muted">
+        Última actualización{" "}
+        {capturedAt ? new Date(capturedAt).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+      </p>
+    </CustomerChrome>
   );
 }

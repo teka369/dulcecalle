@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { PendingBadge } from "@/components/ui/StatusBadge";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
 import {
   describeOutboxDetail,
@@ -35,11 +36,13 @@ function sessionBusinessId(): string | null {
   }
 }
 
-let reloading = false;
-
 export function useSyncItems() {
   const [items, setItems] = useState<EnrichedTrayItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Per-instance coalescing: the tray and /sincronizacion can be mounted at
+  // once; a shared module flag made the second one return early forever.
+  const reloadingRef = useRef(false);
+  const againRef = useRef(false);
 
   const reload = useCallback(async () => {
     const businessId = sessionBusinessId();
@@ -49,14 +52,22 @@ export function useSyncItems() {
       return;
     }
     // Coalesce bursts (e.g. one Dexie read per sync item event).
-    if (reloading) return;
-    reloading = true;
+    if (reloadingRef.current) {
+      againRef.current = true;
+      return;
+    }
+    reloadingRef.current = true;
     try {
-      setItems(await listEnrichedTray(businessId));
-    } catch {
-      /* keep previous list; counts still come from the store */
+      do {
+        againRef.current = false;
+        try {
+          setItems(await listEnrichedTray(businessId));
+        } catch {
+          /* keep previous list; counts still come from the store */
+        }
+      } while (againRef.current);
     } finally {
-      reloading = false;
+      reloadingRef.current = false;
       setLoading(false);
     }
   }, []);
@@ -142,8 +153,9 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
             <span className="mt-0.5 block truncate text-xs text-ink-muted">{detail}</span>
           )}
           {item.blockedBy && (
-            <span className="mt-1 block text-xs font-medium text-ink-muted">
-              ⏳ {item.blockedBy}
+            <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+              <PendingBadge label="En espera" />
+              {item.blockedBy}
             </span>
           )}
         </span>

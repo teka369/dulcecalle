@@ -19,9 +19,9 @@ vi.mock("../http/customer-api", async (importOriginal) => {
 const CUSTOMER_A = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", code: "DC-0001", name: "Rosa" };
 const CUSTOMER_B = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", code: "DC-0002", name: "Luis" };
 
-function ledger(debt = 0): CustomerLedger {
+function ledger(debt = 0, id: string = CUSTOMER_A.id): CustomerLedger {
   return {
-    customer: { id: CUSTOMER_A.id, code: "DC-0001", name: "Rosa", debt, createdAt: 1 },
+    customer: { id, code: "DC-0001", name: "Rosa", debt, createdAt: 1 },
     initials: [],
     sales: [],
     payments: [],
@@ -91,7 +91,8 @@ describe("M6.10 customer ledger cache", () => {
     api.ledger.mockResolvedValue(ledger(5000));
     await loadCachedCustomerLedger();
     loginAs(CUSTOMER_B);
-    api.ledger.mockResolvedValue(ledger(0));
+    // The server answers for B's session with B's ledger (a foreign one is rejected: privacy 4a).
+    api.ledger.mockResolvedValue(ledger(0, CUSTOMER_B.id));
     const result = await loadCachedCustomerLedger();
     expect(result.source).toBe("server");
     // A's snapshot is untouched and still keyed by A.

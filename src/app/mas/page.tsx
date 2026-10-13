@@ -1,82 +1,75 @@
 "use client";
 
-import Link from "next/link";
-import { OfflineLink } from "@/components/shell/OfflineLink";
-import { Card } from "@/components/ui/Card";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { CASH_COPY } from "@/domain/cash";
 import { STATS_COPY } from "@/domain/stats";
+import { useCash } from "@/store/cashStore";
+import { getCachedBusinessLabel } from "@/data/pwa/dashboard";
+import { useEffect, useState } from "react";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { HeroPill } from "@/components/ui/HeroPill";
+import { Sheet } from "@/components/ui/Sheet";
+import { SectionHead } from "@/components/ui/SectionHead";
+import { RowGroup } from "@/components/ui/RowGroup";
+import { Row } from "@/components/ui/Row";
+import { Badge } from "@/components/ui/Badge";
+import { GlyphIcon, type Glyph } from "@/components/ui/icons";
 
-const rowClass =
-  "flex min-h-11 items-center justify-between text-base font-semibold";
-
-/**
- * Más hub — U0 pilot for shared PageHeader + section rhythm.
- * Primary CTA for the viewport is the shell FAB (+ Nueva venta); no page-level primary.
- */
-export default function MasPage() {
+function Lead({ icon }: { icon: Glyph }) {
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader
+    <span className="flex size-9 items-center justify-center rounded-[var(--r-sm)] bg-surface-2 text-ink">
+      <GlyphIcon name={icon} />
+    </span>
+  );
+}
+
+/** Más hub. Caja pill/badge only from already-loaded cashStore data (no new fetch). */
+export default function MasPage() {
+  const { summary } = useCash();
+  // Read after mount (session lives in localStorage); no fetch — null until Inicio has loaded it.
+  const [businessLabel, setBusinessLabel] = useState<string | null>(null);
+  useEffect(() => setBusinessLabel(getCachedBusinessLabel()), []);
+  const pending = summary?.pendingCount ?? 0;
+  const pill = !summary
+    ? null
+    : pending > 0
+      ? { href: "/mas/caja/gestionar", label: "Caja pendiente", dot: "warning" as const }
+      : summary.session && !summary.closed
+        ? { href: "/mas/caja", label: CASH_COPY.estadoAbierta, dot: "ok" as const }
+        : summary.closed
+          ? { href: "/mas/caja", label: CASH_COPY.estadoCerrada, dot: null }
+          : { href: "/mas/caja", label: CASH_COPY.abrirCaja, dot: null };
+
+  return (
+    <div className="flex flex-col pb-6">
+      <HeroBlock
+        size="tall"
         title="Más"
-        subtitle="Caja, gastos y ajustes de la tienda"
+        subtitle={businessLabel ? `${businessLabel} · Caja, gastos y ajustes de la tienda` : "Caja, gastos y ajustes de la tienda"}
+        action={pill ? <HeroPill label={pill.label} href={pill.href} dot={pill.dot} /> : undefined}
       />
-
-      {/* Zona tarea — ops del día */}
-      <section className="flex flex-col gap-2" aria-label="Operaciones">
-        <Card>
-          <Link href="/mas/estadisticas" className={rowClass}>
-            <span>{STATS_COPY.masItem}</span>
-            <span className="text-ink/40" aria-hidden>
-              →
-            </span>
-          </Link>
-        </Card>
-        <Card>
-          <OfflineLink href="/mas/gastos" className={rowClass}>
-            <span>{CASH_COPY.masGastos}</span>
-            <span className="text-ink/40" aria-hidden>
-              →
-            </span>
-          </OfflineLink>
-        </Card>
-        <Card>
-          <OfflineLink href="/mas/caja" className={rowClass}>
-            <span>{CASH_COPY.masCaja}</span>
-            <span className="text-ink/40" aria-hidden>
-              →
-            </span>
-          </OfflineLink>
-        </Card>
-      </section>
-
-      {/* Zona secundaria — overflow / settings */}
-      <section className="flex flex-col gap-2" aria-label="Ajustes">
-        <Card>
-          <Link href="/mas/apariencia" className={rowClass}>
-            <span>Apariencia</span>
-            <span className="text-ink/40" aria-hidden>
-              →
-            </span>
-          </Link>
-        </Card>
-        <Card>
-          <Link href="/mas/datos" className={rowClass}>
-            <span>Datos</span>
-            <span className="text-ink/40" aria-hidden>
-              →
-            </span>
-          </Link>
-        </Card>
-        <Card>
-          <Link href="/login" className={rowClass}>
-            <span>Cuenta</span>
-            <span className="text-ink/40" aria-hidden>
-              →
-            </span>
-          </Link>
-        </Card>
-      </section>
+      <Sheet>
+        <section className="flex flex-col gap-2" aria-label="Negocio">
+          <SectionHead title="Negocio" />
+          <RowGroup label="Negocio">
+            <Row
+              href="/mas/caja"
+              leading={<Lead icon="cash" />}
+              title={CASH_COPY.masCaja}
+              trailing={pending > 0 ? <Badge tone="warning">{pending === 1 ? "1 pendiente" : `${pending} pendientes`}</Badge> : undefined}
+            />
+            <Row href="/mas/estadisticas" leading={<Lead icon="clock" />} title={STATS_COPY.masItem} />
+            <Row href="/mas/gastos" leading={<Lead icon="bag" />} title={CASH_COPY.masGastos} />
+          </RowGroup>
+        </section>
+        <section className="flex flex-col gap-2" aria-label="Ajustes">
+          <SectionHead title="Ajustes" />
+          <RowGroup label="Ajustes">
+            <Row href="/mas/apariencia" leading={<Lead icon="check" />} title="Apariencia" />
+            <Row href="/mas/datos" leading={<Lead icon="package" />} title="Datos" />
+            <Row href="/login" leading={<Lead icon="users" />} title="Cuenta" />
+          </RowGroup>
+        </section>
+      </Sheet>
     </div>
   );
 }

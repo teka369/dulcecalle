@@ -1,13 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
 import { resetPwaApi } from "@/data/pwa/api";
 import { usePrep } from "@/store/prepStore";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { Sheet } from "@/components/ui/Sheet";
+import { SectionHead } from "@/components/ui/SectionHead";
+import { RowGroup } from "@/components/ui/RowGroup";
+import { Row } from "@/components/ui/Row";
 
 export default function DatosPage() {
   const router = useRouter();
@@ -39,72 +42,63 @@ export default function DatosPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex items-center gap-2">
-        <Link
-          href="/mas"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </Link>
-        <h1 className="text-[22px] font-semibold">Datos</h1>
-      </header>
-
-      <Card>
-        <p className="font-semibold">El negocio vive en el servidor y en este teléfono</p>
-        <p className="mt-2 text-sm text-ink-muted">
+    <div className="flex flex-col pb-6">
+      <HeroBlock
+        size="compact"
+        back={{ href: "/mas", label: "Volver a Más" }}
+        title="Datos"
+        subtitle="El negocio vive en el servidor y en este teléfono"
+      />
+      <Sheet>
+        <p className="text-sm text-ink-muted">
           Ventas, fiados, caja e inventario que ya se enviaron quedan en tu cuenta.
-          Este teléfono también guarda una copia para trabajar sin conexión y las
-          operaciones que todavía no se han enviado.
+          Este teléfono también guarda una copia para trabajar sin conexión y las operaciones que todavía no se han enviado.
+          Si sales de la cuenta, lo que ya está en el servidor no se borra. Cerrar sesión tampoco borra esa copia local.
         </p>
-        <p className="mt-2 text-sm text-ink-muted">
-          Si sales de la cuenta, lo que ya está en el servidor no se borra. Cerrar
-          sesión tampoco borra esa copia local.
-        </p>
-        <Link
-          href="/sincronizacion"
-          className="mt-4 flex min-h-11 items-center justify-between text-sm font-semibold"
-        >
-          <span>Ver almacenamiento de este teléfono</span>
-          <span className="text-ink/40" aria-hidden>
-            →
-          </span>
-        </Link>
-      </Card>
+        <RowGroup label="Almacenamiento">
+          <Row href="/sincronizacion" title="Ver almacenamiento de este teléfono" />
+        </RowGroup>
 
-      <Card>
-        <p className="font-semibold">Cerrar sesión en este teléfono</p>
-        <p className="mt-2 text-sm text-ink-muted">
-          Quita la sesión de aquí. No toca productos, ventas ni deudas.
-        </p>
-        <Button
-          type="button"
-          variant="primary"
-          onClick={() => void start({ refresh: true })}
-          disabled={!online}
-          className="mt-4 w-full"
-        >
-          Actualizar preparación offline
-        </Button>
-        <p className="mt-2 text-xs text-ink-muted">
-          {phase === "ready" && lastReadyAt
-            ? `Dispositivo preparado el ${new Date(lastReadyAt).toLocaleString()}.`
-            : "Prepara este dispositivo para trabajar sin conexión."}
-        </p>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onLogout}
-          className="mt-4 w-full"
-        >
-          Cerrar sesión
-        </Button>
-      </Card>
+        <section className="flex flex-col gap-2">
+          <SectionHead title="Sin conexión" />
+          <div className="rounded-[var(--r-lg)] border border-border bg-surface p-3">
+            <p className="text-sm font-medium text-ink">Preparar este dispositivo para trabajar sin conexión</p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {phase === "ready" && lastReadyAt
+                ? `Dispositivo preparado el ${new Date(lastReadyAt).toLocaleString()}.`
+                : "Prepara este dispositivo para trabajar sin conexión."}
+            </p>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void start({ refresh: true })}
+              disabled={!online}
+              className="mt-3 w-full"
+            >
+              Actualizar preparación offline
+            </Button>
+          </div>
+        </section>
 
-      {done && (
-        <p className="text-sm text-ink-muted">Sesión cerrada. Puedes entrar de nuevo.</p>
-      )}
+        <section className="flex flex-col gap-2" aria-label="Sesión">
+          <div className="rounded-[var(--r-lg)] border border-danger/30 bg-surface p-3">
+            <p className="text-sm font-semibold text-ink">Cerrar sesión en este teléfono</p>
+            <p className="mt-1 text-sm text-ink-muted">Quita la sesión de aquí. No toca productos, ventas ni deudas.</p>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="mt-3 flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-danger bg-surface text-sm font-semibold text-danger"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+          {done && (
+            <p role="status" className="text-sm text-ink-muted">
+              Sesión cerrada. Puedes entrar de nuevo.
+            </p>
+          )}
+        </section>
+      </Sheet>
     </div>
   );
 }

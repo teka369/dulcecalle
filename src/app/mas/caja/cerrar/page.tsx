@@ -1,18 +1,21 @@
 "use client";
 
-import Link from "next/link";
 import { Spinner } from "@/components/ui/Spinner";
-import { Input } from "@/components/ui/Input";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { Sheet } from "@/components/ui/Sheet";
+import { AmountField } from "@/components/ui/AmountField";
+import { Row } from "@/components/ui/Row";
+import { RowGroup } from "@/components/ui/RowGroup";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { ActionToast } from "@/components/ui/ActionToast";
+import { closeDifference } from "@/components/cash/cash";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
 import {
   CASH_COPY,
-  differenceDetail,
-  differenceLabel,
   parseCopAmount,
   validateCounted,
 } from "@/domain/cash";
@@ -79,112 +82,58 @@ export default function CerrarCajaPage() {
     );
   }
 
-  if (summary.closed) {
+  const back = { href: "/mas/caja", label: "Volver a Caja" };
+  if (summary.closed || !summary.session) {
     return (
-      <div className="flex flex-col gap-4">
-        <Link href="/mas/caja" className="text-sm text-ink-muted">
-          ← Caja
-        </Link>
-        <p className="text-sm">{CASH_COPY.elDiaEstaCerrado}</p>
-      </div>
+      <HeroBlock size="compact" back={back} title={CASH_COPY.cerrarCaja}>
+        <StateBlock onHero kind="empty" title={summary.closed ? CASH_COPY.elDiaEstaCerrado : CASH_COPY.emptyCerrada} />
+      </HeroBlock>
     );
   }
 
-  if (!summary.session) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Link href="/mas/caja" className="text-sm text-ink-muted">
-          ← Caja
-        </Link>
-        <p className="text-sm">{CASH_COPY.emptyCerrada}</p>
-      </div>
-    );
-  }
+  const live = closeDifference(counted, expectedEf);
 
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <Link
-          href="/mas/caja"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </Link>
-        <h1 className="text-[22px] font-semibold">{CASH_COPY.cerrarCaja}</h1>
-      </header>
-
-      <Card className="flex flex-col gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-            {CASH_COPY.deberiaHaber} (Efectivo)
-          </p>
-          <p className="mt-1 text-2xl font-semibold">{formatCop(expectedEf)}</p>
-          <p className="mt-1 text-xs text-ink-muted">
-            {CASH_COPY.esperado} Nequi: {formatCop(summary.expected.nequi)}{" "}
-            (no cuenta en billetes)
-          </p>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium" htmlFor="contado">
-            {CASH_COPY.cuantoHay}
-          </label>
-          <Input
-            id="contado"
-            inputMode="numeric"
-            value={countedRaw}
-            onChange={(e) => {
-              setConfirmDiff(false);
-              setCountedRaw(e.target.value.replace(/\D/g, ""));
-            }}
-            className="mt-2"
-            placeholder="0"
-          />
-        </div>
-
-        {diff != null && (
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-              {CASH_COPY.diferencia}
-            </p>
-            <p className="mt-1 text-xl font-semibold">
-              {diff === 0
-                ? CASH_COPY.sinDiferencia
-                : formatCop(Math.abs(diff))}
-            </p>
-            <p className="text-sm font-medium">
-              {differenceLabel(diff)}
-              {diff === 0 ? ` · ${differenceDetail(diff)}` : ""}
-            </p>
-          </div>
-        )}
-
-        {error && <p className="text-sm text-danger">{error}</p>}
-      </Card>
-
-      {/* Sticky CTA above AppShell bottom nav (~64–80px) + safe-area */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-lg">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={busy || countedRaw.trim() === ""}
-            onClick={() => void confirm()}
-            className="w-full"
-          >
-            {confirmDiff && diff !== 0
-              ? CASH_COPY.cerrarConDiferencia
-              : CASH_COPY.confirmarCierre}
-          </Button>
-        </div>
-      </div>
-
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white">
-          {toast}
-        </div>
-      )}
+    <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
+      <HeroBlock
+        size="compact"
+        back={back}
+        title={CASH_COPY.cerrarCaja}
+        subtitle={`${CASH_COPY.esperado} ${formatCop(expectedEf)} (Efectivo) · Nequi ${formatCop(summary.expected.nequi)} no cuenta en billetes`}
+      />
+      <Sheet>
+        <AmountField
+          label="¿Cuánto efectivo hay?"
+          value={countedRaw}
+          onChange={(v) => {
+            setConfirmDiff(false);
+            setCountedRaw(v);
+          }}
+        />
+        {live ? (
+          <RowGroup label={CASH_COPY.diferencia}>
+            <Row
+              title={live.diff === 0 ? `${CASH_COPY.diferencia}: ${CASH_COPY.sinDiferencia}` : `${CASH_COPY.diferencia}: ${live.word} ${formatCop(live.abs)}`}
+              trailing={
+                <span className={`flex items-center gap-1.5 text-sm font-semibold ${live.tone === "ok" ? "text-ok" : "text-danger"}`}>
+                  <span aria-hidden className={`size-2 rounded-full ${live.tone === "ok" ? "bg-ok" : "bg-danger"}`} />
+                  {live.word}
+                </span>
+              }
+            />
+          </RowGroup>
+        ) : null}
+        {error ? <StateBlock kind="error" title={error} /> : null}
+      </Sheet>
+      <ActionBar
+        primary={{
+          label: confirmDiff && diff !== 0 ? CASH_COPY.cerrarConDiferencia : CASH_COPY.cerrarCaja,
+          onClick: () => void confirm(),
+          disabled: countedRaw.trim() === "",
+          busy,
+        }}
+      />
+      <ActionToast text={toast} />
     </div>
   );
 }

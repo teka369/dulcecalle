@@ -10,12 +10,17 @@ import {
 } from "@/domain/initialDebt";
 import { formatCop } from "@/domain/money";
 import type { RemoteCustomer } from "@/data/http/mappers";
-import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
+import { useEntityId } from "@/components/shell/entity-route";
 import { customerStore } from "@/store/customerStore";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Spinner } from "@/components/ui/Spinner";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { Sheet } from "@/components/ui/Sheet";
+import { AmountField } from "@/components/ui/AmountField";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
+import { Row } from "@/components/ui/Row";
+import { RowGroup } from "@/components/ui/RowGroup";
+import { ActionToast } from "@/components/ui/ActionToast";
 
 export default function AgregarDeudaAnteriorPage() {
   const router = useRouter();
@@ -90,95 +95,48 @@ export default function AgregarDeudaAnteriorPage() {
 
   if (!ready) {
     return (
-      <div className="flex justify-center py-10">
-        <Spinner />
+      <div className="flex flex-col gap-4">
+        <SkeletonHero />
+        <SkeletonRows rows={3} />
       </div>
     );
   }
 
   if (!customer) {
     return (
-      <div className="flex flex-col gap-4">
-        <EntityBackLink href="/clientes" className="text-sm text-ink-muted">
-          ← Clientes
-        </EntityBackLink>
-        <p className="text-sm text-ink-muted">No encontramos ese cliente.</p>
-      </div>
+      <HeroBlock size="compact" back={{ href: "/clientes", label: "Volver a Clientes", entity: true }} title="Clientes">
+        <StateBlock onHero kind="empty" title="No encontramos ese cliente." />
+      </HeroBlock>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <EntityBackLink
-          href={`/clientes/${customer.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          ariaLabel="Volver"
-        >
-          ←
-        </EntityBackLink>
-        <h1 className="text-[22px] font-semibold">Agregar deuda anterior</h1>
-      </header>
-
-      <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-          Cliente
-        </p>
-        <p className="mt-1 text-base font-semibold">{customer.name}</p>
-
-        <p className="mt-4 text-xs font-medium uppercase tracking-wide text-ink-muted">
-          Saldo ahora
-        </p>
-        <p className="mt-1 text-xl font-semibold">
-          {formatCop(customer.debt)}
-        </p>
-
-        <p className="mt-4 text-sm text-ink-muted">
-          Lo que ya debía antes de usar DulceCalle. No es una venta: no mueve
-          caja ni inventario.
-        </p>
-
-        <label className="mt-4 block text-sm font-medium" htmlFor="deuda">
-          Cuánto debía
-        </label>
-        <Input
-          id="deuda"
-          inputMode="numeric"
+    <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
+      <HeroBlock
+        size="compact"
+        back={{ href: `/clientes/${customer.id}`, label: "Volver al cliente", entity: true }}
+        title="Agregar deuda anterior"
+        subtitle={`${customer.name} · Debe ${formatCop(customer.debt)}`}
+      />
+      <Sheet>
+        <AmountField
+          label="Cuánto debía"
           value={amountRaw}
-          onChange={(e) => setAmountRaw(e.target.value.replace(/\D/g, ""))}
-          className="mt-2"
-          placeholder="0"
-          autoFocus
+          onChange={setAmountRaw}
+          error={error}
+          hint="Lo que ya debía antes de usar DulceCalle. No es una venta: no mueve caja ni inventario."
         />
+        {preview != null ? (
+          <RowGroup label="Resultado">
+            <Row title={`Quedará debiendo ${formatCop(preview)}`} />
+          </RowGroup>
+        ) : null}
+      </Sheet>
 
-        {preview != null && (
-          <p className="mt-3 text-sm text-ink-muted">
-            Quedará debiendo {formatCop(preview)}
-          </p>
-        )}
-
-        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      </Card>
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-lg">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={!canSubmit || busy}
-            onClick={() => void confirm()}
-            className="w-full"
-          >
-            Guardar deuda anterior
-          </Button>
-        </div>
-      </div>
-
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white">
-          {toast}
-        </div>
-      )}
+      <ActionBar
+        primary={{ label: "Agregar deuda anterior", onClick: () => void confirm(), disabled: !canSubmit, busy }}
+      />
+      <ActionToast text={toast} />
     </div>
   );
 }

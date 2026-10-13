@@ -1,5 +1,6 @@
 "use client";
 
+import { PendingBadge } from "@/components/ui/StatusBadge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RemoteProductImage } from "@/data/http/mappers";
 import { getPwaAuthSession } from "@/data/http/session";
@@ -292,8 +293,9 @@ export function ProductImageManager({ productId, images, onChanged }: Props) {
         {pending.map((row) => (
           <li key={row.id} className="flex flex-col gap-1">
             <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-dashed border-ink/20 bg-ink/[0.04] px-2 text-center">
-              <p className="text-xs text-ink/60">
-                ⏳ {row.fileName}
+              <p className="flex flex-col items-center gap-1 text-xs text-ink-muted">
+                <PendingBadge />
+                {row.fileName}
                 <br />
                 Se subirá al sincronizar
               </p>

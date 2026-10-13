@@ -29,6 +29,10 @@ export async function loadCachedCustomerCatalog(): Promise<CachedCustomerCatalog
   try {
     const products = await getCustomerApi().products();
     const capturedAt = Date.now();
+    // Privacy 4a: catalog rows carry no customer id, so the verifiable guard is
+    // that the session customer is still the one the request was made for.
+    // Otherwise don't write it under this customerId (nor return it).
+    if (getCustomerAuthSession().customer?.id !== customerId) throw new Error("Inicia sesión.");
     await db.portalCatalogs.put({ customerId, products, capturedAt });
     return { products, source: "server", capturedAt };
   } catch (e) {

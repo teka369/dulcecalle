@@ -4,20 +4,26 @@ import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  abonoRemainingHelper,
   parseAbonoAmount,
   validateAbono,
 } from "@/domain/abono";
 import { formatCop } from "@/domain/money";
+import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
+import { ABONO_METHODS, abonoView } from "@/components/customers/clientes";
 import type { PayMethod } from "@/domain/types";
 import type { RemoteCustomer } from "@/data/http/mappers";
-import { EntityBackLink, useEntityId } from "@/components/shell/entity-route";
+import { useEntityId } from "@/components/shell/entity-route";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { customerStore } from "@/store/customerStore";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Spinner } from "@/components/ui/Spinner";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { Sheet } from "@/components/ui/Sheet";
+import { AmountField } from "@/components/ui/AmountField";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
+import { Row } from "@/components/ui/Row";
+import { RowGroup } from "@/components/ui/RowGroup";
+import { ActionToast } from "@/components/ui/ActionToast";
 
 export default function RegistrarAbonoPage() {
   const router = useRouter();
@@ -59,8 +65,8 @@ export default function RegistrarAbonoPage() {
 
   const helper = useMemo(() => {
     if (!customer || amount == null) return null;
-    return abonoRemainingHelper(customer.debt, amount);
-  }, [customer, amount]);
+    return abonoView(customer.debt, amountRaw, method).remainingText;
+  }, [customer, amount, amountRaw, method]);
 
   const canSubmit = useMemo(() => {
     if (!customer) return false;
@@ -112,133 +118,75 @@ export default function RegistrarAbonoPage() {
 
   if (!ready) {
     return (
-      <div className="flex justify-center py-10">
-        <Spinner />
+      <div className="flex flex-col gap-4">
+        <SkeletonHero />
+        <SkeletonRows rows={3} />
       </div>
     );
   }
 
   if (!customer) {
     return (
-      <div className="flex flex-col gap-4">
-        <EntityBackLink href="/clientes" className="text-sm text-ink-muted">
-          ← Clientes
-        </EntityBackLink>
-        <p className="text-sm text-ink-muted">No encontramos ese cliente.</p>
-      </div>
+      <HeroBlock size="compact" back={{ href: "/clientes", label: "Volver a Clientes", entity: true }} title="Clientes">
+        <StateBlock onHero kind="empty" title="No encontramos ese cliente." />
+      </HeroBlock>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <EntityBackLink
-          href={`/clientes/${customer.id}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </EntityBackLink>
-        <h1 className="text-[22px] font-semibold">Registrar abono</h1>
-      </header>
-
-      <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-          Cliente
-        </p>
-        <p className="mt-1 text-base font-semibold">{customer.name}</p>
-
-        <p className="mt-4 text-xs font-medium uppercase tracking-wide text-ink-muted">
-          Saldo
-        </p>
-        <p className="mt-1 text-xl font-semibold text-accent">
-          {formatCop(customer.debt)}
-        </p>
-
-        <label className="mt-4 block text-sm font-medium" htmlFor="abono">
-          Abono
-        </label>
-        <Input
-          id="abono"
-          inputMode="numeric"
-          value={amountRaw}
-          onChange={(e) => setAmountRaw(e.target.value.replace(/\D/g, ""))}
-          className="mt-2"
-          placeholder="0"
-        />
-
-        <p className="mt-4 text-sm font-semibold">¿Cómo recibes?</p>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <MethodButton
-            label="Efectivo"
-            active={method === "Efectivo"}
-            onClick={() => setMethod("Efectivo")}
-          />
-          <MethodButton
-            label="Nequi"
-            active={method === "Nequi"}
-            onClick={() => setMethod("Nequi")}
-          />
+    <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
+      <HeroBlock
+        size="compact"
+        back={{ href: `/clientes/${customer.id}`, label: "Volver al cliente", entity: true }}
+        title="Registrar abono"
+        subtitle={`${customer.name} · Debe ${formatCop(customer.debt)}`}
+      />
+      <Sheet>
+        <div>
+          <AmountField label="¿Cuánto abona?" value={amountRaw} onChange={setAmountRaw} error={error} />
+          {customer.debt > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setAmountRaw(String(customer.debt))}
+                aria-pressed={amountRaw === String(customer.debt)}
+                className="inline-flex min-h-11 items-center rounded-[var(--r-pill)] border border-border bg-surface px-4 text-sm font-semibold text-ink"
+              >
+                Todo {formatCop(customer.debt)}
+              </button>
+            </div>
+          ) : null}
         </div>
 
-        {helper && (
-          <p className="mt-3 text-sm text-ink-muted">{helper}</p>
-        )}
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">¿Cómo recibes?</p>
+          <ChoiceSegmented label="¿Cómo recibes?" options={ABONO_METHODS} value={method} onChange={setMethod} />
+        </div>
+
+        {helper ? (
+          <RowGroup label="Resultado">
+            <Row title={helper} />
+          </RowGroup>
+        ) : null}
 
         {pendingSync && (
-          <p className="mt-3 text-sm text-ink-muted">
-            Este cliente aún se está sincronizando. Podrás registrar el abono
-            en cuanto termine la sincronización.
-          </p>
+          <StateBlock
+            kind="offline-miss"
+            title="Cliente en sincronización"
+            body="Este cliente aún se está sincronizando. Podrás registrar el abono en cuanto termine la sincronización."
+          />
         )}
+      </Sheet>
 
-        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      </Card>
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-lg">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={!canSubmit || busy || pendingSync}
-            onClick={() => void confirm()}
-            className="w-full"
-          >
-            Confirmar abono
-          </Button>
-        </div>
-      </div>
-
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white">
-          {toast}
-        </div>
-      )}
+      <ActionBar
+        primary={{
+          label: "Registrar abono",
+          onClick: () => void confirm(),
+          disabled: !canSubmit || pendingSync,
+          busy,
+        }}
+      />
+      <ActionToast text={toast} />
     </div>
-  );
-}
-
-function MethodButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="secondary"
-      onClick={onClick}
-      className={`w-full px-2 ${
-        active
-          ? "border-primary bg-primary text-ink hover:opacity-[0.92]"
-          : "text-ink-muted"
-      }`}
-    >
-      {label}
-    </Button>
   );
 }

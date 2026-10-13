@@ -165,6 +165,7 @@ describe("portal cliente comprensible", () => {
   it("el chrome del portal muestra marca y navegación a perfil", () => {
     const chrome = src("src/components/customer/CustomerChrome.tsx");
     expect(chrome).toContain("/brand/dulcecalle-logo.png");
-    expect(chrome).toContain("/cliente/perfil");
+    expect(chrome).toContain("PORTAL_TABS");
+    expect(src("src/components/customer/portal.ts")).toContain("/cliente/perfil");
   });
 });

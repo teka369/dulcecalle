@@ -2,8 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { Sheet } from "@/components/ui/Sheet";
+import { AmountField } from "@/components/ui/AmountField";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { QtyStepper } from "@/components/inventory/QtyStepper";
+import { units } from "@/components/inventory/inventory";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useEffect, useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
@@ -28,13 +34,39 @@ export default function PrepararPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
 
+  const [loaded, setLoaded] = useState(false);
+
+  // Direct entry: products may not be loaded yet. Read the source itself so the
+  // header (insumo · stock · costo) and the sellable guard don't depend on the list.
   useEffect(() => {
     if (!sourceId) return;
-    setSource(products.find((p) => p.id === sourceId) ?? null);
-  }, [products, sourceId]);
+    let alive = true;
+    void inventoryStore
+      .getProduct(sourceId)
+      .then((p) => {
+        if (alive) setSource(p ?? null);
+      })
+      .finally(() => {
+        if (alive) setLoaded(true);
+      });
+    if (inventoryStore.getSnapshot().products.length === 0) void inventoryStore.refreshAll().catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [sourceId]);
+
+  // Preparar only exists for insumo/combo (sellable === false). Sellable → back to the product.
+  const sellable = source != null && source.sellable !== false;
+  useEffect(() => {
+    if (sellable && sourceId) router.replace(`/inventario/${sourceId}`);
+  }, [sellable, sourceId, router]);
 
   if (!sourceId) {
-    return <p className="text-sm text-ink-muted">No encontramos ese producto.</p>;
+    return (
+      <HeroBlock size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Preparar">
+        <StateBlock onHero kind="empty" title="No encontramos ese producto." />
+      </HeroBlock>
+    );
   }
 
   async function onPrepare() {
@@ -75,146 +107,117 @@ export default function PrepararPage() {
     }
   }
 
+  if (sellable) {
+    return (
+      <HeroBlock size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al producto", entity: true }} title="Preparar">
+        <StateBlock
+          onHero
+          kind="empty"
+          title="Este producto se vende directo."
+          body="Preparar solo aplica a insumos o combos. Te llevamos al producto."
+        />
+      </HeroBlock>
+    );
+  }
+
+  if (loaded && !source) {
+    return (
+      <HeroBlock size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Preparar">
+        <StateBlock onHero kind="empty" title="No encontramos ese producto." />
+      </HeroBlock>
+    );
+  }
+
   if (done) {
     const target = products.find((p) => p.id === done);
     return (
-      <div className="flex flex-col gap-4 pb-28">
-        <h1 className="text-[22px] font-semibold">Preparación lista</h1>
-        <p className="text-sm text-ink-muted">
-          {qtyRaw} uds de {target?.name ?? "producto"} ya son stock vendible.
-        </p>
-        <Button
-          type="button"
-          variant="primary"
-          onClick={() => navigateOfflineAware(router, `/inventario/${done}`)}
-          className="w-full"
-        >
-          Ver producto
-        </Button>
-        <EntityBackLink
-          href={`/inventario/${sourceId}`}
-          className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-sm font-semibold"
-        >
-          Volver al combo
-        </EntityBackLink>
+      <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
+        <HeroBlock size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al combo", entity: true }} title="Preparación lista">
+          <p className="mt-2 text-sm text-on-hero-muted">
+            {qtyRaw} uds de {target?.name ?? "producto"} ya son stock vendible.
+          </p>
+        </HeroBlock>
+        <Sheet>
+          <Button type="button" variant="primary" onClick={() => navigateOfflineAware(router, `/inventario/${done}`)} className="w-full">
+            Ver producto
+          </Button>
+          <EntityBackLink
+            href={`/inventario/${sourceId}`}
+            className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-sm font-semibold"
+          >
+            Volver al combo
+          </EntityBackLink>
+        </Sheet>
       </div>
     );
   }
 
-  const targets = products.filter(
-    (p) => p.id !== sourceId && !p.archivedAt && p.sellable !== false,
-  );
+  const targets = products.filter((p) => p.id !== sourceId && !p.archivedAt && p.sellable !== false);
+  const label = "text-xs font-semibold uppercase tracking-wide text-ink-muted";
 
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <EntityBackLink
-          href={`/inventario/${sourceId}`}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          ariaLabel="Volver"
-        >
-          ←
-        </EntityBackLink>
-        <h1 className="text-[22px] font-semibold">Preparar</h1>
-      </header>
-
-      {source && (
-        <Card className="flex items-start gap-3">
-          <ProductThumbnail
-            secureUrl={primaryImageUrl(source.images)}
-            alt={source.name}
-            size="md"
-          />
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-              Proviene de
-            </p>
-            <p className="mt-1 font-semibold">{source.name}</p>
-            <p className="mt-1 text-sm text-ink-muted">
-              Lotes disponibles: {source.stock} · Valor restante:{" "}
-              {formatCop(source.avgCost)}
-            </p>
-            <p className="mt-1 text-sm text-ink-muted">
-              Costo máximo asignable en total: {formatCop(source.avgCost)}
+    <div className="flex flex-col pb-[calc(var(--actionbar-h)+var(--nav-h)+1.5rem)]">
+      <HeroBlock size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al combo", entity: true }} title="Preparar">
+        {source ? (
+          <div className="mt-3 flex items-center gap-3">
+            <ProductThumbnail secureUrl={primaryImageUrl(source.images)} alt={source.name} size="sm" decorative />
+            <p className="min-w-0 text-sm text-on-hero-muted">
+              Insumo: <span className="font-semibold text-on-hero">{source.name}</span> · Stock {units(source.stock)} ·
+              Costo prom. {formatCop(source.avgCost)}
             </p>
           </div>
-        </Card>
-      )}
+        ) : null}
+      </HeroBlock>
 
-      <Card>
-        <label className="text-sm font-medium" htmlFor="preparar-producto">
-          ¿Qué vas a preparar?
-        </label>
-        <select
-          id="preparar-producto"
-          value={targetId}
-          onChange={(e) => setTargetId(e.target.value)}
-          className="mt-2 h-11 min-h-11 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <option value="">Elige el producto…</option>
-          {targets.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} (stock {p.stock})
-            </option>
-          ))}
-        </select>
-
-        <label className="mt-4 block text-sm font-medium" htmlFor="preparar-cantidad">
-          ¿Cuántas hiciste?
-        </label>
-        <Input
-          id="preparar-cantidad"
-          inputMode="numeric"
-          value={qtyRaw}
-          onChange={(e) => setQtyRaw(e.target.value.replace(/\D/g, ""))}
-          className="mt-2"
-          placeholder="10"
-        />
-
-        <label className="mt-4 block text-sm font-medium" htmlFor="preparar-costo">
-          Costo por unidad (opcional)
-        </label>
-        <Input
-          id="preparar-costo"
-          inputMode="numeric"
-          value={costRaw}
-          onChange={(e) => setCostRaw(e.target.value.replace(/\D/g, ""))}
-          className="mt-2"
-          placeholder="0"
-        />
-        <p className="mt-1 text-xs text-ink-muted">
-          {INVENTORY_ERRORS.pendingCostHint} El combo conserva su valor; aquí
-          solo defines el costo de estas unidades.
-        </p>
-
-        <label className="mt-4 block text-sm font-medium" htmlFor="preparar-nota">
-          Nota (opcional)
-        </label>
-        <Input
-          id="preparar-nota"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          className="mt-2"
-          placeholder="Tanda de la mañana"
-          maxLength={160}
-        />
-
-        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      </Card>
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-lg">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={busy || !targetId}
-            onClick={() => void onPrepare()}
-            className="w-full"
+      <Sheet>
+        <div>
+          <label className={label} htmlFor="preparar-producto">
+            Destino · ¿Qué vas a preparar?
+          </label>
+          <select
+            id="preparar-producto"
+            value={targetId}
+            onChange={(e) => setTargetId(e.target.value)}
+            className="mt-2 h-14 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]"
           >
-            Preparar
-          </Button>
+            <option value="">Elige el producto…</option>
+            {targets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} (stock {p.stock})
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
+
+        <QtyStepper label="¿Cuántas hiciste?" value={qtyRaw} onChange={setQtyRaw} />
+
+        <AmountField
+          label="Costo por unidad (opcional)"
+          value={costRaw}
+          onChange={setCostRaw}
+          hint={`${INVENTORY_ERRORS.pendingCostHint} El combo conserva su valor; aquí solo defines el costo de estas unidades.${
+            source ? ` Máximo asignable en total: ${formatCop(source.avgCost)}.` : ""
+          }`}
+        />
+
+        <div>
+          <label className={label} htmlFor="preparar-nota">
+            Nota (opcional)
+          </label>
+          <Input
+            id="preparar-nota"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="mt-2"
+            placeholder="Tanda de la mañana"
+            maxLength={160}
+          />
+        </div>
+
+        {error ? <StateBlock kind="error" title={error} /> : null}
+      </Sheet>
+
+      <ActionBar aboveNav primary={{ label: "Preparar", onClick: () => void onPrepare(), disabled: !targetId, busy }} />
     </div>
   );
 }

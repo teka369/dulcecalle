@@ -2,11 +2,11 @@
 
 /* Shared light semantics + space / radii / shadow (Spec §2.5) */
 :root {
-  --ok: #15803d;
+  --ok: #166534;
   --ok-soft: #d8f3e7;
-  --warning: #d97706;
+  --warning: #92400e;
   --warning-soft: #fde8c8;
-  --danger: #dc2626;
+  --danger: #c81e1e;
   --danger-soft: #fee2e2;
   --info: #6b5b95;
   --info-soft: #ede7f6;
@@ -28,6 +28,13 @@
   --r-lg: 16px;
   --r-pill: 999px;
 
+  /* Fixed ActionBar: 12px top pad + 52px button + bottom pad (≥12px / safe-area). */
+  --actionbar-h: calc(4rem + max(0.75rem, env(safe-area-inset-bottom)));
+  /* SyncPill button height (min-h-11). Toasts stack above it. */
+  --syncpill-h: 2.75rem;
+  /* Floating bottom nav height incl. gap (aboveNav bars stack over it). */
+  --nav-h: 4.75rem;
+
   --shadow-sm: 0 1px 2px rgba(59, 36, 28, 0.06);
   --shadow-md: 0 4px 12px rgba(59, 36, 28, 0.08);
   --shadow-lg: 0 12px 32px rgba(59, 36, 28, 0.12);
@@ -41,7 +48,7 @@
   --surface-2: #f3ebe3;
   --border: #e8dfd4;
   --ink: #3b241c;
-  --ink-muted: #7a6a60;
+  --ink-muted: #74645a;
   --primary: #ffc857;
   --cta: #ff8c42;
   --accent: #ff6b8a;
@@ -306,4 +313,48 @@ body {
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+}
+
+/* SyncPill sits above a fixed ActionBar (+ gap); screens without a bar keep
+   the pill's own bottom offset. aboveNav bars stack over the nav (4.75rem). */
+html[data-actionbar="on"] .sync-pill {
+  bottom: calc(var(--actionbar-h) + 0.5rem);
+}
+html[data-actionbar="nav"] .sync-pill {
+  bottom: calc(var(--actionbar-h) + var(--nav-h) + 0.5rem);
+}
+
+/* PrepIndicator edge tab: same low anchor on every route (no mid-sheet float);
+   lifts with the SyncPill when a fixed ActionBar is present. */
+html[data-actionbar="on"] .prep-tab {
+  bottom: calc(var(--actionbar-h) + var(--syncpill-h) + 1rem);
+}
+html[data-actionbar="nav"] .prep-tab {
+  bottom: calc(var(--actionbar-h) + var(--nav-h) + var(--syncpill-h) + 1rem);
+}
+
+/* P6 hardening: visible focus on hero and sheet in every theme. */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.hero-block :focus-visible {
+  outline-color: var(--on-hero);
+}
+
+/* P6 hardening: respect reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus on the floating nav must contrast with --nav-pill (e.g. contraste: black on black). */
+nav[aria-label="Navegación principal"] :focus-visible {
+  outline-color: var(--nav-active-bg);
 }

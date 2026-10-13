@@ -1,11 +1,19 @@
 "use client";
 
-import Link from "next/link";
-import { OfflineLink } from "@/components/shell/OfflineLink";
-import { Spinner } from "@/components/ui/Spinner";
-import { Empty } from "@/components/ui/Empty";
-import { Card } from "@/components/ui/Card";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { HeroAmount } from "@/components/ui/HeroAmount";
+import { HeroPill } from "@/components/ui/HeroPill";
+import { Sheet } from "@/components/ui/Sheet";
+import { SectionHead } from "@/components/ui/SectionHead";
+import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
+import { Row } from "@/components/ui/Row";
+import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
+import { GASTOS_OFFLINE_NOCACHE, cashOfflineView, sumAmounts } from "@/components/cash/cash";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { useSync } from "@/store/syncStore";
+import { usePrep } from "@/store/prepStore";
+import { bogotaKey, dayHeading, groupByDay } from "@/components/sale/sales-list";
 import { formatCop } from "@/domain/money";
 import { CASH_COPY } from "@/domain/cash";
 import type { RemoteExpense } from "@/data/http/mappers";
@@ -16,83 +24,104 @@ export default function GastosPage() {
   const [closed, setClosed] = useState(false);
   const [hasSession, setHasSession] = useState(false);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { online } = useSync();
+  const { lastReadyAt } = usePrep();
 
   const load = useCallback(async () => {
-    const summary = await cashStore.refresh();
-    setExpenses(cashStore.getSnapshot().expenses);
-    setClosed(summary.closed);
-    setHasSession(summary.session != null);
-    setReady(true);
+    setLoadError(null);
+    try {
+      const summary = await cashStore.refresh();
+      setExpenses(cashStore.getSnapshot().expenses);
+      setClosed(summary.closed);
+      setHasSession(summary.session != null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "No se pudo cargar.");
+    } finally {
+      setReady(true);
+    }
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  const total = useMemo(() => sumAmounts(expenses), [expenses]);
+  const days = useMemo(() => groupByDay(expenses), [expenses]);
+  const [todayKey] = useState(() => bogotaKey(Date.now()));
+
   if (!ready) {
     return (
-      <div className="flex justify-center py-10">
-        <Spinner />
+      <div className="flex flex-col gap-4">
+        <SkeletonHero />
+        <SkeletonRows />
+      </div>
+    );
+  }
+
+  const canAdd = !closed && hasSession;
+  const offlineView = cashOfflineView({ online, preparedAt: lastReadyAt, hasLocalData: hasSession || expenses.length > 0 });
+
+  if (loadError || offlineView === "offline-nocache") {
+    return (
+      <div className="flex flex-col pb-6">
+        <HeroBlock size="medium" back={{ href: "/mas", label: "Volver a Más" }} title={CASH_COPY.masGastos} offline={online ? null : { text: "Sin conexión" }} />
+        <Sheet>
+          <StateBlock
+            kind={offlineView === "offline-nocache" ? "offline-miss" : "error"}
+            title={offlineView === "offline-nocache" ? GASTOS_OFFLINE_NOCACHE.title : "No se pudo cargar."}
+            body={offlineView === "offline-nocache" ? GASTOS_OFFLINE_NOCACHE.body : (loadError ?? undefined)}
+            action={
+              <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg">
+                Reintentar
+              </button>
+            }
+          />
+        </Sheet>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <Link
-          href="/mas"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg"
-          aria-label="Volver"
-        >
-          ←
-        </Link>
-        <h1 className="text-[22px] font-semibold">{CASH_COPY.masGastos}</h1>
-      </header>
-
-      {closed && (
-        <p className="rounded-[var(--r-lg)] border border-border bg-surface p-3 shadow-[var(--shadow-sm)] text-sm text-ink-muted">
-          {CASH_COPY.elDiaEstaCerrado}
-        </p>
-      )}
-
-      {expenses.length === 0 ? (
-        <Empty title="Aún no hay gastos." />
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {expenses.map((e) => (
-            <Card as="li" key={e.id}>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-semibold">{e.category}</p>
-                  <p className="text-xs text-ink-muted">{e.method}</p>
-                </div>
-                <p className="font-semibold text-danger">{formatCop(e.amount)}</p>
-              </div>
-              {e.note && (
-                <p className="mt-1 text-sm text-ink-muted">{e.note}</p>
-              )}
-            </Card>
-          ))}
-        </ul>
-      )}
-
-      {!closed && hasSession && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-          <div className="mx-auto max-w-lg">
-            <OfflineLink
-              href="/mas/gastos/nuevo"
-              className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
-            >
-              {CASH_COPY.registrarGasto}
-            </OfflineLink>
-          </div>
+    <div className="flex flex-col pb-6">
+      <HeroBlock
+        size="medium"
+        back={{ href: "/mas", label: "Volver a Más" }}
+        title={CASH_COPY.masGastos}
+        offline={offlineView === "offline-cache" ? (lastReadyAt != null ? { capturedAt: lastReadyAt } : { text: "Sin conexión · datos de este teléfono" }) : null}
+        action={canAdd ? <HeroPill label="Nuevo gasto" href="/mas/gastos/nuevo" /> : undefined}
+      >
+        <div className="mt-5">
+          <HeroAmount
+            label="Total listado"
+            value={formatCop(total)}
+            caption={expenses.length === 1 ? "1 gasto" : `${expenses.length} gastos`}
+          />
         </div>
-      )}
-
-      {!closed && !hasSession && (
-        <p className="text-sm text-ink-muted">{CASH_COPY.emptyCerrada}</p>
-      )}
+      </HeroBlock>
+      <Sheet>
+        {closed ? <RowGroupNote>{CASH_COPY.elDiaEstaCerrado}</RowGroupNote> : null}
+        {!closed && !hasSession ? <RowGroupNote>{CASH_COPY.emptyCerrada}</RowGroupNote> : null}
+        {expenses.length === 0 ? (
+          <RowGroupNote>Aún no hay gastos.</RowGroupNote>
+        ) : (
+          days.map((d) => (
+            <section key={d.key} className="flex flex-col gap-2">
+              <SectionHead title={dayHeading(d.key, todayKey)} />
+              <RowGroup label={dayHeading(d.key, todayKey)}>
+                {d.rows.map((e) => (
+                  <Row
+                    key={e.id}
+                    title={e.category}
+                    meta={[e.method, e.note].filter(Boolean).join(" · ")}
+                    trailing={<span className="text-[15px] font-semibold tabular-nums text-ink">− {formatCop(e.amount)}</span>}
+                  />
+                ))}
+              </RowGroup>
+            </section>
+          ))
+        )}
+      </Sheet>
     </div>
   );
 }

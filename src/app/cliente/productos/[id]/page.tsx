@@ -1,12 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  CustomerChrome,
-  CustomerCacheNotice,
-} from "@/components/customer/CustomerChrome";
+import { CustomerChrome, PortalError, PortalLoading } from "@/components/customer/CustomerChrome";
 import { ProductImageView } from "@/components/product/ProductImageView";
 import type { CustomerCatalogProduct } from "@/data/http/customer-api";
 import {
@@ -16,9 +12,7 @@ import {
 import { routeId } from "@/data/pwa/ids";
 import { formatCop } from "@/domain/money";
 import { Badge } from "@/components/ui/Badge";
-import { Card } from "@/components/ui/Card";
-import { Empty } from "@/components/ui/Empty";
-import { Spinner } from "@/components/ui/Spinner";
+import { StateBlock } from "@/components/ui/StateBlock";
 
 export default function CustomerProductDetailPage() {
   const params = useParams();
@@ -52,68 +46,61 @@ export default function CustomerProductDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const BACK = { href: "/cliente/productos", label: "Volver a Productos" };
+
   if (error) {
     return (
-      <CustomerChrome title="Producto">
-        <p className="text-sm text-danger">{error}</p>
+      <CustomerChrome title="Producto" back={BACK}>
+        <PortalError message={error} />
       </CustomerChrome>
     );
   }
 
   if (loading) {
     return (
-      <CustomerChrome title="Producto">
-        <div className="flex flex-col items-center gap-2 py-10">
-          <Spinner />
-          <p className="text-sm text-ink-muted">Cargando…</p>
-        </div>
+      <CustomerChrome title="Producto" back={BACK}>
+        <PortalLoading />
       </CustomerChrome>
     );
   }
 
   if (missing || !product) {
     return (
-      <CustomerChrome title="Producto">
-        <Empty
-          title="No encontramos ese producto."
-          action={
-            <Link
-              href="/cliente/productos"
-              className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold text-ink"
-            >
-              ← Productos
-            </Link>
-          }
-        />
+      <CustomerChrome title="Producto" back={BACK}>
+        <StateBlock kind="empty" title="No encontramos ese producto." />
       </CustomerChrome>
     );
   }
 
   const primary = primaryCatalogImage(product) ?? product.images[0] ?? null;
-  const gallery = primary
-    ? [primary, ...product.images.filter((img) => img.id !== primary.id)]
-    : [];
+  const gallery = primary ? [primary, ...product.images.filter((img) => img.id !== primary.id)] : [];
   const current = gallery[Math.min(selected, Math.max(0, gallery.length - 1))] ?? null;
 
   return (
-    <CustomerChrome title={product.name}>
-      {fromCache && capturedAt != null && (
-        <CustomerCacheNotice capturedAt={capturedAt} />
-      )}
-      <Link
-        href="/cliente/productos"
-        className="text-sm font-semibold text-ink-muted"
-      >
-        ← Productos
-      </Link>
-      <ProductImageView
-        secureUrl={current?.secureUrl ?? null}
-        alt={current?.altText || product.name}
-        variant="detail"
-        eager
-        className="aspect-square w-full"
-      />
-      {gallery.length > 1 && (
+    <CustomerChrome
+      title={product.name}
+      back={BACK}
+      capturedAt={fromCache ? capturedAt : null}
+      hero={
+        <div className="mt-4 flex flex-col gap-3">
+          <div className="-mx-4 overflow-hidden">
+            <ProductImageView
+              secureUrl={current?.secureUrl ?? null}
+              alt={current?.altText || product.name}
+              variant="detail"
+              eager
+              className="aspect-square w-full !rounded-none"
+            />
+          </div>
+          <p className="text-4xl font-semibold tabular-nums">{formatCop(product.price)}</p>
+          <p className="flex items-center gap-1.5 text-sm text-on-hero-muted">
+            <span aria-hidden className={`size-2 rounded-full ${product.available ? "bg-ok" : "bg-danger"}`} />
+            {product.available ? "Disponible" : "Agotado por ahora"}
+          </p>
+        </div>
+      }
+    >
+      {gallery.length > 1 ? (
         <ul className="grid grid-cols-4 gap-2" aria-label="Galería">
           {gallery.map((img, index) => (
             <li key={img.id}>
@@ -122,34 +109,17 @@ export default function CustomerProductDetailPage() {
                 onClick={() => setSelected(index)}
                 aria-label={`Ver foto ${index + 1}`}
                 aria-pressed={index === selected}
-                className={`w-full overflow-hidden rounded-[var(--r-lg)] border ${
-                  index === selected ? "border-cta" : "border-border"
-                }`}
+                className={`w-full overflow-hidden rounded-[var(--r-lg)] border-2 ${index === selected ? "border-cta" : "border-border"}`}
               >
-                <ProductImageView
-                  secureUrl={img.secureUrl}
-                  alt=""
-                  variant="thumb"
-                  className="aspect-square w-full !rounded-none !border-0"
-                />
+                <ProductImageView secureUrl={img.secureUrl} alt="" variant="thumb" className="aspect-square w-full !rounded-none !border-0" />
               </button>
             </li>
           ))}
         </ul>
+      ) : (
+        <p className="text-sm text-ink-muted">Precio de referencia. Pregunta en la tienda por disponibilidad.</p>
       )}
-      <Card as="section">
-        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-          Precio
-        </p>
-        <p className="mt-1 text-2xl font-semibold tabular-nums">
-          {formatCop(product.price)}
-        </p>
-        <p className="mt-2">
-          <Badge tone={product.available ? "ok" : "danger"}>
-            {product.available ? "Disponible" : "Agotado por ahora"}
-          </Badge>
-        </p>
-      </Card>
+      {product.available ? null : <Badge tone="danger">Agotado por ahora</Badge>}
     </CustomerChrome>
   );
 }

@@ -358,9 +358,23 @@ async function reconcileCustomer(businessId: string, localId: string, remote: Re
 
 async function reconcileSupplier(businessId: string, localId: string, remote: RemoteSupplier) {
   const db = getLocalDb();
-  await db.transaction("rw", db.suppliers, async () => {
+  await db.transaction("rw", [db.suppliers, db.stockMoves, db.outbox], async () => {
     const local = await getLocalStore().suppliers.get(businessId, localId);
-    if (local && local.id !== remote.id) await db.suppliers.delete(local.id);
+    if (local && local.id !== remote.id) {
+      // Same remap as reconcileCustomer: rewrite pending FK refs local → server.
+      const moves = await db.stockMoves.where("businessId").equals(businessId).toArray();
+      for (const row of moves) {
+        if (row.supplierId === localId) await db.stockMoves.put({ ...row, supplierId: remote.id });
+      }
+      const ops = await db.outbox.where("businessId").equals(businessId).toArray();
+      for (const op of ops) {
+        if (op.status === "synced" || !op.payload || typeof op.payload !== "object") continue;
+        const payload = op.payload as Record<string, unknown>;
+        if (payload.supplierId !== localId) continue;
+        await db.outbox.put({ ...op, payload: { ...payload, supplierId: remote.id } });
+      }
+      await db.suppliers.delete(local.id);
+    }
     await getLocalStore().suppliers.put(supplierToLocal(remote, businessId, Date.now()));
   });
 }
