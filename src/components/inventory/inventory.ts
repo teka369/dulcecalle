@@ -81,3 +81,8 @@ export function dmy(dateKey: string | null | undefined): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateKey ?? "");
   return m ? `${m[3]}/${m[2]}/${m[1]}` : (dateKey ?? "");
 }
+
+/** Historial row meta: note · dd/mm/aaaa (same date format as Preparaciones). */
+export function moveMeta(m: { note?: string | null; occurredOn?: string | null }): string {
+  return [m.note, m.occurredOn ? dmy(m.occurredOn) : null].filter(Boolean).join(" · ");
+}

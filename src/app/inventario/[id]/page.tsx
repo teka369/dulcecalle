@@ -15,7 +15,7 @@ import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { primaryImageUrl } from "@/data/media/urls";
-import { dmy, inventoryValue, isLowStock, moveDelta, units } from "@/components/inventory/inventory";
+import { dmy, inventoryValue, isLowStock, moveDelta, moveMeta, units } from "@/components/inventory/inventory";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import type {
@@ -274,7 +274,7 @@ export default function ProductoFichaPage() {
                   <Row
                     key={m.id}
                     title={REASON_LABEL[m.reason] ?? m.reason}
-                    meta={[m.note, m.occurredOn].filter(Boolean).join(" · ")}
+                    meta={moveMeta(m)}
                     trailing={
                       <>
                         <span className={`text-[15px] font-semibold tabular-nums ${d.tone === "ok" ? "text-ok" : "text-danger"}`}>
