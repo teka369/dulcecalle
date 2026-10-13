@@ -150,6 +150,17 @@ describe("WCAG AA contrast from globals.css tokens", () => {
     expect(tokens("ocean", "light")["--cta-fg"]).toBe("#ffffff");
   });
 
+  it("H1: light classic palettes use warning #92400e and ok #166534", () => {
+    for (const id of ["amber", "ocean", "emerald", "violet", "rose", "slate"]) {
+      const t = tokens(id, "light");
+      expect(t["--warning"], id).toBe("#92400e");
+      expect(t["--ok"], id).toBe("#166534");
+      expect(ratio(t["--warning"], t["--warning-soft"])).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(t["--ok"], t["--ok-soft"])).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(t["--danger"], t["--bg"])).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   for (const [id, mode] of combos) {
     it(`${id} ${mode}: text ≥ 4.5 and UI ≥ 3`, () => {
       const t = tokens(id, mode);

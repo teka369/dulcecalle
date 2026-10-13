@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DebtEntry } from "@/domain/debt/statement";
-import { abonoView, filterCustomers, porCobrar, sortCustomers, statementRow } from "./clientes";
+import { abonoView, filterCustomers, porCobrar, shortDateTime, sortCustomers, statementRow } from "./clientes";
 
 const people = [
   { id: "a", name: "Luis", code: "C-0007", debt: 0 },
@@ -68,6 +68,15 @@ describe("abono with Efectivo | Nequi", () => {
     const v = abonoView(30000, "30000", "Efectivo");
     expect(v.fullChip).toBe("30000");
     expect(v.remaining).toBe(0);
+    expect(v.remainingText).toMatch(/^Queda debiendo \$\s?0$/);
+    expect(v.remainingText).not.toMatch(/Queda en/);
     expect(abonoView(0, "", "Efectivo").fullChip).toBeNull();
+  });
+});
+
+describe("short statement dates (360px)", () => {
+  it("formats as «13 oct · 10:05» in Bogotá", () => {
+    // 2026-10-13 15:05Z = 10:05 Bogotá
+    expect(shortDateTime(Date.UTC(2026, 9, 13, 15, 5))).toBe("13 oct · 10:05");
   });
 });

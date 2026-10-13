@@ -11,6 +11,7 @@ import { createReturnWithOfflineFallback } from "@/data/pwa/offline-returns";
 import { getSaleDetailWithOfflineFallback } from "@/data/pwa/offline-sales";
 import type { SaleDetailResult } from "@/data/pwa/offline-sales";
 import { getPwaAuthSession } from "@/data/http/session";
+import { listCachedCustomers } from "@/data/pwa/catalog";
 import { useProductImageMap } from "@/data/pwa/product-image-map";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { HeroBlock } from "@/components/ui/HeroBlock";
@@ -31,6 +32,7 @@ export default function DevolverVentaPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [customerName, setCustomerName] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const imageMap = useProductImageMap(getPwaAuthSession().businessId);
 
@@ -45,6 +47,12 @@ export default function DevolverVentaPage() {
       const next: Record<string, string> = {};
       for (const l of row.lines) next[l.id] = "";
       setQtyByLine(next);
+      if (row.sale.customerId) {
+        const cid = row.sale.customerId;
+        void listCachedCustomers()
+          .then((cs) => setCustomerName(cs.find((c) => c.id === cid)?.name ?? null))
+          .catch(() => setCustomerName(null));
+      }
     }
     setReady(true);
   }, [id]);
@@ -152,7 +160,7 @@ export default function DevolverVentaPage() {
         size="compact"
         back={{ href: `/ventas/${data.sale.id}`, label: "Volver a la venta", entity: true }}
         title="Devolver"
-        subtitle={`Venta ${formatCop(data.sale.saleTotal)}`}
+        subtitle={[`Venta ${formatCop(data.sale.saleTotal)}`, customerName].filter(Boolean).join(" · ")}
         offline={data.source === "cache" ? { text: "Sin conexión · mostrando venta guardada en este dispositivo." } : null}
       />
 
@@ -244,7 +252,7 @@ export default function DevolverVentaPage() {
       {remainingLines.length > 0 && (
         <ActionBar
           primary={{
-            label: previewValue > 0 ? `Devolver ${formatCop(previewValue)}` : "Devolver",
+            label: previewValue > 0 ? `Devolver ${formatCop(previewValue)}` : "Elige qué vuelve",
             onClick: () => void confirm(),
             disabled: !canSubmit,
             busy,

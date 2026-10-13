@@ -2,6 +2,8 @@
 import { abonoRemainingHelper, parseAbonoAmount, validateAbono } from "@/domain/abono";
 import type { DebtEntry } from "@/domain/debt/statement";
 import type { PayMethod } from "@/domain/types";
+import { addCop, formatCop } from "@/domain/money";
+import { formatBogotaDateTime } from "@/domain/debt/statement";
 
 export type CustomerLike = { id: string; name: string; code?: string | null; debt: number };
 export type ClientesSegment = "deben" | "todos";
@@ -12,7 +14,7 @@ export function porCobrar(list: ReadonlyArray<CustomerLike>): { total: number; c
   let count = 0;
   for (const c of list) {
     if (c.debt > 0) {
-      total += c.debt;
+      total = addCop(total, c.debt);
       count += 1;
     }
   }
@@ -97,8 +99,32 @@ export function abonoView(debt: number, amountRaw: string, method: PayMethod) {
     valid: error === null,
     error,
     remaining: amount != null && error === null ? debt - amount : null,
-    remainingText: amount != null && Number.isFinite(amount) ? abonoRemainingHelper(debt, amount) : null,
+    remainingText:
+      amount != null && Number.isFinite(amount) && abonoRemainingHelper(debt, amount) != null
+        ? `Queda debiendo ${formatCop(debt - amount)}`
+        : null,
     fullChip: debt > 0 ? String(debt) : null,
     method,
   };
+}
+
+const SHORT_DATE = new Intl.DateTimeFormat("es-CO", {
+  timeZone: "America/Bogota",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+/** «13 oct · 10:05» (Bogotá). Falls back to the long domain format if Intl parts are missing. */
+export function shortDateTime(ms: number): string {
+  const parts = SHORT_DATE.formatToParts(new Date(ms));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const day = get("day");
+  const month = get("month").replace(".", "");
+  const hour = get("hour");
+  const minute = get("minute");
+  if (!day || !month || !hour) return formatBogotaDateTime(ms);
+  return `${day} ${month} · ${hour}:${minute}`;
 }

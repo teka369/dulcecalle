@@ -17,6 +17,8 @@ import { QuickTiles } from "@/components/ui/QuickTiles";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { formatCop } from "@/domain/money";
+import { getCachedCustomer } from "@/data/pwa/catalog";
+import { ApiError } from "@/data/errors";
 
 export default function ClienteFichaPage() {
   const id = useEntityId();
@@ -33,13 +35,26 @@ export default function ClienteFichaPage() {
   const [fromCache, setFromCache] = useState(false);
   const [ready, setReady] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) {
       setReady(true);
       return;
     }
-    const c = await customerStore.getCustomer(id);
+    setLoadError(false);
+    let c: RemoteCustomer | undefined;
+    try {
+      c = await getCachedCustomer(id);
+    } catch (e) {
+      // 404 = not found; anything else (network, server) = load error with Reintentar.
+      if (!(e instanceof ApiError && e.status === 404)) {
+        setLoadError(true);
+        setReady(true);
+        return;
+      }
+      c = undefined;
+    }
     setCustomer(c ?? null);
     if (c) {
       setEditName(c.name);
@@ -63,6 +78,30 @@ export default function ClienteFichaPage() {
         <SkeletonHero />
         <SkeletonRows />
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <HeroBlock size="medium" back={{ href: "/clientes", label: "Volver a Clientes", entity: true }} title="Clientes">
+        <StateBlock
+          onHero
+          kind="error"
+          title="No se pudo cargar."
+          action={
+            <button
+              type="button"
+              onClick={() => {
+                setReady(false);
+                void load();
+              }}
+              className="inline-flex min-h-11 items-center rounded-[var(--r-pill)] bg-on-hero px-4 text-sm font-semibold text-hero"
+            >
+              Reintentar
+            </button>
+          }
+        />
+      </HeroBlock>
     );
   }
 

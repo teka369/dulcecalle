@@ -44,7 +44,7 @@ export function ActionBar({ primary, summary, aboveNav = false }: ActionBarProps
           onClick={primary.onClick}
           disabled={primary.disabled || primary.busy}
           aria-busy={primary.busy || undefined}
-          className={`inline-flex min-h-[3.25rem] items-center justify-center rounded-[var(--r-md)] bg-cta px-6 text-base font-semibold text-cta-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] disabled:opacity-40 ${
+          className={`inline-flex min-h-[3.25rem] items-center justify-center rounded-[var(--r-md)] bg-cta px-6 text-base font-semibold text-cta-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] disabled:border disabled:border-border disabled:bg-surface-2 disabled:text-ink-muted ${
             summary != null ? "shrink-0" : "w-full"
           }`}
         >
