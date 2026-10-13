@@ -5,6 +5,7 @@ import {
   isLowStock,
   isOutOfStock,
   moveDelta,
+  clampQty,
   splitByStock,
   stepQty,
   stockAfter,
@@ -68,5 +69,14 @@ describe("form helpers", () => {
   it("move delta carries a word", () => {
     expect(moveDelta(5)).toEqual({ sign: "+", qty: 5, word: "Entra", tone: "ok" });
     expect(moveDelta(-2)).toEqual({ sign: "−", qty: 2, word: "Sale", tone: "danger" });
+  });
+});
+
+describe("typed qty is capped at stock", () => {
+  it("never lets «Quedará» go negative", () => {
+    expect(clampQty("9", 5)).toBe("5");
+    expect(stockAfter(5, clampQty("9", 5), -1)).toBe(0);
+    expect(clampQty("3a", 5)).toBe("3");
+    expect(clampQty("40", undefined)).toBe("40");
   });
 });

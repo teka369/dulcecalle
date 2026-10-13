@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bogotaKey, dayHeading, groupByDay, saleDayKey, saleTime } from "./sales-list";
+import { bogotaKey, dayHeading, groupByDay, saleDayKey, saleTime, ventasSheetState } from "./sales-list";
 
 describe("sales list helpers", () => {
   it("uses occurredOn, else Bogotá day of createdAt", () => {
@@ -24,5 +24,17 @@ describe("sales list helpers", () => {
       ["2026-10-13", [1, 3]],
       ["2026-10-12", [2]],
     ]);
+  });
+});
+
+describe("ventasSheetState", () => {
+  it("error with no data shows the error (Reintentar), not the filter-empty state", () => {
+    expect(ventasSheetState({ ready: true, error: "Sin red", salesCount: 0, filteredCount: 0 })).toBe("error");
+  });
+  it("error with data keeps the list; loading/empty/filter-empty otherwise", () => {
+    expect(ventasSheetState({ ready: true, error: "x", salesCount: 3, filteredCount: 3 })).toBe("list");
+    expect(ventasSheetState({ ready: false, error: null, salesCount: 0, filteredCount: 0 })).toBe("loading");
+    expect(ventasSheetState({ ready: true, error: null, salesCount: 0, filteredCount: 0 })).toBe("empty");
+    expect(ventasSheetState({ ready: true, error: null, salesCount: 2, filteredCount: 0 })).toBe("filter-empty");
   });
 });

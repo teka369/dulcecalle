@@ -67,3 +67,11 @@ export function moveDelta(delta: number): { sign: "+" | "−"; qty: number; word
 export function units(n: number): string {
   return `${n} u.`;
 }
+
+/** Typed qty: digits only, capped at max (stock) so «Quedará» never goes negative. */
+export function clampQty(raw: string, max?: number): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits || max == null) return digits;
+  const n = Number.parseInt(digits, 10);
+  return n > max ? String(Math.max(0, max)) : digits;
+}

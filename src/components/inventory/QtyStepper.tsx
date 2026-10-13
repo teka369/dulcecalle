@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { stepQty } from "./inventory";
+import { clampQty, stepQty } from "./inventory";
 
 /** Big qty stepper (− input +), 56px targets. Input stays editable. */
 export function QtyStepper({
@@ -34,7 +34,7 @@ export function QtyStepper({
           id={id}
           inputMode="numeric"
           value={value}
-          onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => onChange(clampQty(e.target.value, max))}
           placeholder="0"
           aria-describedby={hint ? `${id}-h` : undefined}
           className="h-14 min-w-0 flex-1 rounded-[var(--r-md)] border border-border bg-surface px-3 text-center text-[28px] font-semibold tabular-nums text-ink outline-none focus-visible:ring-2 focus-visible:ring-[var(--cta)]"

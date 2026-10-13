@@ -58,3 +58,19 @@ export function groupByDay<T extends DayGroupable>(rows: ReadonlyArray<T>): Arra
   }
   return out;
 }
+
+export type VentasSheetState = "loading" | "error" | "empty" | "filter-empty" | "list";
+
+/** Which state the Ventas sheet shows. An error with no data wins over any filter/empty state. */
+export function ventasSheetState(input: {
+  ready: boolean;
+  error: string | null;
+  salesCount: number;
+  filteredCount: number;
+}): VentasSheetState {
+  if (!input.ready) return "loading";
+  if (input.error && input.salesCount === 0) return "error";
+  if (input.salesCount === 0) return "empty";
+  if (input.filteredCount === 0) return "filter-empty";
+  return "list";
+}

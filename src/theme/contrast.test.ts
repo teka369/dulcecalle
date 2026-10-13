@@ -117,6 +117,15 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ["--nav-active-ink", "--nav-active-bg"],
   // V2 P1: debt/negative amounts in the sheet.
   ["--danger", "--surface"],
+  // Tester AA (P1 7df20a4): status text on its soft tint and on page/sheet.
+  ["--warning", "--warning-soft"],
+  ["--warning", "--surface"],
+  ["--warning", "--bg"],
+  ["--danger", "--danger-soft"],
+  ["--danger", "--bg"],
+  ["--ok", "--ok-soft"],
+  ["--ok", "--surface"],
+  ["--ok", "--bg"],
 ];
 const UI_PAIRS: Array<[string, string]> = [
   ["--cta", "--bg"],
@@ -139,6 +148,17 @@ describe("WCAG AA contrast from globals.css tokens", () => {
     expect(t["--cta-fg"]).toBe("#3b241c");
     expect(ratio(t["--cta-fg"], t["--cta"])).toBeGreaterThan(6.2);
     expect(tokens("ocean", "light")["--cta-fg"]).toBe("#ffffff");
+  });
+
+  it("H1: light classic palettes use warning #92400e and ok #166534", () => {
+    for (const id of ["amber", "ocean", "emerald", "violet", "rose", "slate"]) {
+      const t = tokens(id, "light");
+      expect(t["--warning"], id).toBe("#92400e");
+      expect(t["--ok"], id).toBe("#166534");
+      expect(ratio(t["--warning"], t["--warning-soft"])).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(t["--ok"], t["--ok-soft"])).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(t["--danger"], t["--bg"])).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   for (const [id, mode] of combos) {

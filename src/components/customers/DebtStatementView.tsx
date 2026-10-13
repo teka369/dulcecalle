@@ -2,16 +2,15 @@ import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { formatCop } from "@/domain/money";
-import { formatBogotaDateTime, type DebtEntry, type DebtStatement } from "@/domain/debt/statement";
-import { statementRow } from "./clientes";
+import { type DebtEntry, type DebtStatement } from "@/domain/debt/statement";
+import { shortDateTime, statementRow } from "./clientes";
 
 function entryMeta(entry: DebtEntry): string {
-  const when = formatBogotaDateTime(entry.createdAt);
+  const when = shortDateTime(entry.createdAt);
   if (entry.kind === "fiada" || entry.kind === "parcial") {
-    const items = entry.lines.map((l) => `${l.qty} × ${l.productName}`).join(", ");
+    // One line: sale total and what was paid stay separate from the fiado (trailing amount).
     const parts = [when, `Venta ${formatCop(entry.saleTotal)}`];
-    if (entry.amountReceived > 0) parts.push(`Pagó ahora ${formatCop(entry.amountReceived)}`);
-    if (items) parts.push(items);
+    if (entry.amountReceived > 0) parts.push(`Pagó ${formatCop(entry.amountReceived)}`);
     return parts.join(" · ");
   }
   if ((entry.kind === "inicial" || entry.kind === "abono") && entry.note) return `${when} · Nota: ${entry.note}`;
