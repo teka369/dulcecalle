@@ -1,6 +1,15 @@
 "use client";
 
 import { usePrep } from "@/store/prepStore";
+import { Badge } from "@/components/ui/Badge";
+import { SectionHead } from "@/components/ui/SectionHead";
+
+const TASK_TONE = { done: "ok", failed: "danger", running: "warning" } as const;
+const TASK_WORD = { done: "Lista", failed: "Error", running: "Preparando" } as const;
+const TAB_TONE: Record<string, string> = {
+  failed: "border-danger/40 text-danger",
+  ready: "border-ok/40 text-ok",
+};
 
 const GROUP_TITLES = {
   app: "Aplicación",
@@ -42,7 +51,7 @@ export function PrepIndicator() {
           aria-label={label}
           aria-expanded={false}
           aria-controls="prep-panel"
-          className={`prep-tab fixed z-[65] flex min-h-11 items-center bottom-[calc(9.5rem+env(safe-area-inset-bottom))] rounded-l-[var(--r-md)] border border-r-0 border-border bg-surface py-2 pl-1.5 pr-1 text-[10px] font-semibold text-ink shadow-[var(--shadow-md)]`}
+          className={`prep-tab fixed z-[65] flex min-h-11 items-center bottom-[calc(9.5rem+env(safe-area-inset-bottom))] rounded-l-[var(--r-md)] border border-r-0 bg-surface py-2 pl-1.5 pr-1 text-[11px] font-semibold shadow-[var(--shadow-md)] ${TAB_TONE[phase] ?? "border-border text-ink"}`}
           style={{ right: "env(safe-area-inset-right)" }}
         >
           <span aria-hidden className="[writing-mode:vertical-rl] rotate-180">
@@ -63,30 +72,32 @@ export function PrepIndicator() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="prep-panel-title"
-            className="absolute inset-y-0 right-0 flex w-[min(22rem,calc(100vw-2.75rem))] max-w-sm flex-col overflow-hidden border-l border-border bg-surface shadow-[var(--shadow-lg)]"
+            className="absolute inset-y-0 right-0 flex w-[min(22rem,calc(100vw-2.75rem))] max-w-sm flex-col overflow-hidden rounded-l-[28px] bg-bg shadow-[var(--shadow-lg)]"
             style={{ paddingRight: "env(safe-area-inset-right)" }}
           >
             <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
-              <h2 id="prep-panel-title" className="text-base font-semibold">Preparación offline</h2>
+              <h2 id="prep-panel-title" className="text-[22px] font-semibold text-ink">Preparación offline</h2>
               <p className="mt-1 text-sm text-ink-muted">{label}. La app sigue disponible.</p>
               {(["app", "catalogos", "historial", "resumen", "sistema"] as const).map((group) => {
                 const groupTasks = tasks.filter((task) => task.group === group);
                 if (groupTasks.length === 0) return null;
                 return (
-                  <div key={group} className="mt-3">
-                    <h3 className="text-xs font-semibold uppercase text-ink-muted">{GROUP_TITLES[group]}</h3>
-                    <ul className="mt-1 flex flex-col gap-1">
+                  <div key={group} className="mt-4 flex flex-col gap-2">
+                    <SectionHead title={GROUP_TITLES[group]} />
+                    <ul className="divide-y divide-border overflow-hidden rounded-[var(--r-lg)] border border-border bg-surface">
                       {groupTasks.map((task) => (
-                        <li key={task.key} className="flex justify-between gap-2 text-sm">
-                          <span className="min-w-0 truncate">{task.label}</span>
-                          <span className="shrink-0">{task.status === "done" ? "Lista" : task.status === "failed" ? "Error" : task.status === "running" ? "Preparando" : "Pendiente"}</span>
+                        <li key={task.key} className="flex min-h-11 items-center justify-between gap-2 px-3 py-2 text-sm">
+                          <span className="min-w-0 truncate text-ink">{task.label}</span>
+                          <Badge tone={TASK_TONE[task.status as keyof typeof TASK_TONE] ?? "neutral"} className="shrink-0">
+                            {TASK_WORD[task.status as keyof typeof TASK_WORD] ?? "Pendiente"}
+                          </Badge>
                         </li>
                       ))}
                     </ul>
                   </div>
                 );
               })}
-              <button type="button" onClick={() => void start({ refresh: true })} className="mt-4 min-h-11 w-full rounded-[var(--r-md)] border border-border text-sm font-semibold">
+              <button type="button" onClick={() => void start({ refresh: true })} className="mt-5 min-h-11 w-full rounded-[var(--r-md)] border border-border bg-surface text-sm font-semibold text-ink">
                 Actualizar preparación offline
               </button>
               <button type="button" onClick={closePanel} className="mt-2 min-h-11 w-full rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg">

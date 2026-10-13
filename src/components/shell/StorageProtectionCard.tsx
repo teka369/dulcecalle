@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { SectionHead } from "@/components/ui/SectionHead";
+import { Badge } from "@/components/ui/Badge";
 import {
   STORAGE_BACKUP_NOTE,
   STORAGE_NOT_A_BACKUP_BUTTON,
@@ -46,9 +48,9 @@ export function StorageProtectionCard() {
   }
 
   return (
-    <section className="rounded-[var(--r-lg)] border border-border bg-bg p-3 text-sm">
-      <h2 className="font-semibold">Protección del dispositivo</h2>
-      <ul className="mt-2 flex flex-col gap-2 text-ink-muted">
+    <section className="flex flex-col gap-2 text-sm">
+      <SectionHead title="Protección del dispositivo" />
+      <ul className="divide-y divide-border overflow-hidden rounded-[var(--r-lg)] border border-border bg-surface text-ink-muted [&>li]:px-3 [&>li]:py-2.5 [&>li]:leading-snug">
         <li>
           <span className="font-semibold text-ink">En el servidor.</span> Lo que ya fue aceptado
           por el servidor. El resumen de arriba dice si queda algo por enviar.
@@ -67,7 +69,7 @@ export function StorageProtectionCard() {
       </ul>
 
       {snapshot == null ? (
-        <p className="mt-3 text-ink-muted">Consultando el almacenamiento de este sitio.</p>
+        <p className="rounded-[var(--r-lg)] border border-border bg-surface px-3 py-2.5 text-ink-muted" aria-busy="true">Consultando el almacenamiento de este sitio.</p>
       ) : (
         <StorageStatus snapshot={snapshot} action={action} busy={busy} onProtect={() => void onProtect()} />
       )}
@@ -96,27 +98,32 @@ function StorageStatus({
   const canAsk = snapshot.supported && snapshot.error !== "unsupported" && snapshot.persistent !== true;
 
   return (
-    <div className="mt-3">
-      <p className="font-semibold">{copy.title}</p>
+    <div className="rounded-[var(--r-lg)] border border-border bg-surface p-3">
+      <p className="flex items-center justify-between gap-2 font-semibold text-ink">
+        <span className="min-w-0">{copy.title}</span>
+        <Badge tone={snapshot.persistent === true ? "ok" : "warning"} className="shrink-0">
+          {snapshot.persistent === true ? "Protegido" : "Sin protección"}
+        </Badge>
+      </p>
       <p className="mt-1 leading-snug text-ink-muted">{copy.body}</p>
-      {usage && <p className="mt-3">{usage}</p>}
+      {usage && <p className="mt-3 font-semibold tabular-nums text-ink">{usage}</p>}
       {quota && <p className="mt-1 text-ink-muted">{quota}</p>}
       {percent && <p className="mt-1 text-ink-muted">{percent}</p>}
       {missing && <p className="mt-3 text-ink-muted">{missing}</p>}
-      {warning && <p className="mt-3 font-semibold text-danger">{warning}</p>}
+      {warning && <p className="mt-3 rounded-[var(--r-md)] bg-danger-soft px-3 py-2 font-semibold text-danger">{warning}</p>}
       {snapshot.persistent === true && (
         <p className="mt-3 leading-snug text-ink-muted">{STORAGE_PERSISTENT_LIMIT}</p>
       )}
       {canAsk && (
         <>
           <p className="mt-3 leading-snug text-ink-muted">{STORAGE_NOT_A_BACKUP_BUTTON}</p>
-          <Button type="button" variant="primary" className="mt-3 w-full" disabled={busy} onClick={onProtect}>
+          <Button type="button" variant="primary" className="mt-3 min-h-12 w-full" disabled={busy} onClick={onProtect}>
             {busy ? "Solicitando protección…" : "Proteger almacenamiento de este dispositivo"}
           </Button>
         </>
       )}
       {requestMessage && (
-        <p className="mt-3 leading-snug" role="status">
+        <p className="mt-3 rounded-[var(--r-md)] bg-surface-2 px-3 py-2 leading-snug text-ink" role="status">
           {requestMessage}
         </p>
       )}

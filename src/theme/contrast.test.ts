@@ -193,4 +193,15 @@ describe("WCAG AA contrast from globals.css tokens", () => {
       expect(t["--cta"], `${id}/${mode} cta`).toMatch(/^#/);
     });
   }
+
+  it("toasts: text-bg on bg-ink reaches AA in every theme/mode", () => {
+    const report: string[] = [];
+    for (const [id, mode] of combos) {
+      const t = tokens(id, mode);
+      const r = ratio(resolveMix(t["--bg"]), resolveMix(t["--ink"]));
+      report.push(`${id}:${mode} ${t["--bg"]} on ${t["--ink"]} = ${r.toFixed(2)}`);
+      expect(r, `${id}:${mode} toast`).toBeGreaterThanOrEqual(4.5);
+    }
+    console.info(report.join("\n"));
+  });
 });
