@@ -166,7 +166,7 @@ export default function SurtirPage() {
   if (!ready) {
     return (
       <div className="flex flex-col gap-4">
-        <SkeletonHero />
+        <SkeletonHero title="Surtir" />
         <SkeletonRows rows={4} />
       </div>
     );

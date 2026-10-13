@@ -9,6 +9,7 @@
  *   cache), so an offline reload boots where the user was;
  * - catalogs: the admin read-cache snapshots offline writes depend on.
  */
+import { getPrepPwaApi } from "./api";
 import { NetworkError } from "../errors";
 import { getLocalDb } from "../local/db";
 import type { PrepReadiness, PrepTaskRecord, PrepTaskStatus } from "../local/types";
@@ -108,7 +109,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
       group: "catalogos" as const,
       label: "Catálogo de productos",
       run: async () => {
-        await listCachedProducts();
+        await listCachedProducts(getPrepPwaApi());
       },
     },
     {
@@ -116,7 +117,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
       group: "catalogos" as const,
       label: "Catálogo de clientes",
       run: async () => {
-        await listCachedCustomers();
+        await listCachedCustomers(getPrepPwaApi());
       },
     },
     {
@@ -124,7 +125,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
       group: "catalogos" as const,
       label: "Catálogo de proveedores",
       run: async () => {
-        await listCachedSuppliers();
+        await listCachedSuppliers(getPrepPwaApi());
       },
     },
     {
@@ -132,7 +133,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
       group: "resumen" as const,
       label: "Resumen del inicio",
       run: async () => {
-        await loadDashboardWithOfflineFallback();
+        await loadDashboardWithOfflineFallback(getPrepPwaApi());
       },
     },
     ...(["hoy", "semana", "mes"] as const).map((period) => ({

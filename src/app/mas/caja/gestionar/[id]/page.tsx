@@ -110,7 +110,7 @@ export default function GestionarCajaDetailPage() {
   if (!detail) {
     return (
       <div className="flex flex-col gap-4">
-        <SkeletonHero />
+        <SkeletonHero title="Caja" />
         <SkeletonRows />
       </div>
     );

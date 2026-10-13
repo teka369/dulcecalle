@@ -1,4 +1,5 @@
 import { NetworkError } from "../errors";
+import type { HttpRepository } from "../http/repository";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import type { RemoteStats } from "../http/mappers";
 import { getPwaApi } from "./api";
@@ -90,12 +91,12 @@ export function isRemoteStats(data: unknown): data is RemoteStats {
  * would silently undercount); offline serves the last snapshot labeled
  * with its capture time. Never a fake zero.
  */
-export async function loadDashboardWithOfflineFallback(): Promise<
+export async function loadDashboardWithOfflineFallback(api?: HttpRepository): Promise<
   SnapshotResult<DashboardSnapshot>
 > {
   let result: { snapshot: DashboardSnapshot; complete: boolean; networkFailure: boolean };
   try {
-    result = await loadDashboardResult();
+    result = await loadDashboardResult(api);
   } catch (e: unknown) {
     // Core queries have no fallback: a transport failure serves the
     // previous snapshot, anything else propagates.

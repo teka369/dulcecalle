@@ -119,7 +119,7 @@ export default function RegistrarAbonoPage() {
   if (!ready) {
     return (
       <div className="flex flex-col gap-4">
-        <SkeletonHero />
+        <SkeletonHero title="Registrar abono" />
         <SkeletonRows rows={3} />
       </div>
     );

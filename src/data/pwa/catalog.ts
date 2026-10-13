@@ -3,6 +3,7 @@ import type {
   RemoteProduct,
   RemoteSupplier,
 } from "../http/mappers";
+import type { HttpRepository } from "../http/repository";
 import { getCatalogReadCache } from "../local/read-cache";
 import { getPwaApi } from "./api";
 
@@ -14,8 +15,7 @@ function requireBusinessId(): string {
   return businessId;
 }
 
-export async function listCachedProducts(): Promise<RemoteProduct[]> {
-  const api = getPwaApi();
+export async function listCachedProducts(api: HttpRepository = getPwaApi()): Promise<RemoteProduct[]> {
   const result = await getCatalogReadCache().listProducts(
     requireBusinessId(),
     () => api.products.list(),
@@ -23,8 +23,7 @@ export async function listCachedProducts(): Promise<RemoteProduct[]> {
   return result.data;
 }
 
-export async function listCachedCustomers(): Promise<RemoteCustomer[]> {
-  const api = getPwaApi();
+export async function listCachedCustomers(api: HttpRepository = getPwaApi()): Promise<RemoteCustomer[]> {
   const result = await getCatalogReadCache().listCustomers(
     requireBusinessId(),
     () => api.customers.list(),
@@ -32,8 +31,7 @@ export async function listCachedCustomers(): Promise<RemoteCustomer[]> {
   return result.data;
 }
 
-export async function listCachedSuppliers(): Promise<RemoteSupplier[]> {
-  const api = getPwaApi();
+export async function listCachedSuppliers(api: HttpRepository = getPwaApi()): Promise<RemoteSupplier[]> {
   const result = await getCatalogReadCache().listSuppliers(
     requireBusinessId(),
     () => api.suppliers.list(),

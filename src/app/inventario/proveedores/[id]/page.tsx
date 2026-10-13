@@ -58,7 +58,7 @@ export default function ProveedorFichaPage() {
   if (!ready) {
     return (
       <div className="flex flex-col gap-4">
-        <SkeletonHero />
+        <SkeletonHero title="Proveedor" />
         <SkeletonRows />
       </div>
     );

@@ -134,7 +134,7 @@ export default function DevolverVentaPage() {
   if (!ready) {
     return (
       <div className="flex flex-col">
-        <SkeletonHero />
+        <SkeletonHero title="Devolver" />
         <Sheet>
           <SkeletonRows rows={3} />
         </Sheet>

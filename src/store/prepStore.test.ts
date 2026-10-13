@@ -29,7 +29,7 @@ const api = {
   stats: { get: vi.fn(async (period: string) => ({ period, ventas: 0, emptyPeriod: true })) },
 };
 
-vi.mock("@/data/pwa/api", () => ({ getPwaApi: () => api }));
+vi.mock("@/data/pwa/api", () => ({ getPwaApi: () => api, getPrepPwaApi: () => api }));
 
 function installStubs(online = true) {
   const stored = new Map<string, Response>();

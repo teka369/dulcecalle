@@ -65,7 +65,7 @@ export default function VentaDetallePage() {
   if (!ready) {
     return (
       <div className="flex flex-col">
-        <SkeletonHero />
+        <SkeletonHero title="Venta" />
         <Sheet>
           <SkeletonRows rows={3} />
         </Sheet>

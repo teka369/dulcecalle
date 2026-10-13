@@ -113,7 +113,7 @@ export function ShrinkForm({
   if (!ready) {
     return (
       <div className="flex flex-col gap-4">
-        <SkeletonHero />
+        <SkeletonHero title={title} />
         <SkeletonRows rows={3} />
       </div>
     );

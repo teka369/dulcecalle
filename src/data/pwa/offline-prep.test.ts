@@ -37,7 +37,7 @@ const api = {
   stats: { get: vi.fn(async (period: string) => ({ period, ventas: 0, emptyPeriod: true })) },
 };
 
-vi.mock("./api", () => ({ getPwaApi: () => api }));
+vi.mock("./api", () => ({ getPwaApi: () => api, getPrepPwaApi: () => api }));
 
 function installCacheStubs(failPaths: string[] = []) {
   const stored = new Map<string, Response>();

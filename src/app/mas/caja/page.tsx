@@ -115,7 +115,7 @@ export default function CajaPage() {
   if (!ready || !summary) {
     return (
       <div className="flex flex-col gap-4">
-        <SkeletonHero />
+        <SkeletonHero title={CASH_COPY.titleCaja} />
         <SkeletonRows />
       </div>
     );
