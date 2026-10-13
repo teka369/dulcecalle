@@ -33,3 +33,15 @@ export function swNavigationRoute(pathname: string): SwNavigationRoute {
 
 /** Bound for the "documents" cache: above the number of static screens so PREP docs are never evicted. */
 export const DOCUMENTS_MAX_ENTRIES = 80;
+
+/**
+ * Business API traffic (same-origin /api/ or the Nest API's /v1/ on any
+ * origin). Always NetworkOnly: Serwist's defaultCache would otherwise put
+ * cross-origin GETs in its NetworkFirst "cross-origin" cache, and offline the
+ * app would get a stale server answer (e.g. /cash/today without the moves
+ * recorded offline) instead of a NetworkError that falls back to Dexie.
+ */
+export function isBusinessApiRequest(url: URL, sameOrigin: boolean): boolean {
+  if (sameOrigin) return url.pathname.startsWith("/api/") || url.pathname.startsWith("/v1/");
+  return url.pathname.includes("/v1/");
+}

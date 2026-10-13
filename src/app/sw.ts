@@ -8,7 +8,7 @@ import {
   NetworkOnly,
   Serwist,
 } from "serwist";
-import { DOCUMENTS_MAX_ENTRIES, swNavigationRoute } from "@/data/pwa/sw-routing";
+import { DOCUMENTS_MAX_ENTRIES, isBusinessApiRequest, swNavigationRoute } from "@/data/pwa/sw-routing";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -29,8 +29,9 @@ declare const self: ServiceWorkerGlobalScope;
  */
 const runtimeCaching = [
   {
-    matcher: ({ sameOrigin, url }: { sameOrigin: boolean; url: URL }) =>
-      sameOrigin && url.pathname.startsWith("/api/"),
+    // Business API (same-origin /api/ and the Nest /v1/ on its own origin):
+    // never cached, so offline reads fail and fall back to Dexie (B5).
+    matcher: ({ sameOrigin, url }: { sameOrigin: boolean; url: URL }) => isBusinessApiRequest(url, sameOrigin),
     handler: new NetworkOnly(),
   },
   {

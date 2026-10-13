@@ -7,7 +7,7 @@ import {
   entityParentPath,
   bootEntityPatternSources,
 } from "./entity-href";
-import { DOCUMENTS_MAX_ENTRIES, swNavigationRoute } from "./sw-routing";
+import { DOCUMENTS_MAX_ENTRIES, isBusinessApiRequest, swNavigationRoute } from "./sw-routing";
 import { requiredStaticDocuments } from "./offline-prep";
 import { BOOT_ENTITY_ATTR, bootRestoreTarget, bootScriptSource } from "./boot-restore";
 import { gestionarIsOffline, GESTIONAR_OFFLINE_TEXT } from "@/components/cash/gestionar-offline";
@@ -172,5 +172,16 @@ describe("gestionar cajas offline", () => {
     expect(gestionarIsOffline(false, new Error("500"))).toBe(false);
     expect(GESTIONAR_OFFLINE_TEXT).toBe("Necesitas internet para gestionar cajas");
     expect(requiredStaticDocuments()).toContain("/mas/caja/gestionar");
+  });
+});
+
+describe("B5: business API is never cached by the SW", () => {
+  it("API GETs (cross-origin /v1/ and same-origin /api/) are NetworkOnly; other assets are not", () => {
+    expect(isBusinessApiRequest(new URL("https://dulcecalle-teka369.onrender.com/v1/cash/today"), false)).toBe(true);
+    expect(isBusinessApiRequest(new URL("https://app.test/api/x"), true)).toBe(true);
+    expect(isBusinessApiRequest(new URL("https://app.test/v1/customers"), true)).toBe(true);
+    expect(isBusinessApiRequest(new URL("https://res.cloudinary.com/x/image/upload/a.jpg"), false)).toBe(false);
+    expect(isBusinessApiRequest(new URL("https://api.fontshare.com/v2/css"), false)).toBe(false);
+    expect(isBusinessApiRequest(new URL("https://app.test/_next/static/a.js"), true)).toBe(false);
   });
 });
