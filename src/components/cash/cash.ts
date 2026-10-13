@@ -9,7 +9,12 @@ export type Expected = { efectivo: number; nequi: number; total: number };
 export function kindLabel(kind: string): string {
   switch (kind) {
     case "expense":
+    case "gasto":
       return "Gasto";
+    case "venta":
+      return "Venta";
+    case "abono":
+      return "Abono";
     case "retiro":
       return CASH_COPY.retiroPersonal;
     case "aporte":
@@ -23,7 +28,7 @@ export function kindLabel(kind: string): string {
     case "devolucion":
       return "Devolución";
     default:
-      return kind;
+      return kind ? kind.charAt(0).toUpperCase() + kind.slice(1).replace(/_/g, " ") : kind;
   }
 }
 
@@ -104,3 +109,29 @@ export function shortDay(localDate: string | null | undefined): string {
   const wd = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
   return `${WD[wd]} ${d} ${MO[mo - 1]}`;
 }
+
+export type CashOfflineView = "online" | "offline-cache" | "offline-nocache";
+
+/**
+ * UI-only read of how trustworthy the local caja snapshot is. Offline without a
+ * prepared snapshot (no offline prep ever completed) and with nothing local, the
+ * empty summary is not "caja cerrada": the server may already have one open, so
+ * the page must show error/offline and never offer «Abrir caja» (duplicate risk).
+ */
+export function cashOfflineView(input: {
+  online: boolean;
+  preparedAt: number | null;
+  hasLocalData: boolean;
+}): CashOfflineView {
+  if (input.online) return "online";
+  return input.preparedAt != null || input.hasLocalData ? "offline-cache" : "offline-nocache";
+}
+
+export const CASH_OFFLINE_NOCACHE = {
+  title: "Sin conexión",
+  body: "No hay datos de caja guardados en este teléfono. Conéctate para ver o abrir la caja de hoy.",
+};
+export const GASTOS_OFFLINE_NOCACHE = {
+  title: "Sin conexión",
+  body: "No hay gastos guardados en este teléfono. Conéctate para verlos.",
+};

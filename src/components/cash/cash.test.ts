@@ -75,3 +75,27 @@ describe("shortDay (§3.22)", () => {
     expect(shortDay("bad")).toBe("bad");
   });
 });
+
+import { cashOfflineView } from "./cash";
+describe("cashOfflineView (S5: no duplicate Abrir caja offline)", () => {
+  it("online is always online", () => {
+    expect(cashOfflineView({ online: true, preparedAt: null, hasLocalData: false })).toBe("online");
+  });
+  it("offline without prep nor local data => offline-nocache (no Abrir caja)", () => {
+    expect(cashOfflineView({ online: false, preparedAt: null, hasLocalData: false })).toBe("offline-nocache");
+  });
+  it("offline with prepared snapshot or local data => offline-cache", () => {
+    expect(cashOfflineView({ online: false, preparedAt: 1, hasLocalData: false })).toBe("offline-cache");
+    expect(cashOfflineView({ online: false, preparedAt: null, hasLocalData: true })).toBe("offline-cache");
+  });
+});
+
+import { kindLabel as kl } from "./cash";
+describe("kindLabel readable (S1)", () => {
+  it("maps raw lowercase kinds", () => {
+    expect(kl("abono")).toBe("Abono");
+    expect(kl("gasto")).toBe("Gasto");
+    expect(kl("venta")).toBe("Venta");
+    expect(kl("otro_tipo")).toBe("Otro tipo");
+  });
+});

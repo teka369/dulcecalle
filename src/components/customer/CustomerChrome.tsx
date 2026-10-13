@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getCustomerApi } from "@/data/http/customer-api";
 import { Card } from "@/components/ui/Card";
@@ -16,6 +16,11 @@ import { PORTAL_TABS, activePortalTab } from "./portal";
 /** Portal tabs: scrollable on-hero links, aria-current on the active one. */
 function PortalTabs() {
   const active = activePortalTab(usePathname());
+  const activeRef = useRef<HTMLAnchorElement | null>(null);
+  // S1 (360px): bring the active tab into view inside the horizontal scroller.
+  useEffect(() => {
+    activeRef.current?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+  }, [active]);
   return (
     <nav aria-label="Consulta" className="mt-5">
       <ul className="flex gap-1 overflow-x-auto rounded-[var(--r-pill)] bg-[color-mix(in_srgb,var(--on-hero)_12%,transparent)] p-1">
@@ -25,6 +30,7 @@ function PortalTabs() {
             <li key={t.href} className="shrink-0">
               <Link
                 href={t.href}
+                ref={on ? activeRef : undefined}
                 aria-current={on ? "page" : undefined}
                 className={`flex min-h-11 items-center whitespace-nowrap rounded-[var(--r-pill)] px-3 text-sm font-semibold ${
                   on ? "bg-nav-active-bg text-nav-active-ink" : "text-on-hero"

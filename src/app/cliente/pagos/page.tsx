@@ -1,5 +1,6 @@
 "use client";
 
+import { dmy } from "@/components/inventory/inventory";
 import { CustomerChrome, PortalError, PortalLoading } from "@/components/customer/CustomerChrome";
 import { usePortalLedger } from "@/components/customer/usePortalLedger";
 import { newestFirst } from "@/components/customer/portal";
@@ -41,7 +42,7 @@ export default function CustomerPaymentsPage() {
               <Row
                 key={p.id}
                 title={p.method}
-                meta={p.occurredOn}
+                meta={dmy(p.occurredOn)}
                 trailing={
                   <>
                     <span className="text-[15px] font-semibold tabular-nums text-ok">− {formatCop(p.amount)}</span>
@@ -61,7 +62,7 @@ export default function CustomerPaymentsPage() {
               <Row
                 key={d.id}
                 title="Deuda anterior"
-                meta={[d.occurredOn, d.note].filter(Boolean).join(" · ")}
+                meta={[dmy(d.occurredOn), d.note].filter(Boolean).join(" · ")}
                 trailing={
                   <>
                     <span className="text-[15px] font-semibold tabular-nums text-danger">+ {formatCop(d.amount)}</span>

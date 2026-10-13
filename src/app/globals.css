@@ -353,3 +353,8 @@ html[data-actionbar="nav"] .prep-tab {
     scroll-behavior: auto !important;
   }
 }
+
+/* Focus on the floating nav must contrast with --nav-pill (e.g. contraste: black on black). */
+nav[aria-label="Navegación principal"] :focus-visible {
+  outline-color: var(--nav-active-bg);
+}

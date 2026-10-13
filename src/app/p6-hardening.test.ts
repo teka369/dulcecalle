@@ -43,3 +43,19 @@ describe("P6 hardening", () => {
     expect(css).toContain("prefers-reduced-motion: reduce");
   });
 });
+
+describe("P6 tester fixes", () => {
+  it("viewport allows zoom", () => {
+    const s = read(join(ROOT, "app/layout.tsx"));
+    expect(s).not.toMatch(/maximumScale|userScalable/);
+  });
+  it("nav labels are not truncated and Inventario gets extra room", () => {
+    const s = read(join(ROOT, "components/shell/BottomNav.tsx"));
+    expect(s).toContain("whitespace-nowrap");
+    expect(s).toContain("item.label.length > 8");
+    expect(s).not.toMatch(/max-w-full truncate/);
+  });
+  it("PrepModal task names ellipsize", () => {
+    expect(read(join(ROOT, "components/shell/PrepModal.tsx"))).toContain('<span className="min-w-0 truncate">{task.label}</span>');
+  });
+});

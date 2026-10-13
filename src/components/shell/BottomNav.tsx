@@ -84,7 +84,7 @@ export function BottomNav() {
               ? pathname === "/"
               : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
-            <li key={item.href} className="flex min-w-0 flex-1">
+            <li key={item.href} className={`flex min-w-0 ${item.label.length > 8 ? "flex-[1.4_1_0%]" : "flex-1"}`}>
               <OfflineLink
                 href={item.href}
                 ariaCurrent={active ? "page" : undefined}
@@ -99,7 +99,7 @@ export function BottomNav() {
                   <NavIcon name={item.icon} />
                 </span>
                 <span
-                  className={`max-w-full truncate text-[clamp(8px,2.6vw,10px)] leading-none tracking-tight ${
+                  className={`max-w-full whitespace-nowrap text-[clamp(8.5px,2.6vw,10px)] leading-none tracking-[-0.02em] ${
                     active ? "font-bold" : "font-semibold"
                   }`}
                 >

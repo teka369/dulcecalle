@@ -15,7 +15,9 @@ import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
-import { kindLabel, moveSign, shortDay } from "@/components/cash/cash";
+import { CASH_OFFLINE_NOCACHE, cashOfflineView, kindLabel, moveSign, shortDay } from "@/components/cash/cash";
+import { useSync } from "@/store/syncStore";
+import { usePrep } from "@/store/prepStore";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import {
@@ -33,11 +35,20 @@ export default function CajaPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { online } = useSync();
+  const { lastReadyAt } = usePrep();
 
   const load = useCallback(async () => {
-    const s = await cashStore.refresh();
-    setSummary(s);
-    setReady(true);
+    setLoadError(null);
+    try {
+      const s = await cashStore.refresh();
+      setSummary(s);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "No se pudo cargar.");
+    } finally {
+      setReady(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -65,6 +76,41 @@ export default function CajaPage() {
     }
   }
 
+  const retryButton = (
+    <button
+      type="button"
+      onClick={() => void load()}
+      className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
+    >
+      Reintentar
+    </button>
+  );
+
+  const hasLocalData = summary != null && (summary.session != null || summary.moves.length > 0 || summary.pendingCount > 0);
+  const offlineView = cashOfflineView({ online, preparedAt: lastReadyAt, hasLocalData });
+
+  if (ready && (loadError || offlineView === "offline-nocache") && (!summary || !hasLocalData)) {
+    return (
+      <div className="flex flex-col pb-6">
+        <HeroBlock
+          size="medium"
+          back={{ href: "/mas", label: "Volver a Más" }}
+          title={CASH_COPY.titleCaja}
+          offline={online ? null : { text: "Sin conexión" }}
+        />
+        <Sheet>
+          {offlineView === "offline-nocache" ? (
+            <StateBlock kind="offline-miss" title={CASH_OFFLINE_NOCACHE.title} body={CASH_OFFLINE_NOCACHE.body} action={retryButton} />
+          ) : (
+            <StateBlock kind="error" title="No se pudo cargar." body={loadError ?? undefined} action={retryButton} />
+          )}
+        </Sheet>
+      </div>
+    );
+  }
+
+  const band = offlineView === "offline-cache" ? (lastReadyAt != null ? { capturedAt: lastReadyAt } : { text: "Sin conexión · datos de este teléfono" }) : null;
+
   if (!ready || !summary) {
     return (
       <div className="flex flex-col gap-4">
@@ -86,9 +132,10 @@ export default function CajaPage() {
   if (closed || summary.counted != null) {
     metrics.push({
       icon: "check",
-      label: diff != null ? `${CASH_COPY.contado} · ${differenceLabel(diff)}` : CASH_COPY.contado,
+      // S7: short label; difference goes on its own line so the 3rd cell fits at 360.
+      label: CASH_COPY.contado,
       value: summary.counted != null ? formatCop(summary.counted) : "—",
-      detail: diff != null && diff !== 0 ? `${CASH_COPY.diferencia} ${formatCop(Math.abs(diff))}` : undefined,
+      detail: diff != null ? (diff !== 0 ? `${differenceLabel(diff)} ${formatCop(Math.abs(diff))}` : differenceLabel(diff)) : undefined,
       tone: diff != null && diff < 0 ? "danger" : "neutral",
     });
   }
@@ -119,7 +166,7 @@ export default function CajaPage() {
   if (noSession) {
     return (
       <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
-        <HeroBlock size="medium" back={{ href: "/mas", label: "Volver a Más" }} title={CASH_COPY.titleCaja} subtitle={shortDay(summary.localDate)}>
+        <HeroBlock size="medium" back={{ href: "/mas", label: "Volver a Más" }} title={CASH_COPY.titleCaja} subtitle={shortDay(summary.localDate)} offline={band}>
           <p className="mt-5 text-2xl font-semibold">{CASH_COPY.estadoCerrada}</p>
           <p className="mt-1 text-sm text-on-hero-muted">{CASH_COPY.emptyCerrada}</p>
         </HeroBlock>
@@ -146,6 +193,7 @@ export default function CajaPage() {
         back={{ href: "/mas", label: "Volver a Más" }}
         title={CASH_COPY.titleCaja}
         subtitle={`${shortDay(summary.localDate)} · ${closed ? CASH_COPY.estadoCerrada : CASH_COPY.estadoAbierta}`}
+        offline={band}
         action={open ? <HeroPill label={CASH_COPY.cerrarCaja} href="/mas/caja/cerrar" /> : undefined}
       >
         <div className="mt-5">

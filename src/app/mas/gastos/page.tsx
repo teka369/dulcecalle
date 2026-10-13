@@ -9,7 +9,10 @@ import { SectionHead } from "@/components/ui/SectionHead";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
-import { sumAmounts } from "@/components/cash/cash";
+import { GASTOS_OFFLINE_NOCACHE, cashOfflineView, sumAmounts } from "@/components/cash/cash";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { useSync } from "@/store/syncStore";
+import { usePrep } from "@/store/prepStore";
 import { bogotaKey, dayHeading, groupByDay } from "@/components/sale/sales-list";
 import { formatCop } from "@/domain/money";
 import { CASH_COPY } from "@/domain/cash";
@@ -21,13 +24,22 @@ export default function GastosPage() {
   const [closed, setClosed] = useState(false);
   const [hasSession, setHasSession] = useState(false);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { online } = useSync();
+  const { lastReadyAt } = usePrep();
 
   const load = useCallback(async () => {
-    const summary = await cashStore.refresh();
-    setExpenses(cashStore.getSnapshot().expenses);
-    setClosed(summary.closed);
-    setHasSession(summary.session != null);
-    setReady(true);
+    setLoadError(null);
+    try {
+      const summary = await cashStore.refresh();
+      setExpenses(cashStore.getSnapshot().expenses);
+      setClosed(summary.closed);
+      setHasSession(summary.session != null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "No se pudo cargar.");
+    } finally {
+      setReady(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -48,6 +60,27 @@ export default function GastosPage() {
   }
 
   const canAdd = !closed && hasSession;
+  const offlineView = cashOfflineView({ online, preparedAt: lastReadyAt, hasLocalData: hasSession || expenses.length > 0 });
+
+  if (loadError || offlineView === "offline-nocache") {
+    return (
+      <div className="flex flex-col pb-6">
+        <HeroBlock size="medium" back={{ href: "/mas", label: "Volver a Más" }} title={CASH_COPY.masGastos} offline={online ? null : { text: "Sin conexión" }} />
+        <Sheet>
+          <StateBlock
+            kind={offlineView === "offline-nocache" ? "offline-miss" : "error"}
+            title={offlineView === "offline-nocache" ? GASTOS_OFFLINE_NOCACHE.title : "No se pudo cargar."}
+            body={offlineView === "offline-nocache" ? GASTOS_OFFLINE_NOCACHE.body : (loadError ?? undefined)}
+            action={
+              <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg">
+                Reintentar
+              </button>
+            }
+          />
+        </Sheet>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col pb-6">
@@ -55,6 +88,7 @@ export default function GastosPage() {
         size="medium"
         back={{ href: "/mas", label: "Volver a Más" }}
         title={CASH_COPY.masGastos}
+        offline={offlineView === "offline-cache" ? (lastReadyAt != null ? { capturedAt: lastReadyAt } : { text: "Sin conexión · datos de este teléfono" }) : null}
         action={canAdd ? <HeroPill label="Nuevo gasto" href="/mas/gastos/nuevo" /> : undefined}
       >
         <div className="mt-5">
