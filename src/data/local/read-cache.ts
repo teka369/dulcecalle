@@ -265,7 +265,9 @@ export class CatalogReadCache {
         cachedAt,
       };
     } catch (e) {
-      this.rethrowUnlessNetwork(e);
+      // B3: lists also fall back on 5xx (server down): local data + band,
+      // never a false empty list. 4xx still propagate.
+      if (!(e instanceof ApiError && e.status >= 500)) this.rethrowUnlessNetwork(e);
       const meta = await this.db.cacheMeta.get(
         metaId(opts.businessId, opts.resource),
       );

@@ -20,9 +20,10 @@ import {
 import {
   getCachedProduct,
   getCachedSupplier,
-  listCachedProducts,
-  listCachedSuppliers,
+  listCachedProductsResult,
+  listCachedSuppliersResult,
 } from "@/data/pwa/catalog";
+import { EMPTY_LIST_STATUS, listErrorMessage, type ListReadStatus } from "@/data/pwa/list-status";
 import type { RemotePreparation, RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http/mappers";
 import {
   archiveProductWithOfflineFallback,
@@ -54,6 +55,8 @@ export type PwaSupplierSurtir = {
 type InventoryState = {
   products: RemoteProduct[];
   suppliers: RemoteSupplier[];
+  /** B3: products list read status (never a false empty). */
+  listStatus: ListReadStatus;
   loading: boolean;
   lastToast: string | null;
 };
@@ -63,6 +66,7 @@ const listeners = new Set<() => void>();
 let state: InventoryState = {
   products: [],
   suppliers: [],
+  listStatus: EMPTY_LIST_STATUS,
   loading: false,
   lastToast: null,
 };
@@ -104,17 +108,18 @@ export const inventoryStore = {
   async refreshProducts(): Promise<RemoteProduct[]> {
     setState({ loading: true });
     try {
-      const products = await listCachedProducts();
-      setState({ products, loading: false });
+      const result = await listCachedProductsResult();
+      const products = result.data;
+      setState({ products, loading: false, listStatus: { source: result.source, cachedAt: result.cachedAt, error: null } });
       return products;
     } catch (e) {
-      setState({ loading: false });
+      setState({ loading: false, listStatus: { ...state.listStatus, error: listErrorMessage(e) } });
       fail(e);
     }
   },
   async refreshSuppliers(): Promise<RemoteSupplier[]> {
     try {
-      const suppliers = await listCachedSuppliers();
+      const suppliers = (await listCachedSuppliersResult()).data;
       setState({ suppliers });
       return suppliers;
     } catch (e) {
@@ -124,11 +129,23 @@ export const inventoryStore = {
   async refreshAll(): Promise<void> {
     setState({ loading: true });
     try {
-      const [products, suppliers] = await Promise.all([
-        listCachedProducts(),
-        listCachedSuppliers(),
+      // Products and suppliers settle independently: one failing must not hide the other.
+      const [products, suppliers] = await Promise.allSettled([
+        listCachedProductsResult(),
+        listCachedSuppliersResult(),
       ]);
-      setState({ products, suppliers, loading: false });
+      if (products.status === "fulfilled") {
+        setState({
+          products: products.value.data,
+          listStatus: { source: products.value.source, cachedAt: products.value.cachedAt, error: null },
+        });
+      } else {
+        setState({ listStatus: { ...state.listStatus, error: listErrorMessage(products.reason) } });
+      }
+      if (suppliers.status === "fulfilled") setState({ suppliers: suppliers.value.data });
+      setState({ loading: false });
+      if (products.status === "rejected") fail(products.reason);
+      if (suppliers.status === "rejected") fail(suppliers.reason);
     } catch (e) {
       setState({ loading: false });
       fail(e);

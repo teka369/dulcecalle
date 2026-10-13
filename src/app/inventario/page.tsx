@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
+import { useSync } from "@/store/syncStore";
+import { listBand, listGate } from "@/data/pwa/list-status";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { useInventory } from "@/store/inventoryStore";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { HeroPill } from "@/components/ui/HeroPill";
@@ -46,13 +49,14 @@ function ProductRow({ p, low }: { p: RemoteProduct; low: boolean }) {
 }
 
 export default function InventarioPage() {
-  const { products, suppliers, loading, refreshAll } = useInventory();
+  const { products, suppliers, loading, refreshAll, listStatus } = useInventory();
+  const { online } = useSync();
   const [segment, setSegment] = useState<Segment>("productos");
   const [query, setQuery] = useState("");
   const [pendingSupplierIds, setPendingSupplierIds] = useState<string[]>([]);
 
   useEffect(() => {
-    void refreshAll();
+    void refreshAll().catch(() => undefined);
     void getPendingSupplierIds().then(setPendingSupplierIds);
   }, [refreshAll]);
 
@@ -65,6 +69,9 @@ export default function InventarioPage() {
   }, [suppliers, query]);
 
   const isProducts = segment === "productos";
+  // B3: a failed read never renders as "Aún no hay productos/proveedores".
+  const gate = listGate({ loading, count: isProducts ? products.length : suppliers.length, status: listStatus });
+  const band = listBand(listStatus, online, products.length + suppliers.length);
   const searching = query.trim().length > 0;
 
   return (
@@ -72,6 +79,7 @@ export default function InventarioPage() {
       <HeroBlock
         size="tall"
         title="Inventario"
+        offline={band}
         action={
           <HeroPill
             label={isProducts ? "Agregar producto" : "Agregar proveedor"}
@@ -83,8 +91,8 @@ export default function InventarioPage() {
           <SegmentedMetrics
             label="Resumen de inventario"
             items={[
-              { icon: "package", label: "productos", value: String(counts.products) },
-              { icon: "alert", label: "stock bajo", value: String(counts.low), tone: counts.low > 0 ? "danger" : "neutral" },
+              { icon: "package", label: "productos", value: gate === "error" && isProducts ? "—" : String(counts.products) },
+              { icon: "alert", label: "stock bajo", value: gate === "error" && isProducts ? "—" : String(counts.low), tone: counts.low > 0 ? "danger" : "neutral" },
             ]}
           />
         </div>
@@ -113,8 +121,10 @@ export default function InventarioPage() {
       </HeroBlock>
 
       <Sheet>
-        {loading && products.length === 0 && suppliers.length === 0 ? (
+        {gate === "loading" ? (
           <SkeletonRows />
+        ) : gate === "error" ? (
+          <ListErrorState message={listStatus.error} online={online} onRetry={() => void refreshAll().catch(() => undefined)} />
         ) : isProducts ? (
           products.length === 0 ? (
             <StateBlock

@@ -4,7 +4,7 @@ import type {
   RemoteSupplier,
 } from "../http/mappers";
 import type { HttpRepository } from "../http/repository";
-import { getCatalogReadCache } from "../local/read-cache";
+import { getCatalogReadCache, type CachedList } from "../local/read-cache";
 import { getPwaApi } from "./api";
 
 function requireBusinessId(): string {
@@ -13,6 +13,19 @@ function requireBusinessId(): string {
     throw new Error("Selecciona un negocio.");
   }
   return businessId;
+}
+
+/** Lists with where the rows came from (server or this device's cache). */
+export function listCachedProductsResult(api: HttpRepository = getPwaApi()): Promise<CachedList<RemoteProduct>> {
+  return getCatalogReadCache().listProducts(requireBusinessId(), () => api.products.list());
+}
+
+export function listCachedCustomersResult(api: HttpRepository = getPwaApi()): Promise<CachedList<RemoteCustomer>> {
+  return getCatalogReadCache().listCustomers(requireBusinessId(), () => api.customers.list());
+}
+
+export function listCachedSuppliersResult(api: HttpRepository = getPwaApi()): Promise<CachedList<RemoteSupplier>> {
+  return getCatalogReadCache().listSuppliers(requireBusinessId(), () => api.suppliers.list());
 }
 
 export async function listCachedProducts(api: HttpRepository = getPwaApi()): Promise<RemoteProduct[]> {
