@@ -78,5 +78,7 @@ describe("short statement dates (360px)", () => {
   it("formats as «13 oct · 10:05» in Bogotá", () => {
     // 2026-10-13 15:05Z = 10:05 Bogotá
     expect(shortDateTime(Date.UTC(2026, 9, 13, 15, 5))).toBe("13 oct · 10:05");
+    // midnight Bogotá must read 00:xx, never 24:xx; month without trailing dot
+    expect(shortDateTime(Date.UTC(2026, 8, 6, 5, 7))).toBe("6 sept · 00:07");
   });
 });
