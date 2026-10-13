@@ -33,7 +33,7 @@ export function SyncPill() {
 
   return (
     <div
-      className={`pointer-events-none fixed inset-x-0 z-50 px-3 ${
+      className={`sync-pill pointer-events-none fixed inset-x-0 z-50 px-3 ${
         aboveNav
           ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
           : "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]"
