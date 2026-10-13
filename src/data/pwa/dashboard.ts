@@ -349,3 +349,12 @@ export async function loadDashboardResult(): Promise<{
     networkFailure,
   };
 }
+
+/**
+ * Read-only: the business name already cached by the last dashboard load for
+ * the current session's business. Never fetches; null when not loaded yet.
+ */
+export function getCachedBusinessLabel(): string | null {
+  const businessId = getPwaApi().session.businessId;
+  return businessId && businessNameCache?.businessId === businessId ? businessNameCache.name : null;
+}
