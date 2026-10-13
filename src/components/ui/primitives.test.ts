@@ -134,6 +134,16 @@ describe("V2 primitives", () => {
     expect(html(h(ActionBar, { aboveNav: true, primary: { label: "x", onClick: () => {} } }))).toContain("4.75rem");
   });
 
+  it("SyncPill lifts above the ActionBar and toasts stack above the pill", () => {
+    const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+    expect(css).toMatch(/html\[data-actionbar="on"\] \.sync-pill \{\s*bottom: calc\(var\(--actionbar-h\) \+ [\d.]+rem\)/);
+    expect(css).toMatch(/html\[data-actionbar="nav"\] \.sync-pill/);
+    expect(css).toMatch(/--syncpill-h:/);
+    expect(ABOVE_ACTION_BAR).toContain("var(--syncpill-h)");
+    const pill = readFileSync(join(process.cwd(), "src/components/shell/SyncPill.tsx"), "utf8");
+    expect(pill).toContain("sync-pill ");
+  });
+
   it("ActionBar space comes from the --actionbar-h CSS variable", () => {
     expect(ACTION_BAR_SPACE).toContain("var(--actionbar-h)");
     expect(ABOVE_ACTION_BAR).toContain("var(--actionbar-h)");

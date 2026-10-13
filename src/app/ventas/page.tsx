@@ -19,7 +19,7 @@ import type { RemoteCustomer } from "@/data/http/mappers";
 import { listCachedCustomers } from "@/data/pwa/catalog";
 import { listSalesWithOfflineFallback, type LocalSaleRow } from "@/data/pwa/offline-sales";
 import { summarizeSales } from "@/components/sale/checkout";
-import { bogotaKey, dayHeading, groupByDay, saleTime } from "@/components/sale/sales-list";
+import { bogotaKey, dayHeading, groupByDay, saleTime, ventasSheetState } from "@/components/sale/sales-list";
 
 const kindLabel: Record<string, string> = {
   paid: "Pagada",
@@ -84,6 +84,7 @@ export default function VentasPage() {
   );
   const totals = useMemo(() => summarizeSales(filtered), [filtered]);
   const groups = useMemo(() => groupByDay(filtered), [filtered]);
+  const sheet = ventasSheetState({ ready, error, salesCount: sales.length, filteredCount: filtered.length });
 
   return (
     <div className="flex flex-col">
@@ -93,22 +94,7 @@ export default function VentasPage() {
         offline={fromCache ? { text: "Sin conexión · mostrando ventas guardadas en este dispositivo." } : null}
         busy={!ready}
       >
-        {error && sales.length === 0 ? (
-          <StateBlock
-            kind="error"
-            onHero
-            title={error}
-            action={
-              <button
-                type="button"
-                onClick={load}
-                className="inline-flex min-h-11 items-center rounded-[var(--r-pill)] bg-on-hero px-4 text-sm font-semibold text-hero"
-              >
-                Reintentar
-              </button>
-            }
-          />
-        ) : (
+        {error && sales.length === 0 ? null : (
           <>
             <HeroAmount
               className="mt-6"
@@ -127,9 +113,23 @@ export default function VentasPage() {
       </HeroBlock>
 
       <Sheet>
-        {!ready ? (
+        {sheet === "loading" ? (
           <SkeletonRows rows={4} />
-        ) : sales.length === 0 && !error ? (
+        ) : sheet === "error" ? (
+          <StateBlock
+            kind="error"
+            title={error ?? "No se pudo cargar."}
+            action={
+              <button
+                type="button"
+                onClick={load}
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
+              >
+                Reintentar
+              </button>
+            }
+          />
+        ) : sheet === "empty" ? (
           <StateBlock
             kind="empty"
             title={
@@ -146,7 +146,7 @@ export default function VentasPage() {
               </OfflineLink>
             }
           />
-        ) : filtered.length === 0 ? (
+        ) : sheet === "filter-empty" ? (
           <StateBlock
             kind="empty"
             title="No hay ventas con ese filtro."

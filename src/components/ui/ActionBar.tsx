@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 export type ActionBarProps = {
   primary: { label: string; onClick: () => void; disabled?: boolean; busy?: boolean };
@@ -16,9 +16,22 @@ export type ActionBarProps = {
  */
 export const ACTION_BAR_SPACE = "pb-[calc(var(--actionbar-h)+1.5rem)]";
 /** Toast/feedback offset that clears the bar. */
-export const ABOVE_ACTION_BAR = "bottom-[calc(var(--actionbar-h)+0.75rem)]";
+/** Toast/feedback offset: clears the bar AND the SyncPill stacked above it. */
+export const ABOVE_ACTION_BAR = "bottom-[calc(var(--actionbar-h)+var(--syncpill-h)+1.25rem)]";
+
+/** Marks <html data-actionbar> so SyncPill (shell) lifts above the bar. */
+export function useActionBarMark(aboveNav: boolean) {
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.actionbar = aboveNav ? "nav" : "on";
+    return () => {
+      delete root.dataset.actionbar;
+    };
+  }, [aboveNav]);
+}
 
 export function ActionBar({ primary, summary, aboveNav = false }: ActionBarProps) {
+  useActionBarMark(aboveNav);
   const bottom = aboveNav
     ? "bottom-[calc(4.75rem+max(0.75rem,env(safe-area-inset-bottom)))]"
     : "bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]";

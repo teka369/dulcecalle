@@ -117,6 +117,15 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ["--nav-active-ink", "--nav-active-bg"],
   // V2 P1: debt/negative amounts in the sheet.
   ["--danger", "--surface"],
+  // Tester AA (P1 7df20a4): status text on its soft tint and on page/sheet.
+  ["--warning", "--warning-soft"],
+  ["--warning", "--surface"],
+  ["--warning", "--bg"],
+  ["--danger", "--danger-soft"],
+  ["--danger", "--bg"],
+  ["--ok", "--ok-soft"],
+  ["--ok", "--surface"],
+  ["--ok", "--bg"],
 ];
 const UI_PAIRS: Array<[string, string]> = [
   ["--cta", "--bg"],
