@@ -65,32 +65,52 @@ describe("cash open advisory lock", () => {
       .send({ openingFloat: 10000 });
   }
 
-  it("allows only one open session when two phones open the same business", async () => {
+  // Contract (API_CONTRACT: POST /v1/cash/sessions): a second open on the same
+  // business day returns that day's session (201). PENDING_SESSION (409) is
+  // only for an unclosed session from another day. The partial unique index
+  // cash_sessions_one_open_per_business (business_id WHERE closed_at IS NULL)
+  // is the DB backstop for one open session per business.
+  async function shiftOpenToYesterday(business: string) {
+    await prisma.$executeRaw`
+      UPDATE cash_sessions SET local_date = local_date - 1
+      WHERE business_id = ${business}::uuid AND closed_at IS NULL`;
+  }
+
+  it("two phones opening the same business on the same day get one session", async () => {
     const [a, b] = await Promise.all([
       open(token, biz, randomUUID()),
       open(token, biz, randomUUID()),
     ]);
-    const statuses = [a.status, b.status].sort();
-    expect(statuses).toEqual([201, 409]);
-    const rejected = a.status === 409 ? a : b;
-    expect(rejected.body.error.code).toBe("PENDING_SESSION");
+    expect([a.status, b.status]).toEqual([201, 201]);
+    expect(a.body.id).toBe(b.body.id);
     const openCount = await prisma.cashSession.count({
       where: { businessId: biz, closedAt: null },
     });
     expect(openCount).toBe(1);
   });
 
-  it("returns the same session on retry and rejects a different request id", async () => {
-    const existing = await prisma.cashSession.findFirst({
+  it("returns the same session on retry and on a new request id the same day", async () => {
+    const existing = await prisma.cashSession.findFirstOrThrow({
       where: { businessId: biz, closedAt: null },
     });
-    expect(existing?.requestId).toBeTruthy();
-    const retry = await open(token, biz, existing!.requestId!);
+    const retry = await open(token, biz, existing.requestId!);
     expect(retry.status).toBe(201);
-    expect(retry.body.id).toBe(existing!.id);
+    expect(retry.body.id).toBe(existing.id);
     const other = await open(token, biz, randomUUID());
-    expect(other.status).toBe(409);
-    expect(other.body.error.code).toBe("PENDING_SESSION");
+    expect(other.status).toBe(201);
+    expect(other.body.id).toBe(existing.id);
+  });
+
+  it("rejects concurrent opens with 409 while a previous day is still open", async () => {
+    await shiftOpenToYesterday(biz);
+    const [a, b] = await Promise.all([
+      open(token, biz, randomUUID()),
+      open(token, biz, randomUUID()),
+    ]);
+    expect([a.status, b.status]).toEqual([409, 409]);
+    for (const res of [a, b]) {
+      expect(res.body.error.code).toBe("PENDING_SESSION");
+    }
     const openCount = await prisma.cashSession.count({
       where: { businessId: biz, closedAt: null },
     });
@@ -108,5 +128,24 @@ describe("cash open advisory lock", () => {
       where: { businessId: otherBiz, closedAt: null },
     });
     expect(otherOpen).toBe(1);
+  });
+
+  it("the partial unique index blocks a second open row even past the service", async () => {
+    await expect(
+      prisma.cashSession.create({
+        data: {
+          id: randomUUID(),
+          businessId: otherBiz,
+          localDate: new Date("2020-01-01T00:00:00.000Z"),
+          openedAt: new Date(),
+          openingFloat: 0n,
+          requestId: randomUUID(),
+        },
+      }),
+    ).rejects.toMatchObject({ code: "P2002" });
+    const rows = await prisma.$queryRaw<{ indexdef: string }[]>`
+      SELECT indexdef FROM pg_indexes
+      WHERE indexname = 'cash_sessions_one_open_per_business'`;
+    expect(rows[0]?.indexdef).toMatch(/UNIQUE INDEX .*\(business_id\) WHERE \(closed_at IS NULL\)/);
   });
 });
