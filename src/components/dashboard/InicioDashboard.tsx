@@ -1,17 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { formatCop } from "@/domain/money";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
-import {
-  buildWeekSeries,
-  weekTotal,
-  weekWindowStart,
-  type WeekDay,
-  type WeekSaleLike,
-} from "@/domain/dashboard/week";
-import { getDb } from "@/storage/db";
+import { weekTotal, type WeekDay } from "@/domain/dashboard/week";
+import { loadWeekSeries } from "./week-source";
 import { syncThemeColor } from "@/theme/storage";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -129,30 +123,25 @@ function cajaPill(snap: DashboardSnapshot): {
 }
 
 /**
- * Read-only 7-day ventas series from sales already stored on this device.
- * No new query to the server, no writes. Today's bucket is the snapshot
- * total so the chart always matches the hero amount.
+ * 7-day series only when this business's local sales history is prepared;
+ * null → spec fallback (no chart, «Ventas de hoy»).
  */
-function useWeekSeries(todayTotal: number): WeekDay[] {
-  const [sales, setSales] = useState<WeekSaleLike[]>([]);
-  const [now] = useState(() => Date.now());
+function useWeekSeries(todayTotal: number): WeekDay[] | null {
+  const [days, setDays] = useState<WeekDay[] | null>(null);
   useEffect(() => {
     let alive = true;
-    void getDb()
-      .sales.where("createdAt")
-      .aboveOrEqual(weekWindowStart(now))
-      .toArray()
-      .then((rows) => {
-        if (alive) setSales(rows);
+    void loadWeekSeries(Date.now(), todayTotal)
+      .then((d) => {
+        if (alive) setDays(d);
       })
       .catch(() => {
-        /* local store unavailable: series shows only today */
+        if (alive) setDays(null);
       });
     return () => {
       alive = false;
     };
-  }, [now]);
-  return useMemo(() => buildWeekSeries(sales, now, todayTotal), [sales, now, todayTotal]);
+  }, [todayTotal]);
+  return days;
 }
 
 function WeekChart({ days }: { days: WeekDay[] }) {
@@ -296,7 +285,6 @@ export function InicioDashboard({
   const pill = cajaPill(snap);
   const ventas = salesCaption(snap.todaySalesCount);
   const days = useWeekSeries(snap.todaySalesTotal);
-  const total7 = weekTotal(days);
   const quick = QUICK_LINKS.map((item) =>
     item.href === "/inventario" && snap.lowStockCount > 0
       ? { ...item, label: "Stock bajo" }
@@ -350,17 +338,20 @@ export function InicioDashboard({
           </Link>
         </div>
 
-        <div className="mt-6">
-          <WeekChart days={days} />
-        </div>
+        {days ? (
+          <div className="mt-6">
+            <WeekChart days={days} />
+          </div>
+        ) : null}
         <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-[color-mix(in_srgb,var(--on-hero)_20%,transparent)] pt-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-on-hero-muted">
-            Últimos 7 días
+            {days ? "Últimos 7 días" : "Ventas de hoy"}
           </p>
-          <p className="text-sm font-semibold tabular-nums">{formatCop(total7)}</p>
+          <p className="text-sm font-semibold tabular-nums">
+            {formatCop(days ? weekTotal(days) : snap.todaySalesTotal)}
+          </p>
         </div>
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <p className="text-xs text-on-hero-muted">Ventas guardadas en este teléfono</p>
+        <div className="mt-2 flex items-center justify-end gap-3">
           <Link href="/mas/estadisticas" className="text-xs font-semibold underline underline-offset-2">
             Ver estadísticas
           </Link>

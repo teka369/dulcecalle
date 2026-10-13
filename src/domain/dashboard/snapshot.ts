@@ -1,4 +1,5 @@
 import { addCop } from "@/domain/money";
+import { bogotaHour } from "./week";
 import { startOfLocalDay } from "@/domain/cash";
 import type {
   CashSession,
@@ -262,7 +263,7 @@ export function buildDashboardSnapshot(input: {
   const name = input.businessName?.trim() || null;
 
   return {
-    greeting: greetingForHour(new Date(now).getHours()),
+    greeting: greetingForHour(bogotaHour(now)),
     dateLabel: formatDashboardDate(now),
     businessLabel: name,
     todaySalesTotal,

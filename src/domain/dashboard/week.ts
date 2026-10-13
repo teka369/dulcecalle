@@ -1,7 +1,12 @@
 import { addCop } from "@/domain/money";
 
-/** Minimal read-only shape needed from locally stored sales. */
-export type WeekSaleLike = { createdAt: number; saleTotal: number };
+/** Minimal read-only shape needed from locally stored sales (LocalSale). */
+export type WeekSaleLike = {
+  businessId: string;
+  /** Business day YYYY-MM-DD (Bogotá), as stored by the server/local store. */
+  occurredOn: string;
+  saleTotal: number;
+};
 
 export type WeekDay = {
   /** YYYY-MM-DD in America/Bogota. */
@@ -33,9 +38,19 @@ export function bogotaDayKey(ms: number): string {
   return keyFmt.format(new Date(ms));
 }
 
-/** Earliest instant worth querying for the 7-day window (generous; filtered by key). */
-export function weekWindowStart(now: number): number {
-  return now - 7 * DAY_MS;
+/** Hour of day (0–23) in America/Bogota, independent of device zone. */
+export function bogotaHour(ms: number): number {
+  const h = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Bogota",
+    hour: "numeric",
+    hourCycle: "h23",
+  }).format(new Date(ms));
+  return Number(h) % 24;
+}
+
+/** First day key (oldest) of the 7-day window ending today. */
+export function weekStartKey(now: number): string {
+  return bogotaDayKey(now - 6 * DAY_MS);
 }
 
 /**
@@ -46,6 +61,7 @@ export function weekWindowStart(now: number): number {
  */
 export function buildWeekSeries(
   sales: readonly WeekSaleLike[],
+  businessId: string,
   now: number,
   todayTotal?: number,
 ): WeekDay[] {
@@ -62,7 +78,8 @@ export function buildWeekSeries(
   }
   const byKey = new Map(days.map((d) => [d.key, d]));
   for (const s of sales) {
-    const day = byKey.get(bogotaDayKey(s.createdAt));
+    if (s.businessId !== businessId) continue;
+    const day = byKey.get(s.occurredOn);
     if (day) day.total = addCop(day.total, s.saleTotal);
   }
   if (todayTotal != null) days[6].total = todayTotal;

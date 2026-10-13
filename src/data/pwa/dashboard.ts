@@ -5,6 +5,7 @@ import {
   type DashboardSnapshot,
 } from "@/domain/dashboard/snapshot";
 import { addCop } from "@/domain/money";
+import { bogotaHour } from "@/domain/dashboard/week";
 import { isNetworkError } from "../errors";
 import { getPwaApi } from "./api";
 
@@ -324,7 +325,7 @@ export async function loadDashboardResult(): Promise<{
 
   return {
     snapshot: {
-    greeting: greetingForHour(new Date(now).getHours()),
+    greeting: greetingForHour(bogotaHour(now)),
     dateLabel: formatDashboardDate(now),
     businessLabel,
     todaySalesTotal: sales.reduce((s, sale) => addCop(s, sale.saleTotal), 0),
