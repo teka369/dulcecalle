@@ -114,7 +114,7 @@ const SHORT_DATE = new Intl.DateTimeFormat("es-CO", {
   month: "short",
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  hourCycle: "h23",
 });
 
 /** «13 oct · 10:05» (Bogotá). Falls back to the long domain format if Intl parts are missing. */
