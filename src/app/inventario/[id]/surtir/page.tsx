@@ -25,8 +25,11 @@ import { validateSurtirForm } from "@/domain/inventory";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { useEntityId } from "@/components/shell/entity-route";
-import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
+import { getPendingSupplierIds, PENDING_SUPPLIER_MESSAGE } from "@/data/pwa/offline-catalog";
 import { inventoryStore } from "@/store/inventoryStore";
+
+const OFFLINE_NEW_SUPPLIER =
+  "Sin conexión no se puede crear un proveedor nuevo y surtir a la vez. Surte sin proveedor o elige uno ya sincronizado; crea el proveedor cuando vuelva la conexión.";
 
 export default function SurtirPage() {
   const router = useRouter();
@@ -133,6 +136,14 @@ export default function SurtirPage() {
       setError(r.error);
       return;
     }
+    // Offline: a supplier created inline can't be used by the same surtir until it
+    // syncs (store rejects with PENDING_SUPPLIER_MESSAGE after already enqueuing the
+    // supplier). Stop before creating it so nothing half-saves or duplicates.
+    const typedNew = supplierId === "" && supplierCreate.trim() !== "";
+    if (typedNew && typeof navigator !== "undefined" && navigator.onLine === false) {
+      setError(OFFLINE_NEW_SUPPLIER);
+      return;
+    }
     setBusy(true);
     try {
       if (!requestIdRef.current) requestIdRef.current = newRequestId("surtir");
@@ -156,7 +167,16 @@ export default function SurtirPage() {
         navigateOfflineAware(router, `/inventario/${product.id}`);
       }, 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al surtir");
+      const msg = e instanceof Error ? e.message : "Error al surtir";
+      if (msg === PENDING_SUPPLIER_MESSAGE && typedNew) {
+        // Supplier was saved locally (pending). Don't create it again on retry.
+        setSupplierCreate("");
+        void inventoryStore.refreshSuppliers().then(setSuppliers).catch(() => undefined);
+        void getPendingSupplierIds().then(setPendingSupplierIds);
+        setError(`${PENDING_SUPPLIER_MESSAGE} El stock no cambió: surte sin proveedor o espera a que sincronice.`);
+      } else {
+        setError(msg);
+      }
       setBusy(false);
     }
   }
@@ -197,6 +217,7 @@ export default function SurtirPage() {
       </HeroBlock>
 
       <Sheet>
+        {error ? <StateBlock kind="error" title={error} /> : null}
         <QtyStepper label="Cantidad" value={qtyRaw} onChange={onQtyChange} />
 
         <AmountField
@@ -284,7 +305,6 @@ export default function SurtirPage() {
           </RowGroup>
         ) : null}
 
-        {error ? <StateBlock kind="error" title={error} /> : null}
       </Sheet>
 
       <ActionBar
