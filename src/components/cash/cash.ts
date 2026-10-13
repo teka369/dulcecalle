@@ -149,7 +149,14 @@ export function cashPageGate(input: {
   source?: "server" | "local" | null;
 }): "error" | "offline" | "ok" {
   if (input.hasLocalData) return "ok";
-  if (input.source === "local") return input.offlineView === "online" ? "error" : "offline";
+  // Online + local fallback (fetch error/timeout) + empty: server state unknown → block.
+  // Offline + prep done: the existing offline «Abrir caja» flow stays available (Juan).
+  // Offline without prep: offline state, no Abrir caja.
+  if (input.source === "local") {
+    if (input.offlineView === "online") return "error";
+    if (input.offlineView === "offline-cache") return "ok";
+    return "offline";
+  }
   if (input.offlineView === "offline-nocache") return "offline";
   if (input.loadError) return "error";
   return "ok";

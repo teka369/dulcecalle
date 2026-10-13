@@ -23,11 +23,11 @@ function today(session: unknown = null, moves: unknown[] = []) {
   };
 }
 
-async function gateAfterRefresh(online: boolean) {
+async function gateAfterRefresh(online: boolean, preparedAt: number | null = null) {
   const { cashStore } = await import("./cashStore");
   const summary = await cashStore.refresh();
   const hasLocalData = summary.session != null || summary.moves.length > 0 || summary.pendingCount > 0;
-  const offlineView = cashOfflineView({ online, preparedAt: null, hasLocalData });
+  const offlineView = cashOfflineView({ online, preparedAt, hasLocalData });
   return {
     source: cashStore.getSnapshot().source,
     gate: cashPageGate({ source: cashStore.getSnapshot().source, loadError: null, offlineView, hasLocalData }),
@@ -69,5 +69,21 @@ describe("cashStore source + Caja gate", () => {
     const r = await gateAfterRefresh(true);
     expect(r.source).toBe("local");
     expect(r.gate).toBe("ok");
+  });
+
+  it("offline + prep done + empty local snapshot => ok (Abrir caja offline, Juan's decision)", async () => {
+    api.cash.today.mockRejectedValue(new NetworkError("offline"));
+    api.cash.expenses.mockRejectedValue(new NetworkError("offline"));
+    local.mockResolvedValue({ summary: { ...today(), entradas: 0, salidas: 0, counted: null, difference: null }, expenses: [] });
+    const r = await gateAfterRefresh(false, 1_700_000_000_000);
+    expect(r.source).toBe("local");
+    expect(r.gate).toBe("ok");
+  });
+
+  it("online + fetch error + prep done + empty => still error (no Abrir caja)", async () => {
+    api.cash.today.mockRejectedValue(new NetworkError("timeout"));
+    api.cash.expenses.mockRejectedValue(new NetworkError("timeout"));
+    local.mockResolvedValue({ summary: { ...today(), entradas: 0, salidas: 0, counted: null, difference: null }, expenses: [] });
+    expect((await gateAfterRefresh(true, 1_700_000_000_000)).gate).toBe("error");
   });
 });
