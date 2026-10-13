@@ -125,7 +125,7 @@ export default function GestionarCajaDetailPage() {
         <Row
           key={move.id}
           title={`${kindLabel(move.kind)} · ${move.method}`}
-          meta={move.occurredOn}
+          meta={shortDay(move.occurredOn)}
           trailing={
             <>
               <span className={`text-[15px] font-semibold tabular-nums ${sg.tone === "ok" ? "text-ok" : "text-danger"}`}>
@@ -165,7 +165,7 @@ export default function GestionarCajaDetailPage() {
             <ChoiceSegmented<"contar" | "saldo">
               label="Cómo cerrar"
               options={[
-                { id: "contar", label: "Cerrar contando" },
+                { id: "contar", label: "Cerrar contando", disabled: !detail.canCountClose },
                 { id: "saldo", label: "Continuar saldo" },
               ]}
               value={choice}
