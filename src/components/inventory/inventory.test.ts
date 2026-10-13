@@ -6,6 +6,7 @@ import {
   isOutOfStock,
   moveDelta,
   clampQty,
+  dmy,
   splitByStock,
   stepQty,
   stockAfter,
@@ -78,5 +79,12 @@ describe("typed qty is capped at stock", () => {
     expect(stockAfter(5, clampQty("9", 5), -1)).toBe(0);
     expect(clampQty("3a", 5)).toBe("3");
     expect(clampQty("40", undefined)).toBe("40");
+  });
+});
+
+describe("preparation dates", () => {
+  it("dd/mm/aaaa", () => {
+    expect(dmy("2026-10-13")).toBe("13/10/2026");
+    expect(dmy("")).toBe("");
   });
 });

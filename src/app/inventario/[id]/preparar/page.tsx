@@ -34,10 +34,32 @@ export default function PrepararPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
 
+  const [loaded, setLoaded] = useState(false);
+
+  // Direct entry: products may not be loaded yet. Read the source itself so the
+  // header (insumo · stock · costo) and the sellable guard don't depend on the list.
   useEffect(() => {
     if (!sourceId) return;
-    setSource(products.find((p) => p.id === sourceId) ?? null);
-  }, [products, sourceId]);
+    let alive = true;
+    void inventoryStore
+      .getProduct(sourceId)
+      .then((p) => {
+        if (alive) setSource(p ?? null);
+      })
+      .finally(() => {
+        if (alive) setLoaded(true);
+      });
+    if (inventoryStore.getSnapshot().products.length === 0) void inventoryStore.refreshAll().catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [sourceId]);
+
+  // Preparar only exists for insumo/combo (sellable === false). Sellable → back to the product.
+  const sellable = source != null && source.sellable !== false;
+  useEffect(() => {
+    if (sellable && sourceId) router.replace(`/inventario/${sourceId}`);
+  }, [sellable, sourceId, router]);
 
   if (!sourceId) {
     return (
@@ -85,6 +107,27 @@ export default function PrepararPage() {
     }
   }
 
+  if (sellable) {
+    return (
+      <HeroBlock size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al producto", entity: true }} title="Preparar">
+        <StateBlock
+          onHero
+          kind="empty"
+          title="Este producto se vende directo."
+          body="Preparar solo aplica a insumos o combos. Te llevamos al producto."
+        />
+      </HeroBlock>
+    );
+  }
+
+  if (loaded && !source) {
+    return (
+      <HeroBlock size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Preparar">
+        <StateBlock onHero kind="empty" title="No encontramos ese producto." />
+      </HeroBlock>
+    );
+  }
+
   if (done) {
     const target = products.find((p) => p.id === done);
     return (
@@ -120,7 +163,7 @@ export default function PrepararPage() {
             <ProductThumbnail secureUrl={primaryImageUrl(source.images)} alt={source.name} size="sm" decorative />
             <p className="min-w-0 text-sm text-on-hero-muted">
               Insumo: <span className="font-semibold text-on-hero">{source.name}</span> · Stock {units(source.stock)} ·
-              Valor restante {formatCop(source.avgCost)}
+              Costo prom. {formatCop(source.avgCost)}
             </p>
           </div>
         ) : null}
