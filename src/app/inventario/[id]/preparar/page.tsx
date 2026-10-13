@@ -156,7 +156,7 @@ export default function PrepararPage() {
   const label = "text-xs font-semibold uppercase tracking-wide text-ink-muted";
 
   return (
-    <div className="flex flex-col pb-[calc(var(--actionbar-h)+4.75rem+1.5rem)]">
+    <div className="flex flex-col pb-[calc(var(--actionbar-h)+var(--nav-h)+1.5rem)]">
       <HeroBlock size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al combo", entity: true }} title="Preparar">
         {source ? (
           <div className="mt-3 flex items-center gap-3">

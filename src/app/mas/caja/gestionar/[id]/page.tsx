@@ -12,7 +12,7 @@ import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar } from "@/components/ui/ActionBar";
-import { kindLabel, moveSign } from "@/components/cash/cash";
+import { kindLabel, moveSign, shortDay } from "@/components/cash/cash";
 import { formatCop } from "@/domain/money";
 import { getPwaApi } from "@/data/pwa/api";
 import { carryCashWithOfflineFallback } from "@/data/pwa/offline-operations";
@@ -42,11 +42,21 @@ export default function GestionarCajaDetailPage() {
   const [counted, setCounted] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [mode, setMode] = useState<"contar" | "saldo" | null>(null);
 
   useEffect(() => {
-    void getPwaApi().cash.session(params.id).then((row) => setDetail(row as Detail));
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  function load() {
+    setLoadError(null);
+    void getPwaApi()
+      .cash.session(params.id)
+      .then((row) => setDetail(row as Detail))
+      .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : "No se pudo cargar."));
+  }
 
   async function closeCounted() {
     setBusy(true);
@@ -75,6 +85,26 @@ export default function GestionarCajaDetailPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!detail && loadError) {
+    return (
+      <div className="flex flex-col gap-4">
+        <HeroBlock size="compact" back={{ href: "/mas/caja/gestionar", label: "Volver a Gestionar cajas" }} title="Caja" />
+        <Sheet>
+          <StateBlock
+            kind="error"
+            title="No se pudo cargar."
+            body={loadError}
+            action={
+              <button type="button" onClick={load} className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg">
+                Reintentar
+              </button>
+            }
+          />
+        </Sheet>
+      </div>
+    );
   }
 
   if (!detail) {
@@ -109,11 +139,11 @@ export default function GestionarCajaDetailPage() {
     });
 
   return (
-    <div className="flex flex-col pb-[calc(var(--actionbar-h)+4.75rem+1.5rem)]">
+    <div className="flex flex-col pb-[calc(var(--actionbar-h)+var(--nav-h)+1.5rem)]">
       <HeroBlock
         size="medium"
         back={{ href: "/mas/caja/gestionar", label: "Volver a Gestionar cajas" }}
-        title={`Caja del ${detail.localDate}`}
+        title={`Caja del ${shortDay(detail.localDate)}`}
         subtitle={`Efectivo inicial ${formatCop(detail.openingFloat)} · ${detail.moveCount} movimientos`}
       >
         <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-on-hero-muted">Esperado efectivo</p>

@@ -131,7 +131,7 @@ describe("V2 primitives", () => {
     expect(on).not.toContain('disabled=""');
     const off = html(h(ActionBar, { primary: { label: "Cobrar", onClick: () => {}, disabled: true } }));
     expect(off).toContain('disabled=""');
-    expect(html(h(ActionBar, { aboveNav: true, primary: { label: "x", onClick: () => {} } }))).toContain("4.75rem");
+    expect(html(h(ActionBar, { aboveNav: true, primary: { label: "x", onClick: () => {} } }))).toContain("var(--nav-h)");
   });
 
   it("SyncPill lifts above the ActionBar and toasts stack above the pill", () => {

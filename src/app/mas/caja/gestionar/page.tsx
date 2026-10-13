@@ -8,7 +8,7 @@ import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row as UiRow } from "@/components/ui/Row";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonRows } from "@/components/ui/Skeleton";
-import { kindLabel } from "@/components/cash/cash";
+import { kindLabel, shortDay } from "@/components/cash/cash";
 import { formatCop } from "@/domain/money";
 import { getPwaApi } from "@/data/pwa/api";
 import { assignMoveWithOfflineFallback } from "@/data/pwa/offline-operations";
@@ -79,7 +79,7 @@ export default function GestionarCajasPage() {
                       <option value="">Elige la caja</option>
                       {pending.map((row) => (
                         <option key={row.id} value={row.id}>
-                          Caja del {row.localDate}
+                          Caja del {shortDay(row.localDate)}
                         </option>
                       ))}
                     </select>
@@ -124,7 +124,7 @@ export default function GestionarCajasPage() {
                     <UiRow
                       key={row.id}
                       href={`/mas/caja/gestionar/${row.id}`}
-                      title={`Caja del ${row.localDate} · ${ago(row.ageDays)}`}
+                      title={`Caja del ${shortDay(row.localDate)} · ${ago(row.ageDays)}`}
                       meta={
                         <>
                           Esperado {formatCop(row.expectedEfectivo)} · Nequi {formatCop(row.expectedNequi)} · {row.moveCount} mov.
@@ -157,7 +157,7 @@ export default function GestionarCajasPage() {
                 ) : (
                   <RowGroup label="Cerradas">
                     {closed.map((row) => (
-                      <UiRow key={row.id} title={`Caja del ${row.localDate}`} meta="Cerrada" />
+                      <UiRow key={row.id} title={`Caja del ${shortDay(row.localDate)}`} meta="Cerrada" />
                     ))}
                   </RowGroup>
                 )
