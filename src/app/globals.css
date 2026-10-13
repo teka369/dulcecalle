@@ -2,9 +2,9 @@
 
 /* Shared light semantics + space / radii / shadow (Spec §2.5) */
 :root {
-  --ok: #15703d;
+  --ok: #166534;
   --ok-soft: #d8f3e7;
-  --warning: #9a5a00;
+  --warning: #92400e;
   --warning-soft: #fde8c8;
   --danger: #c81e1e;
   --danger-soft: #fee2e2;
@@ -320,4 +320,13 @@ html[data-actionbar="on"] .sync-pill {
 }
 html[data-actionbar="nav"] .sync-pill {
   bottom: calc(var(--actionbar-h) + 4.75rem + 0.5rem);
+}
+
+/* PrepIndicator edge tab: same low anchor on every route (no mid-sheet float);
+   lifts with the SyncPill when a fixed ActionBar is present. */
+html[data-actionbar="on"] .prep-tab {
+  bottom: calc(var(--actionbar-h) + var(--syncpill-h) + 1rem);
+}
+html[data-actionbar="nav"] .prep-tab {
+  bottom: calc(var(--actionbar-h) + 4.75rem + var(--syncpill-h) + 1rem);
 }

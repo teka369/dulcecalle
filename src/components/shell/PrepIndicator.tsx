@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { usePrep } from "@/store/prepStore";
 
 const GROUP_TITLES = {
@@ -31,7 +30,6 @@ export function PrepIndicator() {
   const { phase, stale, tasks, panelOpen, openPanel, closePanel, start } = usePrep();
   // On Inicio the vertically-centred tab sat over the hero; seat it low on
   // the right edge of the sheet instead (above SyncPill/nav).
-  const home = usePathname() === "/";
   if (phase === "idle") return null;
   const label = labelFor(phase, stale);
   const mark = phase === "failed" ? "!" : phase === "ready" ? "✓" : "↻";
@@ -44,7 +42,7 @@ export function PrepIndicator() {
           aria-label={label}
           aria-expanded={false}
           aria-controls="prep-panel"
-          className={`fixed z-[65] flex min-h-11 items-center ${home ? "bottom-[calc(9.5rem+env(safe-area-inset-bottom))]" : "top-1/2 -translate-y-1/2"} rounded-l-[var(--r-md)] border border-r-0 border-border bg-surface py-2 pl-1.5 pr-1 text-[10px] font-semibold text-ink shadow-[var(--shadow-md)]`}
+          className={`prep-tab fixed z-[65] flex min-h-11 items-center bottom-[calc(9.5rem+env(safe-area-inset-bottom))] rounded-l-[var(--r-md)] border border-r-0 border-border bg-surface py-2 pl-1.5 pr-1 text-[10px] font-semibold text-ink shadow-[var(--shadow-md)]`}
           style={{ right: "env(safe-area-inset-right)" }}
         >
           <span aria-hidden className="[writing-mode:vertical-rl] rotate-180">
