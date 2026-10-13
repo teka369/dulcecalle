@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { __resetLocalDbForTests, getLocalDb } from "@/data/local/db";
 import type { LocalSale } from "@/data/local/types";
-import { loadWeekSeries } from "./week-source";
+import { loadWeekSeries, weekHistoryFresh } from "./week-source";
 
 const session = { businessId: "biz-a" as string | null };
 vi.mock("@/data/pwa/api", () => ({ getPwaApi: () => ({ session }) }));
@@ -26,12 +26,12 @@ function row(id: string, businessId: string, occurredOn: string, saleTotal: numb
   };
 }
 
-async function markReady(businessId: string) {
+async function markReady(businessId: string, cachedAt = NOW) {
   await getLocalDb().cacheMeta.put({
     id: `${businessId}::history:sales`,
     businessId,
     resource: "history:sales",
-    cachedAt: NOW,
+    cachedAt,
   });
 }
 
@@ -69,6 +69,25 @@ describe("loadWeekSeries (dulcecalle-local, read-only)", () => {
     const days = await loadWeekSeries(NOW, 0);
     expect(days!.find((d) => d.key === "2026-10-12")?.total).toBe(50000);
     expect(days!.find((d) => d.key === "2026-10-08")?.total).toBe(0);
+  });
+
+  it("shows the chart when history was cached within 24h", async () => {
+    await markReady("biz-a", NOW - 23 * 60 * 60 * 1000);
+    expect(await loadWeekSeries(NOW, 0)).not.toBeNull();
+    await markReady("biz-a", NOW - 24 * 60 * 60 * 1000);
+    expect(await loadWeekSeries(NOW, 0)).not.toBeNull();
+  });
+
+  it("returns null (Ventas de hoy) when history is older than 24h", async () => {
+    await markReady("biz-a", NOW - 24 * 60 * 60 * 1000 - 1);
+    expect(await loadWeekSeries(NOW, 0)).toBeNull();
+    await markReady("biz-a", NOW - 3 * 24 * 60 * 60 * 1000);
+    expect(await loadWeekSeries(NOW, 0)).toBeNull();
+  });
+
+  it("treats a future cachedAt (clock skew) as not fresh", async () => {
+    await markReady("biz-a", NOW + 60_000);
+    expect(await weekHistoryFresh("biz-a", NOW)).toBe(false);
   });
 
   it("returns null without an active business", async () => {

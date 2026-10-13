@@ -47,6 +47,13 @@
   --accent: #ff6b8a;
 }
 
+/* AA: chocolate on orange 6.24:1 (TICKET-CONTRAST-AA, option A). Scoped to
+   amber light only so other palettes keep white-on-cta. */
+[data-theme="amber"]:not([data-mode="dark"]),
+:root:not([data-theme]):not([data-mode="dark"]) {
+  --cta-fg: #3b241c;
+}
+
 [data-theme="ocean"] {
   --bg: #f3f8fc;
   --surface: #ffffff;
@@ -138,31 +145,31 @@
 
 [data-mode="dark"][data-theme="ocean"] {
   --primary: #8fbfd4;
-  --cta: #2b6f8a;
+  --cta: #5fa8c4;
   --accent: #c45c4a;
 }
 
 [data-mode="dark"][data-theme="emerald"] {
   --primary: #9dcca8;
-  --cta: #2f6f4e;
+  --cta: #5fb98a;
   --accent: #c45c4a;
 }
 
 [data-mode="dark"][data-theme="violet"] {
   --primary: #c4b0dc;
-  --cta: #6b4c9a;
+  --cta: #a98bd6;
   --accent: #c45c4a;
 }
 
 [data-mode="dark"][data-theme="rose"] {
   --primary: #e8b4ba;
-  --cta: #9f3d4a;
+  --cta: #e07a88;
   --accent: #c45c4a;
 }
 
 [data-mode="dark"][data-theme="slate"] {
   --primary: #c5ced8;
-  --cta: #334155;
+  --cta: #94a3b8;
   --accent: #c45c4a;
 }
 

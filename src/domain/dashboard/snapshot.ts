@@ -73,9 +73,9 @@ export function greetingForHour(hour: number): string {
 
 export function formatDashboardDate(ms: number): string {
   const d = new Date(ms);
-  const weekday = new Intl.DateTimeFormat("es-CO", { weekday: "long" }).format(d);
-  const day = new Intl.DateTimeFormat("es-CO", { day: "numeric" }).format(d);
-  const month = new Intl.DateTimeFormat("es-CO", { month: "long" }).format(d);
+  const weekday = new Intl.DateTimeFormat("es-CO", { weekday: "long", timeZone: "America/Bogota" }).format(d);
+  const day = new Intl.DateTimeFormat("es-CO", { day: "numeric", timeZone: "America/Bogota" }).format(d);
+  const month = new Intl.DateTimeFormat("es-CO", { month: "long", timeZone: "America/Bogota" }).format(d);
   return `${capitalizeEs(weekday)}, ${day} de ${capitalizeEs(month)}`;
 }
 

@@ -65,3 +65,11 @@ describe("bogotaHour", () => {
     expect(greetingForHour(bogotaHour(Date.parse("2026-10-13T13:00:00Z")))).toBe("Buenos días");
   });
 });
+
+describe("formatDashboardDate (Bogotá)", () => {
+  it("uses the Bogotá calendar day, not the device zone", async () => {
+    const { formatDashboardDate } = await import("./snapshot");
+    // 2026-10-14 03:30Z = Tue 13 Oct 22:30 in Bogotá.
+    expect(formatDashboardDate(Date.parse("2026-10-14T03:30:00Z"))).toBe("Martes, 13 de Octubre");
+  });
+});

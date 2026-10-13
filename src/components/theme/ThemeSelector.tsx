@@ -69,7 +69,7 @@ export function ThemeSelector() {
 
   function grid(ids: readonly PaletteId[]) {
     return (
-      <ul className="mt-2 grid grid-cols-2 gap-2 min-[360px]:grid-cols-3">
+      <ul className="mt-2 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
         {ids.map((id) => {
           const meta = PALETTE_META[id];
           const selected = ready && current === id;
@@ -84,8 +84,8 @@ export function ThemeSelector() {
                 }`}
               >
                 <ThemePreview id={id} mode={mode} />
-                <span className="flex items-center justify-between gap-1 px-0.5">
-                  <span className="truncate">{meta.label}</span>
+                <span className="flex items-start justify-between gap-1 px-0.5">
+                  <span className="min-w-0 break-words leading-tight">{meta.label}</span>
                   {selected ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                       <path d="m5 12 5 5 9-10" />

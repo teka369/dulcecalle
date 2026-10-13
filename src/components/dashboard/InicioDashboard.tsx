@@ -218,7 +218,7 @@ export function InicioHero({ children, busy }: { children: ReactNode; busy?: boo
   }, []);
   return (
     <section
-      className="-mx-4 -mt-4 bg-hero px-4 pb-10 pt-[max(1rem,env(safe-area-inset-top))] text-on-hero lg:rounded-t-[var(--r-lg)]"
+      className="-mx-4 -mt-4 bg-hero px-4 pb-10 pt-[max(1rem,env(safe-area-inset-top))] text-on-hero lg:mt-0 lg:rounded-t-[28px] lg:pt-6"
       aria-busy={busy || undefined}
     >
       {children}
@@ -231,12 +231,14 @@ function MetricCell({
   icon,
   value,
   label,
+  detail,
   tone = "neutral",
 }: {
   href: string;
   icon: Glyph;
   value: string;
   label: string;
+  detail?: string;
   tone?: "neutral" | "danger" | "accent";
 }) {
   const well =
@@ -253,7 +255,10 @@ function MetricCell({
       <span className="block truncate text-base font-semibold leading-tight tabular-nums text-ink">
         {value}
       </span>
-      <span className="block truncate text-xs text-ink-muted">{label}</span>
+      <span className="block text-xs leading-tight text-ink-muted">
+        {label}
+        {detail ? <span className="block">{detail}</span> : null}
+      </span>
     </Link>
   );
 }
@@ -375,10 +380,11 @@ export function InicioDashboard({
             href="/clientes"
             icon="users"
             value={formatCop(snap.debtTotal)}
-            label={
+            label="Por cobrar"
+            detail={
               snap.debtorCount > 0
-                ? `Por cobrar · ${snap.debtorCount} ${snap.debtorCount === 1 ? "fiado" : "fiados"}`
-                : "Por cobrar"
+                ? `${snap.debtorCount} ${snap.debtorCount === 1 ? "fiado" : "fiados"}`
+                : undefined
             }
             tone={snap.debtTotal > 0 ? "accent" : "neutral"}
           />
