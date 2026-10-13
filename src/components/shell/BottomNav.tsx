@@ -74,7 +74,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="flex h-12 min-w-0 flex-1 items-stretch rounded-full bg-ink px-1 py-1 text-bg shadow-[var(--shadow-lg)] min-[380px]:h-14"
+      className="flex h-12 min-w-0 flex-1 items-stretch rounded-full bg-nav-pill px-1 py-1 text-on-nav shadow-[var(--shadow-lg)] min-[380px]:h-14"
       aria-label="Navegación principal"
     >
       <ul className="flex w-full items-stretch justify-between gap-0.5">
@@ -87,16 +87,26 @@ export function BottomNav() {
             <li key={item.href} className="flex min-w-0 flex-1">
               <OfflineLink
                 href={item.href}
-                className={`flex min-h-11 w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-0.5 motion-safe:transition-colors motion-safe:duration-200 ${
-                  active ? "bg-bg text-ink" : "text-bg opacity-70"
-                }`}
+                ariaCurrent={active ? "page" : undefined}
+                className="flex min-h-11 w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-0.5 text-on-nav"
               >
-                <NavIcon name={item.icon} />
-                <span className="max-w-full truncate text-[clamp(8px,2.6vw,10px)] font-semibold leading-none tracking-tight">
+                <span
+                  className={`flex size-8 items-center justify-center rounded-full motion-safe:transition-colors motion-safe:duration-200 min-[380px]:size-9 ${
+                    active ? "bg-nav-active-bg text-nav-active-ink" : ""
+                  }`}
+                  aria-hidden
+                >
+                  <NavIcon name={item.icon} />
+                </span>
+                <span
+                  className={`max-w-full truncate text-[clamp(8px,2.6vw,10px)] leading-none tracking-tight ${
+                    active ? "font-bold" : "font-semibold"
+                  }`}
+                >
                   {item.label}
                 </span>
                 <span
-                  className={`h-1 w-1 rounded-full ${active ? "bg-accent" : "bg-transparent"}`}
+                  className={`h-1 w-1 rounded-full ${active ? "bg-nav-active-bg" : "bg-transparent"}`}
                   aria-hidden
                 />
               </OfflineLink>

@@ -41,11 +41,13 @@ export function OfflineLink({
   className,
   children,
   ariaLabel,
+  ariaCurrent,
 }: {
   href: string;
   className?: string;
   children: ReactNode;
   ariaLabel?: string;
+  ariaCurrent?: "page";
 }) {
   function onClick(e: MouseEvent<HTMLAnchorElement>) {
     onOfflineLinkClick(e, href);
@@ -56,7 +58,7 @@ export function OfflineLink({
   const merged = className ? `${focus} ${className}` : focus;
 
   return (
-    <Link href={href} className={merged} onClick={onClick} aria-label={ariaLabel}>
+    <Link href={href} className={merged} onClick={onClick} aria-label={ariaLabel} aria-current={ariaCurrent}>
       {children}
     </Link>
   );

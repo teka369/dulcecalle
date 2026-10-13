@@ -166,6 +166,91 @@
   --accent: #c45c4a;
 }
 
+/* Hero / nav tokens — classic palettes derive from ink/bg (look unchanged) */
+:root,
+[data-theme] {
+  --hero: var(--ink);
+  --on-hero: var(--bg);
+  --on-hero-muted: color-mix(in srgb, var(--bg) 72%, var(--ink));
+  --hero-accent: var(--primary);
+  --nav-pill: var(--ink);
+  --on-nav: var(--bg);
+  --nav-active-bg: var(--bg);
+  --nav-active-ink: var(--ink);
+}
+
+[data-mode="dark"] {
+  --hero: #0a0c10;
+  --on-hero: var(--ink);
+  --on-hero-muted: var(--ink-muted);
+  --hero-accent: var(--primary);
+  --nav-pill: #05070a;
+  --on-nav: var(--ink);
+  --nav-active-bg: var(--ink);
+  --nav-active-ink: var(--bg);
+}
+
+/* Closed themes: full scheme, ignore data-mode (declared after dark rules). */
+[data-theme="cacao"],
+[data-mode="dark"][data-theme="cacao"] {
+  --bg: #1c1310; --surface: #2a1d18; --surface-2: #36261f; --border: #4a362c;
+  --ink: #f6ebe1; --ink-muted: #c4ad9e; --primary: #e8b04a; --cta: #f08a3e;
+  --cta-fg: #1c1310; --accent: #ff8fa6;
+  --ok: #5fd39a; --warning: #f5c04a; --info: #c9b6ee; --danger: #ff8a80;
+  --ok-soft: #14352a; --warning-soft: #3a2e14; --danger-soft: #3f1d1d; --info-soft: #2a2438;
+  --hero: #120c0a; --on-hero: #f6ebe1; --on-hero-muted: #c4ad9e; --hero-accent: #f08a3e;
+  --nav-pill: #0c0807; --on-nav: #d9c6b8; --nav-active-bg: #f6ebe1; --nav-active-ink: #1c1310;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+[data-theme="menta"],
+[data-mode="dark"][data-theme="menta"] {
+  --bg: #f2faf6; --surface: #ffffff; --surface-2: #e2f2ea; --border: #c9e3d6;
+  --ink: #12352a; --ink-muted: #4b6a5f; --primary: #8fd9b6; --cta: #0f6b4f;
+  --cta-fg: #ffffff; --accent: #b0405a;
+  --ok: #15703d; --warning: #9a5a00; --info: #5b4a8a; --danger: #b42318;
+  --ok-soft: #dcf3e6; --warning-soft: #fbecd2; --danger-soft: #fde4e1; --info-soft: #ece8f6;
+  --hero: #0f3d30; --on-hero: #effaf5; --on-hero-muted: #a9d4c3; --hero-accent: #8fd9b6;
+  --nav-pill: #0f3d30; --on-nav: #cdeadf; --nav-active-bg: #effaf5; --nav-active-ink: #0f3d30;
+  --shadow-sm: 0 1px 2px rgba(18, 53, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(18, 53, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(18, 53, 42, 0.12);
+  color-scheme: light;
+}
+
+[data-theme="mora"],
+[data-mode="dark"][data-theme="mora"] {
+  --bg: #faf6fb; --surface: #ffffff; --surface-2: #f0e6f3; --border: #e0d0e6;
+  --ink: #2b1633; --ink-muted: #6c5875; --primary: #d7b3e6; --cta: #7a2e8c;
+  --cta-fg: #ffffff; --accent: #c23a6b;
+  --ok: #15703d; --warning: #9a5a00; --info: #5b4a8a; --danger: #b42318;
+  --ok-soft: #dcf3e6; --warning-soft: #fbecd2; --danger-soft: #fde4e1; --info-soft: #ece8f6;
+  --hero: #3a1446; --on-hero: #fbf3fd; --on-hero-muted: #d6bfe0; --hero-accent: #e7a8f5;
+  --nav-pill: #2b1633; --on-nav: #dcc8e4; --nav-active-bg: #fbf3fd; --nav-active-ink: #3a1446;
+  --shadow-sm: 0 1px 2px rgba(43, 22, 51, 0.06);
+  --shadow-md: 0 4px 12px rgba(43, 22, 51, 0.08);
+  --shadow-lg: 0 12px 32px rgba(43, 22, 51, 0.12);
+  color-scheme: light;
+}
+
+[data-theme="contraste"],
+[data-mode="dark"][data-theme="contraste"] {
+  --bg: #ffffff; --surface: #ffffff; --surface-2: #f0f0f0; --border: #000000;
+  --ink: #000000; --ink-muted: #333333; --primary: #ffd400; --cta: #000000;
+  --cta-fg: #ffffff; --accent: #a3003c;
+  --ok: #005a1f; --warning: #6b3d00; --info: #3b2a7a; --danger: #a30000;
+  --ok-soft: #e6f2ea; --warning-soft: #f6ecdf; --danger-soft: #f6e0e0; --info-soft: #e8e6f2;
+  --hero: #000000; --on-hero: #ffffff; --on-hero-muted: #e6e6e6; --hero-accent: #ffd400;
+  --nav-pill: #000000; --on-nav: #ffffff; --nav-active-bg: #ffd400; --nav-active-ink: #000000;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  color-scheme: light;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -185,6 +270,14 @@
   --color-danger-soft: var(--danger-soft);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
+  --color-hero: var(--hero);
+  --color-on-hero: var(--on-hero);
+  --color-on-hero-muted: var(--on-hero-muted);
+  --color-hero-accent: var(--hero-accent);
+  --color-nav-pill: var(--nav-pill);
+  --color-on-nav: var(--on-nav);
+  --color-nav-active-bg: var(--nav-active-bg);
+  --color-nav-active-ink: var(--nav-active-ink);
   --font-sans: "Satoshi", var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --radius-sm: var(--r-sm);
   --radius-md: var(--r-md);

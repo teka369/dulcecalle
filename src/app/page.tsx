@@ -4,11 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   InicioDashboard,
+  InicioHero,
   InicioSkeleton,
 } from "@/components/dashboard/InicioDashboard";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import { loadDashboardWithOfflineFallback } from "@/data/pwa/offline-snapshots";
-import { Button } from "@/components/ui/Button";
 
 export default function InicioPage() {
   const pathname = usePathname();
@@ -45,35 +45,32 @@ export default function InicioPage() {
   if (!snap) {
     if (failed) {
       return (
-        <div className="flex flex-col gap-3 py-8">
-          <p className="text-base font-medium">
-            No se pudo consultar el servidor.
-          </p>
-          <p className="text-sm text-ink-muted">
-            El inicio estará disponible cuando haya conexión.
-          </p>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => void refresh().catch(() => setFailed(true))}
-            className="w-fit"
-          >
-            Reintentar
-          </Button>
-        </div>
+        <InicioHero>
+          <div className="flex flex-col gap-3 py-4">
+            <h1 className="text-xl font-semibold">No se pudo cargar el inicio</h1>
+            <p className="text-sm text-on-hero-muted">
+              El inicio estará disponible cuando haya conexión.
+            </p>
+            <button
+              type="button"
+              onClick={() => void refresh().catch(() => setFailed(true))}
+              className="inline-flex min-h-11 w-fit items-center rounded-[var(--r-pill)] bg-on-hero px-4 text-sm font-semibold text-hero"
+            >
+              Reintentar
+            </button>
+          </div>
+        </InicioHero>
       );
     }
     return <InicioSkeleton />;
   }
 
   return (
-    <>
-      {fromCache && capturedAt != null && (
-        <p className="mb-3 text-xs text-ink-muted">
-          Sin conexión · última actualización: {new Date(capturedAt).toLocaleString()}.
-        </p>
-      )}
-      <InicioDashboard snap={snap} toast={toast} />
-    </>
+    <InicioDashboard
+      snap={snap}
+      toast={toast}
+      fromCache={fromCache}
+      capturedAt={capturedAt}
+    />
   );
 }

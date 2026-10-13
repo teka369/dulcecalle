@@ -7,6 +7,8 @@ export type PageHeaderProps = {
   subtitle?: string;
   /** Optional search, chips, or secondary controls under the title block. */
   children?: ReactNode;
+  /** Optional top-right pill action (h-11). */
+  action?: ReactNode;
   className?: string;
 };
 
@@ -18,12 +20,14 @@ export function PageHeader({
   title,
   subtitle,
   children,
+  action,
   className = "",
 }: PageHeaderProps) {
   return (
     <header
       className={["flex flex-col gap-3", className].filter(Boolean).join(" ")}
     >
+      <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <h1 className="text-[22px] font-semibold tracking-tight text-ink">
           {title}
@@ -31,6 +35,8 @@ export function PageHeader({
         {subtitle ? (
           <p className="mt-0.5 text-sm leading-snug text-ink-muted">{subtitle}</p>
         ) : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
       </div>
       {children ? (
         <div className="flex min-w-0 flex-col gap-2">{children}</div>

@@ -87,8 +87,8 @@ describe("login con Cliente como prioridad", () => {
 });
 
 describe("tema del cliente reutiliza el sistema de la tienda", () => {
-  it("expone las mismas 6 paletas en el portal", () => {
-    expect(PALETTE_IDS).toHaveLength(6);
+  it("expone las mismas 10 paletas (6 clásicas + 4 temas) en el portal", () => {
+    expect(PALETTE_IDS).toHaveLength(10);
     const perfil = src("src/app/cliente/perfil/page.tsx");
     expect(perfil).toContain("ThemeSelector");
     const selector = src("src/components/theme/ThemeSelector.tsx");
