@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { BOOT_ENTITY_ATTR, bootRestoreTarget } from "@/data/pwa/boot-restore";
+import { coldLoadParentPath } from "@/data/pwa/entity-href";
+import { isOffline } from "@/data/pwa/offline-nav";
 import { EntityIdProvider } from "@/components/shell/entity-route";
 import { entityViewStore, useEntityView } from "@/store/entityViewStore";
 import type { EntityHref } from "@/data/pwa/entity-href";
@@ -32,14 +35,50 @@ function EntityScreen({ view }: { view: EntityHref }) {
   return <VentaDetallePage />;
 }
 
+/** Puts the requested URL back after Next's router canonicalizes to the served list document. */
+function keepUrl(path: string) {
+  const restore = () => {
+    if (window.location.pathname !== path) {
+      window.history.replaceState(window.history.state, "", path + window.location.search);
+    }
+  };
+  restore();
+  window.setTimeout(restore, 0);
+  window.requestAnimationFrame(restore);
+}
+
 /**
- * In-shell ficha. Only mounted after an offline click inside an already
- * loaded app. A cold navigation never reaches this component; the service
- * worker serves /offline instead of inventing the page.
+ * In-shell ficha. Opens after an offline click inside an already loaded
+ * app, or on boot when a cold offline load of an entity URL was served its
+ * parent list document (window.__DC_BOOT_PATH): the ficha opens from
+ * IndexedDB and the entity URL stays in the address bar.
  */
 export function EntityViewHost() {
   const { stack } = useEntityView();
   const view = stack[stack.length - 1];
+  const bootPath = useRef<string | null>(null);
+
+  useEffect(() => {
+    const target = bootRestoreTarget(window.__DC_BOOT_PATH, isOffline());
+    window.__DC_BOOT_PATH = undefined;
+    if (target) {
+      bootPath.current = target.path;
+      if (target.kind === "entity") entityViewStore.open(target.path);
+      keepUrl(target.path);
+    }
+    document.documentElement.removeAttribute(BOOT_ENTITY_ATTR);
+  }, []);
+
+  useEffect(() => {
+    // Leaving a booted ficha shows its list: the URL follows.
+    if (stack.length === 0 && bootPath.current) {
+      const parent = coldLoadParentPath(bootPath.current);
+      bootPath.current = null;
+      if (parent && parent !== "/mas/caja/gestionar") {
+        window.history.replaceState(window.history.state, "", parent);
+      }
+    }
+  }, [stack.length]);
 
   useEffect(() => {
     const onOnline = () => entityViewStore.dismissOnOnline();
@@ -50,7 +89,7 @@ export function EntityViewHost() {
   if (!view) return null;
 
   return (
-    <div className="fixed inset-0 z-[75] overflow-y-auto bg-bg">
+    <div className="fixed inset-0 z-[75] overflow-y-auto bg-bg" data-testid="entity-view">
       <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 pb-28 pt-4">
         <button
           type="button"

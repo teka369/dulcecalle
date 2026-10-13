@@ -145,6 +145,18 @@ await runPreparation(BIZ);
     expect((await checkReadiness(OTHER_BIZ)).status).toBe("not_ready");
   });
 
+  it("an existing device prepared before /mas/caja/gestionar was required reads stale, re-prepares, ready (PREP_VERSION unchanged)", async () => {
+    const stored = installCacheStubs();
+    await runPreparation(BIZ);
+    expect((await checkReadiness(BIZ)).status).toBe("ready");
+    expect(PREP_VERSION).toBe(9);
+    stored.delete("/mas/caja/gestionar"); // old device: doc never cached
+    expect((await checkReadiness(BIZ)).status).toBe("stale");
+    await runPreparation(BIZ);
+    expect(stored.has("/mas/caja/gestionar")).toBe(true);
+    expect((await checkReadiness(BIZ)).status).toBe("ready");
+  });
+
   it("goes stale when a catalog snapshot disappears", async () => {
     await runPreparation(BIZ);
     await getLocalDb().cacheMeta.delete(`${BIZ}::products`);
@@ -293,10 +305,10 @@ await runPreparation(BIZ);
 
   it("task list covers documents, catalogs and summaries", () => {
     const defs = prepTaskDefs();
-    expect(defs.filter((d) => d.group === "app")).toHaveLength(19);
+    expect(defs.filter((d) => d.group === "app")).toHaveLength(20);
     expect(defs.filter((d) => d.group === "catalogos")).toHaveLength(3);
     expect(defs.filter((d) => d.group === "resumen")).toHaveLength(4);
-    expect(defs).toHaveLength(26);
+    expect(defs).toHaveLength(27);
     const keys = defs.map((d) => d.key);
     expect(keys).toContain("doc:/inventario/proveedores/nuevo");
     expect(keys).not.toContain("doc:/inventario/proveedores");

@@ -6,7 +6,7 @@
  * can serve the prepared document (or /offline).
  * Offline entity fichas: stay inside the already-loaded shell and read
  * IndexedDB. Do not router.push — that asks Next for an RSC payload.
- * A cold load of an entity URL never reaches this module.
+ * A cold offline load of an entity URL is restored by EntityViewHost (boot-restore.ts).
  */
 import { parseEntityHref } from "./entity-href";
 import { entityViewStore } from "@/store/entityViewStore";

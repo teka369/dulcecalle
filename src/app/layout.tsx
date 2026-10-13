@@ -8,7 +8,11 @@ import { PrepIndicator } from "@/components/shell/PrepIndicator";
 import { SyncCenter } from "@/components/shell/SyncCenter";
 import { SyncPill } from "@/components/shell/SyncPill";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { bootScriptSource } from "@/data/pwa/boot-restore";
+import { bootEntityPatternSources } from "@/data/pwa/entity-href";
 import "./globals.css";
+
+const BOOT_SCRIPT = bootScriptSource(bootEntityPatternSources());
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -52,12 +56,16 @@ export default function RootLayout({
       data-theme="amber"
       data-mode="light"
       className={`${jakarta.variable} h-full antialiased`}
+      // The inline boot script may mark a cold offline ficha load before hydration.
+      suppressHydrationWarning
     >
       <link
         href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap"
         rel="stylesheet"
       />
       <body className="min-h-full bg-bg font-sans text-ink">
+        {/* Pre-hydration: remember the requested path (a cold offline ficha load is served its list document). */}
+        <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
         <PreviewHostBridge />
         <SalesSyncBridge />
         <PrepModal />

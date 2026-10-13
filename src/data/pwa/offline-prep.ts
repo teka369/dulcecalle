@@ -90,6 +90,9 @@ export function prepTaskDefs(): PrepTaskDef[] {
     { path: "/mas/caja/aporte", label: "Documento Aporte" },
     { path: "/mas/caja/retiro", label: "Documento Retiro" },
     { path: "/mas/caja/cerrar", label: "Documento Cerrar caja" },
+    // Server-only screen: offline it shows "Necesitas internet…". Also the
+    // parent document for a cold offline load of /mas/caja/gestionar/[id].
+    { path: "/mas/caja/gestionar", label: "Documento Gestionar cajas" },
     { path: "/mas/estadisticas", label: "Documento Estadísticas" },
     { path: "/mas/apariencia", label: "Documento Apariencia" },
     // The supplier list is a segment of /inventario. There is no
@@ -204,8 +207,10 @@ export function requiredSnapshotKinds(): string[] {
 
 /**
  * Dynamic entity documents are not part of preparation. Fichas open from
- * the already-loaded shell and IndexedDB. A cold load of /inventario/[id]
- * (and the other entity URLs) stays on the service worker /offline fallback.
+ * the already-loaded shell and IndexedDB; a cold offline load of an entity
+ * URL is served its parent list document (/clientes, /inventario, /ventas,
+ * /mas/caja/gestionar), which is in this list. Adding a document here makes
+ * checkReadiness report existing devices as "stale" so they re-prepare.
  */
 export function requiredStaticDocuments(): string[] {
   return prepTaskDefs()

@@ -86,7 +86,7 @@ describe("prepStore evaluate/start", () => {
     expect(snap.modalOpen).toBe(true);
     expect(snap.completed).toBe(snap.total);
     // 19 static docs + 3 catalogs + 4 history + 4 snapshots + 1 thumbs + 3 sistema.
-    expect(snap.total).toBe(34);
+    expect(snap.total).toBe(35);
     expect(snap.lastReadyAt).toBeGreaterThan(0);
   });
 
