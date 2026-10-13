@@ -88,3 +88,11 @@ describe("preparation dates", () => {
     expect(dmy("")).toBe("");
   });
 });
+
+import { moveMeta } from "./inventory";
+describe("moveMeta (Historial)", () => {
+  it("uses dd/mm/aaaa like Preparaciones", () => {
+    expect(moveMeta({ note: "Surtido", occurredOn: "2026-10-13" })).toBe("Surtido · 13/10/2026");
+    expect(moveMeta({ note: null, occurredOn: "2026-01-05T10:00:00Z" })).toBe("05/01/2026");
+  });
+});
