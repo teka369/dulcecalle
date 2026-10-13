@@ -16,6 +16,8 @@ import {
   shrinkWithOfflineFallback,
   surtirWithOfflineFallback,
   syncPendingOperations,
+  cashOpenRequestId,
+  todayCashOpenRequestId,
 } from "./offline-operations";
 
 const businessId = "11111111-1111-4111-8111-111111111111";
@@ -577,5 +579,37 @@ describe("M6.8 offline operations", () => {
     });
 
     expect(await getLocalDb().cashMoves.where("businessId").equals(businessId).count()).toBe(0);
+  });
+});
+
+describe("B1: offline caja open with a deterministic requestId", () => {
+  it("is stable per business+day and UUID-shaped", async () => {
+    const a = await cashOpenRequestId(businessId, "2026-10-13");
+    expect(a).toBe(await cashOpenRequestId(businessId, "2026-10-13"));
+    expect(a).not.toBe(await cashOpenRequestId(businessId, "2026-10-14"));
+    expect(a).not.toBe(await cashOpenRequestId(otherBusinessId, "2026-10-13"));
+    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+
+  it("open offline twice + sync twice = exactly 1 server session", async () => {
+    // Fake server: replays by Idempotency-Key.
+    const sessions = new Map<string, { id: string }>();
+    let online = false;
+    api.cash.open.mockImplementation(async (openingFloat: number, key: string) => {
+      if (!online) throw new NetworkError("offline");
+      if (!sessions.has(key)) sessions.set(key, { id: `5e5e5e5e-0000-4000-8000-${String(sessions.size + 1).padStart(12, "0")}` });
+      return { ...sessions.get(key)!, localDate: "2026-10-13", openedAt: Date.now(), closedAt: null, openingFloat, closingCount: null, expectedEfectivo: null, expectedNequi: null, difference: null };
+    });
+    const first = await openCashWithOfflineFallback(10000, await todayCashOpenRequestId());
+    const second = await openCashWithOfflineFallback(10000, await todayCashOpenRequestId());
+    expect(first.mode).toBe("offline");
+    expect(second).toEqual(first);
+    expect(await getLocalDb().outbox.where("businessId").equals(businessId).count()).toBe(1);
+    online = true;
+    await syncPendingOperations(businessId);
+    await syncPendingOperations(businessId);
+    expect(sessions.size).toBe(1);
+    const keys = api.cash.open.mock.calls.map((c) => c[1]);
+    expect(new Set(keys)).toEqual(new Set([await todayCashOpenRequestId()]));
   });
 });

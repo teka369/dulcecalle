@@ -123,4 +123,25 @@ describe("prepStore evaluate/start", () => {
     await prepStore.start();
     expect(prepStore.getSnapshot().phase).toBe("idle");
   });
+
+  it("B1: an offline boot of a prepared device reports ready (lastReadyAt) without starting prep", async () => {
+    getPwaAuthSession().businessId = BIZ;
+    await prepStore.evaluate();
+    const readyAt = prepStore.getSnapshot().lastReadyAt;
+    prepStore.__reset();
+    api.products.list.mockClear();
+    installStubs(false);
+    await prepStore.evaluate();
+    expect(prepStore.getSnapshot().phase).toBe("ready");
+    expect(prepStore.getSnapshot().lastReadyAt).toBe(readyAt);
+    expect(api.products.list).not.toHaveBeenCalled();
+  });
+
+  it("B1: offline without a completed prep stays idle", async () => {
+    getPwaAuthSession().businessId = BIZ;
+    installStubs(false);
+    await prepStore.evaluate();
+    expect(prepStore.getSnapshot().phase).toBe("idle");
+    expect(prepStore.getSnapshot().lastReadyAt).toBeNull();
+  });
 });
