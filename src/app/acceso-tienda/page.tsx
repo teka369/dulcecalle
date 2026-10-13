@@ -8,10 +8,14 @@ import { ActiveSessionGroup } from "@/components/account/ActiveSessionGroup";
 import { BrandLogo } from "@/components/account/BrandLogo";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
+import { useHydrated } from "@/components/shell/use-online";
 
 export default function StoreLoginPage() {
   const session = useMemo(() => getPwaAuthSession(), []);
   const [, setRev] = useState(0);
+  // B4: the session lives in localStorage; SSR + hydration render signed-out, then the real state.
+  const hydrated = useHydrated();
+  const authenticated = hydrated && session.authenticated;
 
   function onLogout() {
     session.clear();
@@ -22,15 +26,15 @@ export default function StoreLoginPage() {
     <div className="flex flex-col">
       <HeroBlock
         size="tall"
-        title={session.authenticated ? "Cuenta de tienda" : "Acceso de tienda"}
-        subtitle={session.authenticated ? undefined : "Administración privada de tu negocio."}
+        title={authenticated ? "Cuenta de tienda" : "Acceso de tienda"}
+        subtitle={authenticated ? undefined : "Administración privada de tu negocio."}
       >
         <div className="mt-4">
           <BrandLogo />
         </div>
       </HeroBlock>
       <Sheet>
-        {session.authenticated ? (
+        {authenticated ? (
           <ActiveSessionGroup email={session.user?.email} hasBusiness={Boolean(session.businessId)} onLogout={onLogout} />
         ) : (
           <>
