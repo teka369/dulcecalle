@@ -3,6 +3,8 @@
 import { CASH_COPY } from "@/domain/cash";
 import { STATS_COPY } from "@/domain/stats";
 import { useCash } from "@/store/cashStore";
+import { getCachedBusinessLabel } from "@/data/pwa/dashboard";
+import { useEffect, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { HeroPill } from "@/components/ui/HeroPill";
 import { Sheet } from "@/components/ui/Sheet";
@@ -23,6 +25,9 @@ function Lead({ icon }: { icon: Glyph }) {
 /** Más hub. Caja pill/badge only from already-loaded cashStore data (no new fetch). */
 export default function MasPage() {
   const { summary } = useCash();
+  // Read after mount (session lives in localStorage); no fetch — null until Inicio has loaded it.
+  const [businessLabel, setBusinessLabel] = useState<string | null>(null);
+  useEffect(() => setBusinessLabel(getCachedBusinessLabel()), []);
   const pending = summary?.pendingCount ?? 0;
   const pill = !summary
     ? null
@@ -39,7 +44,7 @@ export default function MasPage() {
       <HeroBlock
         size="tall"
         title="Más"
-        subtitle="Caja, gastos y ajustes de la tienda"
+        subtitle={businessLabel ? `${businessLabel} · Caja, gastos y ajustes de la tienda` : "Caja, gastos y ajustes de la tienda"}
         action={pill ? <HeroPill label={pill.label} href={pill.href} dot={pill.dot} /> : undefined}
       />
       <Sheet>
