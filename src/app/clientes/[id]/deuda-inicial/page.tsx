@@ -115,6 +115,7 @@ export default function AgregarDeudaAnteriorPage() {
           size="compact"
           back={{ href: `/clientes/${id}`, label: "Volver al cliente", entity: true }}
           title="Agregar deuda anterior"
+          offline={{ text: "Sin conexión" }}
         />
         <Sheet>
           <div role="status" className="flex flex-col gap-4 py-2" data-testid="deuda-inicial-offline">

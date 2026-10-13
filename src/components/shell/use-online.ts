@@ -26,3 +26,10 @@ const noop = () => () => undefined;
 export function useHydrated(): boolean {
   return useSyncExternalStore(noop, () => true, () => false);
 }
+
+export const OFFLINE_RECORD_BAND = { text: "Sin conexión · datos guardados en este teléfono." } as const;
+
+/** Hero band for record screens read from IndexedDB: shown whenever the device is offline. */
+export function useOfflineBand(): { text: string } | null {
+  return useOnline() ? null : OFFLINE_RECORD_BAND;
+}

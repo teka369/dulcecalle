@@ -66,6 +66,7 @@ export default function GestionarCajasPage() {
         size="medium"
         back={{ href: "/mas/caja", label: "Volver a Caja" }}
         title="Gestionar cajas"
+        offline={offline ? { text: "Sin conexión" } : null}
         subtitle={offline ? undefined : rows ? (pending.length === 1 ? "1 pendiente" : `${pending.length} pendientes`) : undefined}
       />
       <Sheet>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useOfflineBand } from "@/components/shell/use-online";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -26,6 +27,7 @@ import { RowGroup } from "@/components/ui/RowGroup";
 import { ActionToast } from "@/components/ui/ActionToast";
 
 export default function RegistrarAbonoPage() {
+  const offlineBand = useOfflineBand();
   const router = useRouter();
   const id = useEntityId();
   const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
@@ -127,7 +129,7 @@ export default function RegistrarAbonoPage() {
 
   if (!customer) {
     return (
-      <HeroBlock size="compact" back={{ href: "/clientes", label: "Volver a Clientes", entity: true }} title="Clientes">
+      <HeroBlock offline={offlineBand} size="compact" back={{ href: "/clientes", label: "Volver a Clientes", entity: true }} title="Clientes">
         <StateBlock onHero kind="empty" title="No encontramos ese cliente." />
       </HeroBlock>
     );
@@ -135,7 +137,7 @@ export default function RegistrarAbonoPage() {
 
   return (
     <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
-      <HeroBlock
+      <HeroBlock offline={offlineBand}
         size="compact"
         back={{ href: `/clientes/${customer.id}`, label: "Volver al cliente", entity: true }}
         title="Registrar abono"

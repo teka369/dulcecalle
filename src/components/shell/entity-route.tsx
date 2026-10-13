@@ -63,8 +63,12 @@ export function EntityBackLink({
       className={className}
       aria-label={ariaLabel}
       onClick={() => {
-        if (action === "back") entityViewStore.back();
-        else entityViewStore.close();
+        if (action === "back") {
+          // Go to the named record: pop if it is the one underneath, else show it in place.
+          const stack = entityViewStore.getSnapshot().stack;
+          if (stack[stack.length - 2]?.href === href) entityViewStore.back();
+          else entityViewStore.replace(href);
+        } else entityViewStore.close();
       }}
     >
       {children}

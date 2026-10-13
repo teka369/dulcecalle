@@ -49,6 +49,8 @@ test("full PREP, then offline cold loads of never-visited entity URLs keep the U
       await p.waitForTimeout(800);
       expect(new URL(p.url()).pathname, `${label} url after settle`).toBe(r.path);
       await expect(p.getByText("Puedes seguir trabajando. Lo que guardes")).toHaveCount(0);
+      // Offline band in the shown hero (record overlay or the page itself).
+      await expect(scope.getByTestId("offline-band").first(), `${label} band ${r.path}`).toBeVisible();
       if (r.kind === "entity") {
         // Designer (b): the record's view owns the screen; the list underneath is not visible.
         await expect(p.locator("main")).toBeHidden();
@@ -65,5 +67,34 @@ test("full PREP, then offline cold loads of never-visited entity URLs keep the U
     results.push(`${r.path} -> ${new URL(p.url()).pathname} -> data OK`);
     await p.close();
   }
+  // URL follows in-app navigation from a restored record.
+  const d = await context.newPage();
+  await d.goto(`/clientes/${C0}/deuda-inicial`);
+  await d.getByTestId("deuda-inicial-offline").getByRole("button", { name: "Volver al cliente" }).click();
+  await expect(d.getByTestId("entity-view").getByRole("heading", { level: 1, name: CUS.name })).toBeVisible();
+  await expect.poll(() => new URL(d.url()).pathname).toBe(`/clientes/${C0}`);
+  await d.waitForTimeout(500);
+  expect(new URL(d.url()).pathname).toBe(`/clientes/${C0}`);
+  results.push(`/clientes/${C0}/deuda-inicial --Volver al cliente--> ${new URL(d.url()).pathname} (customer shown)`);
+  await d.close();
+
+  const a = await context.newPage();
+  await a.goto(`/clientes/${C0}/abono`);
+  await expect(a.getByTestId("entity-view").getByText(CUS.name).first()).toBeVisible();
+  // Header back on abono names the customer: shows the customer and the URL follows.
+  await a.getByTestId("entity-view").getByRole("button", { name: "Volver al cliente" }).first().click();
+  await expect(a.getByTestId("entity-view").getByRole("heading", { level: 1, name: CUS.name })).toBeVisible();
+  await expect.poll(() => new URL(a.url()).pathname).toBe(`/clientes/${C0}`);
+  results.push(`/clientes/${C0}/abono --header back--> ${new URL(a.url()).pathname} (customer shown)`);
+  // Customer header back names the list: overlay closes, list shown, URL /clientes.
+  await a.getByTestId("entity-view").getByRole("button", { name: "Volver a Clientes" }).first().click();
+  await expect(a.getByTestId("entity-view")).toHaveCount(0);
+  await expect(a.locator("main").getByText(CUS.name).first()).toBeVisible();
+  await expect.poll(() => new URL(a.url()).pathname).toBe("/clientes");
+  await a.waitForTimeout(500);
+  expect(new URL(a.url()).pathname).toBe("/clientes");
+  results.push(`/clientes/${C0} --Volver a Clientes--> ${new URL(a.url()).pathname} (list shown)`);
+  await a.close();
+
   console.log(`E2E (${baseURL})\n` + results.join("\n"));
 });

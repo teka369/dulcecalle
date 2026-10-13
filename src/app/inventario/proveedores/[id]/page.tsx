@@ -1,5 +1,6 @@
 "use client";
 
+import { useOfflineBand } from "@/components/shell/use-online";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import type { RemoteSupplier } from "@/data/http/mappers";
@@ -23,6 +24,7 @@ import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 
 export default function ProveedorFichaPage() {
+  const offlineBand = useOfflineBand();
   const id = useEntityId();
   const [supplier, setSupplier] = useState<RemoteSupplier | null>(null);
   const [historial, setHistorial] = useState<PwaSupplierSurtir[]>([]);
@@ -66,7 +68,7 @@ export default function ProveedorFichaPage() {
 
   if (!supplier) {
     return (
-      <HeroBlock size="medium" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Inventario">
+      <HeroBlock offline={offlineBand} size="medium" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Inventario">
         <StateBlock onHero kind="empty" title="No encontramos ese proveedor." />
       </HeroBlock>
     );
@@ -101,7 +103,7 @@ export default function ProveedorFichaPage() {
 
   return (
     <div className="flex flex-col pb-6">
-      <HeroBlock
+      <HeroBlock offline={offlineBand}
         size="medium"
         back={{ href: "/inventario", label: "Volver a Inventario", entity: true }}
         title={supplier.name}

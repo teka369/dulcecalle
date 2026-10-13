@@ -1,5 +1,6 @@
 "use client";
 
+import { useOfflineBand } from "@/components/shell/use-online";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -41,6 +42,7 @@ export function ShrinkForm({
   showNote?: boolean;
   requireMotivo?: boolean;
 }) {
+  const offlineBand = useOfflineBand();
   const router = useRouter();
   const id = useEntityId();
   const [product, setProduct] = useState<RemoteProduct | null>(null);
@@ -121,7 +123,7 @@ export function ShrinkForm({
 
   if (!product) {
     return (
-      <HeroBlock size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title={title}>
+      <HeroBlock offline={offlineBand} size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title={title}>
         <StateBlock onHero kind="empty" title="No encontramos ese producto." />
       </HeroBlock>
     );
@@ -131,7 +133,7 @@ export function ShrinkForm({
 
   return (
     <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
-      <HeroBlock
+      <HeroBlock offline={offlineBand}
         size="compact"
         back={{ href: `/inventario/${product.id}`, label: "Volver al producto", entity: true }}
         title={title}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useOfflineBand } from "@/components/shell/use-online";
 import { Input } from "@/components/ui/Input";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
@@ -29,6 +30,7 @@ import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
 import { inventoryStore } from "@/store/inventoryStore";
 
 export default function SurtirPage() {
+  const offlineBand = useOfflineBand();
   const router = useRouter();
   const id = useEntityId();
   const [product, setProduct] = useState<RemoteProduct | null>(null);
@@ -174,7 +176,7 @@ export default function SurtirPage() {
 
   if (!product) {
     return (
-      <HeroBlock size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Surtir">
+      <HeroBlock offline={offlineBand} size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Surtir">
         <StateBlock onHero kind="empty" title="No encontramos ese producto." />
       </HeroBlock>
     );
@@ -185,7 +187,7 @@ export default function SurtirPage() {
 
   return (
     <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
-      <HeroBlock
+      <HeroBlock offline={offlineBand}
         size="compact"
         back={{ href: `/inventario/${product.id}`, label: "Volver al producto", entity: true }}
         title="Surtir"

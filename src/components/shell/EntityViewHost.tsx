@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { BOOT_ENTITY_ATTR, bootRestoreTarget } from "@/data/pwa/boot-restore";
-import { coldLoadParentPath } from "@/data/pwa/entity-href";
+import { coldLoadParentPath, parseEntityHref } from "@/data/pwa/entity-href";
 import { isOffline } from "@/data/pwa/offline-nav";
 import { EntityIdProvider } from "@/components/shell/entity-route";
 import { entityViewStore, useEntityView } from "@/store/entityViewStore";
@@ -38,6 +38,9 @@ function EntityScreen({ view }: { view: EntityHref }) {
 /** Puts the requested URL back after Next's router canonicalizes to the served list document. */
 function keepUrl(path: string) {
   const restore = () => {
+    // Follow the overlay if the user already moved on (replace/close).
+    const top = entityViewStore.getSnapshot().stack.at(-1)?.href;
+    if (top !== undefined ? top !== path : parseEntityHref(path) != null) return;
     if (window.location.pathname !== path) {
       window.history.replaceState(window.history.state, "", path + window.location.search);
     }
@@ -56,29 +59,39 @@ function keepUrl(path: string) {
 export function EntityViewHost() {
   const { stack } = useEntityView();
   const view = stack[stack.length - 1];
-  const bootPath = useRef<string | null>(null);
+  /** URL of what is underneath the overlay (the list for a cold-load restore). */
+  const baseUrl = useRef<string | null>(null);
 
   useEffect(() => {
     const target = bootRestoreTarget(window.__DC_BOOT_PATH, isOffline());
     window.__DC_BOOT_PATH = undefined;
     if (target) {
-      bootPath.current = target.path;
-      if (target.kind === "entity") entityViewStore.open(target.path);
+      if (target.kind === "entity") {
+        baseUrl.current = coldLoadParentPath(target.path);
+        entityViewStore.open(target.path);
+      }
       keepUrl(target.path);
     }
     document.documentElement.removeAttribute(BOOT_ENTITY_ATTR);
   }, []);
 
+  // The address bar always matches what is shown: the top ficha while the
+  // overlay is open, the page underneath once it closes.
+  const topHref = view?.href ?? null;
   useEffect(() => {
-    // Leaving a booted ficha shows its list: the URL follows.
-    if (stack.length === 0 && bootPath.current) {
-      const parent = coldLoadParentPath(bootPath.current);
-      bootPath.current = null;
-      if (parent && parent !== "/mas/caja/gestionar") {
-        window.history.replaceState(window.history.state, "", parent);
+    if (topHref) {
+      if (baseUrl.current == null) baseUrl.current = window.location.pathname;
+      if (window.location.pathname !== topHref) {
+        window.history.replaceState(window.history.state, "", topHref);
       }
+      return;
     }
-  }, [stack.length]);
+    if (baseUrl.current != null) {
+      const base = baseUrl.current;
+      baseUrl.current = null;
+      if (window.location.pathname !== base) window.history.replaceState(window.history.state, "", base);
+    }
+  }, [topHref]);
 
   useEffect(() => {
     const onOnline = () => entityViewStore.dismissOnOnline();
