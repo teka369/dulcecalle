@@ -1,5 +1,6 @@
 "use client";
 
+import { dmy } from "@/components/inventory/inventory";
 import { CustomerChrome, PortalError, PortalLoading } from "@/components/customer/CustomerChrome";
 import { usePortalLedger } from "@/components/customer/usePortalLedger";
 import { debtHero, statementSign } from "@/components/customer/portal";
@@ -56,7 +57,7 @@ export default function CustomerStatementPage() {
                 key={row.id}
                 href={row.href}
                 title={row.title}
-                meta={row.occurredOn}
+                meta={dmy(row.occurredOn)}
                 trailing={
                   <>
                     <span className={`text-[15px] font-semibold tabular-nums ${sg.tone === "ok" ? "text-ok" : "text-danger"}`}>
