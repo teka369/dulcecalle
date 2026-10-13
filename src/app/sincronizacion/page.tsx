@@ -1,79 +1,67 @@
 "use client";
 
-import Link from "next/link";
 import { useSync } from "@/store/syncStore";
 import { SyncOperationList, useSyncItems } from "@/components/shell/sync-items";
 import { SyncStatusSummary } from "@/components/shell/SyncStatusSummary";
 import { StorageProtectionCard } from "@/components/shell/StorageProtectionCard";
 import { DISCARD_NOTICE } from "@/data/pwa/sync-copy";
-import { Button } from "@/components/ui/Button";
-import { Empty } from "@/components/ui/Empty";
-import { Spinner } from "@/components/ui/Spinner";
+import { HeroBlock } from "@/components/ui/HeroBlock";
+import { HeroPill } from "@/components/ui/HeroPill";
+import { Sheet } from "@/components/ui/Sheet";
+import { SectionHead } from "@/components/ui/SectionHead";
+import { StateBlock } from "@/components/ui/StateBlock";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 
 export default function SincronizacionPage() {
   const { online, counts, flushing, lastDoneAt, authRequired, syncNow } = useSync();
   const { items, loading } = useSyncItems();
+  const canSync = online && counts.total > 0 && !flushing && !authRequired;
 
   return (
-    <div className="flex flex-col gap-4 pb-28">
-      <header className="flex items-center gap-2">
-        <Link
-          href="/"
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-lg shadow-[var(--shadow-sm)]"
-          aria-label="Volver"
-        >
-          ←
-        </Link>
-        <h1 className="text-[22px] font-semibold">Datos y sincronización</h1>
-      </header>
-
-      <section className="text-sm leading-snug">
-        <p className="font-semibold">Este teléfono</p>
-        <p className="mt-1 text-ink-muted">
-          Los datos de la tienda abierta se conservan aquí para poder trabajar
-          incluso sin conexión.
-        </p>
-      </section>
-
-      <SyncStatusSummary
-        online={online}
-        counts={counts}
-        flushing={flushing}
-        authRequired={authRequired}
-        lastDoneAt={lastDoneAt}
+    <div className="flex flex-col">
+      <HeroBlock
+        size="medium"
+        back={{ href: "/", label: "Volver" }}
+        title="Datos y sincronización"
+        subtitle={`Este teléfono · ${counts.total} ${counts.total === 1 ? "pendiente" : "pendientes"}`}
+        offline={online ? null : { text: "Sin conexión · Lo guardado aquí se enviará cuando vuelva la conexión." }}
+        busy={flushing != null}
+        action={canSync ? <HeroPill primary label="Sincronizar ahora" onClick={() => void syncNow()} /> : undefined}
       />
-
-      <StorageProtectionCard />
-
-      {online && authRequired && (
-        <a
-          href="/login"
-          className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
-        >
-          Entra para enviar lo guardado aquí
-        </a>
-      )}
-
-      {online && counts.total > 0 && !flushing && !authRequired && (
-        <Button type="button" variant="primary" onClick={() => void syncNow()} className="w-full">
-          Sincronizar ahora
-        </Button>
-      )}
-
-      {loading ? (
-        <div className="flex justify-center py-10">
-          <Spinner />
-        </div>
-      ) : items.length === 0 ? (
-        <Empty
-          title="Nada pendiente"
-          description="No hay operaciones por enviar desde este teléfono."
+      <Sheet>
+        <p className="text-sm leading-snug text-ink-muted">
+          Los datos de la tienda abierta se conservan aquí para poder trabajar incluso sin conexión.
+        </p>
+        <SyncStatusSummary
+          online={online}
+          counts={counts}
+          flushing={flushing}
+          authRequired={authRequired}
+          lastDoneAt={lastDoneAt}
         />
-      ) : (
-        <SyncOperationList items={items} flushing={flushing != null} />
-      )}
-
-      <p className="text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>
+        {online && authRequired && (
+          <a
+            href="/login"
+            className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] bg-cta text-sm font-semibold text-cta-fg"
+          >
+            Entra para enviar lo guardado aquí
+          </a>
+        )}
+        <section className="flex flex-col gap-2">
+          <SectionHead title="Operaciones" />
+          {loading ? (
+            <div aria-busy="true">
+              <SkeletonRows rows={3} />
+            </div>
+          ) : items.length === 0 ? (
+            <StateBlock kind="empty" title="Nada pendiente" body="No hay operaciones por enviar desde este teléfono." />
+          ) : (
+            <SyncOperationList items={items} flushing={flushing != null} />
+          )}
+        </section>
+        <StorageProtectionCard />
+        <p className="text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>
+      </Sheet>
     </div>
   );
 }

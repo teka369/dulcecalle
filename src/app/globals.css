@@ -332,3 +332,24 @@ html[data-actionbar="on"] .prep-tab {
 html[data-actionbar="nav"] .prep-tab {
   bottom: calc(var(--actionbar-h) + var(--nav-h) + var(--syncpill-h) + 1rem);
 }
+
+/* P6 hardening: visible focus on hero and sheet in every theme. */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.hero-block :focus-visible {
+  outline-color: var(--on-hero);
+}
+
+/* P6 hardening: respect reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

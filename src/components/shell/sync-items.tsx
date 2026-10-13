@@ -1,5 +1,6 @@
 "use client";
 
+import { PendingBadge } from "@/components/ui/StatusBadge";
 import { useCallback, useEffect, useState } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
 import {
@@ -142,8 +143,9 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
             <span className="mt-0.5 block truncate text-xs text-ink-muted">{detail}</span>
           )}
           {item.blockedBy && (
-            <span className="mt-1 block text-xs font-medium text-ink-muted">
-              ⏳ {item.blockedBy}
+            <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+              <PendingBadge label="En espera" />
+              {item.blockedBy}
             </span>
           )}
         </span>

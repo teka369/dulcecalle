@@ -24,18 +24,24 @@ export function SyncStatusSummary({
   const copy = syncPlaceCopy({ online, authRequired, flushing, counts });
   const clear = queueIsClear({ counts, flushing, authRequired });
   return (
-    <div className="mt-4 rounded-[var(--r-lg)] border border-border bg-bg p-3 text-sm">
+    <div className="flex flex-col gap-2 text-sm">
       <p className="leading-snug">{copy.lead}</p>
-      <p className="mt-3 font-semibold">En el servidor</p>
-      <p className="mt-0.5 leading-snug text-ink-muted">{copy.server}</p>
-      <p className="mt-3 font-semibold">Guardado solo aquí</p>
-      <p className="mt-0.5 leading-snug text-ink-muted">{copy.device}</p>
-      <p className="mt-3 font-semibold">Hace falta atención</p>
-      <p className={`mt-0.5 leading-snug ${counts.permanent > 0 ? "text-danger" : "text-ink-muted"}`}>
-        {copy.attention}
-      </p>
-      <p className="mt-3 text-xs text-ink-muted">{lastCompletedSyncLine(lastDoneAt, clear)}</p>
-      <p className="mt-1 text-xs text-ink-muted">{NOT_A_BACKUP}</p>
+      <ul className="grid grid-cols-1 gap-px overflow-hidden rounded-[var(--r-lg)] border border-border bg-border min-[420px]:grid-cols-3" aria-label="Estado de sincronización">
+        <li className="bg-surface p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">En el servidor</p>
+          <p className="mt-1 leading-snug text-ink">{copy.server}</p>
+        </li>
+        <li className="bg-surface p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Guardado solo aquí</p>
+          <p className="mt-1 leading-snug text-ink">{copy.device}</p>
+        </li>
+        <li className="bg-surface p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Hace falta atención</p>
+          <p className={`mt-1 leading-snug ${counts.permanent > 0 ? "text-danger" : "text-ink"}`}>{copy.attention}</p>
+        </li>
+      </ul>
+      <p className="text-xs text-ink-muted">{lastCompletedSyncLine(lastDoneAt, clear)}</p>
+      <p className="text-xs text-ink-muted">{NOT_A_BACKUP}</p>
     </div>
   );
 }

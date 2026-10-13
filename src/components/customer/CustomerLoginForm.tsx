@@ -43,7 +43,7 @@ export function CustomerLoginForm({ showBack = false }: { showBack?: boolean }) 
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-[22px] font-semibold">Consulta como cliente</h1>
+        <h2 className="text-[22px] font-semibold">Consulta como cliente</h2>
         <p className="mt-1 text-sm text-ink-muted">
           Consulta tu saldo, compras y abonos.
         </p>

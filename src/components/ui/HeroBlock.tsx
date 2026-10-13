@@ -81,7 +81,7 @@ export function HeroBlock({
   const hasHead = back != null || title != null || action != null;
   return (
     <section
-      className={`-mx-4 -mt-4 bg-hero px-4 ${PAD[size]} pt-[max(1rem,env(safe-area-inset-top))] text-on-hero lg:mt-0 lg:rounded-t-[28px] lg:pt-6`}
+      className={`hero-block -mx-4 -mt-4 bg-hero px-4 ${PAD[size]} pt-[max(1rem,env(safe-area-inset-top))] text-on-hero lg:mt-0 lg:rounded-t-[28px] lg:pt-6`}
       aria-busy={busy || undefined}
     >
       {offline ? (
