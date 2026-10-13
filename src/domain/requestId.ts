@@ -34,3 +34,21 @@ export function newStableUuid(): string {
   }
   return id;
 }
+
+/**
+ * Deterministic child requestId (UUID v5-style, SHA-1 of parent + purpose).
+ * Same parent + purpose → same id, so a retried composite intent (e.g. surtir
+ * with an inline new supplier) reuses its child's Idempotency-Key.
+ */
+export async function deriveRequestId(parent: string, purpose: string): Promise<string> {
+  if (!UUID_RE.test(parent)) throw new Error("deriveRequestId: parent must be a UUID.");
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    throw new Error("crypto.subtle is required to derive a requestId.");
+  }
+  const data = new TextEncoder().encode(`${parent.toLowerCase()}::${purpose}`);
+  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-1", data)).slice(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}

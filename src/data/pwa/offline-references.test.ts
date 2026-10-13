@@ -128,7 +128,7 @@ describe("D3 pending references", () => {
     ).rejects.toThrow(PENDING_CUSTOMER_MESSAGE);
   });
 
-  it("blocks an offline surtir with a pending supplier", async () => {
+  it("queues an offline surtir behind a pending supplier (no throw)", async () => {
     await seedProduct();
     const supplierId = await offlineSupplier("Proveedor");
     api.inventory.surtir.mockRejectedValue(new NetworkError("offline"));
@@ -144,7 +144,12 @@ describe("D3 pending references", () => {
         },
         crypto.randomUUID(),
       ),
-    ).rejects.toThrow(PENDING_SUPPLIER_MESSAGE);
+    ).resolves.toMatchObject({ mode: "offline" });
+    const ops = await getOutboxStore().listPending(businessId);
+    const supplierOp = ops.find((op) => op.entity === "supplier")!;
+    const surtirOp = ops.find((op) => op.entity === "stockMove")!;
+    expect(surtirOp.dependsOn).toContain(supplierOp.operationId);
+    expect(PENDING_SUPPLIER_MESSAGE).toBeTruthy();
   });
 
   it("allows the reference once the entity is synced and reconciled", async () => {

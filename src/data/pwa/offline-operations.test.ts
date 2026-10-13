@@ -379,7 +379,7 @@ describe("M6.8 offline operations", () => {
     expect(combo?.avgCost).toBe(100_000);
   });
 
-  it("surtir waits for an offline supplier creation instead of referencing it", async () => {
+  it("surtir queues behind an offline supplier creation instead of throwing", async () => {
     api.inventory.surtir.mockRejectedValue(new NetworkError("offline"));
     await getLocalDb().products.put(productRow());
     await getLocalDb().suppliers.put({
@@ -407,8 +407,11 @@ describe("M6.8 offline operations", () => {
         { productId, qty: 1, unitCost: 100, totalCost: 100, method: "Efectivo", supplierId },
         "24242424-2424-4242-8242-242424242424",
       ),
-    ).rejects.toThrow("aún se está sincronizando");
-    expect(await getLocalDb().stockMoves.where("businessId").equals(businessId).count()).toBe(0);
+    ).resolves.toMatchObject({ mode: "offline" });
+    const move = (await getLocalDb().stockMoves.where("businessId").equals(businessId).toArray())[0];
+    expect((await getOutboxStore().get(businessId, move.id))?.dependsOn).toEqual([
+      "23232323-2323-4232-8232-232323232323",
+    ]);
   });
 
   it("rejects shrink when cached stock is insufficient", async () => {

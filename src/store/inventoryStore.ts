@@ -38,6 +38,7 @@ import {
   surtirWithOfflineFallback,
 } from "@/data/pwa/offline-operations";
 import { NetworkError } from "@/data/errors";
+import { deriveRequestId } from "@/domain/requestId";
 
 export type PwaSupplierSurtir = {
   moveId: string;
@@ -351,11 +352,14 @@ export const inventoryStore = {
     });
     if ("error" in parsed) throw new Error(parsed.error);
 
+    // One requestId per surtir intent; the inline supplier's key derives from
+    // it so a retry reuses the same supplier instead of creating another.
+    const requestId = input.requestId ?? crypto.randomUUID();
     let supplierId = input.supplierId ?? null;
     if (!supplierId && input.supplierNameCreate?.trim()) {
       const created = await createSupplierWithOfflineFallback(
         { name: input.supplierNameCreate.trim() },
-        crypto.randomUUID(),
+        await deriveRequestId(requestId, "surtir:supplier"),
       );
       supplierId = created.mode === "offline" ? created.supplierId : created.supplier.id;
     }
@@ -371,7 +375,7 @@ export const inventoryStore = {
           supplierId,
           note: input.note?.trim() || undefined,
         },
-        input.requestId ?? crypto.randomUUID(),
+        requestId,
       );
       await this.refreshAll();
       setState({ lastToast: INVENTORY_TOASTS.surtir });
