@@ -115,8 +115,9 @@ export function PrepModal() {
                         key={task.key}
                         className="flex min-h-11 items-center justify-between gap-2 px-3 py-2 text-sm"
                       >
-                        <span className="flex min-w-0 items-center gap-2 truncate">
-                          <TaskIcon status={task.status} /> {task.label}
+                        <span className="flex min-w-0 flex-1 items-center gap-2">
+                          <TaskIcon status={task.status} />
+                          <span className="min-w-0 truncate">{task.label}</span>
                         </span>
                         {task.status === "failed" ? (
                           <Badge tone="danger" className="shrink-0">

@@ -51,7 +51,9 @@ export function applyPalette(id: PaletteId): void {
 export async function loadPalette(): Promise<PaletteId> {
   try {
     const row = await getDb().settings.get(PALETTE_SETTING_KEY);
-    return parsePalette(row?.value);
+    // No saved row yet (fresh Dexie, portal-only device): keep the cached
+    // choice instead of silently snapping back to amber.
+    return row?.value ? parsePalette(row.value) : readCachedPalette();
   } catch {
     return readCachedPalette();
   }
@@ -86,7 +88,7 @@ export function applyMode(mode: ColorMode): void {
 export async function loadMode(): Promise<ColorMode> {
   try {
     const row = await getDb().settings.get(MODE_SETTING_KEY);
-    return parseMode(row?.value);
+    return row?.value ? parseMode(row.value) : readCachedMode();
   } catch {
     return readCachedMode();
   }
