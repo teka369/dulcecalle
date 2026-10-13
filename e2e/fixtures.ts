@@ -29,6 +29,49 @@ export const SALEO = {
 const TODAY = { localDate: today, session: null, expected: { efectivo: 0, nequi: 0, total: 0 }, closed: false, pendingCount: 0, pendingSessions: [], needsReviewCount: 0, conflict: false, canOpen: true, moves: [] };
 const STATS = (period: string) => ({ period, from: today, to: today, ventas: 3000, ventasCount: 1, devoluciones: 0, devolucionesCount: 0, recibido: 0, recibidoEfectivo: 0, recibidoNequi: 0, porCobrar: 3000, gaste: 0, inverti: 0, ganancia: 2200, valorInventario: 4000, stockBajo: 0, emptyPeriod: false });
 
+/** B1/B5: minimal server-side caja with Idempotency-Key semantics. */
+export type FakeCash = {
+  sessions: Map<string, Record<string, unknown>>; // idempotency key -> session
+  moves: Map<string, Record<string, unknown>>; // idempotency key -> move
+  posts: Array<{ path: string; key: string | null }>;
+  /** Server applies the next POST /cash/sessions but the response is lost (client must retry). */
+  dropNextOpenResponse: boolean;
+};
+
+function cashToday(c: FakeCash) {
+  const session = [...c.sessions.values()][0] ?? null;
+  if (!session) return TODAY;
+  const moves = [...c.moves.values()];
+  let efectivo = Number(session.openingFloat);
+  let nequi = 0;
+  for (const m of moves) {
+    const d = m.direction === "in" ? Number(m.amount) : -Number(m.amount);
+    if (m.method === "Efectivo") efectivo += d;
+    else nequi += d;
+  }
+  return { ...TODAY, session, canOpen: false, expected: { efectivo, nequi, total: efectivo + nequi }, moves };
+}
+
+function cashPost(c: FakeCash, p: string, key: string | null, body: Record<string, unknown>): unknown | undefined {
+  const k = key ?? crypto.randomUUID();
+  if (p === "/cash/sessions") {
+    if (!c.sessions.has(k)) {
+      if (c.sessions.size > 0) return undefined; // one caja per day
+      c.sessions.set(k, { id: crypto.randomUUID(), localDate: today, openedAt: new Date().toISOString(), closedAt: null, openingFloat: Number(body.openingFloat ?? 0), closingCount: null, expectedEfectivo: null, expectedNequi: null, difference: null });
+    }
+    return c.sessions.get(k);
+  }
+  if (p === "/cash/aportes" || p === "/cash/retiros") {
+    if (!c.moves.has(k)) {
+      c.moves.set(k, { id: crypto.randomUUID(), amount: Number(body.amount), direction: p === "/cash/aportes" ? "in" : "out", method: String(body.method), kind: p === "/cash/aportes" ? "aporte" : "retiro", refType: null, refId: null, occurredOn: today, createdAt: new Date().toISOString() });
+    }
+    return c.moves.get(k);
+  }
+  return undefined;
+}
+
+let cash: FakeCash;
+
 function respond(p: string, url: URL): unknown {
   if (p === "/products") return [PROD, INSUMO];
   if (p === `/products/${P1}`) return PROD;
@@ -42,23 +85,35 @@ function respond(p: string, url: URL): unknown {
   if (p === `/sales/${SALE}`) return SALEO;
   if (p.endsWith("/returns")) return [];
   if (p === "/sales") return [SALEO];
-  if (p === "/cash/today") return TODAY;
+  if (p === "/cash/today") return cashToday(cash);
   if (p === "/me") return { id: AUTH.user.id, email: AUTH.user.email, memberships: [{ businessId: BIZ, role: "owner", business: { id: BIZ, name: "Tienda QA" } }] };
   if (p.startsWith("/stats")) return STATS(url.searchParams.get("period") ?? "hoy");
   return [];
 }
 
-export type Fake = { offline: boolean; log: string[] };
+export type Fake = { offline: boolean; log: string[]; cash: FakeCash };
 
 /** Fake API (same approach as /workspace/qa-plans scripts): intercepts every /v1/ request. */
 export async function installFakeApi(context: BrowserContext): Promise<Fake> {
-  const st: Fake = { offline: false, log: [] };
+  cash = { sessions: new Map(), moves: new Map(), posts: [], dropNextOpenResponse: false };
+  const st: Fake = { offline: false, log: [], cash };
   await context.route(/\/v1\//, async (route) => {
     const req = route.request();
     const url = new URL(req.url());
     const p = url.pathname.replace(/^.*\/v1/, "");
     st.log.push(`${req.method()} ${p}`);
     if (st.offline) return route.abort("internetdisconnected");
+    if (req.method() === "POST" && p.startsWith("/cash/")) {
+      const key = (await req.allHeaders())["idempotency-key"] ?? null;
+      st.cash.posts.push({ path: p, key });
+      const out = cashPost(st.cash, p, key, (req.postDataJSON() ?? {}) as Record<string, unknown>);
+      if (out === undefined) return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ code: "CONFLICT", message: "conflict" }) });
+      if (p === "/cash/sessions" && st.cash.dropNextOpenResponse) {
+        st.cash.dropNextOpenResponse = false;
+        return route.abort("connectionreset");
+      }
+      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(out) });
+    }
     if (req.method() !== "GET") return route.fulfill({ status: 501, contentType: "application/json", body: "{}" });
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(respond(p, url)) });
   });
