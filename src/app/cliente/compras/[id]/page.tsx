@@ -1,5 +1,6 @@
 "use client";
 
+import { dmy } from "@/components/inventory/inventory";
 import { useParams } from "next/navigation";
 import { CustomerChrome, PortalError, PortalLoading } from "@/components/customer/CustomerChrome";
 import { usePortalLedger } from "@/components/customer/usePortalLedger";
@@ -53,7 +54,7 @@ export default function CustomerPurchaseDetailPage() {
       title="Compra"
       back={BACK}
       capturedAt={fromCache ? capturedAt : null}
-      subtitle={sale.occurredOn}
+      subtitle={dmy(sale.occurredOn)}
       hero={
         <div className="mt-4">
           <HeroAmount
@@ -100,7 +101,7 @@ export default function CustomerPurchaseDetailPage() {
             {sale.returns.map((r) => (
               <Row
                 key={r.id}
-                title={r.occurredOn}
+                title={dmy(r.occurredOn)}
                 meta={[
                   r.lines.map((l) => `${l.qty} × ${formatCop(l.unitPrice)}`).join(", "),
                   r.debtReduced > 0 ? `Bajó deuda ${formatCop(r.debtReduced)}` : null,

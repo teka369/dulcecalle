@@ -1,5 +1,6 @@
 "use client";
 
+import { dmy } from "@/components/inventory/inventory";
 import { CustomerChrome, PortalError, PortalLoading } from "@/components/customer/CustomerChrome";
 import { usePortalLedger } from "@/components/customer/usePortalLedger";
 import { newestFirst, purchaseLabel, purchaseTone } from "@/components/customer/portal";
@@ -53,7 +54,7 @@ export default function CustomerPurchasesPage() {
                     decorative
                   />
                 }
-                title={s.occurredOn}
+                title={dmy(s.occurredOn)}
                 meta={<Badge tone={purchaseTone(s.credit, s.paymentKind)}>{purchaseLabel(s.credit, s.paymentKind)}</Badge>}
                 trailing={<span className="text-[15px] font-semibold tabular-nums">{formatCop(s.saleTotal)}</span>}
               />

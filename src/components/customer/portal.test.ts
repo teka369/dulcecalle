@@ -57,3 +57,18 @@ describe("portal nav", () => {
     expect(newestFirst([{ createdAt: "2026-01-01" }, { createdAt: "2026-05-01" }])[0].createdAt).toBe("2026-05-01");
   });
 });
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+describe("portal softs (P5 visual pass)", () => {
+  it("active tab scrolls into view", () => {
+    const s = readFileSync(join(__dirname, "CustomerChrome.tsx"), "utf8");
+    expect(s).toContain('scrollIntoView?.({ inline: "nearest"');
+  });
+  it("no raw ISO dates in portal pages", () => {
+    for (const p of ["cuenta/page.tsx", "pagos/page.tsx", "compras/page.tsx", "compras/[id]/page.tsx"]) {
+      const s = readFileSync(join(__dirname, "../../app/cliente", p), "utf8");
+      expect(s, p).not.toMatch(/=\{(row|p|s|sale|r)\.occurredOn\}/);
+    }
+  });
+});
