@@ -12,3 +12,11 @@ export type CustomerAuth = {
   customerId: string;
   businessId: string;
 };
+
+/** Explicit read scope for the customer portal ledger (never a staff role). */
+export type PortalLedgerScope = {
+  kind: "portal";
+  customerId: string;
+  businessId: string;
+  timezone: string;
+};

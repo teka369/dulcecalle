@@ -6,7 +6,8 @@ import { CatalogService } from "../catalog/catalog.service";
 import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import { AuthSessionService } from "../identity/auth-sessions";
 import { normalizeCustomerCode } from "../shared/customer-code";
-import type { CustomerAuth } from "../identity/auth.types";
+import type { CustomerAuth, PortalLedgerScope } from "../identity/auth.types";
+import { DEFAULT_TZ } from "../shared/clock";
 import { copToJson } from "../shared/money";
 import { PortalLoginThrottle } from "./portal-throttle";
 
@@ -188,17 +189,21 @@ export class CustomerAccessService {
   }
 
   async ledger(auth: CustomerAuth) {
-    const raw = await this.catalog.customerLedger(
-      {
-        userId: auth.customerId,
-        businessId: auth.businessId,
-        role: "staff",
-        timezone: "America/Bogota",
-      },
-      auth.customerId,
+    const raw = await this.catalog.portalCustomerLedger(
+      portalLedgerScope(auth),
     );
     return publicCustomerLedger(raw);
   }
+}
+
+/** J-B1: portal keeps the fixed Bogota zone. */
+export function portalLedgerScope(auth: CustomerAuth): PortalLedgerScope {
+  return {
+    kind: "portal",
+    customerId: auth.customerId,
+    businessId: auth.businessId,
+    timezone: DEFAULT_TZ,
+  };
 }
 
 type AdminLedger = Awaited<
