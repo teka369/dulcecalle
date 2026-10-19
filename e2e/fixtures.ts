@@ -98,12 +98,14 @@ export type Fake = {
   /** GET paths matching this are answered only after slowMs (slow server). */
   slow: RegExp | null;
   slowMs: number;
+  /** GET paths matching this answer 503 (server down while online). */
+  fail5xx: RegExp | null;
 };
 
 /** Fake API (same approach as /workspace/qa-plans scripts): intercepts every /v1/ request. */
 export async function installFakeApi(context: BrowserContext): Promise<Fake> {
   cash = { sessions: new Map(), moves: new Map(), posts: [], dropNextOpenResponse: false };
-  const st: Fake = { offline: false, log: [], cash, slow: null, slowMs: 0 };
+  const st: Fake = { offline: false, log: [], cash, slow: null, slowMs: 0, fail5xx: null };
   await context.route(/\/v1\//, async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -120,6 +122,9 @@ export async function installFakeApi(context: BrowserContext): Promise<Fake> {
         return route.abort("connectionreset");
       }
       return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(out) });
+    }
+    if (req.method() === "GET" && st.fail5xx?.test(p)) {
+      return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ code: "INTERNAL", message: "Servicio no disponible" }) });
     }
     if (req.method() === "GET" && st.slow?.test(p)) await new Promise((r) => setTimeout(r, st.slowMs));
     if (req.method() !== "GET") return route.fulfill({ status: 501, contentType: "application/json", body: "{}" });

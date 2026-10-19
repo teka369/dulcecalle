@@ -1,4 +1,4 @@
-import { NetworkError } from "../errors";
+import { ApiError, NetworkError } from "../errors";
 import type { HttpRepository } from "../http/repository";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import type { RemoteStats } from "../http/mappers";
@@ -112,6 +112,24 @@ export async function loadDashboardWithOfflineFallback(api?: HttpRepository): Pr
     throw new Error("Respuesta incompleta del servidor.");
   }
   return saveSnapshot(DASHBOARD_SNAPSHOT_KIND, snapshot);
+}
+
+/**
+ * Inicio screen read (PREP keeps loadDashboardWithOfflineFallback). B3: a 5xx
+ * also serves this phone's last snapshot (the screen shows the
+ * "No se pudo actualizar" band); with no snapshot the server error stands.
+ */
+export async function loadDashboardForScreen(): Promise<SnapshotResult<DashboardSnapshot>> {
+  try {
+    return await loadDashboardWithOfflineFallback();
+  } catch (e) {
+    if (!(e instanceof ApiError && e.status >= 500)) throw e;
+    try {
+      return await loadCachedSnapshot<DashboardSnapshot>(DASHBOARD_SNAPSHOT_KIND);
+    } catch {
+      throw e;
+    }
+  }
 }
 
 async function loadCachedSnapshot<T>(kind: string): Promise<SnapshotResult<T>> {

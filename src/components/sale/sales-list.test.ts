@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bogotaKey, dayHeading, groupByDay, saleDayKey, saleTime, ventasSheetState } from "./sales-list";
+import { bogotaKey, dayHeading, groupByDay, saleDayKey, saleTime, ventasSheetState, ventasHero } from "./sales-list";
 
 describe("sales list helpers", () => {
   it("uses occurredOn, else Bogotá day of createdAt", () => {
@@ -36,5 +36,14 @@ describe("ventasSheetState", () => {
     expect(ventasSheetState({ ready: false, error: null, salesCount: 0, filteredCount: 0 })).toBe("loading");
     expect(ventasSheetState({ ready: true, error: null, salesCount: 0, filteredCount: 0 })).toBe("empty");
     expect(ventasSheetState({ ready: true, error: null, salesCount: 2, filteredCount: 0 })).toBe("filter-empty");
+  });
+});
+
+describe("ventasHero: never a partial total that reads as complete", () => {
+  it("skeleton while loading, total from server, note for local rows, nothing on error", () => {
+    expect(ventasHero({ ready: false, fromCache: false, salesCount: 0, error: null })).toBe("skeleton");
+    expect(ventasHero({ ready: true, fromCache: false, salesCount: 3, error: null })).toBe("total");
+    expect(ventasHero({ ready: true, fromCache: true, salesCount: 2, error: null })).toBe("local");
+    expect(ventasHero({ ready: true, fromCache: false, salesCount: 0, error: "x" })).toBe("none");
   });
 });

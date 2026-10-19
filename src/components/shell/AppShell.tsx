@@ -24,7 +24,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col overflow-x-hidden bg-bg text-ink">
       <AuthGate>
       <main className={`flex-1 px-4 ${mainPad}`} hidden={overlayOpen} aria-hidden={overlayOpen || undefined}>
-        {children}
+        {/* One h1 on screen: the page underneath is not rendered while a ficha overlay owns it. */}
+        {overlayOpen ? null : children}
       </main>
       <EntityViewHost />
       {!hideChrome && (

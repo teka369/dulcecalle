@@ -55,6 +55,9 @@ test("full PREP, then offline cold loads of never-visited entity URLs keep the U
         // Designer (b): the record's view owns the screen; the list underneath is not visible.
         await expect(p.locator("main")).toBeHidden();
         await expect(scope.locator("h1").first()).toBeAttached();
+        // Visual pass soft 1: one h1 on the page, no extra "← Volver" pill.
+        await expect(p.locator("h1"), `single h1 ${r.path}`).toHaveCount(1);
+        await expect(p.getByRole("button", { name: "← Volver" })).toHaveCount(0);
         if (r.button) await expect(scope.getByRole("button", { name: r.button }).last()).toBeVisible();
       } else {
         await expect(p.getByRole("link", { name: "Volver a Caja" }).last()).toBeVisible();

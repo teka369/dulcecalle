@@ -103,14 +103,7 @@ export function EntityViewHost() {
 
   return (
     <div className="fixed inset-0 z-[75] overflow-y-auto bg-bg" data-testid="entity-view">
-      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 pb-28 pt-4">
-        <button
-          type="button"
-          onClick={() => entityViewStore.back()}
-          className="mb-3 min-h-11 w-fit rounded-[var(--r-md)] border border-border bg-surface px-3 text-sm font-medium"
-        >
-          ← Volver
-        </button>
+      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 pb-28 pt-4" data-testid="entity-view-body">
         <EntityIdProvider id={view.id}>
           <EntityScreen view={view} />
         </EntityIdProvider>

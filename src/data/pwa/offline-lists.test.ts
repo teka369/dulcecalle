@@ -11,6 +11,7 @@ import { resetLocalStoreSingleton } from "@/data/local/store";
 import { newEntityId } from "@/data/local/ids";
 import {
   getSaleDetailWithOfflineFallback,
+  listSalesForScreen,
   listSalesWithOfflineFallback,
 } from "./offline-sales";
 import { listLocalStockMoves } from "./offline-operations";
@@ -121,6 +122,35 @@ describe("offline sales readers", () => {
     const serverError = new ApiError("INTERNAL", "Falla el servidor.", 500);
     api.sales.list.mockRejectedValue(serverError);
     await expect(listSalesWithOfflineFallback()).rejects.toBe(serverError);
+  });
+
+  it("screen: 5xx with local sales serves them flagged failed (band, no total)", async () => {
+    await seedLocalSale();
+    api.sales.list.mockRejectedValue(new ApiError("INTERNAL", "Falla el servidor.", 503));
+    const result = await listSalesForScreen();
+    expect(result).toMatchObject({ source: "cache", failed: true });
+    expect(result.sales).toHaveLength(1);
+  });
+
+  it("screen: 5xx without local sales keeps the error (never a false empty)", async () => {
+    const err = new ApiError("INTERNAL", "Falla el servidor.", 503);
+    api.sales.list.mockRejectedValue(err);
+    await expect(listSalesForScreen()).rejects.toBe(err);
+  });
+
+  it("screen: timeout while online with no local sales is an error; truly offline stays empty", async () => {
+    api.sales.list.mockRejectedValue(new NetworkError("timeout"));
+    vi.stubGlobal("navigator", { onLine: true });
+    await expect(listSalesForScreen()).rejects.toBeInstanceOf(NetworkError);
+    vi.stubGlobal("navigator", { onLine: false });
+    expect(await listSalesForScreen()).toMatchObject({ sales: [], source: "cache", failed: false });
+    vi.unstubAllGlobals();
+  });
+
+  it("screen: 4xx is rethrown", async () => {
+    const err = new ApiError("FORBIDDEN", "No.", 403);
+    api.sales.list.mockRejectedValue(err);
+    await expect(listSalesForScreen()).rejects.toBe(err);
   });
 
   it("detail serves a locally-created sale with its pending flag", async () => {

@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:prod": "playwright test -c playwright.prod.config.ts"
   },
   "dependencies": {
     "@serwist/next": "^9.5.12",

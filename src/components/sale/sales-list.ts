@@ -74,3 +74,16 @@ export function ventasSheetState(input: {
   if (input.filteredCount === 0) return "filter-empty";
   return "list";
 }
+
+export type VentasHero = "skeleton" | "total" | "local" | "none";
+
+/**
+ * Ventas hero. Local rows (offline or a failed read) may be incomplete, so
+ * they never get a "Total listado" that reads as complete.
+ */
+export function ventasHero(input: { ready: boolean; fromCache: boolean; salesCount: number; error: string | null }): VentasHero {
+  if (!input.ready) return "skeleton";
+  if (input.error && input.salesCount === 0) return "none";
+  if (input.fromCache) return "local";
+  return "total";
+}
