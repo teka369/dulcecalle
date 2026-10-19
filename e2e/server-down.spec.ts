@@ -37,3 +37,14 @@ test("5xx without local data: Inicio and Ventas show the error + Reintentar", as
   await expect(page.getByText("No se pudo cargar el inicio")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: "Reintentar" })).toBeVisible();
 });
+
+test("new device online, Ventas read times out: 'No se pudo cargar' + Reintentar, never 'Sin conexión · $0'", async ({ context, page }) => {
+  await installFakeApi(context);
+  await context.route(/\/v1\/sales(\?|$)/, (route) => route.abort("timedout"));
+  await page.goto("/ventas");
+  await expect(page.getByText("No se pudo cargar.")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: "Reintentar" })).toBeVisible();
+  await expect(page.getByText(/Sin conexión/)).toHaveCount(0);
+  await expect(page.getByText(/\$\s?0(?![\d.,])/)).toHaveCount(0);
+  await expect(page.getByText(/0 ventas/)).toHaveCount(0);
+});

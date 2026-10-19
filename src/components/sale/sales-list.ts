@@ -87,3 +87,9 @@ export function ventasHero(input: { ready: boolean; fromCache: boolean; salesCou
   if (input.fromCache) return "local";
   return "total";
 }
+
+/** Online (timeout / server down): "No se pudo cargar." — never "Sin conexión" on an online device. */
+export function ventasErrorMessage(e: unknown, online: boolean): string {
+  if (online || !(e instanceof Error) || !e.message) return "No se pudo cargar.";
+  return e.message;
+}

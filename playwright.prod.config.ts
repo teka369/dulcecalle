@@ -10,7 +10,7 @@ const PORT = Number(process.env.E2E_PORT ?? 4317);
  */
 export default defineConfig({
   ...base,
-  testMatch: ["**/offline-cold-load.spec.ts", "**/caja-offline.spec.ts"],
+  testMatch: ["**/offline-cold-load.spec.ts", "**/caja-offline.spec.ts", "**/caja-tiles-offline.spec.ts"],
   webServer: {
     command: `npm run build && npx next start -H 127.0.0.1 -p ${PORT}`,
     url: `http://127.0.0.1:${PORT}/offline`,

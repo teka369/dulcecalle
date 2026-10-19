@@ -19,7 +19,7 @@ import type { RemoteCustomer } from "@/data/http/mappers";
 import { listCachedCustomers } from "@/data/pwa/catalog";
 import { listSalesForScreen, type LocalSaleRow } from "@/data/pwa/offline-sales";
 import { LIST_STALE_TEXT } from "@/data/pwa/list-status";
-import { ventasHero } from "@/components/sale/sales-list";
+import { ventasErrorMessage, ventasHero } from "@/components/sale/sales-list";
 import { summarizeSales } from "@/components/sale/checkout";
 import { bogotaKey, dayHeading, groupByDay, saleTime, ventasSheetState } from "@/components/sale/sales-list";
 
@@ -62,7 +62,7 @@ export default function VentasPage() {
         setFailed(result.failed);
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "No se pudo cargar.");
+        setError(ventasErrorMessage(e, typeof navigator === "undefined" || navigator.onLine !== false));
       })
       .finally(() => setReady(true));
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bogotaKey, dayHeading, groupByDay, saleDayKey, saleTime, ventasSheetState, ventasHero } from "./sales-list";
+import { bogotaKey, dayHeading, groupByDay, saleDayKey, saleTime, ventasSheetState, ventasHero, ventasErrorMessage } from "./sales-list";
 
 describe("sales list helpers", () => {
   it("uses occurredOn, else Bogotá day of createdAt", () => {
@@ -45,5 +45,12 @@ describe("ventasHero: never a partial total that reads as complete", () => {
     expect(ventasHero({ ready: true, fromCache: false, salesCount: 3, error: null })).toBe("total");
     expect(ventasHero({ ready: true, fromCache: true, salesCount: 2, error: null })).toBe("local");
     expect(ventasHero({ ready: true, fromCache: false, salesCount: 0, error: "x" })).toBe("none");
+  });
+});
+
+describe("ventasErrorMessage", () => {
+  it("online timeout reads 'No se pudo cargar.', offline keeps 'Sin conexión.'", () => {
+    expect(ventasErrorMessage(new Error("Sin conexión."), true)).toBe("No se pudo cargar.");
+    expect(ventasErrorMessage(new Error("Sin conexión."), false)).toBe("Sin conexión.");
   });
 });

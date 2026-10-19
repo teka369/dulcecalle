@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
-import { isOffline } from "@/data/pwa/offline-nav";
+import { isOffline, offlineDocumentNavigate } from "@/data/pwa/offline-nav";
 import { parseEntityHref } from "@/data/pwa/entity-href";
 import { entityViewStore } from "@/store/entityViewStore";
 import { useOnline } from "./use-online";
@@ -27,7 +27,7 @@ export function onOfflineLinkClick(event: OfflineClick, href: string): void {
     entityViewStore.open(href);
     return;
   }
-  window.location.assign(href);
+  offlineDocumentNavigate(href);
 }
 
 /**
