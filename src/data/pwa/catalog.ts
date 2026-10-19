@@ -28,6 +28,29 @@ export function listCachedSuppliersResult(api: HttpRepository = getPwaApi()): Pr
   return getCatalogReadCache().listSuppliers(requireBusinessId(), () => api.suppliers.list());
 }
 
+/** Local-only snapshot for a first paint while the server read is slow. Never throws. */
+async function peekSafe<T>(read: (businessId: string) => Promise<T[] | null>): Promise<T[] | null> {
+  try {
+    const businessId = getPwaApi().session.businessId;
+    if (!businessId) return null;
+    return await read(businessId);
+  } catch {
+    return null;
+  }
+}
+
+export function peekLocalProducts(): Promise<RemoteProduct[] | null> {
+  return peekSafe((b) => getCatalogReadCache().peekProducts(b));
+}
+
+export function peekLocalCustomers(): Promise<RemoteCustomer[] | null> {
+  return peekSafe((b) => getCatalogReadCache().peekCustomers(b));
+}
+
+export function peekLocalSuppliers(): Promise<RemoteSupplier[] | null> {
+  return peekSafe((b) => getCatalogReadCache().peekSuppliers(b));
+}
+
 export async function listCachedProducts(api: HttpRepository = getPwaApi()): Promise<RemoteProduct[]> {
   const result = await getCatalogReadCache().listProducts(
     requireBusinessId(),

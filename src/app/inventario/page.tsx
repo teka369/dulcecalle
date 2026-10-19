@@ -6,7 +6,7 @@ import { formatCop } from "@/domain/money";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getPendingSupplierIds } from "@/data/pwa/offline-catalog";
 import { useSync } from "@/store/syncStore";
-import { listBand, listGate } from "@/data/pwa/list-status";
+import { heroFigures, listBand, listGate } from "@/data/pwa/list-status";
 import { ListErrorState } from "@/components/ui/ListErrorState";
 import { useInventory } from "@/store/inventoryStore";
 import { HeroBlock } from "@/components/ui/HeroBlock";
@@ -72,6 +72,8 @@ export default function InventarioPage() {
   // B3: a failed read never renders as "Aún no hay productos/proveedores".
   const gate = listGate({ loading, count: isProducts ? products.length : suppliers.length, status: listStatus });
   const band = listBand(listStatus, online, products.length + suppliers.length);
+  // Hero figures are always about products, whatever segment is shown.
+  const figures = heroFigures(listGate({ loading, count: products.length, status: listStatus }));
   const searching = query.trim().length > 0;
 
   return (
@@ -91,8 +93,8 @@ export default function InventarioPage() {
           <SegmentedMetrics
             label="Resumen de inventario"
             items={[
-              { icon: "package", label: "productos", value: gate === "error" && isProducts ? "—" : String(counts.products) },
-              { icon: "alert", label: "stock bajo", value: gate === "error" && isProducts ? "—" : String(counts.low), tone: counts.low > 0 ? "danger" : "neutral" },
+              { icon: "package", label: "productos", loading: figures === "skeleton", value: figures === "error" ? "—" : String(counts.products) },
+              { icon: "alert", label: "stock bajo", loading: figures === "skeleton", value: figures === "error" ? "—" : String(counts.low), tone: counts.low > 0 ? "danger" : "neutral" },
             ]}
           />
         </div>

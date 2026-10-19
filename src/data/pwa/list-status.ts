@@ -22,6 +22,18 @@ export function listGate(input: { loading: boolean; count: number; status: ListR
   return "empty";
 }
 
+export type HeroFigures = "value" | "skeleton" | "error";
+
+/**
+ * Hero money/count figures. While nothing real is known (no server answer,
+ * no local rows) they are a skeleton — never a fake "$0" / "0 productos".
+ */
+export function heroFigures(gate: ListGate): HeroFigures {
+  if (gate === "loading") return "skeleton";
+  if (gate === "error") return "error";
+  return "value";
+}
+
 export type ListBand = { capturedAt: number } | { text: string } | null;
 
 export const LIST_STALE_TEXT = "No se pudo actualizar · mostrando datos de este teléfono";

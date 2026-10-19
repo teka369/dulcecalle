@@ -22,6 +22,8 @@ import {
   getCachedSupplier,
   listCachedProductsResult,
   listCachedSuppliersResult,
+  peekLocalProducts,
+  peekLocalSuppliers,
 } from "@/data/pwa/catalog";
 import { EMPTY_LIST_STATUS, listErrorMessage, type ListReadStatus } from "@/data/pwa/list-status";
 import type { RemotePreparation, RemoteProduct, RemoteStockMove, RemoteSupplier } from "@/data/http/mappers";
@@ -128,12 +130,27 @@ export const inventoryStore = {
   },
   async refreshAll(): Promise<void> {
     setState({ loading: true });
+    let productsSettled = false;
+    let suppliersSettled = false;
+    // Hero-first paint: this device's rows while a slow server read runs.
+    if (state.products.length === 0) {
+      void peekLocalProducts().then((rows) => {
+        if (!productsSettled && rows && rows.length > 0 && state.products.length === 0) setState({ products: rows });
+      });
+    }
+    if (state.suppliers.length === 0) {
+      void peekLocalSuppliers().then((rows) => {
+        if (!suppliersSettled && rows && rows.length > 0 && state.suppliers.length === 0) setState({ suppliers: rows });
+      });
+    }
     try {
       // Products and suppliers settle independently: one failing must not hide the other.
       const [products, suppliers] = await Promise.allSettled([
         listCachedProductsResult(),
         listCachedSuppliersResult(),
       ]);
+      productsSettled = true;
+      suppliersSettled = true;
       if (products.status === "fulfilled") {
         setState({
           products: products.value.data,
@@ -147,6 +164,8 @@ export const inventoryStore = {
       if (products.status === "rejected") fail(products.reason);
       if (suppliers.status === "rejected") fail(suppliers.reason);
     } catch (e) {
+      productsSettled = true;
+      suppliersSettled = true;
       setState({ loading: false });
       fail(e);
     }

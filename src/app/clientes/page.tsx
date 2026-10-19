@@ -6,7 +6,7 @@ import { formatCop } from "@/domain/money";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { useCustomers } from "@/store/customerStore";
 import { useSync } from "@/store/syncStore";
-import { listBand, listGate } from "@/data/pwa/list-status";
+import { heroFigures, listBand, listGate } from "@/data/pwa/list-status";
 import { ListErrorState } from "@/components/ui/ListErrorState";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { HeroAmount } from "@/components/ui/HeroAmount";
@@ -40,6 +40,8 @@ export default function ClientesPage() {
   // B3: a failed read never renders as "Sin clientes aún".
   const gate = listGate({ loading, count: customers.length, status: listStatus });
   const band = listBand(listStatus, online, customers.length);
+  const figures = heroFigures(gate);
+  const known = figures === "value";
 
   return (
     <div className="flex flex-col pb-6">
@@ -52,9 +54,10 @@ export default function ClientesPage() {
         <div className="mt-5">
           <HeroAmount
             label="Por cobrar"
-            value={gate === "error" ? "—" : formatCop(summary.total)}
+            loading={figures === "skeleton"}
+            value={figures === "error" ? "—" : formatCop(summary.total)}
             tone={summary.count > 0 ? "danger" : "default"}
-            caption={gate === "error" ? "Sin datos" : summary.count === 1 ? "1 cliente debe" : `${summary.count} clientes deben`}
+            caption={figures === "error" ? "Sin datos" : summary.count === 1 ? "1 cliente debe" : `${summary.count} clientes deben`}
           />
         </div>
         <div className="mt-4">
@@ -66,8 +69,8 @@ export default function ClientesPage() {
             value={segment}
             onChange={setSegment}
             options={[
-              { id: "deben", label: "Deben", count: summary.count },
-              { id: "todos", label: "Todos", count: customers.length },
+              { id: "deben", label: "Deben", count: known ? summary.count : undefined },
+              { id: "todos", label: "Todos", count: known ? customers.length : undefined },
             ]}
           />
         </div>

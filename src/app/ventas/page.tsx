@@ -99,12 +99,15 @@ export default function VentasPage() {
             <HeroAmount
               className="mt-6"
               label="Total listado"
+              loading={!ready}
               value={formatCop(totals.ventas)}
               caption={`${totals.count} ${totals.count === 1 ? "venta" : "ventas"}`}
             />
+            {ready ? (
             <p className="mt-2 text-sm tabular-nums text-on-hero-muted">
               Recibido {formatCop(totals.recibido)} · Fiado {formatCop(totals.fiado)}
             </p>
+            ) : null}
           </>
         )}
         <div className="mt-5">

@@ -14,7 +14,7 @@ import {
 } from "@/domain/initialDebt";
 import { ApiError } from "@/data/errors";
 import { getPwaApi } from "@/data/pwa/api";
-import { getCachedCustomer, listCachedCustomersResult } from "@/data/pwa/catalog";
+import { getCachedCustomer, listCachedCustomersResult, peekLocalCustomers } from "@/data/pwa/catalog";
 import { EMPTY_LIST_STATUS, listErrorMessage, type ListReadStatus } from "@/data/pwa/list-status";
 import { createPaymentWithOfflineFallback } from "@/data/pwa/offline-payments";
 import {
@@ -70,8 +70,16 @@ export const customerStore = {
   },
   async refresh(): Promise<RemoteCustomer[]> {
     setState({ loading: true });
+    let settled = false;
+    // Hero-first paint: show this device's rows while a slow server read runs.
+    if (state.customers.length === 0) {
+      void peekLocalCustomers().then((rows) => {
+        if (!settled && rows && rows.length > 0 && state.customers.length === 0) setState({ customers: rows });
+      });
+    }
     try {
       const result = await listCachedCustomersResult();
+      settled = true;
       const customers = result.data;
       setState({
         customers,
@@ -80,6 +88,7 @@ export const customerStore = {
       });
       return customers;
     } catch (e) {
+      settled = true;
       setState({ loading: false, listStatus: { ...state.listStatus, error: listErrorMessage(e) } });
       fail(e);
     }
