@@ -215,7 +215,32 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
           tabIndex={-1}
           aria-labelledby={`discard-title-${item.operationId}`}
           aria-describedby={`discard-desc-${item.operationId}`}
-          onKeyDown={(e) => { if (e.key === "Escape" && !busy) setConfirming(false); }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !busy) {
+              e.preventDefault();
+              setConfirming(false);
+              return;
+            }
+            if (e.key !== "Tab") return;
+            // Focus trap: Tab / Shift+Tab cycle between the dialog's enabled buttons.
+            const focusables = Array.from(
+              e.currentTarget.querySelectorAll<HTMLElement>("button:not([disabled]), [href], input:not([disabled])"),
+            );
+            if (focusables.length === 0) {
+              e.preventDefault();
+              return;
+            }
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            const active = document.activeElement;
+            if (e.shiftKey && (active === first || active === e.currentTarget)) {
+              e.preventDefault();
+              last.focus();
+            } else if (!e.shiftKey && active === last) {
+              e.preventDefault();
+              first.focus();
+            }
+          }}
           className="mt-3 rounded-[var(--r-lg)] border border-danger/20 bg-danger/5 p-3 outline-none focus-visible:ring-2 focus-visible:ring-danger"
         >
           <p id={`discard-title-${item.operationId}`} className="text-sm font-semibold">¿Descartar este envío?</p>
