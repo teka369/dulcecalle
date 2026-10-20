@@ -1,6 +1,5 @@
 "use client";
 
-import { errorText } from "@/domain/ux/user-message";
 import { useCallback, useEffect, useState } from "react";
 import { DebtStatementView } from "@/components/customers/DebtStatementView";
 import type { DebtStatement } from "@/domain/debt/statement";
@@ -126,7 +125,7 @@ export default function ClienteFichaPage() {
         setPinMessage("PIN guardado. No vuelve a mostrarse.");
       })
       .catch((e: unknown) => {
-        setPinMessage(errorText(e, "No se pudo guardar el PIN."));
+        setPinMessage(e instanceof Error ? e.message : "No se pudo guardar el PIN.");
       })
       .finally(() => setPinBusy(false));
   };
@@ -150,7 +149,7 @@ export default function ClienteFichaPage() {
         setEditing(false);
       })
       .catch((e: unknown) => {
-        setEditError(errorText(e, "No se pudo guardar."));
+        setEditError(e instanceof Error ? e.message : "No se pudo guardar.");
       })
       .finally(() => setEditBusy(false));
   };

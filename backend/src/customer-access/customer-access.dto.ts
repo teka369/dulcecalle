@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from "class-validator";
+import { IsOptional, IsString, IsUUID, Matches, MinLength } from "class-validator";
 
 export class CustomerLoginDto {
   @IsString()
@@ -12,12 +12,6 @@ export class CustomerLoginDto {
   @IsOptional()
   @IsUUID()
   businessId?: string;
-
-  /** Store short name or 8-char store code; only used when the code is in 2+ stores. */
-  @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  store?: string;
 }
 
 export class CustomerRefreshDto {

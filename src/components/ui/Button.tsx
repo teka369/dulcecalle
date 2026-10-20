@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export type ButtonVariant =
   | "primary"
@@ -8,7 +8,6 @@ export type ButtonVariant =
   | "icon";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  ref?: Ref<HTMLButtonElement>;
   variant?: ButtonVariant;
   children: ReactNode;
 };
@@ -21,7 +20,7 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
   ghost:
     "h-11 min-h-11 bg-transparent px-4 text-sm font-semibold text-ink hover:text-cta hover:opacity-[0.92]",
   danger:
-    "h-11 min-h-11 bg-danger px-4 text-sm font-semibold text-bg hover:opacity-[0.92]",
+    "h-11 min-h-11 bg-danger px-4 text-sm font-semibold text-white hover:opacity-[0.92]",
   icon:
     "h-11 w-11 min-h-11 min-w-11 items-center justify-center p-0 hover:opacity-[0.92]",
 };

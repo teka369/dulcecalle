@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Ip, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { CustomerAccessService } from "./customer-access.service";
 import { CustomerLoginDto, CustomerLogoutDto, CustomerRefreshDto } from "./customer-access.dto";
@@ -14,9 +14,8 @@ export class CustomerAccessController {
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post("customer-access/login")
-  login(@Body() dto: CustomerLoginDto, @Ip() ip: string) {
-    // req.ip honours `trust proxy` (configureHttp); see CustomerAccessService.login.
-    return this.access.login(dto.code, dto.pin, dto.businessId, ip, dto.store);
+  login(@Body() dto: CustomerLoginDto) {
+    return this.access.login(dto.code, dto.pin, dto.businessId);
   }
 
   @Public()

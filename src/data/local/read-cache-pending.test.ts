@@ -70,8 +70,7 @@ describe("D2 read-cache preserves pending rows", () => {
       serverCustomer(),
     ]);
     expect(result.source).toBe("server");
-    // loop/v1 HIGH: the pending create is also RETURNED (visible online), once.
-    expect(result.data.map((r) => r.id).sort()).toEqual([LOCAL_ID, SERVER_ID].sort());
+    expect(result.data).toHaveLength(1);
 
     const rows = await getLocalStore().customers.list(BIZ);
     expect(rows.map((r) => r.id).sort()).toEqual(
@@ -185,7 +184,7 @@ describe("D2 read-cache preserves pending rows", () => {
     });
     const result = await cache().listSuppliers(BIZ, async () => []);
     expect(result.source).toBe("server");
-    expect(result.data.map((r) => r.id)).toEqual([LOCAL_ID]);
+    expect(result.data).toEqual([]);
     const rows = await getLocalStore().suppliers.list(BIZ);
     expect(rows.map((r) => r.id)).toEqual([LOCAL_ID]);
   });

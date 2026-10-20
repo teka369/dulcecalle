@@ -1,10 +1,8 @@
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength } from "class-validator";
-import { MAX_COP_AMOUNT, MAX_COP_MESSAGE } from "../shared/money";
+import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Min, MinLength } from "class-validator";
 
 export class OpenSessionDto {
   @IsInt()
   @Min(0)
-  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   openingFloat!: number;
 
   @IsOptional()
@@ -15,7 +13,6 @@ export class OpenSessionDto {
 export class CloseSessionDto {
   @IsInt()
   @Min(0)
-  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   countedEfectivo!: number;
 
   @IsOptional()
@@ -26,7 +23,6 @@ export class CloseSessionDto {
 export class CashOwnerMoveDto {
   @IsInt()
   @Min(1)
-  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   amount!: number;
 
   @IsEnum(["Efectivo", "Nequi"])
@@ -44,7 +40,6 @@ export class CashOwnerMoveDto {
 export class CreateExpenseDto {
   @IsInt()
   @Min(1)
-  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   amount!: number;
 
   @IsString()
@@ -70,7 +65,6 @@ export class CarrySessionDto {
   @IsOptional()
   @IsInt()
   @Min(0)
-  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   countedEfectivo?: number;
 
   @IsOptional()

@@ -1,5 +1,3 @@
-import { AMOUNT_TOO_LARGE_MESSAGE, exceedsMaxCop } from "@/domain/money/limits";
-
 /** Copy for «Agregar deuda anterior» — not a sale, not an abono. */
 export const INITIAL_DEBT_ERRORS = {
   empty: "Escribe cuánto debía.",
@@ -14,7 +12,6 @@ export const INITIAL_DEBT_TOAST = "Deuda anterior registrada";
 export function validateInitialDebtAmount(amountRaw: string): string | null {
   const raw = amountRaw.trim();
   if (raw === "") return INITIAL_DEBT_ERRORS.empty;
-  if (exceedsMaxCop(raw)) return AMOUNT_TOO_LARGE_MESSAGE;
   const amount = Number.parseInt(raw, 10);
   if (!Number.isFinite(amount) || Number.isNaN(amount) || !Number.isInteger(amount)) {
     return INITIAL_DEBT_ERRORS.empty;

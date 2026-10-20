@@ -1,4 +1,3 @@
-import { userFacingMessage } from "@/domain/ux/user-message";
 import type { ReactNode } from "react";
 
 export type StateBlockProps = {
@@ -10,12 +9,7 @@ export type StateBlockProps = {
   onHero?: boolean;
 };
 
-export function StateBlock({ kind, title, body: rawBody, action, onHero = false }: StateBlockProps) {
-  // Error bodies come from caught exceptions: never show technical text.
-  const filtered = kind === "error" && rawBody ? userFacingMessage(rawBody, "Inténtalo de nuevo con Reintentar.") : rawBody;
-  // Never say the same thing twice (e.g. title «No se pudo cargar.» + the same fallback body).
-  const same = (a: string, b: string) => a.trim().replace(/[.\s]+$/, "").toLowerCase() === b.trim().replace(/[.\s]+$/, "").toLowerCase();
-  const body = filtered && same(filtered, title) ? undefined : filtered;
+export function StateBlock({ kind, title, body, action, onHero = false }: StateBlockProps) {
   return (
     <div
       role={kind === "error" ? "alert" : "status"}

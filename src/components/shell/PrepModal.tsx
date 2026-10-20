@@ -89,7 +89,7 @@ export function PrepModal() {
             <div>
               <div className="flex items-center justify-between text-xs font-medium tabular-nums text-ink-muted">
                 <span>
-                  {completed} de {total} pasos listos
+                  {completed} de {total} tareas completadas
                 </span>
                 <span>{progress}%</span>
               </div>
@@ -139,7 +139,7 @@ export function PrepModal() {
               <div className="mt-4 rounded-[var(--r-lg)] border border-danger/30 bg-danger-soft p-3">
                 <p className="text-sm font-semibold">Preparación incompleta</p>
                 <p className="mt-1 text-xs leading-relaxed text-ink">
-                  {completed} de {total} pasos listos. Faltan datos
+                  {completed} de {total} tareas completadas. Faltan datos
                   necesarios:
                 </p>
                 <ul className="mt-2 flex flex-col gap-1">

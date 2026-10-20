@@ -10,7 +10,6 @@ import { sessionExpected } from "./carry-rules";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
 import type { CreatePaymentDto } from "../sales/sales.dto";
-import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import type { CashOwnerMoveDto, CreateExpenseDto } from "./cash.dto";
 
 export function isOneOpenConstraint(error: { message?: string; meta?: unknown }): boolean {
@@ -316,7 +315,7 @@ export class CashService {
     return moves.map(cashMoveJson);
   }
 
-  async listExpenses(ctx: BusinessContext, from?: string, to?: string, page: PageQuery = {}) {
+  async listExpenses(ctx: BusinessContext, from?: string, to?: string) {
     const where: Prisma.ExpenseWhereInput = { businessId: ctx.businessId };
     if (from || to) {
       where.occurredOn = {
@@ -324,15 +323,11 @@ export class CashService {
         ...(to ? { lte: new Date(`${to}T00:00:00.000Z`) } : {}),
       };
     }
-    const after = await afterCursor(page.cursor, (id) =>
-      this.prisma.expense.findFirst({ where: { id, businessId: ctx.businessId }, select: { id: true, createdAt: true } }),
-    );
     const rows = await this.prisma.expense.findMany({
-      where: after ? { AND: [where, after] } : where,
-      orderBy: NEWEST_FIRST,
-      take: pageProbe(page.limit),
+      where,
+      orderBy: { createdAt: "desc" },
     });
-    return paged(rows, page.limit, expenseJson);
+    return rows.map(expenseJson);
   }
 
   async recordPayment(

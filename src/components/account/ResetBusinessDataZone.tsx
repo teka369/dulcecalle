@@ -1,6 +1,5 @@
 "use client";
 
-import { errorText } from "@/domain/ux/user-message";
 import { useState } from "react";
 import { apiBaseUrl } from "@/data/backend";
 import { NetworkError } from "@/data/errors";
@@ -85,7 +84,7 @@ export function ResetBusinessDataZone() {
       if (e instanceof NetworkError) {
         setError("Necesitas conexión a internet para eliminar los datos del negocio.");
       } else {
-        setError(errorText(e, "No se pudieron eliminar los datos."));
+        setError(e instanceof Error ? e.message : "No se pudieron eliminar los datos.");
       }
       setStep("error");
     } finally {

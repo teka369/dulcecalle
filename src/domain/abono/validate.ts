@@ -1,5 +1,4 @@
 import type { PayMethod } from "@/domain/types";
-import { AMOUNT_TOO_LARGE_MESSAGE, exceedsMaxCop } from "@/domain/money/limits";
 
 /** Exact Escritor / Designer S2 error strings. */
 export const ABONO_ERRORS = {
@@ -27,7 +26,6 @@ export type AbonoInput = {
 export function validateAbono(input: AbonoInput): string | null {
   const raw = input.amountRaw.trim();
   if (raw === "") return ABONO_ERRORS.empty;
-  if (exceedsMaxCop(raw)) return AMOUNT_TOO_LARGE_MESSAGE;
 
   const amount = Number.parseInt(raw, 10);
   if (!Number.isFinite(amount) || Number.isNaN(amount)) {

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../prisma/prisma.service";
@@ -9,35 +9,10 @@ import { normalizeCustomerCode } from "../shared/customer-code";
 import type { CustomerAuth, PortalLedgerScope } from "../identity/auth.types";
 import { DEFAULT_TZ } from "../shared/clock";
 import { copToJson } from "../shared/money";
-import {
-  CUSTOMER_SOFT_CAP,
-  IP_CODE_POLICY,
-  IP_POLICY,
-  isPrivateOrUnknownIp,
-  PortalLoginThrottle,
-  softCapAlert,
-  softDelayMs,
-} from "./portal-throttle";
+import { PortalLoginThrottle } from "./portal-throttle";
 
 const IDENTIFY_FAIL = "No pudimos identificarte.";
 const PIN_RE = /^\d{6}$/;
-
-/** Lowercase, no accents, single spaces. Null when empty. */
-function normalizeStore(raw: string | undefined): string | null {
-  const v = (raw ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-  return v ? v : null;
-}
-
-/** Store short name (normalized, exact) or store code (first 8 hex of its id). */
-function storeMatches(store: string, businessId: string, name: string): boolean {
-  if (/^[0-9a-f]{8}$/.test(store) && businessId.toLowerCase().startsWith(store)) return true;
-  return normalizeStore(name) === store;
-}
 
 let dummyPinHash: Promise<string> | null = null;
 
@@ -56,10 +31,6 @@ export class CustomerAccessService {
     private readonly throttle: PortalLoginThrottle,
   ) {}
 
-  private readonly logger = new Logger("CustomerAccess");
-  /** Overridable in tests. */
-  private sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
   private tokens(customerId: string, businessId: string) {
     return this.sessions.issue({
       kind: "customer",
@@ -71,21 +42,7 @@ export class CustomerAccessService {
     });
   }
 
-  /**
-   * loop/v1 portal hardening:
-   * - Exactly ONE bcrypt compare per attempt, whatever the number of stores.
-   *   Without businessId the code must resolve to a single customer; zero or
-   *   several candidates do one dummy compare and fail the same way (no O(n)
-   *   bcrypt, no timing signal about how many stores use the code).
-   * - Guess limits are per client IP + code (and per IP across codes), never
-   *   per customer: anonymous attempts from someone else cannot lock the real
-   *   customer out of their own phone.
-   * - If `req.ip` looks private (trust proxy misconfigured → every client is the
-   *   proxy), the per-IP-across-codes bucket is skipped (it would throttle
-   *   everyone) and the per-IP+code bucket degrades to per-code — the previous
-   *   behaviour, never weaker against guessing.
-   */
-  async login(codeRaw: string, pinRaw: string, businessIdRaw?: string, clientIp?: string, storeRaw?: string) {
+  async login(codeRaw: string, pinRaw: string, businessIdRaw?: string) {
     const code = normalizeCustomerCode(codeRaw);
     const pin = pinRaw.trim();
     const businessId = businessIdRaw?.trim() || undefined;
@@ -94,13 +51,15 @@ export class CustomerAccessService {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
     }
 
-    const ip = clientIp?.replace(/^::ffff:/i, "") || "unknown";
-    const shared = isPrivateOrUnknownIp(ip);
-    const ipCodeKey = `ipcode:${shared ? "shared" : ip}:${businessId ?? "*"}:${code}`;
-    const cooled =
-      (await this.throttle.take(ipCodeKey, IP_CODE_POLICY)) === "cooled" ||
-      (!shared && (await this.throttle.take(`ip:${ip}`, IP_POLICY)) === "cooled");
-    if (cooled) {
+    const where = businessId
+      ? { code, businessId, archivedAt: null, pinHash: { not: null } }
+      : { code, archivedAt: null, pinHash: { not: null } };
+    const rows = await this.prisma.customer.findMany({
+      where,
+      include: { business: { select: { timezone: true } } },
+    });
+    const gateKey = rows.length === 1 ? `customer:${rows[0].id}` : `code:${code}:${businessId ?? "*"}`;
+    if ((await this.throttle.take(gateKey)) === "cooled") {
       await bcrypt.compare(pin, await dummyHash());
       throw new AppError(
         ERROR_CODES.RATE_LIMIT,
@@ -108,57 +67,18 @@ export class CustomerAccessService {
       );
     }
 
-    const store = businessId ? null : normalizeStore(storeRaw);
-    const where = businessId
-      ? { code, businessId, archivedAt: null, pinHash: { not: null } }
-      : { code, archivedAt: null, pinHash: { not: null } };
-    // Without a store hint we only need to know whether the code is
-    // unambiguous (2 rows). With one, read a bounded set and pick by store.
-    const rows = await this.prisma.customer.findMany({
-      where,
-      include: { business: { select: { timezone: true, name: true } } },
-      orderBy: { id: "asc" },
-      take: store ? 50 : 2,
-    });
-    const pool = store ? rows.filter((r) => storeMatches(store, r.businessId, r.business.name)) : rows;
-    const candidate = pool.length === 1 ? pool[0] : null;
-    // Soft cap (never a block), counted by the TYPED code before any lookup,
-    // so an unknown code gets exactly the same schedule as a real one:
-    // - progressive delay ONLY per IP+code and per store+code (when the
-    //   store is given via businessId or the store field). A flood on a
-    //   shared code (DC-0001) from one IP never slows other IPs.
-    //   A private/unknown IP (trust proxy wrong) skips the IP key, as above.
-    // - global per code: counted for the alert log only, no delay.
-    const storeKey = businessId ?? (store ? `name:${store}` : null);
-    const softKeys = [
-      ...(shared ? [] : [`softip:${ip}:${code}`]),
-      ...(storeKey ? [`softstore:${storeKey}:${code}`] : []),
-    ];
-    const globalKey = `code:${code}`;
-    const priors = await Promise.all(softKeys.map((k) => this.throttle.peek(k, CUSTOMER_SOFT_CAP.windowMs)));
-    const wait = Math.max(0, ...priors.map(softDelayMs));
-    if (wait > 0) await this.sleep(wait);
-    // Exactly one bcrypt compare in every branch (real hash or dummy).
-    const ok = await bcrypt.compare(pin, candidate ? (candidate.pinHash as string) : await dummyHash());
-    if (!candidate || !ok) {
-      await Promise.all([...softKeys, globalKey].map((k) => this.throttle.bump(k, CUSTOMER_SOFT_CAP.windowMs)));
-      const total = (await this.throttle.peek(globalKey, CUSTOMER_SOFT_CAP.windowMs));
-      if (softCapAlert(total)) {
-        this.logger.warn(
-          `portal: many failed PINs for one customer code (${total} in the last hour, any IP/store); alert only, per-IP/per-store delays apply. code=${code}${candidate ? ` customer=${candidate.id} business=${candidate.businessId}` : " (no single match)"}`,
-        );
-      }
+    const dummy = await dummyHash();
+    const hashes = rows.length > 0 ? rows.map((row) => row.pinHash as string) : [dummy];
+    const matches: typeof rows = [];
+    for (let i = 0; i < hashes.length; i += 1) {
+      const ok = await bcrypt.compare(pin, hashes[i]);
+      if (ok && rows[i]) matches.push(rows[i]);
     }
-    // Same code in 2+ stores without a store hint: no candidate, so the SAME
-    // generic 401 as a wrong PIN or unknown code (no enumeration). The client
-    // then offers the optional store field.
-    if (!candidate || !ok) {
+    if (matches.length !== 1) {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
     }
-    const matches = [candidate];
     const customer = matches[0];
-    await this.throttle.reset(ipCodeKey);
-    await Promise.all(softKeys.map((k) => this.throttle.reset(k)));
+    await this.throttle.reset(`customer:${customer.id}`);
     const issued = await this.tokens(customer.id, customer.businessId);
     return {
       customer: {

@@ -1,8 +1,5 @@
 "use client";
 
-import { errorText } from "@/domain/ux/user-message";
-import Link from "next/link";
-
 import { PendingBadge } from "@/components/ui/StatusBadge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
@@ -29,11 +26,6 @@ export function timeAgo(at: number, now: number = Date.now()): string {
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `hace ${minutes} min`;
   return formatDateTime(at);
-}
-
-/** «Corregir» tells the form which rejected op to offer to discard after saving. */
-function withRejected(href: string, operationId: string): string {
-  return `${href}${href.includes("?") ? "&" : "?"}rechazada=${encodeURIComponent(operationId)}`;
 }
 
 function sessionBusinessId(): string | null {
@@ -91,10 +83,6 @@ export function useSyncItems() {
 }
 
 function StatusChip({ item, flushing }: { item: EnrichedTrayItem; flushing: boolean }) {
-  // An orphan will never be sent on its own: say so instead of «Guardada aquí».
-  if (item.orphaned) {
-    return <Badge tone="danger" className="shrink-0">! No se puede enviar</Badge>;
-  }
   if (item.status === "failed" && item.permanent) {
     return <Badge tone="danger" className="shrink-0">! Necesita atención</Badge>;
   }
@@ -114,16 +102,6 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const discardTriggerRef = useRef<HTMLButtonElement>(null);
-  const confirmRef = useRef<HTMLDivElement>(null);
-  const wasConfirming = useRef(false);
-
-  // Focus moves into the confirmation when it opens and back to «Descartar» when it closes.
-  useEffect(() => {
-    if (confirming) confirmRef.current?.focus();
-    else if (wasConfirming.current) discardTriggerRef.current?.focus();
-    wasConfirming.current = confirming;
-  }, [confirming]);
 
   const detail = describeOutboxDetail(item);
   const reason = humanizeSyncError(item.lastError);
@@ -137,7 +115,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
       await retryOutboxOperation(businessId, item.operationId);
       await syncStore.syncNow();
     } catch (e) {
-      setError(errorText(e, "No se pudo reintentar."));
+      setError(e instanceof Error ? e.message : "No se pudo reintentar.");
     } finally {
       setBusy(false);
     }
@@ -153,7 +131,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
       setConfirming(false);
       await syncStore.refresh();
     } catch (e) {
-      setError(errorText(e, "No se pudo descartar."));
+      setError(e instanceof Error ? e.message : "No se pudo descartar.");
     } finally {
       setBusy(false);
     }
@@ -176,7 +154,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
           )}
           {item.blockedBy && (
             <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
-              {!item.orphaned && <PendingBadge label="En espera" />}
+              <PendingBadge label="En espera" />
               {item.blockedBy}
             </span>
           )}
@@ -184,7 +162,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
         <StatusChip item={item} flushing={flushing} />
       </button>
 
-      {item.status === "failed" && reason && !item.orphanNote && (
+      {item.status === "failed" && reason && (
         <p className="mt-2 text-sm text-danger">
           <span className="font-semibold">Motivo: </span>
           {reason}
@@ -199,74 +177,21 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
         </div>
       )}
 
-      {item.orphanNote && (
-        <p className="mt-2 text-sm text-ink-muted">{item.orphanNote}</p>
-      )}
-
-      {item.correction && !item.orphanNote && !confirming && (
-        <div className="mt-3 flex flex-col gap-2">
-          <p className="text-sm text-ink-muted">{item.correction.note}</p>
-          {item.correction.href && (
-            <Link
-              href={withRejected(item.correction.href, item.operationId)}
-              className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold"
-            >
-              Corregir
-            </Link>
-          )}
-        </div>
-      )}
-
-      {(item.status === "failed" || item.orphaned) && !confirming && (
-        <div className={`mt-3 grid gap-2 ${item.canRetry ? "grid-cols-2" : "grid-cols-1"}`}>
-          {item.canRetry && (
-            <Button type="button" variant="primary" disabled={busy} onClick={() => void retry()} className="w-full">
-              Reintentar
-            </Button>
-          )}
-          <Button ref={discardTriggerRef} type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(true)} className="w-full text-ink-muted">
+      {item.status === "failed" && !confirming && (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Button type="button" variant="primary" disabled={busy} onClick={() => void retry()} className="w-full">
+            Reintentar
+          </Button>
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(true)} className="w-full text-ink-muted">
             Descartar
           </Button>
         </div>
       )}
 
-      {(item.status === "failed" || item.orphaned) && confirming && (
-        <div
-          ref={confirmRef}
-          role="alertdialog"
-          tabIndex={-1}
-          aria-labelledby={`discard-title-${item.operationId}`}
-          aria-describedby={`discard-desc-${item.operationId}`}
-          onKeyDown={(e) => {
-            if (e.key === "Escape" && !busy) {
-              e.preventDefault();
-              setConfirming(false);
-              return;
-            }
-            if (e.key !== "Tab") return;
-            // Focus trap: Tab / Shift+Tab cycle between the dialog's enabled buttons.
-            const focusables = Array.from(
-              e.currentTarget.querySelectorAll<HTMLElement>("button:not([disabled]), [href], input:not([disabled])"),
-            );
-            if (focusables.length === 0) {
-              e.preventDefault();
-              return;
-            }
-            const first = focusables[0];
-            const last = focusables[focusables.length - 1];
-            const active = document.activeElement;
-            if (e.shiftKey && (active === first || active === e.currentTarget)) {
-              e.preventDefault();
-              last.focus();
-            } else if (!e.shiftKey && active === last) {
-              e.preventDefault();
-              first.focus();
-            }
-          }}
-          className="mt-3 rounded-[var(--r-lg)] border border-danger/20 bg-danger/5 p-3 outline-none focus-visible:ring-2 focus-visible:ring-danger"
-        >
-          <p id={`discard-title-${item.operationId}`} className="text-sm font-semibold">¿Descartar este envío?</p>
-          <p id={`discard-desc-${item.operationId}`} className="mt-1 text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>
+      {item.status === "failed" && confirming && (
+        <div className="mt-3 rounded-[var(--r-lg)] border border-danger/20 bg-danger/5 p-3">
+          <p className="text-sm font-semibold">¿Descartar este envío?</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(false)} className="w-full">
               Cancelar

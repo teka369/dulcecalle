@@ -93,8 +93,7 @@ async function createDatabase(port: number, name: string): Promise<void> {
       port,
       user: "postgres",
       database: "postgres",
-      connectionTimeoutMillis: 3000,
-    } as ConstructorParameters<typeof Client>[0]);
+    });
     try {
       await client.connect();
       await client.query(`CREATE DATABASE ${name}`);
@@ -113,52 +112,12 @@ async function createDatabase(port: number, name: string): Promise<void> {
   throw last instanceof Error ? last : new Error("CREATE DATABASE failed");
 }
 
-/** A port the OS says is free right now (no fixed range, no guessing). */
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.unref();
-    srv.on("error", reject);
-    srv.listen(0, "127.0.0.1", () => {
-      const addr = srv.address();
-      srv.close(() => (addr && typeof addr === "object" ? resolve(addr.port) : reject(new Error("no port"))));
-    });
-  });
-}
+export async function startLocalPostgres(): Promise<PgHandle> {
+  const port = 55432 + Math.floor(Math.random() * 400);
+  const dataDir = path.join("/tmp", `dc-pg-${port}`);
+  fs.rmSync(dataDir, { recursive: true, force: true });
+  fs.mkdirSync(dataDir, { recursive: true });
 
-/**
- * Ready only when OUR postmaster says so (postmaster.pid status line), not
- * when "something" accepts TCP on the port; fails fast if it exited (e.g. the
- * port was taken between freePort() and bind).
- */
-function waitForOwnPostmaster(dataDir: string, child: ChildProcess, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  return new Promise((resolve, reject) => {
-    const tick = () => {
-      if (child.exitCode !== null || child.signalCode !== null) {
-        reject(new Error(`postgres exited (${child.exitCode ?? child.signalCode}) before ready`));
-        return;
-      }
-      try {
-        const lines = fs.readFileSync(path.join(dataDir, "postmaster.pid"), "utf8").split("\n");
-        if (lines[7]?.trim() === "ready") {
-          resolve();
-          return;
-        }
-      } catch {
-        /* not written yet */
-      }
-      if (Date.now() > deadline) reject(new Error("postgres did not become ready"));
-      else setTimeout(tick, 100);
-    };
-    tick();
-  });
-}
-
-async function startOnce(): Promise<PgHandle> {
-  const port = await freePort();
-  // Unique per start: never rm another cluster's data dir.
-  const dataDir = fs.mkdtempSync(path.join("/tmp", `dc-pg-${port}-`));
   run(`${BIN}/initdb`, [
     "-D",
     dataDir,
@@ -181,8 +140,7 @@ async function startOnce(): Promise<PgHandle> {
   child.unref();
 
   try {
-    await waitForOwnPostmaster(dataDir, child, 20000);
-    await waitForPort(port, 5000);
+    await waitForPort(port, 20000);
     await createDatabase(port, "dulcecalle_test");
   } catch (e) {
     try {
@@ -196,7 +154,6 @@ async function startOnce(): Promise<PgHandle> {
         }
       }
     }
-    fs.rmSync(dataDir, { recursive: true, force: true });
     throw e;
   }
 
@@ -219,17 +176,4 @@ async function startOnce(): Promise<PgHandle> {
       fs.rmSync(dataDir, { recursive: true, force: true });
     },
   };
-}
-
-/** loop/v1 jest flake: retry on a fresh free port if a start loses a race. */
-export async function startLocalPostgres(): Promise<PgHandle> {
-  let last: unknown;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    try {
-      return await startOnce();
-    } catch (e) {
-      last = e;
-    }
-  }
-  throw last instanceof Error ? last : new Error("could not start postgres");
 }

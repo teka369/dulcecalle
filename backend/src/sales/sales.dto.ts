@@ -8,10 +8,8 @@ import {
   IsString,
   IsUUID,
   Min,
-  Max,
   ValidateNested,
 } from "class-validator";
-import { MAX_COP_AMOUNT, MAX_COP_MESSAGE } from "../shared/money";
 
 export class SaleLineDto {
   @IsOptional()
@@ -28,7 +26,6 @@ export class SaleLineDto {
   @IsOptional()
   @IsInt()
   @Min(0)
-  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   unitPrice?: number;
 }
 
@@ -48,7 +45,6 @@ export class CreateSaleDto {
 
   @IsInt()
   @Min(0)
-  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   amountReceived!: number;
 
   @IsOptional()
@@ -67,7 +63,6 @@ export class CreateSaleDto {
 export class CreatePaymentDto {
   @IsInt()
   @Min(1)
-  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   amount!: number;
 
   @IsEnum(["Efectivo", "Nequi"])

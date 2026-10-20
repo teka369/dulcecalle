@@ -488,8 +488,8 @@ describe("M7.1 offline debt reconciliation", () => {
 
     const listed = await cache().listCustomers(BIZ, async () => [remoteCustomer(customerId, 100_000)]);
     expect(listed.source).toBe("server");
-    expect(listed.data.map((c) => c.id).sort()).toEqual([customerId, localOnly].sort());
-    expect(listed.data.find((c) => c.id === customerId)?.debt).toBe(150_000);
+    expect(listed.data).toHaveLength(1);
+    expect(listed.data[0]?.debt).toBe(150_000);
     expect((await getLocalDb().customers.get(customerId))?.debt).toBe(150_000);
     expect((await getLocalDb().customers.get(localOnly))?.debt).toBe(5_000);
 

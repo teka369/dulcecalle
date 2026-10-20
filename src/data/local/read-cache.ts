@@ -5,7 +5,6 @@
 import { addCop } from "@/domain/money";
 import { pendingDebtAdjustment } from "../pwa/pending-debt";
 import { ApiError, isNetworkError } from "../errors";
-import { resolveIdAlias } from "./id-alias";
 import type {
   RemoteCustomer,
   RemoteProduct,
@@ -283,17 +282,13 @@ export class CatalogReadCache {
         opts.toLocal(row, opts.businessId, cachedAt),
       );
       const stored = opts.projectStored ? await opts.projectStored(locals) : locals;
-      // Offline creates the server does not know yet stay visible (loop/v1
-      // HIGH). Never twice: skip one whose id, or remapped server id, is in
-      // the server snapshot.
-      const serverIds = new Set(locals.map((row) => row.id));
-      const pending = (await this.pendingLocalRows(opts)).filter(
-        (row) => !serverIds.has(row.id) && !serverIds.has(resolveIdAlias(opts.businessId, row.id)),
-      );
-      await opts.replaceAll(opts.businessId, [...stored, ...pending]);
+      await opts.replaceAll(opts.businessId, [
+        ...stored,
+        ...(await this.pendingLocalRows(opts)),
+      ]);
       await this.writeMeta(opts.businessId, opts.resource, cachedAt);
       return {
-        data: [...(opts.projectStored ? stored.map(opts.toRemote) : data), ...pending.map(opts.toRemote)],
+        data: opts.projectStored ? stored.map(opts.toRemote) : data,
         source: "server",
         cachedAt,
       };
@@ -333,13 +328,6 @@ export class CatalogReadCache {
       await opts.put(stored);
       return opts.projectStored ? opts.toRemote(stored) : row;
     } catch (e) {
-      if (e instanceof ApiError && e.status === 404) {
-        // Created offline and its create is not synced yet: the server does
-        // not know it, but it exists here (D2). Anything else stays a 404.
-        const cached = await opts.get(opts.businessId, opts.id);
-        if (cached && (await this.hasUnsyncedCreate(opts.businessId, cached))) return opts.toRemote(cached);
-        throw e;
-      }
       this.rethrowUnlessNetwork(e);
       const cached = await opts.get(opts.businessId, opts.id);
       if (!cached) throw e;
@@ -352,15 +340,6 @@ export class CatalogReadCache {
    * non-synced outbox operation. Server rows always win by id; client-minted
    * pending rows (unknown to the server) are carried over untouched.
    */
-  private async hasUnsyncedCreate(businessId: string, row: { id: string }): Promise<boolean> {
-    const requestId = (row as { requestId?: unknown }).requestId;
-    for (const status of ["pending", "failed", "in_flight"] as const) {
-      const items = await this.db.outbox.where("[businessId+status]").equals([businessId, status]).toArray();
-      if (items.some((o) => o.operation === "create" && (o.requestId === requestId || o.operationId === row.id || (o.payload as { id?: unknown } | null)?.id === row.id))) return true;
-    }
-    return false;
-  }
-
   private async pendingLocalRows<
     TLocal extends { id: string; businessId: string },
   >(opts: {

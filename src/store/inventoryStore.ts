@@ -170,22 +170,18 @@ export const inventoryStore = {
       fail(e);
     }
   },
-  /** Only a real 404 means "not found"; any other error reaches the page (No se pudo cargar + Reintentar). */
   async getProduct(id: string): Promise<RemoteProduct | undefined> {
     try {
       return await getCachedProduct(id);
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 404) return undefined;
-      throw e;
+    } catch {
+      return undefined;
     }
   },
-  /** Only a real 404 means "not found"; any other error reaches the page (No se pudo cargar + Reintentar). */
   async getSupplier(id: string): Promise<RemoteSupplier | undefined> {
     try {
       return await getCachedSupplier(id);
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 404) return undefined;
-      throw e;
+    } catch {
+      return undefined;
     }
   },
   async listProductMoves(productId: string): Promise<RemoteStockMove[]> {

@@ -7,7 +7,6 @@ import {
 } from "@nestjs/common";
 import { ThrottlerException } from "@nestjs/throttler";
 import type { Response } from "express";
-import { Prisma } from "@prisma/client";
 import { AppError, ERROR_CODES } from "../errors";
 
 @Catch()
@@ -57,21 +56,6 @@ export class HttpErrorFilter implements ExceptionFilter {
       } else {
         message = exception.message;
       }
-    } else if (exception instanceof Prisma.PrismaClientKnownRequestError && exception.code === "P2023") {
-      // Malformed id/value that slipped past the route pipes (M3): a client error, not a 500.
-      status = 400;
-      code = ERROR_CODES.VALIDATION;
-      message = "Datos inválidos.";
-    } else if (exception instanceof Prisma.PrismaClientKnownRequestError && exception.code === "P2025") {
-      status = 404;
-      code = ERROR_CODES.NOT_FOUND;
-      message = "No encontramos eso.";
-    } else if (exception instanceof Prisma.PrismaClientValidationError) {
-      // e.g. an Invalid Date reaching a query (M4).
-      this.log.warn(exception.message.split("\n").slice(-1)[0]);
-      status = 400;
-      code = ERROR_CODES.VALIDATION;
-      message = "Datos inválidos.";
     } else {
       this.log.error(exception);
     }

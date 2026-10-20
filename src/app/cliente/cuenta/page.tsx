@@ -60,8 +60,8 @@ export default function CustomerStatementPage() {
                 meta={dmy(row.occurredOn)}
                 trailing={
                   <>
-                    <span className={`text-[15px] font-semibold tabular-nums ${sg.tone === "ok" ? "text-ok" : sg.tone === "danger" ? "text-danger" : "text-ink"}`}>
-                      {sg.sign ? `${sg.sign} ` : ""}{formatCop(row.amount)}
+                    <span className={`text-[15px] font-semibold tabular-nums ${sg.tone === "ok" ? "text-ok" : "text-danger"}`}>
+                      {sg.sign} {formatCop(row.amount)}
                     </span>
                     <span className="text-xs text-ink-muted">{sg.word}</span>
                   </>

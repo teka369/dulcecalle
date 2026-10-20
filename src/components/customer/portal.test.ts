@@ -26,11 +26,10 @@ describe("portal balance", () => {
   it("zero debt reads Al día", () => {
     expect(debtHero(ledger({ debt: 0 }))).toMatchObject({ owes: false, label: "Al día" });
   });
-  it("statement signs: pago/devolución lower debt, fiado/inicial raise it", () => {
+  it("statement signs: pago/devolución lower debt, venta raises it", () => {
     expect(statementSign({ kind: "pago" }).sign).toBe("−");
     expect(statementSign({ kind: "devolucion" }).word).toBe("Baja tu deuda");
-    expect(statementSign({ kind: "fiado" }).sign).toBe("+");
-    expect(statementSign({ kind: "inicial" }).sign).toBe("+");
+    expect(statementSign({ kind: "venta" } as never).sign).toBe("+");
   });
   it("labels purchases", () => {
     expect(purchaseLabel(0, "cash")).toBe("Compra");

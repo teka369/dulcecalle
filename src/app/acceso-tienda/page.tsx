@@ -39,8 +39,8 @@ export default function StoreLoginPage() {
         ) : (
           <>
             <StoreLoginForm />
-            <Link href="/cliente/login" className="flex min-h-11 items-center justify-center text-sm font-semibold text-ink">
-              ¿Eres cliente? Consulta tu saldo
+            <Link href="/login" className="flex min-h-11 items-center justify-center text-sm font-semibold text-ink">
+              ← Volver al acceso de cliente
             </Link>
           </>
         )}

@@ -16,7 +16,7 @@ const GROUP_TITLES = {
   catalogos: "Catálogos",
   historial: "Histórico",
   resumen: "Resúmenes",
-  sistema: "Revisión",
+  sistema: "Verificación",
 } as const;
 
 function labelFor(phase: string, stale: boolean): string {

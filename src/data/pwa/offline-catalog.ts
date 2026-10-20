@@ -1,4 +1,3 @@
-import { recordIdAlias } from "@/data/local/id-alias";
 import { NetworkError } from "@/data/errors";
 import type { RemoteCustomer, RemoteProduct, RemoteSupplier } from "@/data/http/mappers";
 import { getPwaApi } from "./api";
@@ -310,7 +309,6 @@ export async function createProductWithOfflineFallback(
 }
 
 async function reconcileCustomer(businessId: string, localId: string, remote: RemoteCustomer) {
-  recordIdAlias(businessId, localId, remote.id);
   const db = getLocalDb();
   await db.transaction(
     "rw",
@@ -359,7 +357,6 @@ async function reconcileCustomer(businessId: string, localId: string, remote: Re
 }
 
 async function reconcileSupplier(businessId: string, localId: string, remote: RemoteSupplier) {
-  recordIdAlias(businessId, localId, remote.id);
   const db = getLocalDb();
   await db.transaction("rw", [db.suppliers, db.stockMoves, db.outbox], async () => {
     const local = await getLocalStore().suppliers.get(businessId, localId);
@@ -384,7 +381,6 @@ async function reconcileSupplier(businessId: string, localId: string, remote: Re
 
 /** Remap local product UUID → server UUID and rewrite pending FK refs. */
 async function reconcileProduct(businessId: string, localId: string, remote: RemoteProduct) {
-  recordIdAlias(businessId, localId, remote.id);
   const db = getLocalDb();
   await db.transaction(
     "rw",
@@ -412,13 +408,6 @@ async function reconcileProduct(businessId: string, localId: string, remote: Rem
           if (next.productId === localId) {
             next.productId = remote.id;
             changed = true;
-          }
-          // Preparation payloads reference products as source/target.
-          for (const key of ["sourceId", "targetId"] as const) {
-            if (next[key] === localId) {
-              next[key] = remote.id;
-              changed = true;
-            }
           }
           if (op.entity === "product" && next.id === localId) {
             next.id = remote.id;
