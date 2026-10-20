@@ -26,7 +26,7 @@ export const SALEO = {
   occurredOn: today, createdAt: iso,
   lines: [{ id: LINE, productId: P1, productName: PROD.name, qty: 2, unitPrice: 1500, unitCost: 400, lineTotal: 3000 }],
 };
-const TODAY = { localDate: today, session: null, expected: { efectivo: 0, nequi: 0, total: 0 }, closed: false, pendingCount: 0, pendingSessions: [], needsReviewCount: 0, conflict: false, canOpen: true, moves: [] };
+export const TODAY = { localDate: today, session: null, expected: { efectivo: 0, nequi: 0, total: 0 }, closed: false, pendingCount: 0, pendingSessions: [], needsReviewCount: 0, conflict: false, canOpen: true, moves: [] };
 const STATS = (period: string) => ({ period, from: today, to: today, ventas: 3000, ventasCount: 1, devoluciones: 0, devolucionesCount: 0, recibido: 0, recibidoEfectivo: 0, recibidoNequi: 0, porCobrar: 3000, gaste: 0, inverti: 0, ganancia: 2200, valorInventario: 4000, stockBajo: 0, emptyPeriod: false });
 
 /** B1/B5: minimal server-side caja with Idempotency-Key semantics. */
