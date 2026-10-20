@@ -191,7 +191,12 @@ export class OutboxStore {
   async discard(
     businessId: string,
     operationId: string,
-    options: { dependentReason?: (discarded: OutboxItem) => string } = {},
+    options: {
+      dependentReason?: (discarded: OutboxItem, local: boolean) => string;
+      /** Local ids the discarded operation stood for (its operationId, local entity ids…). */
+      parentLocalIds?: string[];
+      parentLabel?: string;
+    } = {},
   ): Promise<void> {
     assertUuid(businessId, "businessId");
     assertUuid(operationId, "operationId");
@@ -210,8 +215,6 @@ export class OutboxStore {
       // says what they were waiting for (Reintentar sends them without it,
       // Descartar drops them). Deeper descendants still wait on their
       // existing parent and are handled if that parent is discarded too.
-      const reason =
-        options.dependentReason?.(row) ?? "Esperando a otra operación, que se descartó.";
       const dependents = await this.db.outbox
         .where("businessId")
         .equals(businessId)
@@ -221,13 +224,19 @@ export class OutboxStore {
             other.dependsOn.includes(operationId),
         )
         .toArray();
+      const localIds = [...new Set([operationId, ...(options.parentLocalIds ?? [])])];
       for (const dependent of dependents) {
+        // A child whose payload carries the parent's local id would be sent
+        // with an id the server never saw: it can only be discarded.
+        const local = payloadReferences(dependent.payload, localIds);
         await this.db.outbox.put({
           ...dependent,
           status: "failed",
           nextAttemptAt: null,
-          lastError: reason,
+          lastError:
+            options.dependentReason?.(row, local) ?? "Esperando a otra operación, que se descartó.",
           dependsOn: dependent.dependsOn.filter((id) => id !== operationId),
+          discardedDependency: { label: options.parentLabel ?? "otra operación", local },
         });
       }
     });
@@ -555,6 +564,18 @@ export class OutboxSyncEngine {
     }
     return true;
   }
+}
+
+/** True when any of `ids` appears anywhere in the (JSON) payload. */
+export function payloadReferences(payload: unknown, ids: readonly string[]): boolean {
+  if (ids.length === 0) return false;
+  let text: string;
+  try {
+    text = JSON.stringify(payload ?? null);
+  } catch {
+    return false;
+  }
+  return ids.some((id) => id.length > 0 && text.includes(id));
 }
 
 let outboxSingleton: OutboxStore | null = null;

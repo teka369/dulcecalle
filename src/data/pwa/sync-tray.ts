@@ -1,6 +1,6 @@
 import { assertUuid } from "../local/ids";
 import { getLocalDb } from "../local/db";
-import { getOutboxStore } from "../local/outbox";
+import { getOutboxStore, payloadReferences } from "../local/outbox";
 import type { OutboxItem } from "../local/types";
 import { getPwaAuthSession } from "../http/session";
 import { formatCop } from "@/domain/money";
@@ -19,6 +19,7 @@ export type TrayItem = {
   nextAttemptAt: number | null;
   dependsOn: string[];
   payload: unknown;
+  discardedDependency?: OutboxItem["discardedDependency"];
 };
 
 export type EnrichedTrayItem = TrayItem & {
@@ -30,7 +31,19 @@ export type EnrichedTrayItem = TrayItem & {
   blockedBy: string | null;
   /** Pending, but a dependency row no longer exists (it was discarded): actionable. */
   orphaned: boolean;
+  /** Reintentar is offered only when a retry can actually work. */
+  canRetry: boolean;
+  /** Why only Descartar is offered (Spanish, user-facing), when it applies. */
+  orphanNote: string | null;
 };
+
+export function orphanLocalNote(label: string): string {
+  return `Dependía de «${label}», que se descartó y nunca llegó al servidor, así que no se puede enviar. Descártalo y vuelve a crearlo.`;
+}
+export const ORPHAN_LOCAL_UNKNOWN_PARENT_NOTE =
+  "Dependía de una operación que se descartó y nunca llegó al servidor, así que no se puede enviar. Descártalo y vuelve a crearlo.";
+export const ORPHAN_UNDETERMINED_NOTE =
+  "Dependía de una operación que se descartó. No podemos confirmar si se puede enviar sin ella, así que por seguridad solo se puede descartar. Descártalo y vuelve a crearlo.";
 
 export const ORPHAN_BLOCKED_REASON = "Esperando a una operación que se descartó";
 
@@ -86,6 +99,7 @@ function toTrayItem(row: OutboxItem): TrayItem {
     nextAttemptAt: row.nextAttemptAt,
     dependsOn: [...row.dependsOn],
     payload: row.payload,
+    ...(row.discardedDependency ? { discardedDependency: row.discardedDependency } : {}),
   };
 }
 
@@ -282,10 +296,45 @@ export async function discardOutboxOperation(
   businessId: string,
   operationId: string,
 ): Promise<void> {
-  await getOutboxStore().discard(businessId, operationId, {
-    dependentReason: (discarded) =>
-      `Esperando a ${describeOutboxOperation(discarded.entity, discarded.operation)}, que se descartó. Reintenta para enviarlo sin eso, o descártalo.`,
+  const outbox = getOutboxStore();
+  const parent = await outbox.get(businessId, operationId);
+  const parentLabel = parent ? describeOutboxOperation(parent.entity, parent.operation) : "otra operación";
+  await outbox.discard(businessId, operationId, {
+    parentLabel,
+    parentLocalIds: parent ? await localIdsFor(businessId, parent) : [],
+    dependentReason: (_discarded, local) =>
+      local
+        ? orphanLocalNote(parentLabel)
+        : `Esperando a ${parentLabel}, que se descartó. Reintenta para enviarlo sin eso, o descártalo.`,
   });
+}
+
+/**
+ * Local ids an operation stands for: its operationId (sales, cash sessions
+ * and moves use it as the local entity id) plus the local customer/supplier/
+ * product/cash-session row created with the same requestId.
+ */
+async function localIdsFor(businessId: string, op: OutboxItem): Promise<string[]> {
+  const ids = [op.operationId];
+  const db = getLocalDb();
+  const byRequest = async (table: "customers" | "suppliers" | "products" | "cashSessions") => {
+    try {
+      const rows = await db
+        .table(table)
+        .where("businessId")
+        .equals(businessId)
+        .filter((row: { requestId?: string | null }) => row.requestId === op.requestId)
+        .toArray();
+      for (const row of rows as Array<{ id?: string }>) if (row.id) ids.push(row.id);
+    } catch {
+      /* table/index unavailable: the operationId alone still counts */
+    }
+  };
+  if (op.entity === "customer") await byRequest("customers");
+  if (op.entity === "supplier") await byRequest("suppliers");
+  if (op.entity === "product") await byRequest("products");
+  if (op.entity === "cashSession") await byRequest("cashSessions");
+  return ids;
 }
 
 /** UI-friendly session resolution: empty when there is no business. */
@@ -295,9 +344,21 @@ export async function listTrayForSession(): Promise<TrayItem[]> {
   return listTrayOperations(businessId);
 }
 
-async function enrichBlocked(businessId: string, row: TrayItem) {
+async function enrichBlocked(businessId: string, row: TrayItem & { discardedDependency?: OutboxItem["discardedDependency"] }) {
   const blockedBy = await resolveBlockedReason(businessId, row);
-  return { blockedBy, orphaned: row.status === "pending" && blockedBy === ORPHAN_BLOCKED_REASON };
+  const orphaned = row.status === "pending" && blockedBy === ORPHAN_BLOCKED_REASON;
+  if (row.discardedDependency?.local) {
+    return { blockedBy, orphaned, canRetry: false, orphanNote: orphanLocalNote(row.discardedDependency.label) };
+  }
+  if (orphaned) {
+    // Legacy orphan: the parent row is gone, so we only know its id.
+    const outbox = getOutboxStore();
+    const missing: string[] = [];
+    for (const id of row.dependsOn) if (!(await outbox.get(businessId, id))) missing.push(id);
+    const note = payloadReferences(row.payload, missing) ? ORPHAN_LOCAL_UNKNOWN_PARENT_NOTE : ORPHAN_UNDETERMINED_NOTE;
+    return { blockedBy, orphaned, canRetry: false, orphanNote: note };
+  }
+  return { blockedBy, orphaned, canRetry: true, orphanNote: null };
 }
 
 /**

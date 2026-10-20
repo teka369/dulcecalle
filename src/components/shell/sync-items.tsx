@@ -162,7 +162,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
         <StatusChip item={item} flushing={flushing} />
       </button>
 
-      {item.status === "failed" && reason && (
+      {item.status === "failed" && reason && !item.orphanNote && (
         <p className="mt-2 text-sm text-danger">
           <span className="font-semibold">Motivo: </span>
           {reason}
@@ -177,11 +177,17 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
         </div>
       )}
 
+      {item.orphanNote && (
+        <p className="mt-2 text-sm text-ink-muted">{item.orphanNote}</p>
+      )}
+
       {(item.status === "failed" || item.orphaned) && !confirming && (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <Button type="button" variant="primary" disabled={busy} onClick={() => void retry()} className="w-full">
-            Reintentar
-          </Button>
+        <div className={`mt-3 grid gap-2 ${item.canRetry ? "grid-cols-2" : "grid-cols-1"}`}>
+          {item.canRetry && (
+            <Button type="button" variant="primary" disabled={busy} onClick={() => void retry()} className="w-full">
+              Reintentar
+            </Button>
+          )}
           <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(true)} className="w-full text-ink-muted">
             Descartar
           </Button>
