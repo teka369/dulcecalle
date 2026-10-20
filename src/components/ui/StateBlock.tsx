@@ -12,7 +12,10 @@ export type StateBlockProps = {
 
 export function StateBlock({ kind, title, body: rawBody, action, onHero = false }: StateBlockProps) {
   // Error bodies come from caught exceptions: never show technical text.
-  const body = kind === "error" && rawBody ? userFacingMessage(rawBody, "Inténtalo de nuevo con Reintentar.") : rawBody;
+  const filtered = kind === "error" && rawBody ? userFacingMessage(rawBody, "Inténtalo de nuevo con Reintentar.") : rawBody;
+  // Never say the same thing twice (e.g. title «No se pudo cargar.» + the same fallback body).
+  const same = (a: string, b: string) => a.trim().replace(/[.\s]+$/, "").toLowerCase() === b.trim().replace(/[.\s]+$/, "").toLowerCase();
+  const body = filtered && same(filtered, title) ? undefined : filtered;
   return (
     <div
       role={kind === "error" ? "alert" : "status"}
