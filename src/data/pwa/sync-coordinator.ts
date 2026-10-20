@@ -81,6 +81,13 @@ export async function syncAllPending(businessId: string): Promise<SyncAllResult>
   return result;
 }
 
+export const SYNC_COMPLETE_EVENT = "dulcecalle:sync-complete";
+
+function emitSyncComplete(businessId: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(SYNC_COMPLETE_EVENT, { detail: { businessId } }));
+}
+
 let stopOutboxSync: (() => void) | null = null;
 
 /**
@@ -94,7 +101,14 @@ export function startOutboxSync(): () => void {
   const run = () => {
     const businessId = getPwaAuthSession().businessId;
     navDebug("outbox-sync-run", { online: monitor.online, hasBusiness: !!businessId });
-    if (businessId && monitor.online) void syncAllPending(businessId);
+    if (businessId && monitor.online) {
+      // Reconnect data refresh (reloadOnOnline is off): open screens re-run their
+      // store load once the outbox flush is done, so they show server data
+      // including what this device just sent. Data only; never a page reload.
+      void syncAllPending(businessId)
+        .catch(() => undefined)
+        .finally(() => emitSyncComplete(businessId));
+    }
   };
   monitor.start();
   monitor.refresh();
