@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useAfterSync } from "@/components/shell/use-after-sync";
 import { usePathname } from "next/navigation";
 import {
   InicioDashboard,
@@ -35,6 +36,8 @@ export default function InicioPage() {
       setToast(e instanceof Error ? e.message : "No se pudo cargar el inicio");
     });
   }, [refresh, pathname]);
+
+  useAfterSync(refresh);
 
   useEffect(() => {
     const onVis = () => {
