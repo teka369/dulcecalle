@@ -81,6 +81,43 @@ function dtoBody<T extends Record<string, unknown>>(
   return body;
 }
 
+/** Server page size for paged history lists (backend PAGE_MAX = 500). */
+export const LIST_PAGE = 500;
+/** Safety ceiling: never loop forever on a misbehaving server. */
+const MAX_PAGES = 200;
+
+/**
+ * Walk a keyset-paged list (`limit` + `cursor` = last id) to the end, so
+ * callers keep receiving the whole list as before the server paged it.
+ */
+export async function pageAll<T extends Record<string, unknown>>(
+  fetchPage: (query: string) => Promise<T[]>,
+  base: URLSearchParams = new URLSearchParams(),
+  pageSize: number = LIST_PAGE,
+): Promise<T[]> {
+  const out: T[] = [];
+  const seen = new Set<unknown>();
+  let cursor: string | null = null;
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const q = new URLSearchParams(base);
+    q.set("limit", String(pageSize));
+    if (cursor) q.set("cursor", cursor);
+    const page = await fetchPage(`?${q.toString()}`);
+    let added = 0;
+    for (const row of page) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      out.push(row);
+      added += 1;
+    }
+    const last = page[page.length - 1]?.id;
+    // Short page, no id, or nothing new (a server that ignores cursor): done.
+    if (page.length < pageSize || typeof last !== "string" || added === 0) break;
+    cursor = last;
+  }
+  return out;
+}
+
 export class HttpRepository {
   readonly session: HttpSession;
   private readonly http: HttpClient;
@@ -556,9 +593,8 @@ export class HttpRepository {
     },
 
     moves: async (productId: string): Promise<RemoteStockMove[]> => {
-      const rows = await this.http.request<Record<string, unknown>[]>(
-        "GET",
-        `/products/${productId}/moves`,
+      const rows = await pageAll((qs) =>
+        this.http.request<Record<string, unknown>[]>("GET", `/products/${productId}/moves${qs}`),
       );
       return rows.map(mapStockMove);
     },
@@ -592,10 +628,9 @@ export class HttpRepository {
       const q = new URLSearchParams();
       if (filter?.sourceId) q.set("sourceId", filter.sourceId);
       if (filter?.targetId) q.set("targetId", filter.targetId);
-      const suffix = q.size ? `?${q.toString()}` : "";
-      const rows = await this.http.request<Record<string, unknown>[]>(
-        "GET",
-        `/preparations${suffix}`,
+      const rows = await pageAll(
+        (qs) => this.http.request<Record<string, unknown>[]>("GET", `/preparations${qs}`),
+        q,
       );
       return rows.map(mapPreparation);
     },
@@ -606,10 +641,9 @@ export class HttpRepository {
       const q = new URLSearchParams();
       if (from) q.set("from", from);
       if (to) q.set("to", to);
-      const suffix = q.size ? `?${q.toString()}` : "";
-      const rows = await this.http.request<Record<string, unknown>[]>(
-        "GET",
-        `/sales${suffix}`,
+      const rows = await pageAll(
+        (qs) => this.http.request<Record<string, unknown>[]>("GET", `/sales${qs}`),
+        q,
       );
       return rows.map(mapSale);
     },
@@ -674,15 +708,23 @@ export class HttpRepository {
       return mapToday(row);
     },
 
-    listSessions: async (status?: "open" | "closed") => {
-      const suffix = status ? `?status=${status}` : "";
+    /** Server pages this list (default 50, max 200; cursor = last id). */
+    listSessions: async (
+      status?: "open" | "closed",
+      page: { limit?: number; cursor?: string } = {},
+    ) => {
+      const qs = new URLSearchParams();
+      if (status) qs.set("status", status);
+      if (page.limit != null) qs.set("limit", String(page.limit));
+      if (page.cursor) qs.set("cursor", page.cursor);
+      const suffix = qs.size ? `?${qs.toString()}` : "";
       return this.http.request<Record<string, unknown>[]>("GET", `/cash/sessions${suffix}`);
     },
     session: async (id: string) => {
       return this.http.request<Record<string, unknown>>("GET", `/cash/sessions/${id}`);
     },
     unassigned: async () => {
-      return this.http.request<Record<string, unknown>[]>("GET", "/cash/unassigned-moves");
+      return pageAll((qs) => this.http.request<Record<string, unknown>[]>("GET", `/cash/unassigned-moves${qs}`));
     },
     carry: async (
       sessionId: string,
@@ -780,10 +822,9 @@ export class HttpRepository {
       const q = new URLSearchParams();
       if (from) q.set("from", from);
       if (to) q.set("to", to);
-      const suffix = q.size ? `?${q.toString()}` : "";
-      const rows = await this.http.request<Record<string, unknown>[]>(
-        "GET",
-        `/expenses${suffix}`,
+      const rows = await pageAll(
+        (qs) => this.http.request<Record<string, unknown>[]>("GET", `/expenses${qs}`),
+        q,
       );
       return rows.map(mapExpense);
     },

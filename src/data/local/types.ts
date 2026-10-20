@@ -382,4 +382,11 @@ export type OutboxItem = {
   attempts: number;
   lastError: string | null;
   nextAttemptAt: number | null;
+  /**
+   * loop/v1 T-alto2 — set when the operation this row depended on was
+   * discarded. `local`: the payload references that operation's local id
+   * (never remapped to a server id), so the row can never be sent.
+   * Optional, not indexed: no Dexie schema change.
+   */
+  discardedDependency?: { label: string; local: boolean } | null;
 };

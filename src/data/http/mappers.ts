@@ -1,8 +1,9 @@
 /** Transport mappers only. No stock/debt/total/caja math. */
+import { ContractError } from "../errors";
 
 export function asCopJson(n: unknown, field: string): number {
   if (typeof n !== "number" || !Number.isInteger(n) || !Number.isSafeInteger(n)) {
-    throw new Error(`${field} must be a JSON integer COP, got ${String(n)}`);
+    throw new ContractError(`${field} must be a JSON integer COP, got ${String(n)}`);
   }
   return n;
 }

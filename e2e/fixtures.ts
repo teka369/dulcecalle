@@ -26,7 +26,7 @@ export const SALEO = {
   occurredOn: today, createdAt: iso,
   lines: [{ id: LINE, productId: P1, productName: PROD.name, qty: 2, unitPrice: 1500, unitCost: 400, lineTotal: 3000 }],
 };
-const TODAY = { localDate: today, session: null, expected: { efectivo: 0, nequi: 0, total: 0 }, closed: false, pendingCount: 0, pendingSessions: [], needsReviewCount: 0, conflict: false, canOpen: true, moves: [] };
+export const TODAY = { localDate: today, session: null, expected: { efectivo: 0, nequi: 0, total: 0 }, closed: false, pendingCount: 0, pendingSessions: [], needsReviewCount: 0, conflict: false, canOpen: true, moves: [] };
 const STATS = (period: string) => ({ period, from: today, to: today, ventas: 3000, ventasCount: 1, devoluciones: 0, devolucionesCount: 0, recibido: 0, recibidoEfectivo: 0, recibidoNequi: 0, porCobrar: 3000, gaste: 0, inverti: 0, ganancia: 2200, valorInventario: 4000, stockBajo: 0, emptyPeriod: false });
 
 /** B1/B5: minimal server-side caja with Idempotency-Key semantics. */
@@ -71,10 +71,14 @@ function cashPost(c: FakeCash, p: string, key: string | null, body: Record<strin
 }
 
 let cash: FakeCash;
+/** Server-side data another device may change (refresh-after-sync specs). */
+export type FakeServer = { extraSales: unknown[]; ventasDelta: number };
+let server: FakeServer = { extraSales: [], ventasDelta: 0 };
 
 function respond(p: string, url: URL): unknown {
   if (p === "/products") return [PROD, INSUMO];
   if (p === `/products/${P1}`) return PROD;
+  if (p === `/products/${P2}`) return INSUMO; // Preparar reads its insumo by id
   if (p.endsWith("/moves")) return [];
   if (p === "/suppliers") return [SUP];
   if (p === `/suppliers/${SU}`) return SUP;
@@ -84,10 +88,13 @@ function respond(p: string, url: URL): unknown {
   if (p.endsWith("/ledger")) return { customer: CUS, initials: [], sales: [SALEO], payments: [] };
   if (p === `/sales/${SALE}`) return SALEO;
   if (p.endsWith("/returns")) return [];
-  if (p === "/sales") return [SALEO];
+  if (p === "/sales") return [...server.extraSales, SALEO];
   if (p === "/cash/today") return cashToday(cash);
   if (p === "/me") return { id: AUTH.user.id, email: AUTH.user.email, memberships: [{ businessId: BIZ, role: "owner", business: { id: BIZ, name: "Tienda QA" } }] };
-  if (p.startsWith("/stats")) return STATS(url.searchParams.get("period") ?? "hoy");
+  if (p.startsWith("/stats")) {
+    const st = STATS(url.searchParams.get("period") ?? "hoy");
+    return { ...st, ventas: st.ventas + server.ventasDelta, ventasCount: st.ventasCount + server.extraSales.length };
+  }
   return [];
 }
 
@@ -100,12 +107,14 @@ export type Fake = {
   slowMs: number;
   /** GET paths matching this answer 503 (server down while online). */
   fail5xx: RegExp | null;
+  server: FakeServer;
 };
 
 /** Fake API (same approach as /workspace/qa-plans scripts): intercepts every /v1/ request. */
 export async function installFakeApi(context: BrowserContext): Promise<Fake> {
   cash = { sessions: new Map(), moves: new Map(), posts: [], dropNextOpenResponse: false };
-  const st: Fake = { offline: false, log: [], cash, slow: null, slowMs: 0, fail5xx: null };
+  server = { extraSales: [], ventasDelta: 0 };
+  const st: Fake = { offline: false, log: [], cash, slow: null, slowMs: 0, fail5xx: null, server };
   await context.route(/\/v1\//, async (route) => {
     const req = route.request();
     const url = new URL(req.url());

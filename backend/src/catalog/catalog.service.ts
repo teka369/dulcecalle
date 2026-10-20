@@ -28,6 +28,7 @@ import { linkForNewMove } from "../cash/session-link";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext, PortalLedgerScope } from "../identity/auth.types";
 import { nextCodeFromExisting } from "../shared/customer-code";
+import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import { imageJson } from "./media.service";
 
 function productJson(p: {
@@ -191,16 +192,21 @@ export class CatalogService {
     return productJson(p);
   }
 
-  async listProductMoves(ctx: BusinessContext, productId: string) {
+  async listProductMoves(ctx: BusinessContext, productId: string, page: PageQuery = {}) {
     const p = await this.prisma.product.findFirst({
       where: { id: productId, businessId: ctx.businessId },
     });
     if (!p) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+    const base = { businessId: ctx.businessId, productId };
+    const after = await afterCursor(page.cursor, (id) =>
+      this.prisma.stockMove.findFirst({ where: { id, ...base }, select: { id: true, createdAt: true } }),
+    );
     const rows = await this.prisma.stockMove.findMany({
-      where: { businessId: ctx.businessId, productId },
-      orderBy: { createdAt: "desc" },
+      where: after ? { AND: [base, after] } : base,
+      orderBy: NEWEST_FIRST,
+      take: pageProbe(page.limit),
     });
-    return rows.map((m) => this.stockMoveJson(m));
+    return paged(rows, page.limit, (m) => this.stockMoveJson(m));
   }
 
   async patchProduct(ctx: BusinessContext, id: string, dto: PatchProductDto) {
@@ -405,6 +411,7 @@ export class CatalogService {
   async listPreparations(
     ctx: BusinessContext,
     filter: { sourceId?: string; targetId?: string },
+    page: PageQuery = {},
   ) {
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     for (const value of [filter.sourceId, filter.targetId]) {
@@ -412,19 +419,24 @@ export class CatalogService {
         throw new AppError(ERROR_CODES.VALIDATION, "Revisa el producto.");
       }
     }
+    const base = {
+      businessId: ctx.businessId,
+      ...(filter.sourceId ? { sourceId: filter.sourceId } : {}),
+      ...(filter.targetId ? { targetId: filter.targetId } : {}),
+    };
+    const after = await afterCursor(page.cursor, (id) =>
+      this.prisma.preparation.findFirst({ where: { id, ...base }, select: { id: true, createdAt: true } }),
+    );
     const rows = await this.prisma.preparation.findMany({
-      where: {
-        businessId: ctx.businessId,
-        ...(filter.sourceId ? { sourceId: filter.sourceId } : {}),
-        ...(filter.targetId ? { targetId: filter.targetId } : {}),
-      },
+      where: after ? { AND: [base, after] } : base,
+      take: pageProbe(page.limit),
       include: {
         source: { select: { name: true } },
         target: { select: { name: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: NEWEST_FIRST,
     });
-    return rows.map((p) => this.preparationJson(p));
+    return paged(rows, page.limit, (p) => this.preparationJson(p));
   }
 
   async createCustomer(

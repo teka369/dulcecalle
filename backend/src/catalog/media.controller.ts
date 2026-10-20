@@ -19,6 +19,7 @@ import {
 import { CurrentBusiness } from "../tenancy/business.decorator";
 import type { BusinessContext } from "../identity/auth.types";
 import { resolveIdempotencyKey } from "../shared/idempotency";
+import { UuidParam } from "../shared/http/params";
 
 @Controller()
 export class MediaController {
@@ -28,7 +29,7 @@ export class MediaController {
   @Post("products/:id/image-signature")
   signUpload(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: SignUploadDto,
     @Headers("idempotency-key") key?: string,
   ) {
@@ -43,7 +44,7 @@ export class MediaController {
   @Post("products/:id/images")
   registerImage(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: RegisterProductImageDto,
     @Headers("idempotency-key") key?: string,
   ) {
@@ -57,7 +58,7 @@ export class MediaController {
   @Get("products/:id/images")
   listImages(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
   ) {
     return this.media.listImages(ctx, id);
   }
@@ -65,7 +66,7 @@ export class MediaController {
   @Patch("products/:id/images/reorder")
   reorderImages(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: ReorderProductImagesDto,
   ) {
     return this.media.reorderImages(ctx, id, dto.imageIds);
@@ -74,8 +75,8 @@ export class MediaController {
   @Patch("products/:id/images/:imageId")
   patchImage(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
-    @Param("imageId") imageId: string,
+    @Param("id", UuidParam) id: string,
+    @Param("imageId", UuidParam) imageId: string,
     @Body() dto: PatchProductImageDto,
   ) {
     return this.media.patchImage(ctx, id, imageId, dto);
@@ -85,8 +86,8 @@ export class MediaController {
   @Delete("products/:id/images/:imageId")
   removeImage(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
-    @Param("imageId") imageId: string,
+    @Param("id", UuidParam) id: string,
+    @Param("imageId", UuidParam) imageId: string,
   ) {
     return this.media.removeImage(ctx, id, imageId);
   }

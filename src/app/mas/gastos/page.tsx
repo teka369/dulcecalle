@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { HeroAmount } from "@/components/ui/HeroAmount";
@@ -36,7 +37,7 @@ export default function GastosPage() {
       setClosed(summary.closed);
       setHasSession(summary.session != null);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "No se pudo cargar.");
+      setLoadError(errorText(e, "No se pudo cargar."));
     } finally {
       setReady(true);
     }

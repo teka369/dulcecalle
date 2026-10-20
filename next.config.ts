@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
+import { securityHeaders } from "./src/security-headers";
 
 const revision =
   spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" }).stdout?.trim() ||
@@ -10,6 +11,14 @@ const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
+  // Offline bounce root cause (QA loop-v1 M2 / caja-tiles-offline): Serwist's
+  // default reloadOnOnline does location.reload() on every window "online".
+  // Chromium can fire "online" on the outgoing document while an offline,
+  // SW-served navigation is committing; that reload of the OLD URL cancels the
+  // new navigation, so typed URLs / tiles land back on the previous page.
+  // The app never needs it: the outbox syncs on "online" and screens refresh
+  // from their stores (entityViewStore: "no reload, no assign, no push").
+  reloadOnOnline: false,
   additionalPrecacheEntries: [
     { url: "/", revision },
     { url: "/offline", revision },
@@ -24,6 +33,11 @@ const nextConfig: NextConfig = {
   // The preview browser calls the dev server as 127.0.0.1. Next blocks
   // that host unless it is listed, and the client bundle never hydrates.
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  async headers() {
+    // CSP / clickjacking (see src/security-headers.ts). Also served on /sw.js,
+    // whose CSP governs the service worker's own fetches.
+    return [{ source: "/:path*", headers: securityHeaders() }];
+  },
   async rewrites() {
     // Same-origin /v1 → Nest. Dev/preview only.
     // Production uses NEXT_PUBLIC_API_URL; never proxy to loopback.

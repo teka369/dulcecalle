@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
@@ -18,7 +19,9 @@ import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { customerStore } from "@/store/customerStore";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
+import { usePrefill } from "@/components/ui/use-prefill";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
@@ -32,6 +35,8 @@ export default function RegistrarAbonoPage() {
   const id = useEntityId();
   const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [amountRaw, setAmountRaw] = useState("");
+  usePrefill("monto", setAmountRaw);
+  const rejected = useRejectedCorrection();
   const [method, setMethod] = useState<PayMethod>("Efectivo");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,6 +87,7 @@ export default function RegistrarAbonoPage() {
   }, [customer, amountRaw, method]);
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (!customer || busy) return;
     setError(null);
     const err = validateAbono({
@@ -109,11 +115,11 @@ export default function RegistrarAbonoPage() {
           ? "Abono guardado sin conexión"
           : "Abono registrado",
       );
-      setTimeout(() => {
+      rejected.afterSave(() => {
         navigateOfflineAware(router, `/clientes/${customer.id}`);
       }, 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar abono");
+      setError(errorText(e, "Error al registrar abono"));
       setBusy(false);
     }
   }
@@ -189,6 +195,7 @@ export default function RegistrarAbonoPage() {
         }}
       />
       <ActionToast text={toast} />
+      {rejected.dialog}
     </div>
   );
 }

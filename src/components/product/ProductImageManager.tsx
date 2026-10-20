@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { PendingBadge } from "@/components/ui/StatusBadge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RemoteProductImage } from "@/data/http/mappers";
@@ -150,7 +151,7 @@ export function ProductImageManager({ productId, images, onChanged }: Props) {
       await reloadPending();
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudieron subir las fotos.");
+      setError(errorText(e, "No se pudieron subir las fotos."));
       setFiles((current) =>
         current.map((f) =>
           f.status === "uploading" ? { ...f, status: "ready" as const, progress: 0 } : f,
@@ -169,7 +170,7 @@ export function ProductImageManager({ productId, images, onChanged }: Props) {
       onChanged();
     } catch (e) {
       if (!(e instanceof NetworkError)) {
-        setError(e instanceof Error ? e.message : "No se pudo eliminar.");
+        setError(errorText(e, "No se pudo eliminar."));
         return;
       }
       try {
@@ -190,7 +191,7 @@ export function ProductImageManager({ productId, images, onChanged }: Props) {
       await setPrimaryImage(productId, imageId);
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo actualizar.");
+      setError(errorText(e, "No se pudo actualizar."));
     }
   }
 
@@ -207,7 +208,7 @@ export function ProductImageManager({ productId, images, onChanged }: Props) {
       await reorderProductImages(productId, next);
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo reordenar.");
+      setError(errorText(e, "No se pudo reordenar."));
     }
   }
 

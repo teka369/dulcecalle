@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
@@ -11,7 +12,7 @@ import { Input } from "@/components/ui/Input";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
@@ -41,6 +42,7 @@ export default function AgregarProductoPage() {
   }
 
   async function onSave() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (busy) return;
     setError(null);
     setBusy(true);
@@ -61,7 +63,7 @@ export default function AgregarProductoPage() {
       setCreatedId(result.id);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : INVENTORY_ERRORS.emptyProductName,
+        errorText(e, INVENTORY_ERRORS.emptyProductName),
       );
       setBusy(false);
     }

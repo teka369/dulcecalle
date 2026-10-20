@@ -30,7 +30,7 @@ export default function CustomerHomePage() {
 
   const summary = customerPortalSummary(ledger);
   const debt = debtHero(ledger);
-  const { totalComprado, totalAbonado } = customerPortalTotals(ledger);
+  const { totalFiado, totalAbonado, totalDevuelto } = customerPortalTotals(ledger);
 
   return (
     <CustomerChrome
@@ -53,14 +53,24 @@ export default function CustomerHomePage() {
       {/* Metrics and shortcuts are rows with dividers in the sheet, not floating cards. */}
       <RowGroup label="Tus totales">
         <Row
-          title="Total comprado"
-          trailing={<span className="text-[15px] font-semibold tabular-nums">{formatCop(totalComprado)}</span>}
+          title="Fiado y deuda anterior"
+          meta="Sube tu deuda"
+          trailing={<span className="text-[15px] font-semibold tabular-nums">{formatCop(totalFiado)}</span>}
         />
         <Row
-          title="Total abonado"
+          title="Abonos a tu deuda"
+          meta="Baja tu deuda"
           trailing={<span className="text-[15px] font-semibold tabular-nums text-ok">{formatCop(totalAbonado)}</span>}
         />
+        {totalDevuelto > 0 ? (
+          <Row
+            title="Devoluciones"
+            meta="Baja tu deuda"
+            trailing={<span className="text-[15px] font-semibold tabular-nums text-ok">{formatCop(totalDevuelto)}</span>}
+          />
+        ) : null}
       </RowGroup>
+      <p className="text-xs text-ink-muted">Las compras pagadas al momento no suman deuda.</p>
       <RowGroup label="Accesos">
         <Row href="/cliente/cuenta" title="Cuenta" meta="Movimientos y saldo" />
         <Row href="/cliente/compras" title="Compras" meta="Lo que has comprado" />

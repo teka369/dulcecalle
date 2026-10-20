@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
+import { navDebug } from "@/data/pwa/nav-debug";
 import type { PayMethod } from "@/domain/types";
 import {
   CASH_COPY,
@@ -85,6 +86,7 @@ export const cashStore = {
     return state;
   },
   async refresh(): Promise<DayCashSummary> {
+    navDebug("cashStore.refresh", { caller: new Error().stack?.split("\n").slice(2, 5).map((l) => l.trim()).join(" < ") });
     setState({ loading: true });
     try {
       const api = getPwaApi();

@@ -89,14 +89,11 @@ describe("customer portal routing", () => {
     ).toEqual({ kind: "redirect", to: "/login" });
   });
 
-  it("login shows customer access directly and hides store access behind ten logo taps", () => {
+  it("loop/v1: login shows the store login first and the customer portal as a secondary link", () => {
     const src = readFileSync(join(__dirname, "../../app/login/page.tsx"), "utf8");
-    expect(src).toContain("CustomerLoginForm");
-    expect(src).toContain("onLogoTap");
-    expect(src).toContain("taps.length === 10");
-    expect(src).toContain('router.push("/acceso-tienda")');
-    expect(src).not.toContain("Entrar como Cliente");
-    expect(src).not.toContain("Entrar a mi tienda");
+    expect(src).toContain("StoreLoginForm");
+    expect(src).toContain('href="/cliente/login"');
+    expect(src).not.toContain("CustomerLoginForm");
   });
 
   it("private store login page exists separately from the customer login", () => {

@@ -40,11 +40,14 @@ export function debtHero(ledger: CustomerLedger) {
     : { owes: false as const, label: "Al día", value: 0, caption: "Estás al día. No debes nada." };
 }
 
+/** Only fiado/deuda anterior raise the debt; abonos and debt-reducing returns lower it. */
 export function statementSign(row: Pick<CustomerStatementRow, "kind">) {
-  const lowers = row.kind === "pago" || row.kind === "devolucion";
-  return lowers
-    ? { sign: "−" as const, word: "Baja tu deuda", tone: "ok" as const }
-    : { sign: "+" as const, word: "Sube tu deuda", tone: "danger" as const };
+  if (row.kind === "pago" || row.kind === "devolucion") {
+    return { sign: "−" as const, word: "Baja tu deuda", tone: "ok" as const };
+  }
+  if (row.kind === "compra") return { sign: "" as const, word: "Pagada", tone: "neutral" as const };
+  if (row.kind === "reembolso") return { sign: "" as const, word: "Te devolvimos", tone: "neutral" as const };
+  return { sign: "+" as const, word: "Sube tu deuda", tone: "danger" as const };
 }
 
 export function purchaseLabel(credit: number, paymentKind: string): string {

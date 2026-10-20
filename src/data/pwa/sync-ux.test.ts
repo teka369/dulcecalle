@@ -412,4 +412,15 @@ describe("sync UX: store reflects Dexie truth and events", () => {
     );
     expect(await resolveBlockedReason(BIZ, { dependsOn: [] })).toBeNull();
   });
+
+  it("FIFO: a dependent op waits for a permanently rejected parent and says so", async () => {
+    const outbox = getOutboxStore();
+    const parent = newEntityId();
+    await outbox.enqueue({ operationId: parent, businessId: BIZ, entity: "cashSession", operation: "open", requestId: newRequestId(), payload: {} });
+    await outbox.markInFlight(BIZ, parent);
+    await outbox.markFailed(BIZ, parent, "Ya hay una caja abierta.", null);
+    expect(await resolveBlockedReason(BIZ, { dependsOn: [parent] })).toBe(
+      "Esperando a «Apertura de caja», que el servidor rechazó. Corrígela o descártala.",
+    );
+  });
 });

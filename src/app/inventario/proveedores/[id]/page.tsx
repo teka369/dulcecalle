@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
@@ -21,6 +22,7 @@ import { SectionHead } from "@/components/ui/SectionHead";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 
 export default function ProveedorFichaPage() {
@@ -29,6 +31,7 @@ export default function ProveedorFichaPage() {
   const [supplier, setSupplier] = useState<RemoteSupplier | null>(null);
   const [historial, setHistorial] = useState<PwaSupplierSurtir[]>([]);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const imageMap = useProductImageMap(getPwaAuthSession().businessId);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -42,15 +45,21 @@ export default function ProveedorFichaPage() {
       setReady(true);
       return;
     }
-    const s = await inventoryStore.getSupplier(id);
-    setSupplier(s ?? null);
-    if (s) {
-      setEditName(s.name);
-      setEditPhone(s.phone ?? "");
-      setEditNotes(s.notes ?? "");
-      setHistorial(await inventoryStore.listSupplierSurtidas(id));
+    setLoadError(null);
+    try {
+      const s = await inventoryStore.getSupplier(id);
+      setSupplier(s ?? null);
+      if (s) {
+        setEditName(s.name);
+        setEditPhone(s.phone ?? "");
+        setEditNotes(s.notes ?? "");
+        setHistorial(await inventoryStore.listSupplierSurtidas(id));
+      }
+    } catch (e: unknown) {
+      setLoadError(errorText(e, ""));
+    } finally {
+      setReady(true);
     }
-    setReady(true);
   }, [id]);
 
   useEffect(() => {
@@ -62,6 +71,24 @@ export default function ProveedorFichaPage() {
       <div className="flex flex-col gap-4">
         <SkeletonHero title="Proveedor" />
         <SkeletonRows />
+      </div>
+    );
+  }
+
+  if (loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock offline={offlineBand} size="medium" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Proveedor" />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={typeof navigator === "undefined" || navigator.onLine}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
+        </Sheet>
       </div>
     );
   }
@@ -96,7 +123,7 @@ export default function ProveedorFichaPage() {
                   setEditing(false);
                 })
                 .catch((e: unknown) => {
-                  setEditError(e instanceof Error ? e.message : "No se pudo guardar.");
+                  setEditError(errorText(e, "No se pudo guardar."));
                 })
                 .finally(() => setEditBusy(false));
             };
