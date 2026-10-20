@@ -83,6 +83,10 @@ export function useSyncItems() {
 }
 
 function StatusChip({ item, flushing }: { item: EnrichedTrayItem; flushing: boolean }) {
+  // An orphan will never be sent on its own: say so instead of «Guardada aquí».
+  if (item.orphaned) {
+    return <Badge tone="danger" className="shrink-0">! No se puede enviar</Badge>;
+  }
   if (item.status === "failed" && item.permanent) {
     return <Badge tone="danger" className="shrink-0">! Necesita atención</Badge>;
   }
@@ -102,6 +106,16 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const discardTriggerRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
+  const wasConfirming = useRef(false);
+
+  // Focus moves into the confirmation when it opens and back to «Descartar» when it closes.
+  useEffect(() => {
+    if (confirming) confirmRef.current?.focus();
+    else if (wasConfirming.current) discardTriggerRef.current?.focus();
+    wasConfirming.current = confirming;
+  }, [confirming]);
 
   const detail = describeOutboxDetail(item);
   const reason = humanizeSyncError(item.lastError);
@@ -154,7 +168,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
           )}
           {item.blockedBy && (
             <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
-              <PendingBadge label="En espera" />
+              {!item.orphaned && <PendingBadge label="En espera" />}
               {item.blockedBy}
             </span>
           )}
@@ -188,16 +202,24 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
               Reintentar
             </Button>
           )}
-          <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(true)} className="w-full text-ink-muted">
+          <Button ref={discardTriggerRef} type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(true)} className="w-full text-ink-muted">
             Descartar
           </Button>
         </div>
       )}
 
       {(item.status === "failed" || item.orphaned) && confirming && (
-        <div className="mt-3 rounded-[var(--r-lg)] border border-danger/20 bg-danger/5 p-3">
-          <p className="text-sm font-semibold">¿Descartar este envío?</p>
-          <p className="mt-1 text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>
+        <div
+          ref={confirmRef}
+          role="alertdialog"
+          tabIndex={-1}
+          aria-labelledby={`discard-title-${item.operationId}`}
+          aria-describedby={`discard-desc-${item.operationId}`}
+          onKeyDown={(e) => { if (e.key === "Escape" && !busy) setConfirming(false); }}
+          className="mt-3 rounded-[var(--r-lg)] border border-danger/20 bg-danger/5 p-3 outline-none focus-visible:ring-2 focus-visible:ring-danger"
+        >
+          <p id={`discard-title-${item.operationId}`} className="text-sm font-semibold">¿Descartar este envío?</p>
+          <p id={`discard-desc-${item.operationId}`} className="mt-1 text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(false)} className="w-full">
               Cancelar

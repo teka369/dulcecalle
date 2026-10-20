@@ -2,7 +2,7 @@ import type { SyncCounts } from "@/store/syncStore";
 
 /** Shown wherever discard is offered. Does not describe a data delete. */
 export const DISCARD_NOTICE =
-  "No enviar elimina este envío pendiente de este dispositivo. No deshace nada que ya esté guardado en el servidor. El registro puede seguir apareciendo en este teléfono hasta que los datos locales se actualicen o se eliminen mediante el flujo correspondiente.";
+  "Descartar elimina este envío pendiente de este dispositivo. No deshace nada que ya esté guardado en el servidor. El registro puede seguir apareciendo en este teléfono hasta que los datos locales se actualicen o se eliminen mediante el flujo correspondiente.";
 
 export const NOT_A_BACKUP = "Esto no es una copia de seguridad.";
 
