@@ -31,15 +31,15 @@ function setup() {
       counts.set(key, (counts.get(key) ?? 0) + 1);
     },
   };
-  const prisma = { customer: { findMany: jest.fn(async () => [ROW]) } };
+  const prisma = { customer: { findMany: jest.fn(async (a: { where: { code: string } }) => (a.where.code === ROW.code ? [ROW] : [])) } };
   const sessions = { issue: async () => ({ accessToken: "a", refreshToken: "r" }) };
   const svc = new CustomerAccessService(prisma as never, {} as never, {} as never, sessions as never, throttle as unknown as PortalLoginThrottle);
   const sleeps: number[] = [];
   (svc as unknown as { sleep: (ms: number) => Promise<void> }).sleep = async (ms: number) => void sleeps.push(ms);
   return { svc, sleeps, counts };
 }
-const attempt = (svc: CustomerAccessService, pin: string, ip: string) =>
-  svc.login("DC-0001", pin, undefined, ip).then(() => "ok", (e: { code?: string }) => e.code ?? "error");
+const attempt = (svc: CustomerAccessService, pin: string, ip: string, code = "DC-0001") =>
+  svc.login(code, pin, undefined, ip).then(() => "ok", (e: { code?: string }) => e.code ?? "error");
 
 describe("portal per-customer soft cap", () => {
   it("many IPs failing on one customer: progressive delay + alert, never RATE_LIMIT/lock; real PIN still works and resets", async () => {
@@ -61,5 +61,20 @@ describe("portal per-customer soft cap", () => {
     expect(await attempt(svc, "000000", "198.51.100.8")).toBe("UNAUTHORIZED");
     expect(sleeps).toEqual([]);
     warn.mockRestore();
+  });
+
+  it("timing reveals nothing: an unknown code and a real code get the same delay schedule (keyed by the typed code)", async () => {
+    const real = setup();
+    const ghost = setup();
+    for (let i = 0; i < 15; i++) {
+      expect(await attempt(real.svc, "000000", `203.0.113.${i + 1}`, "DC-0001")).toBe("UNAUTHORIZED");
+      expect(await attempt(ghost.svc, "000000", `203.0.113.${i + 1}`, "DC-9999")).toBe("UNAUTHORIZED");
+    }
+    expect(real.sleeps.length).toBeGreaterThan(0);
+    expect(ghost.sleeps).toEqual(real.sleeps);
+    // Same typed code, different spelling → same counter.
+    expect([...ghost.counts.keys()]).toEqual(["code:DC-9999"]);
+    expect(await attempt(ghost.svc, "000000", "203.0.113.200", " dc-9999 ")).toBe("UNAUTHORIZED");
+    expect(ghost.counts.get("code:DC-9999")).toBe(16);
   });
 });

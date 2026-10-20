@@ -122,18 +122,20 @@ export class CustomerAccessService {
     });
     const pool = store ? rows.filter((r) => storeMatches(store, r.businessId, r.business.name)) : rows;
     const candidate = pool.length === 1 ? pool[0] : null;
-    // Soft per-customer cap (any IP): progressive delay, never a block.
-    const customerKey = candidate ? `cust:${candidate.id}` : null;
-    const prior = customerKey ? await this.throttle.peek(customerKey, CUSTOMER_SOFT_CAP.windowMs) : 0;
+    // Soft cap per TYPED code (normalized), from any IP: progressive delay,
+    // never a block. Keyed by what was typed, not by a found customer, so an
+    // unknown code gets exactly the same delay schedule (timing reveals nothing).
+    const customerKey = `code:${code}`;
+    const prior = await this.throttle.peek(customerKey, CUSTOMER_SOFT_CAP.windowMs);
     const wait = softDelayMs(prior);
     if (wait > 0) await this.sleep(wait);
     // Exactly one bcrypt compare in every branch (real hash or dummy).
     const ok = await bcrypt.compare(pin, candidate ? (candidate.pinHash as string) : await dummyHash());
-    if (customerKey && !ok) {
+    if (!candidate || !ok) {
       await this.throttle.bump(customerKey, CUSTOMER_SOFT_CAP.windowMs);
       if (softCapAlert(prior + 1)) {
         this.logger.warn(
-          `portal: many failed PINs for one customer (${prior + 1} in the last hour, any IP); slowing attempts, not locking. customer=${candidate!.id} business=${candidate!.businessId}`,
+          `portal: many failed PINs for one customer code (${prior + 1} in the last hour, any IP); slowing attempts, not locking. code=${code}${candidate ? ` customer=${candidate.id} business=${candidate.businessId}` : " (no single match)"}`,
         );
       }
     }
@@ -146,7 +148,7 @@ export class CustomerAccessService {
     const matches = [candidate];
     const customer = matches[0];
     await this.throttle.reset(ipCodeKey);
-    if (customerKey) await this.throttle.reset(customerKey);
+    await this.throttle.reset(customerKey);
     const issued = await this.tokens(customer.id, customer.businessId);
     return {
       customer: {
