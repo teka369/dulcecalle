@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
@@ -14,6 +14,7 @@ import { getPwaApi } from "@/data/pwa/api";
 import { assignMoveWithOfflineFallback } from "@/data/pwa/offline-operations";
 import { isOffline } from "@/data/pwa/offline-nav";
 import { GestionarOfflineState, gestionarIsOffline } from "@/components/cash/gestionar-offline";
+import { type AssignAttempt, assignAttemptFor, assignErrorMessage } from "@/components/cash/assign-attempt";
 
 type Row = {
   id: string;
@@ -38,6 +39,9 @@ export default function GestionarCajasPage() {
   const [error, setError] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const attemptRef = useRef<AssignAttempt | null>(null);
 
   useEffect(() => {
     if (isOffline()) {
@@ -54,6 +58,23 @@ export default function GestionarCajasPage() {
       });
     void api.cash.unassigned().then((data) => setOrphans(data as typeof orphans)).catch(() => setOrphans([]));
   }, []);
+
+  async function assign(moveId: string) {
+    if (!target || assigningId) return;
+    const attempt = assignAttemptFor(attemptRef.current, moveId, target);
+    attemptRef.current = attempt;
+    setAssigningId(moveId);
+    setAssignError(null);
+    try {
+      await assignMoveWithOfflineFallback(attempt.moveId, attempt.target, attempt.requestId);
+      attemptRef.current = null;
+      setOrphans((list) => list.filter((row) => row.id !== moveId));
+    } catch (e: unknown) {
+      setAssignError(assignErrorMessage(e));
+    } finally {
+      setAssigningId(null);
+    }
+  }
 
   const pending = rows?.filter((row) => !row.regularized) ?? [];
   const closed = rows?.filter((row) => row.regularized) ?? [];
@@ -89,7 +110,10 @@ export default function GestionarCajasPage() {
                     <select
                       className="mt-1 h-14 w-full rounded-[var(--r-md)] border border-border bg-surface px-3 text-base"
                       value={target}
-                      onChange={(e) => setTarget(e.target.value)}
+                        onChange={(e) => {
+                        setTarget(e.target.value);
+                        setAssignError(null);
+                      }}
                     >
                       <option value="">Elige la caja</option>
                       {pending.map((row) => (
@@ -99,6 +123,11 @@ export default function GestionarCajasPage() {
                       ))}
                     </select>
                   </label>
+                ) : null}
+                {assignError ? (
+                  <p role="alert" className="text-sm text-danger">
+                    {assignError}
+                  </p>
                 ) : null}
                 <RowGroup label="Movimientos sin caja">
                   {orphans.map((move) => (
@@ -112,12 +141,9 @@ export default function GestionarCajasPage() {
                           <button
                             type="button"
                             className="min-h-11 text-xs font-semibold text-ink underline underline-offset-2 disabled:opacity-40"
-                            disabled={!target}
-                            onClick={() =>
-                              void assignMoveWithOfflineFallback(move.id, target).then(() =>
-                                setOrphans((rows) => rows.filter((row) => row.id !== move.id)),
-                              )
-                            }
+                            disabled={!target || assigningId !== null}
+                            aria-busy={assigningId === move.id}
+                            onClick={() => void assign(move.id)}
                           >
                             Asignar a esa caja
                           </button>
