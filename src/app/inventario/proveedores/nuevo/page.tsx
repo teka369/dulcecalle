@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useState } from "react";
@@ -34,7 +35,7 @@ export default function AgregarProveedorPage() {
       }, 700);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : INVENTORY_ERRORS.emptySupplierName,
+        errorText(e, INVENTORY_ERRORS.emptySupplierName),
       );
       setBusy(false);
     }

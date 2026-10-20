@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
@@ -118,7 +119,7 @@ export default function RegistrarAbonoPage() {
         navigateOfflineAware(router, `/clientes/${customer.id}`);
       }, 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar abono");
+      setError(errorText(e, "Error al registrar abono"));
       setBusy(false);
     }
   }

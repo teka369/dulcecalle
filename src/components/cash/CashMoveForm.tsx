@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useEffect, useRef, useState } from "react";
 import { usePrefill } from "@/components/ui/use-prefill";
 import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
@@ -99,7 +100,7 @@ export function CashMoveForm({ kind }: { kind: CashFormKind }) {
       setToast(cfg.toast);
       rejected.afterSave(() => navigateOfflineAware(router, cfg.back), 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(errorText(e, "Error"));
       setBusy(false);
     }
   }

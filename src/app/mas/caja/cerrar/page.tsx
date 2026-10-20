@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { Spinner } from "@/components/ui/Spinner";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
@@ -70,7 +71,7 @@ export default function CerrarCajaPage() {
       setToast(CASH_COPY.toastCajaCerrada);
       setTimeout(() => navigateOfflineAware(router, "/mas/caja"), 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(errorText(e, "Error"));
       setBusy(false);
     }
   }

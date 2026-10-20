@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
@@ -71,10 +72,10 @@ export default function CobrarPage() {
   useEffect(() => {
     void listCachedProducts()
       .then(setProducts)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Sin conexión."));
+      .catch((e: unknown) => setError(errorText(e, "Sin conexión.")));
     void listCachedCustomers()
       .then(setCustomers)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Sin conexión."));
+      .catch((e: unknown) => setError(errorText(e, "Sin conexión.")));
     void getPendingCustomerIds().then(setPendingCustomerIds);
   }, []);
 
@@ -146,7 +147,7 @@ export default function CobrarPage() {
       );
       setTimeout(() => navigateOfflineAware(router, "/"), 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar venta");
+      setError(errorText(e, "Error al registrar venta"));
       setBusy(false);
     }
   }

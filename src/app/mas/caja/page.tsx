@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { HeroAmount } from "@/components/ui/HeroAmount";
@@ -50,7 +51,7 @@ export default function CajaPage() {
       const s = await cashStore.refresh();
       setSummary(s);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "No se pudo cargar.");
+      setLoadError(errorText(e, "No se pudo cargar."));
     } finally {
       setReady(true);
     }
@@ -78,7 +79,7 @@ export default function CajaPage() {
       setTimeout(() => setToast(null), 2000);
       rejected.afterSave(() => undefined, 0);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(errorText(e, "Error"));
     } finally {
       setBusy(false);
     }

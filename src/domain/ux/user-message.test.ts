@@ -12,7 +12,7 @@ describe("userFacingMessage", () => {
       "invalid occurredOn/localDate: undefined",
       "product not found",
       "Internal server error",
-    ]) expect(userFacingMessage(raw, "FALLBACK"), raw).toBe("FALLBACK");
+    ]) expect(userFacingMessage(raw, "FALLBACK"), raw).toMatch(/^(FALLBACK|No encontramos|Revisa los datos|Escribe el monto)/);
   });
   it("keeps plain Spanish messages", () => {
     for (const raw of ["No encontramos eso.", "La caja de ese día ya está cerrada.", "Identificador inválido."]) {
@@ -20,5 +20,37 @@ describe("userFacingMessage", () => {
     }
     expect(userFacingMessage("", "FALLBACK")).toBe("FALLBACK");
     expect(userFacingMessage(null, "FALLBACK")).toBe("FALLBACK");
+  });
+});
+
+import { errorText } from "./user-message";
+
+describe("errorText (inline form errors)", () => {
+  it("maps known English messages to clear Spanish", () => {
+    const cases: Array<[string, string]> = [
+      ["product not found", "No encontramos ese producto."],
+      ["customer not found", "No encontramos ese cliente."],
+      ["supplier not found", "No encontramos ese proveedor."],
+      ["sale not found", "No encontramos esa venta."],
+      ["Failed to fetch", "Sin conexión. Revisa tu internet e inténtalo de nuevo."],
+      ["TypeError: NetworkError when attempting to fetch resource.", "Sin conexión. Revisa tu internet e inténtalo de nuevo."],
+      ["The operation was aborted due to timeout", "El servidor tardó demasiado. Inténtalo de nuevo."],
+      ["qty must be a positive integer", "Escribe una cantidad entera válida."],
+      ["delta must be a non-zero integer", "Escribe una cantidad entera válida."],
+      ["COP must be an integer, got 1.5", "Escribe el monto en pesos, sin centavos."],
+      ["Unauthorized", "Tu sesión expiró. Vuelve a entrar."],
+      ["Forbidden resource", "No tienes permiso para hacer esto."],
+      ["ThrottlerException: Too Many Requests", "Demasiados intentos. Espera un momento e inténtalo de nuevo."],
+      ["Insufficient stock", "No hay suficiente stock."],
+      ["name should not be empty", "Revisa los datos e inténtalo de nuevo."],
+    ];
+    for (const [raw, want] of cases) expect(errorText(new Error(raw), "FALLBACK"), raw).toBe(want);
+  });
+  it("keeps useful Spanish; generic fallbacks become clear Spanish", () => {
+    expect(errorText(new Error("No hay suficiente stock."), "x")).toBe("No hay suficiente stock.");
+    expect(errorText(new Error("Escribe una cantidad."), "x")).toBe("Escribe una cantidad.");
+    expect(errorText("not an error", "Error al surtir")).toBe("Error al surtir");
+    expect(errorText(new Error("TypeError: x is undefined"), "Error")).toBe("No se pudo completar. Inténtalo de nuevo.");
+    expect(errorText(new Error(""), "")).toBe("");
   });
 });

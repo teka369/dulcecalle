@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { Button } from "@/components/ui/Button";
 import { useEffect, useRef, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
@@ -75,7 +76,7 @@ export default function GestionarCajasPage() {
       })
       .catch((e: unknown) => {
         if (gestionarIsOffline(false, e)) setOffline(true);
-        else setError(e instanceof Error ? e.message : "No se pudieron cargar las cajas.");
+        else setError(errorText(e, "No se pudieron cargar las cajas."));
       });
     void api.cash.unassigned().then((data) => setOrphans(data as typeof orphans)).catch(() => setOrphans([]));
   }, []);

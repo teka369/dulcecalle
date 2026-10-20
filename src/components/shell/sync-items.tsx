@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import Link from "next/link";
 
 import { PendingBadge } from "@/components/ui/StatusBadge";
@@ -136,7 +137,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
       await retryOutboxOperation(businessId, item.operationId);
       await syncStore.syncNow();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo reintentar.");
+      setError(errorText(e, "No se pudo reintentar."));
     } finally {
       setBusy(false);
     }
@@ -152,7 +153,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
       setConfirming(false);
       await syncStore.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo descartar.");
+      setError(errorText(e, "No se pudo descartar."));
     } finally {
       setBusy(false);
     }

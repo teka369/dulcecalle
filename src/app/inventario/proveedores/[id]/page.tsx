@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
@@ -55,7 +56,7 @@ export default function ProveedorFichaPage() {
         setHistorial(await inventoryStore.listSupplierSurtidas(id));
       }
     } catch (e: unknown) {
-      setLoadError(e instanceof Error ? e.message : "");
+      setLoadError(errorText(e, ""));
     } finally {
       setReady(true);
     }
@@ -122,7 +123,7 @@ export default function ProveedorFichaPage() {
                   setEditing(false);
                 })
                 .catch((e: unknown) => {
-                  setEditError(e instanceof Error ? e.message : "No se pudo guardar.");
+                  setEditError(errorText(e, "No se pudo guardar."));
                 })
                 .finally(() => setEditBusy(false));
             };

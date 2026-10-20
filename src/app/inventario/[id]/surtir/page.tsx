@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand, useOnline } from "@/components/shell/use-online";
 import { Input } from "@/components/ui/Input";
 import { HeroBlock } from "@/components/ui/HeroBlock";
@@ -71,7 +72,7 @@ export default function SurtirPage() {
       setSuppliers(s);
       void getPendingSupplierIds().then(setPendingSupplierIds);
     } catch (e: unknown) {
-      setLoadError(e instanceof Error ? e.message : "");
+      setLoadError(errorText(e, ""));
     } finally {
       setReady(true);
     }
@@ -175,7 +176,7 @@ export default function SurtirPage() {
         navigateOfflineAware(router, `/inventario/${product.id}`);
       }, 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al surtir");
+      setError(errorText(e, "Error al surtir"));
       setBusy(false);
     }
   }

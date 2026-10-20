@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
@@ -62,7 +63,7 @@ export default function AgregarProductoPage() {
       setCreatedId(result.id);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : INVENTORY_ERRORS.emptyProductName,
+        errorText(e, INVENTORY_ERRORS.emptyProductName),
       );
       setBusy(false);
     }

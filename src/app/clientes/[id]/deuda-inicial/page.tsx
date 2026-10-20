@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useRouter } from "next/navigation";
 import { isOffline, navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -107,7 +108,7 @@ export default function AgregarDeudaAnteriorPage() {
       }, 700);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Error al registrar la deuda anterior",
+        errorText(e, "Error al registrar la deuda anterior"),
       );
       setBusy(false);
     }

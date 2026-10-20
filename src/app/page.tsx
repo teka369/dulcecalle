@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useCallback, useEffect, useState } from "react";
 import { useAfterSync } from "@/components/shell/use-after-sync";
 import { usePathname } from "next/navigation";
@@ -33,7 +34,7 @@ export default function InicioPage() {
   useEffect(() => {
     void refresh().catch((e: unknown) => {
       setFailed(true);
-      setToast(e instanceof Error ? e.message : "No se pudo cargar el inicio");
+      setToast(errorText(e, "No se pudo cargar el inicio"));
     });
   }, [refresh, pathname]);
 

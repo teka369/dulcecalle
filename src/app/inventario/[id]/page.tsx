@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -84,7 +85,7 @@ export default function ProductoFichaPage() {
         setIntoPreparations(into);
       }
     } catch (e: unknown) {
-      setLoadError(e instanceof Error ? e.message : "");
+      setLoadError(errorText(e, ""));
     } finally {
       setReady(true);
     }
@@ -155,7 +156,7 @@ export default function ProductoFichaPage() {
                   setEditing(false);
                 })
                 .catch((e: unknown) => {
-                  setEditError(e instanceof Error ? e.message : "No se pudo guardar.");
+                  setEditError(errorText(e, "No se pudo guardar."));
                 })
                 .finally(() => setEditBusy(false));
             };
@@ -171,7 +172,7 @@ export default function ProductoFichaPage() {
                     setConfirmArchive(false);
                   })
                   .catch((e: unknown) => {
-                    setEditError(e instanceof Error ? e.message : "No se pudo archivar.");
+                    setEditError(errorText(e, "No se pudo archivar."));
                   })
                   .finally(() => setEditBusy(false));
               };

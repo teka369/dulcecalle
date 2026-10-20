@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
@@ -61,7 +62,7 @@ export default function GestionarCajaDetailPage() {
         // B9: prefill the counted field with the expected cash (user can edit it).
         setCounted((prev) => (prev === "" && Number.isFinite(d.expectedEfectivo) ? String(Math.max(0, Math.round(d.expectedEfectivo))) : prev));
       })
-      .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : "No se pudo cargar."));
+      .catch((e: unknown) => setLoadError(errorText(e, "No se pudo cargar.")));
   }
 
   async function closeCounted() {
@@ -72,7 +73,7 @@ export default function GestionarCajaDetailPage() {
       await getPwaApi().cash.close(params.id, Number(counted));
       router.push("/mas/caja/gestionar");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cerrar.");
+      setError(errorText(e, "No se pudo cerrar."));
     } finally {
       setBusy(false);
     }
@@ -91,7 +92,7 @@ export default function GestionarCajaDetailPage() {
       await carryCashWithOfflineFallback(params.id, { mode, countedEfectivo });
       router.push("/mas/caja");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo pasar el saldo.");
+      setError(errorText(e, "No se pudo pasar el saldo."));
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -54,7 +55,7 @@ export default function PrepararPage() {
         if (alive) setSource(p ?? null);
       })
       .catch((e: unknown) => {
-        if (alive) setLoadError(e instanceof Error ? e.message : "");
+        if (alive) setLoadError(errorText(e, ""));
       })
       .finally(() => {
         if (alive) setLoaded(true);
@@ -113,7 +114,7 @@ export default function PrepararPage() {
       void id;
       setDone(targetId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : INVENTORY_ERRORS.emptyQty);
+      setError(errorText(e, INVENTORY_ERRORS.emptyQty));
       setBusy(false);
     }
   }

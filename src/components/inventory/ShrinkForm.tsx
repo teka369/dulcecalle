@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
@@ -71,7 +72,7 @@ export function ShrinkForm({
       const p = await inventoryStore.getProduct(id);
       setProduct(p ?? null);
     } catch (e: unknown) {
-      setLoadError(e instanceof Error ? e.message : "");
+      setLoadError(errorText(e, ""));
     } finally {
       setReady(true);
     }
@@ -120,7 +121,7 @@ export function ShrinkForm({
         navigateOfflineAware(router, `/inventario/${product.id}`);
       }, 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(errorText(e, "Error"));
       setBusy(false);
     }
   }
