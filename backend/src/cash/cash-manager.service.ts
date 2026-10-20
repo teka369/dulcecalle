@@ -16,6 +16,51 @@ function ageDays(from: Date, to: Date): number {
   return Math.max(0, Math.round((to.getTime() - from.getTime()) / 86_400_000));
 }
 
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
+function parseLimit(raw: string | undefined): number {
+  if (raw == null || raw === "") return DEFAULT_LIMIT;
+  if (!/^\d+$/.test(raw) || Number(raw) < 1) {
+    throw new AppError(ERROR_CODES.VALIDATION, "Límite inválido.");
+  }
+  return Math.min(Number(raw), MAX_LIMIT);
+}
+
+function summaryJson(
+  session: {
+    id: string; localDate: Date; openedAt: Date; closedAt: Date | null; openingFloat: bigint;
+    closingCount: bigint | null; difference: bigint | null; closeMode: string | null; note: string | null;
+  },
+  expected: { efectivo: bigint; nequi: bigint },
+  moveCount: number,
+  lastMoveAt: Date | null,
+  stamped: number,
+  laterOpen: number,
+  today: Date,
+) {
+    return {
+    id: session.id,
+    localDate: dateKey(session.localDate),
+    openedAt: session.openedAt,
+    closedAt: session.closedAt,
+    openingFloat: copToJson(session.openingFloat),
+    expectedEfectivo: copToJson(expected.efectivo),
+    expectedNequi: copToJson(expected.nequi),
+    closingCount: session.closingCount == null ? null : copToJson(session.closingCount),
+    difference: session.difference == null ? null : copToJson(session.difference),
+    closeMode: session.closeMode,
+    note: session.note,
+    moveCount,
+    lastMoveAt,
+    laterActivity: stamped > 0,
+    ageDays: ageDays(session.localDate, today),
+    canCountClose: session.closedAt == null && stamped === 0,
+    requiresCarry: session.closedAt == null && stamped > 0,
+    hasLaterOpenSession: laterOpen > 0,
+    regularized: session.closedAt != null,
+  };
+}
+
 @Injectable()
 export class CashManagerService {
   constructor(
@@ -23,15 +68,84 @@ export class CashManagerService {
     private readonly cash: CashService,
   ) {}
 
-  async list(ctx: BusinessContext, status?: string) {
+  /**
+   * M5: keyset-paginated (localDate desc, id desc; `cursor` = last session id
+   * of the previous page) and batched: a constant number of queries per page
+   * regardless of page size (sessions, move aggregates, open-session moves,
+   * open localDates) instead of ~4 queries per session.
+   */
+  async list(
+    ctx: BusinessContext,
+    status?: string,
+    page: { limit?: string; cursor?: string } = {},
+  ) {
+    const limit = parseLimit(page.limit);
     const where: Prisma.CashSessionWhereInput = { businessId: ctx.businessId };
     if (status === "open") where.closedAt = null;
     if (status === "closed") where.closedAt = { not: null };
+    if (page.cursor) {
+      const anchor = await this.prisma.cashSession.findMany({
+        where: { id: page.cursor, businessId: ctx.businessId },
+        take: 1,
+      });
+      if (!anchor[0]) throw new AppError(ERROR_CODES.VALIDATION, "Cursor inválido.");
+      const at = anchor[0].localDate;
+      where.OR = [
+        { localDate: { lt: at } },
+        { AND: [{ localDate: at }, { id: { lt: anchor[0].id } }] },
+      ];
+    }
     const sessions = await this.prisma.cashSession.findMany({
       where,
-      orderBy: { localDate: "desc" },
+      orderBy: [{ localDate: "desc" }, { id: "desc" }],
+      take: limit,
     });
-    return Promise.all(sessions.map((session) => this.summary(ctx, session)));
+    if (sessions.length === 0) return [];
+    const ids = sessions.map((s) => s.id);
+    const moves = await this.prisma.cashMove.findMany({
+      where: {
+        businessId: ctx.businessId,
+        OR: [
+          { sessionId: { in: ids } },
+          { sessionId: null, pendingForSessionId: { in: ids } },
+        ],
+      },
+      select: {
+        sessionId: true,
+        pendingForSessionId: true,
+        direction: true,
+        method: true,
+        amount: true,
+        createdAt: true,
+      },
+    });
+    const openDates = (
+      await this.prisma.cashSession.findMany({
+        where: { businessId: ctx.businessId, closedAt: null },
+        select: { localDate: true },
+      })
+    ).map((r) => r.localDate.getTime());
+    const today = occurredOnDate(ctx.timezone);
+    return sessions.map((session) => {
+      const own = moves.filter((m) => m.sessionId === session.id);
+      const stamped = moves.filter(
+        (m) => m.sessionId == null && m.pendingForSessionId === session.id,
+      ).length;
+      const last = own.reduce<Date | null>(
+        (acc, m) => (acc == null || m.createdAt > acc ? m.createdAt : acc),
+        null,
+      );
+      const expected = session.closedAt
+        ? { efectivo: session.expectedEfectivo ?? 0n, nequi: session.expectedNequi ?? 0n }
+        : sessionExpected({
+            sessionId: session.id,
+            openingFloat: asCop(session.openingFloat),
+            carriedEfectivo: asCop(session.carriedEfectivo ?? 0n),
+            moves: moves as never,
+          });
+      const laterOpen = openDates.filter((d) => d > session.localDate.getTime()).length;
+      return summaryJson(session, expected, own.length, last, stamped, laterOpen, today);
+    });
   }
 
   async detail(ctx: BusinessContext, id: string) {
@@ -299,27 +413,7 @@ export class CashManagerService {
         localDate: { gt: session.localDate },
       },
     });
-    return {
-      id: session.id,
-      localDate: dateKey(session.localDate),
-      openedAt: session.openedAt,
-      closedAt: session.closedAt,
-      openingFloat: copToJson(session.openingFloat),
-      expectedEfectivo: copToJson(expected.efectivo),
-      expectedNequi: copToJson(expected.nequi),
-      closingCount: session.closingCount == null ? null : copToJson(session.closingCount),
-      difference: session.difference == null ? null : copToJson(session.difference),
-      closeMode: session.closeMode,
-      note: session.note,
-      moveCount,
-      lastMoveAt: last?.createdAt ?? null,
-      laterActivity: stamped > 0,
-      ageDays: ageDays(session.localDate, today),
-      canCountClose: session.closedAt == null && stamped === 0,
-      requiresCarry: session.closedAt == null && stamped > 0,
-      hasLaterOpenSession: laterOpen > 0,
-      regularized: session.closedAt != null,
-    };
+    return summaryJson(session, expected, moveCount, last?.createdAt ?? null, stamped, laterOpen, today);
   }
 
   private async carryResult(

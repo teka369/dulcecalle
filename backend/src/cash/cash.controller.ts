@@ -22,7 +22,7 @@ import { CreatePaymentDto } from "../sales/sales.dto";
 import { CurrentBusiness } from "../tenancy/business.decorator";
 import type { BusinessContext } from "../identity/auth.types";
 import { resolveIdempotencyKey } from "../shared/idempotency";
-import { UuidParam, optionalDateQuery } from "../shared/http/params";
+import { UuidParam, optionalDateQuery, optionalUuidQuery } from "../shared/http/params";
 
 @Controller()
 export class CashController {
@@ -57,8 +57,16 @@ export class CashController {
   }
 
   @Get("cash/sessions")
-  list(@CurrentBusiness() ctx: BusinessContext, @Query("status") status?: string) {
-    return this.manager.list(ctx, status);
+  list(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Query("status") status?: string,
+    @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
+  ) {
+    return this.manager.list(ctx, status, {
+      limit,
+      cursor: optionalUuidQuery(cursor, "cursor"),
+    });
   }
 
   @Get("cash/sessions/:id")

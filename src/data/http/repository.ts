@@ -674,8 +674,16 @@ export class HttpRepository {
       return mapToday(row);
     },
 
-    listSessions: async (status?: "open" | "closed") => {
-      const suffix = status ? `?status=${status}` : "";
+    /** Server pages this list (default 50, max 200; cursor = last id). */
+    listSessions: async (
+      status?: "open" | "closed",
+      page: { limit?: number; cursor?: string } = {},
+    ) => {
+      const qs = new URLSearchParams();
+      if (status) qs.set("status", status);
+      if (page.limit != null) qs.set("limit", String(page.limit));
+      if (page.cursor) qs.set("cursor", page.cursor);
+      const suffix = qs.size ? `?${qs.toString()}` : "";
       return this.http.request<Record<string, unknown>[]>("GET", `/cash/sessions${suffix}`);
     },
     session: async (id: string) => {

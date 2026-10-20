@@ -49,9 +49,20 @@ export default function GestionarCajasPage() {
       return;
     }
     const api = getPwaApi();
-    void api.cash
-      .listSessions()
-      .then((data) => setRows(data as Row[]))
+    // M5: the list is paginated server-side. Every pending (open) caja must be
+    // shown, so fetch open ones at the max page size and only the most recent
+    // closed page; merge by id.
+    void Promise.all([
+      api.cash.listSessions("open", { limit: 200 }),
+      api.cash.listSessions("closed"),
+    ])
+      .then(([open, closed]) => {
+        const seen = new Set<string>();
+        const merged = [...(open as Row[]), ...(closed as Row[])].filter((row) =>
+          seen.has(row.id) ? false : (seen.add(row.id), true),
+        );
+        setRows(merged);
+      })
       .catch((e: unknown) => {
         if (gestionarIsOffline(false, e)) setOffline(true);
         else setError(e instanceof Error ? e.message : "No se pudieron cargar las cajas.");
