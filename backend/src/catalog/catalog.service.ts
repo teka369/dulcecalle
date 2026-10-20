@@ -26,7 +26,7 @@ import { asCop, copToJson, mulCop } from "../shared/money";
 import { occurredOnDate, dateKey } from "../shared/clock";
 import { linkForNewMove } from "../cash/session-link";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
-import type { BusinessContext } from "../identity/auth.types";
+import type { BusinessContext, PortalLedgerScope } from "../identity/auth.types";
 import { nextCodeFromExisting } from "../shared/customer-code";
 import { imageJson } from "./media.service";
 
@@ -513,6 +513,20 @@ export class CatalogService {
   }
 
   async customerLedger(ctx: BusinessContext, customerId: string) {
+    return this.ledgerFor({ businessId: ctx.businessId }, customerId);
+  }
+
+  /**
+   * Customer portal ledger. Explicit portal scope: no staff/owner role is
+   * borrowed, and business + customer both come from the verified customer
+   * token. Timezone is the fixed portal zone (decision J-B1); stored
+   * occurredOn values are already business-local date keys.
+   */
+  async portalCustomerLedger(scope: PortalLedgerScope) {
+    return this.ledgerFor({ businessId: scope.businessId }, scope.customerId);
+  }
+
+  private async ledgerFor(ctx: { businessId: string }, customerId: string) {
     const c = await this.prisma.customer.findFirst({
       where: { id: customerId, businessId: ctx.businessId },
     });
