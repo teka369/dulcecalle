@@ -62,7 +62,7 @@ describe("outbox: dependents of a discarded operation (T-alto2)", () => {
     const g = await outbox.get(BIZ, grandchild);
     expect(g?.status).toBe("pending");
     expect(g?.dependsOn).toEqual([child]);
-    expect(tray.find((t) => t.operationId === grandchild)?.blockedBy).toBe("Esperando otra operación");
+    expect(tray.find((t) => t.operationId === grandchild)?.blockedBy).toBe("Esperando a «Movimiento de caja», que el servidor rechazó. Corrígela o descártala.");
 
     // Reintentar sends the child (same requestId) without the discarded parent.
     await retryOutboxOperation(BIZ, child);
