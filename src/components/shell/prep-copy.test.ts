@@ -28,3 +28,11 @@ describe("Preparando popup copy (pass3)", () => {
     expect(prep).toMatch(/key: "sys:verify",\s+group: "sistema",\s+label: "Revisión"/);
   });
 });
+
+describe("Prep indicator matches the popup (pass3 follow-up)", () => {
+  it("system group is «Revisión», not «Verificación»", () => {
+    const ind = readFileSync("src/components/shell/PrepIndicator.tsx", "utf8");
+    expect(ind).toContain('sistema: "Revisión"');
+    expect(ind).not.toContain("Verificación");
+  });
+});
