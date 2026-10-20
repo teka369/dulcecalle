@@ -1,6 +1,6 @@
 "use client";
 
-import { useOfflineBand } from "@/components/shell/use-online";
+import { useOfflineBand, useOnline } from "@/components/shell/use-online";
 import { Input } from "@/components/ui/Input";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
@@ -9,6 +9,7 @@ import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
@@ -47,6 +48,8 @@ export default function SurtirPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const online = useOnline();
   const [totalLocked, setTotalLocked] = useState(false);
   const requestIdRef = useRef<string | null>(null);
 
@@ -55,12 +58,19 @@ export default function SurtirPage() {
       setReady(true);
       return;
     }
-    const p = await inventoryStore.getProduct(id).catch(() => undefined);
-    setProduct(p ?? null);
-    const s = await inventoryStore.refreshSuppliers();
-    setSuppliers(s);
-    void getPendingSupplierIds().then(setPendingSupplierIds);
-    setReady(true);
+    setLoadError(null);
+    try {
+      // Only a real 404 comes back as undefined («No encontramos»); other errors → Reintentar.
+      const p = await inventoryStore.getProduct(id);
+      setProduct(p ?? null);
+      const s = await inventoryStore.refreshSuppliers();
+      setSuppliers(s);
+      void getPendingSupplierIds().then(setPendingSupplierIds);
+    } catch (e: unknown) {
+      setLoadError(e instanceof Error ? e.message : "");
+    } finally {
+      setReady(true);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -170,6 +180,24 @@ export default function SurtirPage() {
       <div className="flex flex-col gap-4">
         <SkeletonHero title="Surtir" />
         <SkeletonRows rows={4} />
+      </div>
+    );
+  }
+
+  if (loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock offline={offlineBand} size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Surtir" />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={online}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
+        </Sheet>
       </div>
     );
   }

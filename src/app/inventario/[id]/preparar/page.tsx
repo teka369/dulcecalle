@@ -8,6 +8,7 @@ import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
 import { AmountField } from "@/components/ui/AmountField";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { QtyStepper } from "@/components/inventory/QtyStepper";
 import { units } from "@/components/inventory/inventory";
@@ -37,17 +38,23 @@ export default function PrepararPage() {
   const [done, setDone] = useState<string | null>(null);
 
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadRev, setLoadRev] = useState(0);
 
   // Direct entry: products may not be loaded yet. Read the source itself so the
   // header (insumo · stock · costo) and the sellable guard don't depend on the list.
   useEffect(() => {
     if (!sourceId) return;
     let alive = true;
+    setLoadError(null);
+    // Only a real 404 comes back as undefined («No encontramos»); other errors → Reintentar.
     void inventoryStore
       .getProduct(sourceId)
-      .catch(() => undefined)
       .then((p) => {
         if (alive) setSource(p ?? null);
+      })
+      .catch((e: unknown) => {
+        if (alive) setLoadError(e instanceof Error ? e.message : "");
       })
       .finally(() => {
         if (alive) setLoaded(true);
@@ -56,7 +63,7 @@ export default function PrepararPage() {
     return () => {
       alive = false;
     };
-  }, [sourceId]);
+  }, [sourceId, loadRev]);
 
   // Preparar only exists for insumo/combo (sellable === false). Sellable → back to the product.
   const sellable = source != null && source.sellable !== false;
@@ -120,6 +127,24 @@ export default function PrepararPage() {
           body="Preparar solo aplica a insumos o combos. Te llevamos al producto."
         />
       </HeroBlock>
+    );
+  }
+
+  if (loaded && loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock offline={offlineBand} size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Preparar" />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={typeof navigator === "undefined" || navigator.onLine}
+            onRetry={() => {
+              setLoaded(false);
+              setLoadRev((n) => n + 1);
+            }}
+          />
+        </Sheet>
+      </div>
     );
   }
 

@@ -21,6 +21,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
@@ -52,6 +53,7 @@ export function ShrinkForm({
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
@@ -59,9 +61,16 @@ export function ShrinkForm({
       setReady(true);
       return;
     }
-    const p = await inventoryStore.getProduct(id).catch(() => undefined);
-    setProduct(p ?? null);
-    setReady(true);
+    setLoadError(null);
+    try {
+      // Only a real 404 comes back as undefined («No encontramos»); other errors → Reintentar.
+      const p = await inventoryStore.getProduct(id);
+      setProduct(p ?? null);
+    } catch (e: unknown) {
+      setLoadError(e instanceof Error ? e.message : "");
+    } finally {
+      setReady(true);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -117,6 +126,24 @@ export function ShrinkForm({
       <div className="flex flex-col gap-4">
         <SkeletonHero title={title} />
         <SkeletonRows rows={3} />
+      </div>
+    );
+  }
+
+  if (loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock offline={offlineBand} size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title={title} />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={typeof navigator === "undefined" || navigator.onLine}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
+        </Sheet>
       </div>
     );
   }
