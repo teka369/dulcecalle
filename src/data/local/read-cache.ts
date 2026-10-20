@@ -5,6 +5,7 @@
 import { addCop } from "@/domain/money";
 import { pendingDebtAdjustment } from "../pwa/pending-debt";
 import { ApiError, isNetworkError } from "../errors";
+import { resolveIdAlias } from "./id-alias";
 import type {
   RemoteCustomer,
   RemoteProduct,
@@ -282,13 +283,17 @@ export class CatalogReadCache {
         opts.toLocal(row, opts.businessId, cachedAt),
       );
       const stored = opts.projectStored ? await opts.projectStored(locals) : locals;
-      await opts.replaceAll(opts.businessId, [
-        ...stored,
-        ...(await this.pendingLocalRows(opts)),
-      ]);
+      // Offline creates the server does not know yet stay visible (loop/v1
+      // HIGH). Never twice: skip one whose id, or remapped server id, is in
+      // the server snapshot.
+      const serverIds = new Set(locals.map((row) => row.id));
+      const pending = (await this.pendingLocalRows(opts)).filter(
+        (row) => !serverIds.has(row.id) && !serverIds.has(resolveIdAlias(opts.businessId, row.id)),
+      );
+      await opts.replaceAll(opts.businessId, [...stored, ...pending]);
       await this.writeMeta(opts.businessId, opts.resource, cachedAt);
       return {
-        data: opts.projectStored ? stored.map(opts.toRemote) : data,
+        data: [...(opts.projectStored ? stored.map(opts.toRemote) : data), ...pending.map(opts.toRemote)],
         source: "server",
         cachedAt,
       };
