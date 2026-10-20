@@ -24,6 +24,9 @@ export function AmountField({ label, value, onChange, hint, error, placeholder =
   // Format problems (decimals, above the ceiling) are caught here, before the
   // value reaches the form: the field keeps the last valid amount.
   const [inputError, setInputError] = useState<string | null>(null);
+  // While the text is invalid we show exactly what was typed (so «1500,50» typed
+  // key by key never silently becomes 150050) and the form gets no amount.
+  const [rejectedRaw, setRejectedRaw] = useState<string | null>(null);
   const shownError = inputError ?? error ?? null;
   const described = [hint ? hintId : null, shownError ? errId : null].filter(Boolean).join(" ") || undefined;
   return (
@@ -38,14 +41,17 @@ export function AmountField({ label, value, onChange, hint, error, placeholder =
         <input
           id={id}
           inputMode="numeric"
-          value={value}
+          value={rejectedRaw ?? value}
           onChange={(e) => {
             const parsed = parseAmountInput(e.target.value);
             if ("error" in parsed) {
               setInputError(parsed.error);
+              setRejectedRaw(e.target.value);
+              onChange("");
               return;
             }
             setInputError(null);
+            setRejectedRaw(null);
             onChange(parsed.digits);
           }}
           placeholder={placeholder}
