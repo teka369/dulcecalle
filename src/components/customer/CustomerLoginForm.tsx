@@ -102,7 +102,7 @@ export function CustomerLoginForm({ showBack = false }: { showBack?: boolean }) 
               onChange={(e) => setStore(e.target.value.slice(0, 80))}
               className="mt-2"
               autoComplete="off"
-              placeholder="Nombre o código de la tienda"
+              placeholder="Ej.: Dulcería Norte, o el código de la tienda"
             />
           </>
         )}
