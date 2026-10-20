@@ -9,7 +9,7 @@ import { normalizeCustomerCode } from "../shared/customer-code";
 import type { CustomerAuth, PortalLedgerScope } from "../identity/auth.types";
 import { DEFAULT_TZ } from "../shared/clock";
 import { copToJson } from "../shared/money";
-import { PortalLoginThrottle } from "./portal-throttle";
+import { IP_CODE_POLICY, IP_POLICY, isPrivateOrUnknownIp, PortalLoginThrottle } from "./portal-throttle";
 
 const IDENTIFY_FAIL = "No pudimos identificarte.";
 const PIN_RE = /^\d{6}$/;
@@ -42,7 +42,21 @@ export class CustomerAccessService {
     });
   }
 
-  async login(codeRaw: string, pinRaw: string, businessIdRaw?: string) {
+  /**
+   * loop/v1 portal hardening:
+   * - Exactly ONE bcrypt compare per attempt, whatever the number of stores.
+   *   Without businessId the code must resolve to a single customer; zero or
+   *   several candidates do one dummy compare and fail the same way (no O(n)
+   *   bcrypt, no timing signal about how many stores use the code).
+   * - Guess limits are per client IP + code (and per IP across codes), never
+   *   per customer: anonymous attempts from someone else cannot lock the real
+   *   customer out of their own phone.
+   * - If `req.ip` looks private (trust proxy misconfigured → every client is the
+   *   proxy), the per-IP-across-codes bucket is skipped (it would throttle
+   *   everyone) and the per-IP+code bucket degrades to per-code — the previous
+   *   behaviour, never weaker against guessing.
+   */
+  async login(codeRaw: string, pinRaw: string, businessIdRaw?: string, clientIp?: string) {
     const code = normalizeCustomerCode(codeRaw);
     const pin = pinRaw.trim();
     const businessId = businessIdRaw?.trim() || undefined;
@@ -51,15 +65,13 @@ export class CustomerAccessService {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
     }
 
-    const where = businessId
-      ? { code, businessId, archivedAt: null, pinHash: { not: null } }
-      : { code, archivedAt: null, pinHash: { not: null } };
-    const rows = await this.prisma.customer.findMany({
-      where,
-      include: { business: { select: { timezone: true } } },
-    });
-    const gateKey = rows.length === 1 ? `customer:${rows[0].id}` : `code:${code}:${businessId ?? "*"}`;
-    if ((await this.throttle.take(gateKey)) === "cooled") {
+    const ip = clientIp?.replace(/^::ffff:/i, "") || "unknown";
+    const shared = isPrivateOrUnknownIp(ip);
+    const ipCodeKey = `ipcode:${shared ? "shared" : ip}:${businessId ?? "*"}:${code}`;
+    const cooled =
+      (await this.throttle.take(ipCodeKey, IP_CODE_POLICY)) === "cooled" ||
+      (!shared && (await this.throttle.take(`ip:${ip}`, IP_POLICY)) === "cooled");
+    if (cooled) {
       await bcrypt.compare(pin, await dummyHash());
       throw new AppError(
         ERROR_CODES.RATE_LIMIT,
@@ -67,18 +79,24 @@ export class CustomerAccessService {
       );
     }
 
-    const dummy = await dummyHash();
-    const hashes = rows.length > 0 ? rows.map((row) => row.pinHash as string) : [dummy];
-    const matches: typeof rows = [];
-    for (let i = 0; i < hashes.length; i += 1) {
-      const ok = await bcrypt.compare(pin, hashes[i]);
-      if (ok && rows[i]) matches.push(rows[i]);
-    }
-    if (matches.length !== 1) {
+    const where = businessId
+      ? { code, businessId, archivedAt: null, pinHash: { not: null } }
+      : { code, archivedAt: null, pinHash: { not: null } };
+    // At most 2 rows: we only need to know whether the code is unambiguous.
+    const rows = await this.prisma.customer.findMany({
+      where,
+      include: { business: { select: { timezone: true } } },
+      orderBy: { id: "asc" },
+      take: 2,
+    });
+    const candidate = rows.length === 1 ? rows[0] : null;
+    const ok = await bcrypt.compare(pin, candidate ? (candidate.pinHash as string) : await dummyHash());
+    if (!candidate || !ok) {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
     }
+    const matches = [candidate];
     const customer = matches[0];
-    await this.throttle.reset(`customer:${customer.id}`);
+    await this.throttle.reset(ipCodeKey);
     const issued = await this.tokens(customer.id, customer.businessId);
     return {
       customer: {
