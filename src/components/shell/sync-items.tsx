@@ -30,6 +30,11 @@ export function timeAgo(at: number, now: number = Date.now()): string {
   return formatDateTime(at);
 }
 
+/** «Corregir» tells the form which rejected op to offer to discard after saving. */
+function withRejected(href: string, operationId: string): string {
+  return `${href}${href.includes("?") ? "&" : "?"}rechazada=${encodeURIComponent(operationId)}`;
+}
+
 function sessionBusinessId(): string | null {
   try {
     return getPwaAuthSession().businessId;
@@ -202,7 +207,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
           <p className="text-sm text-ink-muted">{item.correction.note}</p>
           {item.correction.href && (
             <Link
-              href={item.correction.href}
+              href={withRejected(item.correction.href, item.operationId)}
               className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold"
             >
               Corregir

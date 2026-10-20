@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrefill } from "@/components/ui/use-prefill";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import type { RemoteProduct } from "@/data/http/mappers";
 import {
   validateMotivo,
@@ -50,6 +51,7 @@ export function ShrinkForm({
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [qtyRaw, setQtyRaw] = useState("");
   usePrefill("cantidad", setQtyRaw);
+  const rejected = useRejectedCorrection();
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -114,7 +116,7 @@ export function ShrinkForm({
         requestId: requestIdRef.current,
       });
       setToast(toastText);
-      setTimeout(() => {
+      rejected.afterSave(() => {
         navigateOfflineAware(router, `/inventario/${product.id}`);
       }, 700);
     } catch (e) {
@@ -198,6 +200,7 @@ export function ShrinkForm({
 
       <ActionBar primary={{ label: cta, onClick: () => void confirm(), disabled: !valid, busy }} />
       <ActionToast text={toast} />
+      {rejected.dialog}
     </div>
   );
 }

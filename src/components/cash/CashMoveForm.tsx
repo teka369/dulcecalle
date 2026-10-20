@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePrefill } from "@/components/ui/use-prefill";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { CASH_COPY, parseCopAmount, validateCashAmount, validateGasto } from "@/domain/cash";
@@ -66,6 +67,7 @@ export function CashMoveForm({ kind }: { kind: CashFormKind }) {
   const [toast, setToast] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
   usePrefill("monto", setAmountRaw);
+  const rejected = useRejectedCorrection();
   usePrefill("categoria", setCategoryRaw, "text");
 
   useEffect(() => {
@@ -95,7 +97,7 @@ export function CashMoveForm({ kind }: { kind: CashFormKind }) {
       else if (kind === "retiro") await cashStore.recordRetiro({ amountRaw, method, note, requestId: requestIdRef.current });
       else await cashStore.recordGasto({ amountRaw, categoryRaw, method, note, requestId: requestIdRef.current });
       setToast(cfg.toast);
-      setTimeout(() => navigateOfflineAware(router, cfg.back), 700);
+      rejected.afterSave(() => navigateOfflineAware(router, cfg.back), 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
       setBusy(false);
@@ -152,6 +154,7 @@ export function CashMoveForm({ kind }: { kind: CashFormKind }) {
       </Sheet>
       <ActionBar primary={{ label: cfg.cta, onClick: () => void confirm(), disabled: !valid, busy }} />
       <ActionToast text={toast} />
+      {rejected.dialog}
     </div>
   );
 }

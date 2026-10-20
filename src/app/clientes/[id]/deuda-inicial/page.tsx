@@ -16,6 +16,7 @@ import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
 import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { usePrefill } from "@/components/ui/use-prefill";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
@@ -31,6 +32,7 @@ export default function AgregarDeudaAnteriorPage() {
   const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [amountRaw, setAmountRaw] = useState("");
   usePrefill("monto", setAmountRaw);
+  const rejected = useRejectedCorrection();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export default function AgregarDeudaAnteriorPage() {
           ? "Deuda anterior guardada sin conexión"
           : INITIAL_DEBT_TOAST,
       );
-      setTimeout(() => {
+      rejected.afterSave(() => {
         navigateOfflineAware(router, `/clientes/${customer.id}`);
       }, 700);
     } catch (e) {
@@ -180,6 +182,7 @@ export default function AgregarDeudaAnteriorPage() {
         primary={{ label: "Agregar deuda anterior", onClick: () => void confirm(), disabled: !canSubmit, busy }}
       />
       <ActionToast text={toast} />
+      {rejected.dialog}
     </div>
   );
 }

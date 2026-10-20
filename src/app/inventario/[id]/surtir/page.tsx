@@ -6,6 +6,7 @@ import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
 import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { usePrefill } from "@/components/ui/use-prefill";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
@@ -42,6 +43,7 @@ export default function SurtirPage() {
   const [supplierCreate, setSupplierCreate] = useState("");
   const [qtyRaw, setQtyRaw] = useState("");
   usePrefill("cantidad", setQtyRaw);
+  const rejected = useRejectedCorrection();
   const [unitCostRaw, setUnitCostRaw] = useState("");
   const [totalCostRaw, setTotalCostRaw] = useState("");
   const [method, setMethod] = useState<PayMethod>("Efectivo");
@@ -169,7 +171,7 @@ export default function SurtirPage() {
           ? `Stock actualizado · salieron ${formatCop(r.totalCost)} de ${method}`
           : "Stock actualizado",
       );
-      setTimeout(() => {
+      rejected.afterSave(() => {
         navigateOfflineAware(router, `/inventario/${product.id}`);
       }, 700);
     } catch (e) {
@@ -327,6 +329,7 @@ export default function SurtirPage() {
         primary={{ label: "Confirmar surtir", onClick: () => void confirm(), disabled: !valid, busy }}
       />
       <ActionToast text={toast} />
+      {rejected.dialog}
     </div>
   );
 }
