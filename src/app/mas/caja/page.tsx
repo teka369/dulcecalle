@@ -8,6 +8,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { SegmentedMetrics, type MetricItem } from "@/components/ui/SegmentedMetrics";
 import { QuickTiles } from "@/components/ui/QuickTiles";
+import { useAfterSync } from "@/components/shell/use-after-sync";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
 import { AmountField } from "@/components/ui/AmountField";
@@ -54,6 +55,7 @@ export default function CajaPage() {
   useEffect(() => {
     void load();
   }, [load]);
+  useAfterSync(load);
 
   async function onAbrir() {
     if (busy) return;
