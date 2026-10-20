@@ -78,7 +78,8 @@ export default function CajaPage() {
     }
   }
 
-  const retryButton = (
+  // Offline, «Reintentar» cannot succeed: show it only when online again (D9).
+  const retryButton = !online ? undefined : (
     <button
       type="button"
       onClick={() => void load()}
@@ -99,11 +100,23 @@ export default function CajaPage() {
           size="medium"
           back={{ href: "/mas", label: "Volver a Más" }}
           title={CASH_COPY.titleCaja}
-          offline={online ? null : { text: "Sin conexión" }}
+          offline={null}
         />
         <Sheet>
           {gate === "offline" ? (
-            <StateBlock kind="offline-miss" title={CASH_OFFLINE_NOCACHE.title} body={CASH_OFFLINE_NOCACHE.body} action={retryButton} />
+            <StateBlock
+              kind="offline-miss"
+              title={CASH_OFFLINE_NOCACHE.title}
+              body={CASH_OFFLINE_NOCACHE.body}
+              action={
+                <OfflineLink
+                  href="/"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
+                >
+                  {CASH_OFFLINE_NOCACHE.action}
+                </OfflineLink>
+              }
+            />
           ) : (
             <StateBlock kind="error" title="No se pudo cargar." body={loadError ?? undefined} action={retryButton} />
           )}
@@ -112,7 +125,11 @@ export default function CajaPage() {
     );
   }
 
-  const band = offlineView === "offline-cache" ? (lastReadyAt != null ? { capturedAt: lastReadyAt } : { text: "Sin conexión · datos de este teléfono" }) : null;
+  // The global sync pill already says «Sin conexión»; the band says what the data is (D9).
+  const band =
+    offlineView === "offline-cache"
+      ? { text: lastReadyAt != null ? `Datos de este teléfono · actualizado ${new Date(lastReadyAt).toLocaleString("es-CO")}` : "Datos de este teléfono" }
+      : null;
 
   if (!ready || !summary) {
     return (
