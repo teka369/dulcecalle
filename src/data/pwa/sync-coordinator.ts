@@ -10,6 +10,7 @@ import { syncPendingPayments } from "./offline-payments";
 import { syncPendingInitialDebts } from "./offline-initial-debt";
 import { syncPendingSales } from "./offline-sales";
 import { syncPendingReturns } from "./offline-returns";
+import { openSyncChannel, runAsLeader, type SyncBroadcast } from "./sync-leader";
 
 export type SyncAllResult = {
   sales: SyncFlushResult;
@@ -177,6 +178,49 @@ function emitSyncComplete(businessId: string): void {
   window.dispatchEvent(new CustomEvent(SYNC_COMPLETE_EVENT, { detail: { businessId } }));
 }
 
+let channel: ReturnType<typeof openSyncChannel> = null;
+let leading = 0;
+
+function post(message: SyncBroadcast): void {
+  try {
+    channel?.postMessage(message);
+  } catch {
+    /* channel closed: other tabs fall back to their own focus/refresh */
+  }
+}
+
+/**
+ * One outbox cycle, cross-tab safe: only the tab holding the per-business
+ * lock replays (FIFO, idempotent as before). It then refreshes its screens
+ * and tells the other tabs. A tab that isn't the leader does nothing now;
+ * it refreshes on the leader's "complete" broadcast.
+ */
+export async function syncAllPendingAsLeader(businessId: string): Promise<SyncAllResult | null> {
+  const run = await runAsLeader(businessId, async () => {
+    leading += 1;
+    try {
+      return await syncAllPending(businessId).catch(() => null);
+    } finally {
+      leading -= 1;
+    }
+  });
+  if (!run.leader) {
+    navDebug("outbox-sync-follower", {});
+    return null;
+  }
+  emitSyncComplete(businessId);
+  post({ type: "complete", businessId });
+  return run.value;
+}
+
+async function hasLocalPending(businessId: string): Promise<boolean> {
+  try {
+    return (await getOutboxStore().listByStatus(businessId, "pending")).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 let stopOutboxSync: (() => void) | null = null;
 
 /**
@@ -192,13 +236,39 @@ export function startOutboxSync(): () => void {
     navDebug("outbox-sync-run", { online: monitor.online, hasBusiness: !!businessId });
     if (businessId && monitor.online) {
       // Reconnect data refresh (reloadOnOnline is off): open screens re-run their
-      // store load once the outbox flush is done, so they show server data
-      // including what this device just sent. Data only; never a page reload.
-      void syncAllPending(businessId)
-        .catch(() => undefined)
-        .finally(() => emitSyncComplete(businessId));
+      // store load once the LEADER's outbox flush is done, so they show server
+      // data including what was just sent. Data only; never a page reload.
+      void syncAllPendingAsLeader(businessId);
     }
   };
+  channel = openSyncChannel();
+  // Leader → followers: mirror progress so «Enviando X de Y» moves and ends
+  // in every tab. Events received from another tab are tagged `remote`.
+  const forward = (event: Event) => {
+    const detail = (event as CustomEvent<Record<string, unknown>>).detail;
+    if (!leading || !detail || detail.remote) return;
+    const businessId = (detail.businessId as string | undefined) ?? getPwaAuthSession().businessId;
+    if (businessId) post({ type: "progress", businessId, detail });
+  };
+  window.addEventListener("dulcecalle:sync", forward);
+  if (channel) {
+    channel.onmessage = (e) => {
+      const msg = e.data as SyncBroadcast | undefined;
+      const mine = getPwaAuthSession().businessId;
+      if (!msg || !mine || msg.businessId !== mine) return;
+      if (msg.type === "progress") {
+        window.dispatchEvent(new CustomEvent("dulcecalle:sync", { detail: { ...msg.detail, remote: true } }));
+        return;
+      }
+      emitSyncComplete(mine);
+      // Something queued after the leader's snapshot? Take a turn.
+      if (monitor.online) {
+        void hasLocalPending(mine).then((left) => {
+          if (left) void syncAllPendingAsLeader(mine);
+        });
+      }
+    };
+  }
   monitor.start();
   monitor.refresh();
   run();
@@ -209,6 +279,9 @@ export function startOutboxSync(): () => void {
   stopOutboxSync = () => {
     unsubscribe();
     monitor.stop();
+    window.removeEventListener("dulcecalle:sync", forward);
+    channel?.close?.();
+    channel = null;
     stopOutboxSync = null;
   };
   return stopOutboxSync;
