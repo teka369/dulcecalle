@@ -262,7 +262,7 @@ await runPreparation(BIZ);
     expect(row.status).toBe("failed");
     const sw = row.tasks.find((t) => t.key === "sys:sw");
     expect(sw?.status).toBe("failed");
-    expect(sw?.error).toContain("Service Worker");
+    expect(sw?.error).toContain("modo sin conexión");
     expect(row.tasks.find((t) => t.key === "catalog:products")?.status).toBe("done");
   });
 
@@ -300,7 +300,7 @@ await runPreparation(BIZ);
     const row = await runPreparation(BIZ);
     const thumbs = row.tasks.find((t) => t.key === "media:thumbs");
     expect(thumbs?.status).toBe("done");
-    expect(thumbs?.detail).toBe("1/1 miniaturas");
+    expect(thumbs?.detail).toBe("1 de 1 fotos");
   });
 
   it("task list covers documents, catalogs and summaries", () => {
@@ -374,7 +374,7 @@ await runPreparation(BIZ);
     }
     const verify = row.tasks.find((task) => task.key === "sys:verify");
     expect(verify?.status).toBe("done");
-    expect(verify?.detail).toBe(`${declared.length} documentos verificados`);
+    expect(verify?.detail).toBe(`${declared.length} pantallas revisadas`);
   });
 
   it("is not ready when a required static document is missing", async () => {
