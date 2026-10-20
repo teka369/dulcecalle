@@ -93,3 +93,31 @@ export function ventasErrorMessage(e: unknown, online: boolean): string {
   if (online || !(e instanceof Error) || !e.message) return "No se pudo cargar.";
   return e.message;
 }
+
+/** Customer label for a sale: name, «Sin cliente» when none, «Cliente» when not cached. */
+export function saleCustomerLabel(customerId: string | null | undefined, name: string | null | undefined): string {
+  if (name) return name;
+  return customerId ? "Cliente" : "Sin cliente";
+}
+
+/** Method label: paid → method; credit → «Fiado»; partial → «<method> + Fiado». */
+export function saleMethodLabel(paymentKind: string, method: string | null | undefined): string {
+  if (paymentKind === "credit") return "Fiado";
+  if (paymentKind === "partial") return method ? `${method} + Fiado` : "Fiado";
+  return method ?? "—";
+}
+
+/** «13 oct · 22:58» date label for a sale row/detail. */
+export function saleDateLabel(s: DayGroupable): string {
+  const key = saleDayKey(s);
+  let date = "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+    const [y, m, d] = key.split("-").map(Number);
+    const parts = dayFmt.formatToParts(new Date(Date.UTC(y, m - 1, d)));
+    const pick = (t: Intl.DateTimeFormatPartTypes) =>
+      (parts.find((p) => p.type === t)?.value ?? "").replace(/\./g, "");
+    date = `${pick("day")} ${pick("month")}`;
+  }
+  const time = saleTime(s.createdAt ?? null);
+  return [date, time].filter(Boolean).join(" · ") || "Sin fecha";
+}

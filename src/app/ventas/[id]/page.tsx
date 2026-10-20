@@ -11,7 +11,7 @@ import { SegmentedMetrics } from "@/components/ui/SegmentedMetrics";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { PendingBadge } from "@/components/ui/StatusBadge";
-import { dayHeading, saleDayKey, saleTime } from "@/components/sale/sales-list";
+import { dayHeading, saleCustomerLabel, saleDayKey, saleMethodLabel, saleTime } from "@/components/sale/sales-list";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { useEntityId } from "@/components/shell/entity-route";
@@ -108,15 +108,13 @@ export default function VentaDetallePage() {
         <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-on-hero-muted">
           <span className={`size-2 rounded-full ${dot}`} aria-hidden />
           <span className="font-semibold text-on-hero">{kindLabel[sale.paymentKind] ?? sale.paymentKind}</span>
-          {customerName ? (
-            sale.customerId ? (
-              <OfflineLink href={`/clientes/${sale.customerId}`} className="underline underline-offset-2">
-                {customerName}
-              </OfflineLink>
-            ) : (
-              <span>{customerName}</span>
-            )
-          ) : null}
+          {sale.customerId ? (
+            <OfflineLink href={`/clientes/${sale.customerId}`} className="underline underline-offset-2">
+              {saleCustomerLabel(sale.customerId, customerName)}
+            </OfflineLink>
+          ) : (
+            <span>{saleCustomerLabel(null, customerName)}</span>
+          )}
         </p>
         {pending && (
           <p className="mt-3">
@@ -132,7 +130,7 @@ export default function VentaDetallePage() {
           items={[
             { icon: "cash", label: "Recibido", value: formatCop(sale.amountReceived), tone: "ok" },
             { icon: "users", label: "Fiado", value: formatCop(sale.credit), tone: sale.credit > 0 ? "accent" : "neutral" },
-            { icon: "bag", label: "Método", value: sale.method ?? "—" },
+            { icon: "bag", label: "Método", value: saleMethodLabel(sale.paymentKind, sale.method) },
           ]}
         />
 
