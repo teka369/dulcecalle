@@ -75,8 +75,12 @@ export class CashController {
   }
 
   @Get("cash/unassigned-moves")
-  unassigned(@CurrentBusiness() ctx: BusinessContext) {
-    return this.manager.unassigned(ctx);
+  unassigned(
+    @CurrentBusiness() ctx: BusinessContext,
+    @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
+  ) {
+    return this.manager.unassigned(ctx, { limit, cursor });
   }
 
   @Post("cash/moves/:id/assign")
@@ -120,8 +124,10 @@ export class CashController {
     @CurrentBusiness() ctx: BusinessContext,
     @Query("from") from?: string,
     @Query("to") to?: string,
+    @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
   ) {
-    return this.cash.listExpenses(ctx, optionalDateQuery(from, "from"), optionalDateQuery(to, "to"));
+    return this.cash.listExpenses(ctx, optionalDateQuery(from, "from"), optionalDateQuery(to, "to"), { limit, cursor });
   }
 
   @Throttle({ default: { limit: 30, ttl: 60000 } })

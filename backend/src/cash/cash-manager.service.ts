@@ -8,6 +8,7 @@ import { dateKey, occurredOnDate } from "../shared/clock";
 import type { BusinessContext } from "../identity/auth.types";
 import { ASSUMED_CLOSE_NOTE } from "./session-link";
 import { carryModeAllowed, sessionExpected } from "./carry-rules";
+import { afterCursor, NEWEST_FIRST, pageTake, type PageQuery } from "../shared/http/paging";
 import { CashService } from "./cash.service";
 
 const ASSUMED_NOTE = ASSUMED_CLOSE_NOTE;
@@ -173,14 +174,15 @@ export class CashManagerService {
     };
   }
 
-  async unassigned(ctx: BusinessContext) {
+  async unassigned(ctx: BusinessContext, page: PageQuery = {}) {
+    const base: Prisma.CashMoveWhereInput = { businessId: ctx.businessId, sessionId: null, pendingForSessionId: null };
+    const after = await afterCursor(page.cursor, (id) =>
+      this.prisma.cashMove.findFirst({ where: { id, ...base }, select: { id: true, createdAt: true } }),
+    );
     const moves = await this.prisma.cashMove.findMany({
-      where: {
-        businessId: ctx.businessId,
-        sessionId: null,
-        pendingForSessionId: null,
-      },
-      orderBy: { createdAt: "desc" },
+      where: after ? { AND: [base, after] } : base,
+      orderBy: NEWEST_FIRST,
+      take: pageTake(page.limit),
     });
     return moves.map(moveJson);
   }

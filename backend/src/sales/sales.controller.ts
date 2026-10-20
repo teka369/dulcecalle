@@ -16,8 +16,10 @@ export class SalesController {
     @CurrentBusiness() ctx: BusinessContext,
     @Query("from") from?: string,
     @Query("to") to?: string,
+    @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
   ) {
-    return this.sales.list(ctx, optionalDateQuery(from, "from"), optionalDateQuery(to, "to"));
+    return this.sales.list(ctx, optionalDateQuery(from, "from"), optionalDateQuery(to, "to"), { limit, cursor });
   }
 
   @Get(":id/returns")

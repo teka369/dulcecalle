@@ -47,8 +47,10 @@ export class CatalogController {
   listProductMoves(
     @CurrentBusiness() ctx: BusinessContext,
     @Param("id", UuidParam) id: string,
+    @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
   ) {
-    return this.catalog.listProductMoves(ctx, id);
+    return this.catalog.listProductMoves(ctx, id, { limit, cursor });
   }
 
   @Post("products")
@@ -92,11 +94,17 @@ export class CatalogController {
     @CurrentBusiness() ctx: BusinessContext,
     @Query("sourceId") sourceId?: string,
     @Query("targetId") targetId?: string,
+    @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
   ) {
-    return this.catalog.listPreparations(ctx, {
-      sourceId: optionalUuidQuery(sourceId, "sourceId"),
-      targetId: optionalUuidQuery(targetId, "targetId"),
-    });
+    return this.catalog.listPreparations(
+      ctx,
+      {
+        sourceId: optionalUuidQuery(sourceId, "sourceId"),
+        targetId: optionalUuidQuery(targetId, "targetId"),
+      },
+      { limit, cursor },
+    );
   }
 
   @Roles("owner")
