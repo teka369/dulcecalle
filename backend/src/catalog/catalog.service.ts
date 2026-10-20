@@ -28,7 +28,7 @@ import { linkForNewMove } from "../cash/session-link";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext, PortalLedgerScope } from "../identity/auth.types";
 import { nextCodeFromExisting } from "../shared/customer-code";
-import { afterCursor, NEWEST_FIRST, pageTake, type PageQuery } from "../shared/http/paging";
+import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import { imageJson } from "./media.service";
 
 function productJson(p: {
@@ -204,9 +204,9 @@ export class CatalogService {
     const rows = await this.prisma.stockMove.findMany({
       where: after ? { AND: [base, after] } : base,
       orderBy: NEWEST_FIRST,
-      take: pageTake(page.limit),
+      take: pageProbe(page.limit),
     });
-    return rows.map((m) => this.stockMoveJson(m));
+    return paged(rows, page.limit, (m) => this.stockMoveJson(m));
   }
 
   async patchProduct(ctx: BusinessContext, id: string, dto: PatchProductDto) {
@@ -429,14 +429,14 @@ export class CatalogService {
     );
     const rows = await this.prisma.preparation.findMany({
       where: after ? { AND: [base, after] } : base,
-      take: pageTake(page.limit),
+      take: pageProbe(page.limit),
       include: {
         source: { select: { name: true } },
         target: { select: { name: true } },
       },
       orderBy: NEWEST_FIRST,
     });
-    return rows.map((p) => this.preparationJson(p));
+    return paged(rows, page.limit, (p) => this.preparationJson(p));
   }
 
   async createCustomer(

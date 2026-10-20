@@ -149,11 +149,22 @@ await runPreparation(BIZ);
     const stored = installCacheStubs();
     await runPreparation(BIZ);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
-    expect(PREP_VERSION).toBe(9);
+    expect(PREP_VERSION).toBe(10);
     stored.delete("/mas/caja/gestionar"); // old device: doc never cached
     expect((await checkReadiness(BIZ)).status).toBe("stale");
     await runPreparation(BIZ);
     expect(stored.has("/mas/caja/gestionar")).toBe(true);
+    expect((await checkReadiness(BIZ)).status).toBe("ready");
+  });
+
+  it("loop/v1 paged history: a device prepared at PREP_VERSION 9 (history cut at 200 by the paged server) reads stale and re-prepares", async () => {
+    await runPreparation(BIZ);
+    expect(PREP_VERSION).toBe(10);
+    const db = getLocalDb();
+    const row = (await db.prepState.get("readiness::" + BIZ))!;
+    await db.prepState.put({ ...row, prepVersion: 9 });
+    expect((await checkReadiness(BIZ)).status).toBe("stale");
+    await runPreparation(BIZ);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
   });
 

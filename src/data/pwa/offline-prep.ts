@@ -34,7 +34,8 @@ import {
   warmSalesHistory,
 } from "./offline-history";
 
-export const PREP_VERSION = 9;
+// 10: loop/v1 paged history lists (devices prepared at 9 re-download history).
+export const PREP_VERSION = 10;
 export const PREP_DOCUMENT_CACHE = "documents";
 
 export type PrepTaskGroup = "app" | "catalogos" | "historial" | "resumen" | "sistema";

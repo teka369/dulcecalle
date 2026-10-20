@@ -10,7 +10,7 @@ import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard
 import { assertPaymentMath, resolveUnitPrice } from "../shared/sale-math";
 import { splitReturnSettlement } from "../shared/returns";
 import type { BusinessContext } from "../identity/auth.types";
-import { afterCursor, NEWEST_FIRST, pageTake, type PageQuery } from "../shared/http/paging";
+import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import type { CreateReturnDto, CreateSaleDto } from "./sales.dto";
 
 function saleJson(s: {
@@ -336,9 +336,9 @@ export class SalesService {
       where: after ? { AND: [where, after] } : where,
       include: { lines: true },
       orderBy: NEWEST_FIRST,
-      take: pageTake(page.limit),
+      take: pageProbe(page.limit),
     });
-    return rows.map(saleJson);
+    return paged(rows, page.limit, saleJson);
   }
 
   async get(ctx: BusinessContext, id: string) {

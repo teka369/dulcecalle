@@ -8,7 +8,7 @@ import { dateKey, occurredOnDate } from "../shared/clock";
 import type { BusinessContext } from "../identity/auth.types";
 import { ASSUMED_CLOSE_NOTE } from "./session-link";
 import { carryModeAllowed, sessionExpected } from "./carry-rules";
-import { afterCursor, NEWEST_FIRST, pageTake, type PageQuery } from "../shared/http/paging";
+import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import { CashService } from "./cash.service";
 
 const ASSUMED_NOTE = ASSUMED_CLOSE_NOTE;
@@ -182,9 +182,9 @@ export class CashManagerService {
     const moves = await this.prisma.cashMove.findMany({
       where: after ? { AND: [base, after] } : base,
       orderBy: NEWEST_FIRST,
-      take: pageTake(page.limit),
+      take: pageProbe(page.limit),
     });
-    return moves.map(moveJson);
+    return paged(moves, page.limit, moveJson);
   }
 
   async assign(ctx: BusinessContext, moveId: string, sessionId: string, requestId: string) {

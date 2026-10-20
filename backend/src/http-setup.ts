@@ -1,3 +1,4 @@
+import { PAGING_HEADERS } from "./shared/http/paging-headers.interceptor";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 
 type Env = Partial<Record<string, string | undefined>>;
@@ -44,6 +45,7 @@ export function configureHttp(app: NestExpressApplication, env: Env = process.en
       cb(null, originAllowed(origin, env));
     },
     credentials: true,
+    exposedHeaders: PAGING_HEADERS,
     allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "X-Business-Id"],
   });
 }

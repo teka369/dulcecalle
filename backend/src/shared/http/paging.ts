@@ -38,3 +38,30 @@ export async function afterCursor(
 }
 
 export const NEWEST_FIRST = [{ createdAt: "desc" as const }, { id: "desc" as const }];
+
+/** Prisma `take`: one extra row to learn whether another page exists. */
+export function pageProbe(raw: string | undefined): number {
+  return pageTake(raw) + 1;
+}
+
+/** Symbol-keyed: JSON.stringify ignores it, so the array body is unchanged. */
+export const PAGE_META = Symbol("pageMeta");
+export type PageMeta = { hasMore: boolean; nextCursor: string | null };
+export type PagedArray<T> = T[] & { [PAGE_META]?: PageMeta };
+
+/**
+ * Trim the probe row, map, and tag the array so PagingHeadersInterceptor
+ * sets `X-Has-More` / `X-Next-Cursor` (old clients that send no `limit`
+ * learn the list was cut at 200 instead of being silently truncated).
+ */
+export function paged<R extends { id: string }, T>(rows: R[], rawLimit: string | undefined, map: (r: R) => T): PagedArray<T> {
+  const n = pageTake(rawLimit);
+  const hasMore = rows.length > n;
+  const keep = hasMore ? rows.slice(0, n) : rows;
+  const out = keep.map(map) as PagedArray<T>;
+  Object.defineProperty(out, PAGE_META, {
+    value: { hasMore, nextCursor: hasMore ? keep[keep.length - 1].id : null },
+    enumerable: false,
+  });
+  return out;
+}

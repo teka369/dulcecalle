@@ -5,6 +5,9 @@ import { randomUUID } from "crypto";
 import * as path from "path";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
+import { PrismaService } from "../src/prisma/prisma.service";
+import { configureHttp } from "../src/http-setup";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { installBigIntJson } from "../src/shared/bigint";
 import { HttpErrorFilter } from "../src/shared/http/http-error.filter";
 import { startLocalPostgres, type PgHandle } from "./pg-harness";
@@ -34,7 +37,8 @@ describe("paged history lists", () => {
     process.env.JWT_REFRESH_SECRET = "test-refresh-secret";
     execSync("npx prisma migrate deploy", { cwd: path.join(__dirname, ".."), env: { ...process.env }, stdio: "inherit" });
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication<NestExpressApplication>();
+    configureHttp(app as NestExpressApplication, { ...process.env, NODE_ENV: "test" });
     app.setGlobalPrefix("v1");
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     app.useGlobalFilters(new HttpErrorFilter());
@@ -90,5 +94,31 @@ describe("paged history lists", () => {
   it("limit above the max is clamped (500)", async () => {
     const res = await get("/v1/sales?limit=100000").expect(200);
     expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it("more rows than one page: X-Has-More + X-Next-Cursor headers (body stays a plain array), exposed to CORS", async () => {
+    const prisma = app.get(PrismaService);
+    await prisma.expense.createMany({
+      data: Array.from({ length: 205 }, (_, i) => ({
+        id: randomUUID(), businessId: biz, amount: 10n, category: "Lote", method: "Efectivo" as const,
+        occurredOn: new Date(Date.UTC(2026, 0, 1)), createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, i)),
+      })),
+    });
+    // Old client: no limit → first 200 + a signal that there is more.
+    const old = await get("/v1/expenses").set("Origin", "http://localhost:3000").expect(200);
+    expect(Array.isArray(old.body)).toBe(true);
+    expect(old.body).toHaveLength(200);
+    expect(old.headers["x-has-more"]).toBe("true");
+    expect(old.headers["x-next-cursor"]).toBe(old.body[199].id);
+    expect(String(old.headers["access-control-expose-headers"])).toMatch(/X-Has-More/i);
+    expect(String(old.headers["access-control-expose-headers"])).toMatch(/X-Next-Cursor/i);
+    // Following the cursor reaches the end: has-more false, no cursor.
+    const rest = await get(`/v1/expenses?cursor=${old.headers["x-next-cursor"]}`).expect(200);
+    expect(rest.body.length).toBe(205 + 5 - 200);
+    expect(rest.headers["x-has-more"]).toBe("false");
+    expect(rest.headers["x-next-cursor"]).toBeUndefined();
+    // Exactly-one-page list: no false "more".
+    const small = await get(`/v1/products/${productId}/moves`).expect(200);
+    expect(small.headers["x-has-more"]).toBe("false");
   });
 });
