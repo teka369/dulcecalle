@@ -1,6 +1,7 @@
 import { navDebug } from "./nav-debug";
 import { getPwaAuthSession } from "../http/session";
-import { ConnectivityMonitor, type SyncFlushResult } from "../local/outbox";
+import { ConnectivityMonitor, getOutboxStore, getOutboxSyncEngine, type SyncFlushResult } from "../local/outbox";
+import type { OutboxItem } from "../local/types";
 import { syncPendingCustomers, syncPendingProducts, syncPendingSuppliers } from "./offline-catalog";
 import { syncPendingProductImages } from "./product-images";
 import { syncPendingPreparations } from "./offline-production";
@@ -43,6 +44,76 @@ const AUTH_IDLE: SyncFlushResult = {
   authRequired: true,
 };
 
+type StepKey = keyof SyncAllResult;
+
+/** Which per-type flush owns an outbox op. */
+export function stepForItem(item: Pick<OutboxItem, "entity" | "operation">): StepKey | null {
+  switch (item.entity) {
+    case "sale":
+      return "sales";
+    case "saleReturn":
+      return "returns";
+    case "customerPayment":
+      return "payments";
+    case "customer":
+      return "customers";
+    case "initialDebt":
+      return "initialDebts";
+    case "supplier":
+      return "suppliers";
+    case "product":
+      return "products";
+    case "productImage":
+      return "images";
+    case "preparation":
+      return "preparations";
+    case "cashSession":
+    case "cashMove":
+    case "expense":
+    case "stockMove":
+      return "operations";
+    default:
+      return null;
+  }
+}
+
+function addFlush(a: SyncFlushResult | undefined, b: SyncFlushResult): SyncFlushResult {
+  if (!a) return b;
+  return {
+    processed: a.processed + b.processed,
+    synced: a.synced + b.synced,
+    failed: a.failed + b.failed,
+    blocked: b.blocked,
+    stopped: b.stopped,
+    authRequired: b.authRequired,
+  };
+}
+
+async function replayInOrder(
+  businessId: string,
+  steps: ReadonlyArray<[StepKey, () => Promise<SyncFlushResult>]>,
+  acc: Partial<Record<StepKey, SyncFlushResult>>,
+): Promise<"auth" | "stopped" | "done"> {
+  const run = new Map(steps);
+  const engine = getOutboxSyncEngine();
+  const store = getOutboxStore();
+  const now = Date.now();
+  const queue = [
+    ...(await store.listByStatus(businessId, "pending")),
+    ...(await store.listByStatus(businessId, "failed")).filter((r) => r.nextAttemptAt != null && r.nextAttemptAt <= now),
+  ].sort((a, b) => a.localCreatedAt - b.localCreatedAt || a.operationId.localeCompare(b.operationId));
+  for (const item of queue) {
+    const step = stepForItem(item);
+    const flush = step ? run.get(step) : undefined;
+    if (!flush) continue;
+    const r = await engine.withOnly(item.operationId, flush);
+    acc[step!] = addFlush(acc[step!], r);
+    if (r.authRequired) return "auth";
+    if (r.stopped) return "stopped";
+  }
+  return "done";
+}
+
 export async function syncAllPending(businessId: string): Promise<SyncAllResult> {
   const result: SyncAllResult = {
     sales: AUTH_IDLE,
@@ -68,9 +139,27 @@ export async function syncAllPending(businessId: string): Promise<SyncAllResult>
     ["preparations", () => syncPendingPreparations(businessId)],
     ["operations", () => syncPendingOperations(businessId)],
   ];
+  // FIFO (loop-v1 HIGH): replay the WHOLE outbox in localCreatedAt order
+  // (open -> prepare -> sale -> shrink -> close), one op at a time through its
+  // own module, so a sale/shrink never reaches the server before the
+  // preparation/surtir that gave it stock. A retryable failure or auth stop
+  // halts the replay (later ops may depend on it), as the per-type flush did.
+  const replayed: Partial<Record<StepKey, SyncFlushResult>> = {};
+  const stop = await replayInOrder(businessId, steps, replayed);
+  if (stop !== "done") {
+    // auth: every key stays AUTH_IDLE except what already ran. Retryable
+    // failure: keep FIFO, send nothing after it this cycle.
+    for (const [key] of steps) {
+      const idle = stop === "auth" ? AUTH_IDLE : { ...AUTH_IDLE, authRequired: false };
+      result[key] = replayed[key] ? { ...replayed[key]!, stopped: true, authRequired: stop === "auth" } : idle;
+    }
+    return result;
+  }
+  // Housekeeping pass: anything the replay left (blocked, unmapped entity,
+  // concurrent flush) goes through the per-type flushes as before.
   for (const [key, run] of steps) {
     const flush = await run();
-    result[key] = flush;
+    result[key] = addFlush(replayed[key], flush);
     if (flush.authRequired) return result;
   }
   // AC4: a preparation queued behind a pending surtir/merma (dependsOn) is

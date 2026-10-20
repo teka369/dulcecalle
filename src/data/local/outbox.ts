@@ -398,6 +398,22 @@ export class ConnectivityMonitor {
 
 export class OutboxSyncEngine {
   private readonly active = new Map<string, Promise<SyncFlushResult>>();
+  /** FIFO replay (sync-coordinator): while set, flushes only see this one op. */
+  private only: string | null = null;
+
+  /**
+   * Run `fn` (a module's own syncPendingX) restricted to ONE outbox op, so the
+   * coordinator can replay the whole outbox in localCreatedAt order while each
+   * module keeps its sender and its pre/post-processing (remaps, reconcile).
+   */
+  async withOnly<T>(operationId: string, fn: () => Promise<T>): Promise<T> {
+    this.only = operationId;
+    try {
+      return await fn();
+    } finally {
+      this.only = null;
+    }
+  }
 
   constructor(
     private readonly outbox: OutboxStore = getOutboxStore(),
@@ -447,6 +463,7 @@ export class OutboxSyncEngine {
       ),
     ]
       .filter((row) => !filter || filter(row))
+      .filter((row) => this.only == null || row.operationId === this.only)
       .sort((a, b) => {
       if (a.localCreatedAt !== b.localCreatedAt) {
         return a.localCreatedAt - b.localCreatedAt;
