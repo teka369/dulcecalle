@@ -142,6 +142,8 @@ export function syncOperationNotes(item: {
   localCreatedAt: number;
   attempts: number;
   nextAttemptAt: number | null;
+  /** false when the row offers no Reintentar (e.g. orphan): do not suggest retrying. */
+  canRetry?: boolean;
 }): string[] {
   const status =
     item.status === "failed"
@@ -158,7 +160,11 @@ export function syncOperationNotes(item: {
     lines.push("Se reintentará automáticamente.");
   }
   if (item.status === "failed" && item.nextAttemptAt == null) {
-    lines.push("No se enviará sola. Revisa el motivo y reintenta si corresponde.");
+    lines.push(
+      item.canRetry === false
+        ? "No se enviará sola. Descártala y vuelve a crearla."
+        : "No se enviará sola. Revisa el motivo y reintenta si corresponde.",
+    );
   }
   return lines;
 }
