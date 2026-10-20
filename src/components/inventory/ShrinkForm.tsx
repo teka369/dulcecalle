@@ -59,7 +59,7 @@ export function ShrinkForm({
       setReady(true);
       return;
     }
-    const p = await inventoryStore.getProduct(id);
+    const p = await inventoryStore.getProduct(id).catch(() => undefined);
     setProduct(p ?? null);
     setReady(true);
   }, [id]);

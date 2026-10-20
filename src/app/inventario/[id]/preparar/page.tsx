@@ -45,6 +45,7 @@ export default function PrepararPage() {
     let alive = true;
     void inventoryStore
       .getProduct(sourceId)
+      .catch(() => undefined)
       .then((p) => {
         if (alive) setSource(p ?? null);
       })

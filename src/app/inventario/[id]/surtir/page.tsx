@@ -55,7 +55,7 @@ export default function SurtirPage() {
       setReady(true);
       return;
     }
-    const p = await inventoryStore.getProduct(id);
+    const p = await inventoryStore.getProduct(id).catch(() => undefined);
     setProduct(p ?? null);
     const s = await inventoryStore.refreshSuppliers();
     setSuppliers(s);
