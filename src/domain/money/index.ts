@@ -13,5 +13,6 @@ export {
   AMOUNT_DECIMAL_MESSAGE,
   exceedsMaxCop,
   parseAmountInput,
+  AMOUNT_NOT_A_NUMBER_MESSAGE,
   type AmountInputResult,
 } from "./limits";

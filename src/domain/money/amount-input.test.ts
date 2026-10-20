@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AMOUNT_DECIMAL_MESSAGE, AMOUNT_TOO_LARGE_MESSAGE, MAX_COP_AMOUNT, parseAmountInput } from "./limits";
+import { AMOUNT_DECIMAL_MESSAGE, AMOUNT_NOT_A_NUMBER_MESSAGE, AMOUNT_TOO_LARGE_MESSAGE, MAX_COP_AMOUNT, parseAmountInput } from "./limits";
 
 /** loop/v1 T-alto1 / M1: COP input parsing and a documented ceiling. */
 describe("parseAmountInput", () => {
@@ -23,5 +23,11 @@ describe("parseAmountInput", () => {
     expect(parseAmountInput(String(MAX_COP_AMOUNT + 1))).toEqual({ error: AMOUNT_TOO_LARGE_MESSAGE });
     expect(parseAmountInput("9007199254740991")).toEqual({ error: AMOUNT_TOO_LARGE_MESSAGE });
     expect(parseAmountInput("99999999999999999999")).toEqual({ error: AMOUNT_TOO_LARGE_MESSAGE });
+  });
+  it("rejects letters and other characters instead of dropping them («12a» is not 12)", () => {
+    for (const raw of ["12a", "a12", "1a2", "12-", "1_000", "12e3", "١٢", "+12", "12%"]) {
+      expect(parseAmountInput(raw), raw).toEqual({ error: AMOUNT_NOT_A_NUMBER_MESSAGE });
+    }
+    expect(parseAmountInput("$ 1.200")).toEqual({ digits: "1200" });
   });
 });
