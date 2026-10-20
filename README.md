@@ -23,6 +23,7 @@ M3: la PWA habla HTTP (UUID). No hay dual-write, sync ni import Dexie→PG. `pwa
 
 - Dev: `NEXT_PUBLIC_API_URL` opcional; si falta, el cliente usa `/v1` (el PWA reescribe a Nest).
 - Producción: si falta `NEXT_PUBLIC_API_URL`, el cliente usa `https://dulcecalle-teka369.onrender.com/v1`.
+- Vercel Previews: si el preview habla con **otro** backend (staging, un servicio de Render de preview…), define `NEXT_PUBLIC_API_URL` en el entorno *Preview* de Vercel **antes del build**. Además de elegir la API, su origen entra en la CSP `connect-src` (`src/security-headers.ts`); sin ella el navegador bloquea las llamadas a ese backend (solo se permiten `'self'`, la API de producción y Cloudinary). Es una variable de build: cambiarla exige redeploy.
 
 No pongas secrets en `NEXT_PUBLIC_*`.
 
