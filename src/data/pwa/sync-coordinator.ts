@@ -1,3 +1,4 @@
+import { navDebug } from "./nav-debug";
 import { getPwaAuthSession } from "../http/session";
 import { ConnectivityMonitor, type SyncFlushResult } from "../local/outbox";
 import { syncPendingCustomers, syncPendingProducts, syncPendingSuppliers } from "./offline-catalog";
@@ -92,12 +93,14 @@ export function startOutboxSync(): () => void {
   const monitor = new ConnectivityMonitor();
   const run = () => {
     const businessId = getPwaAuthSession().businessId;
+    navDebug("outbox-sync-run", { online: monitor.online, hasBusiness: !!businessId });
     if (businessId && monitor.online) void syncAllPending(businessId);
   };
   monitor.start();
   monitor.refresh();
   run();
   const unsubscribe = monitor.subscribe((online) => {
+    navDebug("connectivity", { online });
     if (online) run();
   });
   stopOutboxSync = () => {
