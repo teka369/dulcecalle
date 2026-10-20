@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { PendingBadge } from "@/components/ui/StatusBadge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
@@ -193,6 +195,20 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
 
       {item.orphanNote && (
         <p className="mt-2 text-sm text-ink-muted">{item.orphanNote}</p>
+      )}
+
+      {item.correction && !item.orphanNote && !confirming && (
+        <div className="mt-3 flex flex-col gap-2">
+          <p className="text-sm text-ink-muted">{item.correction.note}</p>
+          {item.correction.href && (
+            <Link
+              href={item.correction.href}
+              className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold"
+            >
+              Corregir
+            </Link>
+          )}
+        </div>
       )}
 
       {(item.status === "failed" || item.orphaned) && !confirming && (

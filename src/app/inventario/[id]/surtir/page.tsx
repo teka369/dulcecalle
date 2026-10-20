@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/Input";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
 import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
+import { usePrefill } from "@/components/ui/use-prefill";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
@@ -40,6 +41,7 @@ export default function SurtirPage() {
   const [supplierId, setSupplierId] = useState("");
   const [supplierCreate, setSupplierCreate] = useState("");
   const [qtyRaw, setQtyRaw] = useState("");
+  usePrefill("cantidad", setQtyRaw);
   const [unitCostRaw, setUnitCostRaw] = useState("");
   const [totalCostRaw, setTotalCostRaw] = useState("");
   const [method, setMethod] = useState<PayMethod>("Efectivo");

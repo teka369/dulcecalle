@@ -35,6 +35,8 @@ export type EnrichedTrayItem = TrayItem & {
   canRetry: boolean;
   /** Why only Descartar is offered (Spanish, user-facing), when it applies. */
   orphanNote: string | null;
+  /** Permanent rejection: «Corregir» target + explanation. */
+  correction: Correction | null;
 };
 
 export function orphanLocalNote(label: string): string {
@@ -224,6 +226,67 @@ export function describeOutboxDetail(item: Pick<TrayItem, "entity" | "operation"
   }
 }
 
+export type Correction = {
+  /** Form to redo the operation, prefilled where feasible; null = no form. */
+  href: string | null;
+  /** What «Corregir» does / what to do by hand (Spanish, user-facing). */
+  note: string;
+};
+
+const AFTER_FIX = "Cuando la guardes corregida, descarta esta.";
+
+/**
+ * loop/v1 conflict UI — the way out of a permanent server rejection.
+ * Navigates to the relevant form with `?monto=` / `?cantidad=` /
+ * `?categoria=` prefilled from the rejected payload. Ops whose form cannot
+ * be prefilled (a sale's cart, cash open/close) get an explanation instead.
+ */
+export function correctionFor(item: Pick<TrayItem, "entity" | "operation" | "payload">): Correction {
+  const p = asRecord(item.payload) ?? {};
+  const amount = asMoney(p.amount);
+  const qty = asQty(p.qty);
+  const id = (v: unknown) => (typeof v === "string" && /^[0-9a-zA-Z-]{1,64}$/.test(v) ? v : null);
+  const q = (params: Record<string, string | number | null>) => {
+    const sp = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v != null && v !== "") sp.set(k, String(v));
+    const text = sp.toString();
+    return text ? `?${text}` : "";
+  };
+  const key = `${item.entity}:${item.operation}`;
+  if (key === "cashMove:create" && (p.kind === "aporte" || p.kind === "retiro")) {
+    return { href: `/mas/caja/${p.kind}${q({ monto: amount })}`, note: `Abre el formulario con el monto. ${AFTER_FIX}` };
+  }
+  if (key === "expense:create") {
+    return { href: `/mas/gastos/nuevo${q({ monto: amount, categoria: asText(p.category) })}`, note: `Abre el formulario con el monto y la categoría. ${AFTER_FIX}` };
+  }
+  if (key === "customerPayment:pay" && id(p.customerId)) {
+    return { href: `/clientes/${id(p.customerId)}/abono${q({ monto: amount })}`, note: `Abre el abono del cliente con el monto. ${AFTER_FIX}` };
+  }
+  if (key === "initialDebt:create" && id(p.customerId)) {
+    return { href: `/clientes/${id(p.customerId)}/deuda-inicial${q({ monto: amount })}`, note: `Abre la deuda inicial del cliente con el monto. ${AFTER_FIX}` };
+  }
+  if (key === "stockMove:surtir" && id(p.productId)) {
+    return { href: `/inventario/${id(p.productId)}/surtir${q({ cantidad: qty })}`, note: `Abre el surtido del producto con la cantidad. ${AFTER_FIX}` };
+  }
+  if (key === "stockMove:shrink" && id(p.productId)) {
+    const page = p.reason === "me_lo_comi" ? "me-lo-comi" : p.reason === "regalar" ? "regalo" : "perdido";
+    return { href: `/inventario/${id(p.productId)}/${page}${q({ cantidad: qty })}`, note: `Abre la salida del producto con la cantidad. ${AFTER_FIX}` };
+  }
+  if (key === "sale:create") {
+    return { href: "/ventas/nueva", note: `Vuelve a registrar la venta con los productos de arriba (el carrito no se puede rellenar solo). ${AFTER_FIX}` };
+  }
+  if (item.entity === "cashSession") {
+    return { href: "/mas/caja", note: `Revisa la caja de hoy y vuelve a hacerlo desde Caja. ${AFTER_FIX}` };
+  }
+  if (item.entity === "customer" && item.operation === "create") {
+    return { href: "/clientes/nuevo", note: `Vuelve a crear el cliente con el nombre de arriba. ${AFTER_FIX}` };
+  }
+  if (item.entity === "product" || item.entity === "productImage") {
+    return { href: "/inventario", note: `Revisa el producto en Inventario y vuelve a hacer el cambio. ${AFTER_FIX}` };
+  }
+  return { href: null, note: `Revisa el motivo, vuelve a registrarla a mano y luego descarta esta.` };
+}
+
 /**
  * First unsatisfied dependency described in user terms, or null when the
  * operation is not blocked. Reads the same outbox rows the engine uses.
@@ -238,6 +301,11 @@ export async function resolveBlockedReason(
     // A missing row was discarded: it will never sync, so this waits forever.
     if (!dependency) return ORPHAN_BLOCKED_REASON;
     if (dependency.status === "synced") continue;
+    // FIFO decision: a dependent op WAITS for a permanently rejected parent
+    // (never sent without it); independent later ops proceed.
+    if (dependency.status === "failed" && dependency.nextAttemptAt == null) {
+      return `Esperando a «${describeOutboxOperation(dependency.entity, dependency.operation)}», que el servidor rechazó. Corrígela o descártala.`;
+    }
     if (dependency.entity === "supplier") return "Esperando proveedor";
     if (dependency.entity === "cashSession") return "Esperando apertura de caja";
     if (dependency.entity === "customer") return "Esperando cliente";
@@ -374,6 +442,7 @@ export async function listEnrichedTray(businessId: string): Promise<EnrichedTray
       permanent: isPermanentFailure(row),
       retryable: isRetryableFailure(row),
       ...(await enrichBlocked(businessId, row)),
+      correction: isPermanentFailure(row) ? correctionFor(row) : null,
     })),
   );
 }

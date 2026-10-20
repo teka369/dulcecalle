@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePrefill } from "@/components/ui/use-prefill";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { CASH_COPY, parseCopAmount, validateCashAmount, validateGasto } from "@/domain/cash";
@@ -64,6 +65,8 @@ export function CashMoveForm({ kind }: { kind: CashFormKind }) {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
+  usePrefill("monto", setAmountRaw);
+  usePrefill("categoria", setCategoryRaw, "text");
 
   useEffect(() => {
     if (!cashStore.getSnapshot().summary) void cashStore.refresh().catch(() => undefined);

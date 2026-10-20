@@ -4,6 +4,7 @@ import { useOfflineBand } from "@/components/shell/use-online";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePrefill } from "@/components/ui/use-prefill";
 import type { RemoteProduct } from "@/data/http/mappers";
 import {
   validateMotivo,
@@ -48,6 +49,7 @@ export function ShrinkForm({
   const id = useEntityId();
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [qtyRaw, setQtyRaw] = useState("");
+  usePrefill("cantidad", setQtyRaw);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
