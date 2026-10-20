@@ -226,6 +226,34 @@ export class CatalogReadCache {
     });
   }
 
+  /**
+   * Hero-first paint: this device's last list, read-only, no fetch. null when
+   * nothing was ever cached (callers must then show a skeleton, never 0).
+   */
+  async peekProducts(businessId: string): Promise<RemoteProduct[] | null> {
+    return this.peek(businessId, "products", (b) => this.store.products.list(b), productToRemote);
+  }
+
+  async peekCustomers(businessId: string): Promise<RemoteCustomer[] | null> {
+    return this.peek(businessId, "customers", (b) => this.store.customers.list(b), customerToRemote);
+  }
+
+  async peekSuppliers(businessId: string): Promise<RemoteSupplier[] | null> {
+    return this.peek(businessId, "suppliers", (b) => this.store.suppliers.list(b), supplierToRemote);
+  }
+
+  private async peek<TRemote, TLocal>(
+    businessId: string,
+    resource: CatalogResource,
+    list: (businessId: string) => Promise<TLocal[]>,
+    toRemote: (row: TLocal) => TRemote,
+  ): Promise<TRemote[] | null> {
+    assertUuid(businessId, "businessId");
+    const meta = await this.db.cacheMeta.get(metaId(businessId, resource));
+    if (!meta) return null;
+    return (await list(businessId)).map(toRemote);
+  }
+
   async cachedAt(
     businessId: string,
     resource: CatalogResource,
@@ -265,7 +293,9 @@ export class CatalogReadCache {
         cachedAt,
       };
     } catch (e) {
-      this.rethrowUnlessNetwork(e);
+      // B3: lists also fall back on 5xx (server down): local data + band,
+      // never a false empty list. 4xx still propagate.
+      if (!(e instanceof ApiError && e.status >= 500)) this.rethrowUnlessNetwork(e);
       const meta = await this.db.cacheMeta.get(
         metaId(opts.businessId, opts.resource),
       );

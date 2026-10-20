@@ -8,10 +8,12 @@ import {
   InicioSkeleton,
 } from "@/components/dashboard/InicioDashboard";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
-import { loadDashboardWithOfflineFallback } from "@/data/pwa/offline-snapshots";
+import { loadDashboardForScreen } from "@/data/pwa/offline-snapshots";
+import { useSync } from "@/store/syncStore";
 
 export default function InicioPage() {
   const pathname = usePathname();
+  const { online } = useSync();
   const [snap, setSnap] = useState<DashboardSnapshot | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -21,7 +23,7 @@ export default function InicioPage() {
 
   const refresh = useCallback(async () => {
     setFailed(false);
-    const result = await loadDashboardWithOfflineFallback();
+    const result = await loadDashboardForScreen();
     setSnap(result.data);
     setCapturedAt(result.capturedAt);
     setFromCache(result.source === "cache");
@@ -71,6 +73,7 @@ export default function InicioPage() {
       toast={toast}
       fromCache={fromCache}
       capturedAt={capturedAt}
+      online={online}
     />
   );
 }

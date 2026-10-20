@@ -8,7 +8,7 @@
  * sales window. Two offline abonos on two phones can still conflict on
  * the server (debt >= amount). That is not resolved here.
  */
-import { getPwaApi } from "./api";
+import { getPrepPwaApi } from "./api";
 import { persistServerSale } from "./offline-returns";
 import { pendingDebtAdjustment } from "./pending-debt";
 import { getLocalDb } from "../local/db";
@@ -107,11 +107,11 @@ export async function historyReady(businessId: string, resource: HistoryResource
 export async function warmSalesHistory(businessId: string): Promise<string> {
   const from = windowStart(SALES_WINDOW_DAYS);
   const to = todayKey();
-  const sales = await getPwaApi().sales.list(from, to);
+  const sales = await getPrepPwaApi().sales.list(from, to);
   const guard = await protectedIds(businessId);
   await mapPool(sales, HISTORY_FETCH_LIMIT, async (sale) => {
     if (blocked(guard, sale.id)) return;
-    const returns = await getPwaApi().sales.returns(sale.id);
+    const returns = await getPrepPwaApi().sales.returns(sale.id);
     await persistServerSale(businessId, sale, returns);
   });
   await markHistory(businessId, "history:sales");
@@ -132,7 +132,7 @@ export async function warmLedgerHistory(businessId: string): Promise<string> {
   }
   const guard = await protectedIds(businessId);
   await mapPool([...wanted], HISTORY_FETCH_LIMIT, async (customerId) => {
-    const ledger = await getPwaApi().customers.ledger(customerId);
+    const ledger = await getPrepPwaApi().customers.ledger(customerId);
     const customer = customerToLocal(mapCustomer(ledger.customer), businessId, Date.now());
     const pending = await pendingDebtAdjustment(businessId, customerId);
     if (!blocked(guard, customer.id, customer.requestId)) {
@@ -182,7 +182,7 @@ export async function warmLedgerHistory(businessId: string): Promise<string> {
 }
 
 export async function warmCashHistory(businessId: string): Promise<string> {
-  const api = getPwaApi();
+  const api = getPrepPwaApi();
   const from = windowStart(CASH_WINDOW_DAYS);
   const to = todayKey();
   const [today, moves, expenses] = await Promise.all([
@@ -255,7 +255,7 @@ export async function warmMoveHistory(businessId: string): Promise<string> {
   const guard = await protectedIds(businessId);
   let kept = 0;
   await mapPool(products, HISTORY_FETCH_LIMIT, async (product) => {
-    const moves = await getPwaApi().inventory.moves(product.id);
+    const moves = await getPrepPwaApi().inventory.moves(product.id);
     for (const move of moves) {
       if (move.occurredOn < from || blocked(guard, move.id)) continue;
       const row: LocalStockMove = {
@@ -277,7 +277,7 @@ export async function warmMoveHistory(businessId: string): Promise<string> {
       kept += 1;
     }
   });
-  const preparations = await getPwaApi().production.list();
+  const preparations = await getPrepPwaApi().production.list();
   for (const prep of preparations) {
     if (prep.occurredOn < from || blocked(guard, prep.id, prep.id)) continue;
     const row: LocalPreparation = {

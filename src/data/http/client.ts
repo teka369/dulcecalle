@@ -2,6 +2,7 @@ import {
   ApiError,
   apiErrorFromBody,
   isNetworkError,
+  NetworkError,
   toNetworkError,
 } from "../errors";
 
@@ -22,10 +23,14 @@ export type RequestOptions = {
   skipBusiness?: boolean;
   /** Do not attempt 401 → refresh → retry (the refresh call itself). */
   skipRefresh?: boolean;
+  /** GET only: override the read deadline (e.g. offline prep downloads use 30s). */
+  timeoutMs?: number;
 };
 
 /** GET reads give up after this long and surface as NetworkError (writes are never timed out). */
 export const READ_TIMEOUT_MS = 10_000;
+/** Offline-prep downloads (big history reads) get a longer read deadline. */
+export const PREP_READ_TIMEOUT_MS = 30_000;
 
 /**
  * Timeout signal for reads. Built on a plain timer (same effect as
@@ -64,6 +69,8 @@ export class HttpClient {
     private readonly session: FetchAuthSession,
     private readonly fetchImpl: typeof fetch = fetch.bind(globalThis),
     private readonly refreshPath: string = "/auth/refresh",
+    /** Default deadline for GET reads made through this client. */
+    private readonly readTimeoutMs: number = READ_TIMEOUT_MS,
   ) {}
 
   async request<T>(
@@ -80,6 +87,11 @@ export class HttpClient {
     opts: RequestOptions,
     retried: boolean,
   ): Promise<T> {
+    // B8: the browser says it is offline → fail fast as a transport error
+    // without issuing a request (each one logs "Failed to load resource").
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      throw new NetworkError("Sin conexión.");
+    }
     const url = `${this.baseUrl.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
     const headers: Record<string, string> = {};
     if (opts.body !== undefined) headers["Content-Type"] = "application/json";
@@ -97,7 +109,7 @@ export class HttpClient {
       opts.body !== undefined ? JSON.stringify(opts.body) : undefined;
 
     // Only GET reads are timed out; POST/PUT/PATCH/DELETE keep no deadline.
-    const timeout = method === "GET" ? readTimeout(READ_TIMEOUT_MS) : null;
+    const timeout = method === "GET" ? readTimeout(opts.timeoutMs ?? this.readTimeoutMs) : null;
     let res: Response;
     let text!: string;
     try {

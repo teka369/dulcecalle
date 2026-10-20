@@ -75,7 +75,7 @@ export default function ClienteFichaPage() {
   if (!ready) {
     return (
       <div className="flex flex-col gap-4">
-        <SkeletonHero />
+        <SkeletonHero title="Cliente" />
         <SkeletonRows />
       </div>
     );

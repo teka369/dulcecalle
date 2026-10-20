@@ -53,7 +53,7 @@ export default function GastosPage() {
   if (!ready) {
     return (
       <div className="flex flex-col gap-4">
-        <SkeletonHero />
+        <SkeletonHero title={CASH_COPY.masGastos} />
         <SkeletonRows />
       </div>
     );

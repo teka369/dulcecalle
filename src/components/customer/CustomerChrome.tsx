@@ -23,16 +23,20 @@ function PortalTabs() {
   }, [active]);
   return (
     <nav aria-label="Consulta" className="mt-5">
-      <ul className="flex gap-1 overflow-x-auto rounded-[var(--r-pill)] bg-[color-mix(in_srgb,var(--on-hero)_12%,transparent)] p-1">
+      {/* B7: below 380px all six tabs wrap into a 3×2 grid (nothing hidden off-screen); wider screens keep one scrollable row. */}
+      <ul
+        data-testid="portal-tabs"
+        className="grid grid-cols-3 gap-1 rounded-[var(--r-lg)] bg-[color-mix(in_srgb,var(--on-hero)_12%,transparent)] p-1 min-[380px]:flex min-[380px]:overflow-x-auto min-[380px]:rounded-[var(--r-pill)]"
+      >
         {PORTAL_TABS.map((t) => {
           const on = t.href === active;
           return (
-            <li key={t.href} className="shrink-0">
+            <li key={t.href} className="min-w-0 min-[380px]:shrink-0">
               <Link
                 href={t.href}
                 ref={on ? activeRef : undefined}
                 aria-current={on ? "page" : undefined}
-                className={`flex min-h-11 items-center whitespace-nowrap rounded-[var(--r-pill)] px-3 text-sm font-semibold ${
+                className={`flex min-h-11 items-center justify-center whitespace-nowrap rounded-[var(--r-pill)] px-2 text-sm font-semibold min-[380px]:px-3 ${
                   on ? "bg-nav-active-bg text-nav-active-ink" : "text-on-hero"
                 }`}
               >

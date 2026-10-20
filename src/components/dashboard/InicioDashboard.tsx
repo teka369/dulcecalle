@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { formatCop } from "@/domain/money";
+import { LIST_STALE_TEXT } from "@/data/pwa/list-status";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import { weekTotal, type WeekDay } from "@/domain/dashboard/week";
 import { loadWeekSeries } from "./week-source";
@@ -131,12 +132,15 @@ export function InicioDashboard({
   toast,
   fromCache = false,
   capturedAt = null,
+  online = false,
 }: {
   snap: DashboardSnapshot;
   onLoadDemo?: () => void;
   toast: string | null;
   fromCache?: boolean;
   capturedAt?: number | null;
+  /** Online + cached snapshot = the server read failed (B3 band). */
+  online?: boolean;
 }) {
   const pill = cajaPill(snap);
   const ventas = salesCaption(snap.todaySalesCount);
@@ -157,7 +161,12 @@ export function InicioDashboard({
   return (
     <div className="flex flex-col">
       <InicioHero>
-        {fromCache && capturedAt != null ? (
+        {fromCache && online ? (
+          <p className="mb-3 flex items-center gap-1.5 text-xs text-on-hero-muted" data-testid="offline-band">
+            <Cloud />
+            {LIST_STALE_TEXT}
+          </p>
+        ) : fromCache && capturedAt != null ? (
           <p className="mb-3 flex items-center gap-1.5 text-xs text-on-hero-muted">
             <Cloud />
             Sin conexión · actualizado {new Date(capturedAt).toLocaleString("es-CO")}

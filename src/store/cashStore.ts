@@ -12,7 +12,7 @@ import {
   validateOpeningFloat,
 } from "@/domain/cash";
 import { ApiError, NetworkError } from "@/data/errors";
-import { getLocalCashSnapshot, openCashWithOfflineFallback, closeCashWithOfflineFallback, recordAporteOffline, recordRetiroOffline, recordExpenseWithOfflineFallback } from "@/data/pwa/offline-operations";
+import { getLocalCashSnapshot, openCashWithOfflineFallback, todayCashOpenRequestId, closeCashWithOfflineFallback, recordAporteOffline, recordRetiroOffline, recordExpenseWithOfflineFallback } from "@/data/pwa/offline-operations";
 import { getPwaApi } from "@/data/pwa/api";
 import type { RemoteExpense, RemoteToday } from "@/data/http/mappers";
 import { addCop } from "@/domain/money";
@@ -112,7 +112,8 @@ export const cashStore = {
     if (err) throw new Error(err);
     const amount = openingRaw.trim() === "" ? 0 : parseCopAmount(openingRaw)!;
     try {
-      const result = await openCashWithOfflineFallback(amount, crypto.randomUUID());
+      // Deterministic key per business+day: retries/double taps/offline sync open one session.
+      const result = await openCashWithOfflineFallback(amount, await todayCashOpenRequestId());
       setState({ lastToast: result.mode === "offline" ? "Caja guardada sin conexión" : CASH_COPY.toastCajaAbierta });
       await this.refresh();
     } catch (e) {

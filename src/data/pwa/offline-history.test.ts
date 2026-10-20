@@ -23,7 +23,7 @@ const api = {
   production: { list: vi.fn(async () => []) },
 };
 
-vi.mock("./api", () => ({ getPwaApi: () => api }));
+vi.mock("./api", () => ({ getPwaApi: () => api, getPrepPwaApi: () => api }));
 
 describe("offline history v1", () => {
   beforeEach(async () => {

@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
-import { isOffline } from "@/data/pwa/offline-nav";
+import { isOffline, offlineDocumentNavigate } from "@/data/pwa/offline-nav";
 import { parseEntityHref } from "@/data/pwa/entity-href";
 import { entityViewStore } from "@/store/entityViewStore";
+import { useOnline } from "./use-online";
 
 type OfflineClick = {
   metaKey: boolean;
@@ -26,7 +27,7 @@ export function onOfflineLinkClick(event: OfflineClick, href: string): void {
     entityViewStore.open(href);
     return;
   }
-  window.location.assign(href);
+  offlineDocumentNavigate(href);
 }
 
 /**
@@ -49,6 +50,8 @@ export function OfflineLink({
   ariaLabel?: string;
   ariaCurrent?: "page";
 }) {
+  // B8: offline, a viewport prefetch can only fail (and log). Offline clicks are handled below.
+  const online = useOnline();
   function onClick(e: MouseEvent<HTMLAnchorElement>) {
     onOfflineLinkClick(e, href);
   }
@@ -58,7 +61,7 @@ export function OfflineLink({
   const merged = className ? `${focus} ${className}` : focus;
 
   return (
-    <Link href={href} className={merged} onClick={onClick} aria-label={ariaLabel} aria-current={ariaCurrent}>
+    <Link href={href} prefetch={online ? undefined : false} className={merged} onClick={onClick} aria-label={ariaLabel} aria-current={ariaCurrent}>
       {children}
     </Link>
   );

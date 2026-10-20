@@ -89,9 +89,11 @@ export class HttpRepository {
     baseUrl: string,
     session: HttpSession = new HttpSession(),
     fetchImpl?: typeof fetch,
+    /** GET read deadline for this repository's client (default 10s). */
+    readTimeoutMs?: number,
   ) {
     this.session = session;
-    this.http = new HttpClient(baseUrl, session, fetchImpl);
+    this.http = new HttpClient(baseUrl, session, fetchImpl, undefined, readTimeoutMs);
   }
 
   readonly auth = {
