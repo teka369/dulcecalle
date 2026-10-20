@@ -24,6 +24,12 @@ describe("correctionFor", () => {
     expect(other.href).toBeNull();
     expect(other.note).toMatch(/descarta/);
   });
+  it("a rejected caja open reopens Caja with the original opening amount", () => {
+    expect(correctionFor({ entity: "cashSession", operation: "open", payload: { openingFloat: 9000 } }).href).toBe("/mas/caja?monto=9000");
+    expect(correctionFor({ entity: "cashSession", operation: "open", payload: { openingFloat: 0 } }).href).toBe("/mas/caja");
+    expect(correctionFor({ entity: "cashSession", operation: "close", payload: { countedEfectivo: 5 } }).href).toBe("/mas/caja");
+  });
+
   it("garbage ids/amounts are not put in the URL", () => {
     expect(correctionFor({ entity: "customerPayment", operation: "pay", payload: { customerId: "../x?y", amount: -1 } }).href).toBeNull();
     expect(correctionFor({ entity: "cashMove", operation: "create", payload: { kind: "aporte", amount: "1e9" } }).href).toBe("/mas/caja/aporte");

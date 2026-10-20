@@ -16,6 +16,8 @@ import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
+import { usePrefill } from "@/components/ui/use-prefill";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { CASH_OFFLINE_NOCACHE, cashOfflineView, cashPageGate, kindLabel, moveSign, shortDay } from "@/components/cash/cash";
 import { useSync } from "@/store/syncStore";
 import { usePrep } from "@/store/prepStore";
@@ -39,6 +41,8 @@ export default function CajaPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const { online } = useSync();
   const { lastReadyAt } = usePrep();
+  usePrefill("monto", setOpeningRaw); // «Corregir» on a rejected caja open
+  const rejected = useRejectedCorrection();
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -72,6 +76,7 @@ export default function CajaPage() {
       setToast(CASH_COPY.toastCajaAbierta);
       await load();
       setTimeout(() => setToast(null), 2000);
+      rejected.afterSave(() => undefined, 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
@@ -203,6 +208,7 @@ export default function CajaPage() {
         </Sheet>
         <ActionBar aboveNav primary={{ label: CASH_COPY.abrirCaja, onClick: () => void onAbrir(), busy }} />
         <ActionToast text={toast} />
+        {rejected.dialog}
       </div>
     );
   }
@@ -272,6 +278,7 @@ export default function CajaPage() {
         </section>
       </Sheet>
       <ActionToast text={toast} />
+        {rejected.dialog}
     </div>
   );
 }

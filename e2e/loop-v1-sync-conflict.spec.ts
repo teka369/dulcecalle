@@ -127,3 +127,57 @@ test("Corregir → save asks to discard the rejected op: Cancelar keeps it, Desc
   await expect(page.locator("li", { hasText: REJECT })).toHaveCount(0, { timeout: 20_000 });
   expect(rejects, "the rejected op was never re-sent").toBe(1);
 });
+
+/**
+ * loop/v1 MEDIUM: «Corregir» on a rejected offline caja OPEN prefilled 0.
+ * It must reopen Caja with the original opening amount; saving still asks
+ * to discard the rejected op.
+ */
+test("rejected offline caja open: Corregir prefills the original base; save + Descartar removes the rejected op", async ({ context, page }) => {
+  test.setTimeout(400_000);
+  const fake = await installFakeApi(context);
+  let rejects = 0;
+  let accepted = 0;
+  await context.route(/\/v1\/cash\/sessions$/, async (route) => {
+    if (route.request().method() !== "POST" || fake.offline) return route.fallback();
+    if (rejects >= 1) {
+      accepted += 1;
+      return route.fallback();
+    }
+    rejects += 1;
+    return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: { code: "CLOSED_DAY", message: REJECT } }) });
+  });
+  await page.goto("/");
+  await page.waitForFunction(() => navigator.serviceWorker?.ready.then(() => true));
+  await page.reload();
+  await expect.poll(() => readiness(page), { timeout: 180_000, intervals: [1000] }).toBe("ready");
+
+  fake.offline = true;
+  await context.setOffline(true);
+  await page.goto("/mas/caja");
+  await page.getByLabel(/Con cuánto abres/).fill("9300");
+  await page.getByRole("button", { name: "Abrir caja" }).click();
+  await expect(page.locator("main")).toContainText(/9\.300/, { timeout: 15_000 });
+  fake.offline = false;
+  await context.setOffline(false);
+  await expect.poll(() => rejects, { timeout: 60_000 }).toBe(1);
+
+  await page.goto("/sincronizacion");
+  const rejected = page.locator("li", { hasText: REJECT });
+  await expect(rejected).toHaveCount(1, { timeout: 20_000 });
+  await expect(rejected).toContainText("Apertura de caja");
+  await rejected.getByRole("link", { name: "Corregir" }).click({ timeout: 10_000 });
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/mas/caja");
+  const field = page.getByLabel(/Con cuánto abres/);
+  await expect(field).toHaveValue(/^9\.?300$/, { timeout: 15_000 });
+
+  await page.getByRole("button", { name: "Abrir caja" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText("¿Descartar la operación rechazada?", { timeout: 15_000 });
+  await dialog.getByRole("button", { name: "Descartar" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => accepted, { timeout: 30_000 }).toBe(1);
+  await page.goto("/sincronizacion");
+  await expect(page.locator("li", { hasText: REJECT })).toHaveCount(0, { timeout: 20_000 });
+  expect(rejects).toBe(1);
+});

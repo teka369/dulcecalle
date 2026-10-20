@@ -275,6 +275,11 @@ export function correctionFor(item: Pick<TrayItem, "entity" | "operation" | "pay
   if (key === "sale:create") {
     return { href: "/ventas/nueva", note: `Vuelve a registrar la venta con los productos de arriba (el carrito no se puede rellenar solo). ${AFTER_FIX}` };
   }
+  if (key === "cashSession:open") {
+    // Only the opening base is stored with the op (no date/notes to restore).
+    const base = asMoney(p.openingFloat);
+    return { href: `/mas/caja${q({ monto: base && base > 0 ? base : null })}`, note: `Abre Caja con la base que habías puesto. ${AFTER_FIX}` };
+  }
   if (item.entity === "cashSession") {
     return { href: "/mas/caja", note: `Revisa la caja de hoy y vuelve a hacerlo desde Caja. ${AFTER_FIX}` };
   }
