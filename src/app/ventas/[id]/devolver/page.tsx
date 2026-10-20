@@ -1,6 +1,5 @@
 "use client";
 
-import { errorText } from "@/domain/ux/user-message";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCop, mulCop } from "@/domain/money";
@@ -119,7 +118,7 @@ export default function DevolverVentaPage() {
         navigateOfflineAware(router, `/ventas/${data.sale.id}`);
       }, 700);
     } catch (e) {
-      setError(errorText(e, "Error al devolver"));
+      setError(e instanceof Error ? e.message : "Error al devolver");
       setBusy(false);
     }
   }

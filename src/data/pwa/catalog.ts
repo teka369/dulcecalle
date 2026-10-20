@@ -1,4 +1,3 @@
-import { resolveIdAlias } from "@/data/local/id-alias";
 import type {
   RemoteCustomer,
   RemoteProduct,
@@ -76,32 +75,23 @@ export async function listCachedSuppliers(api: HttpRepository = getPwaApi()): Pr
   return result.data;
 }
 
-export async function getCachedProduct(rawId: string): Promise<RemoteProduct> {
+export async function getCachedProduct(id: string): Promise<RemoteProduct> {
   const api = getPwaApi();
-  const businessId = requireBusinessId();
-  // A stale client id (remapped after sync) resolves to the server id.
-  const id = resolveIdAlias(businessId, rawId);
-  return getCatalogReadCache().getProduct(businessId, id, () =>
+  return getCatalogReadCache().getProduct(requireBusinessId(), id, () =>
     api.products.get(id),
   );
 }
 
-export async function getCachedCustomer(rawId: string): Promise<RemoteCustomer> {
+export async function getCachedCustomer(id: string): Promise<RemoteCustomer> {
   const api = getPwaApi();
-  const businessId = requireBusinessId();
-  // A stale client id (remapped after sync) resolves to the server id.
-  const id = resolveIdAlias(businessId, rawId);
-  return getCatalogReadCache().getCustomer(businessId, id, () =>
+  return getCatalogReadCache().getCustomer(requireBusinessId(), id, () =>
     api.customers.get(id),
   );
 }
 
-export async function getCachedSupplier(rawId: string): Promise<RemoteSupplier> {
+export async function getCachedSupplier(id: string): Promise<RemoteSupplier> {
   const api = getPwaApi();
-  const businessId = requireBusinessId();
-  // A stale client id (remapped after sync) resolves to the server id.
-  const id = resolveIdAlias(businessId, rawId);
-  return getCatalogReadCache().getSupplier(businessId, id, () =>
+  return getCatalogReadCache().getSupplier(requireBusinessId(), id, () =>
     api.suppliers.get(id),
   );
 }

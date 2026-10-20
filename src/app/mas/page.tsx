@@ -66,7 +66,6 @@ export default function MasPage() {
           <RowGroup label="Ajustes">
             <Row href="/mas/apariencia" leading={<Lead icon="check" />} title="Apariencia" />
             <Row href="/mas/datos" leading={<Lead icon="package" />} title="Datos" />
-            <Row href="/mas/portal" leading={<Lead icon="users" />} title="Portal de clientes" />
             <Row href="/login" leading={<Lead icon="users" />} title="Cuenta" />
           </RowGroup>
         </section>

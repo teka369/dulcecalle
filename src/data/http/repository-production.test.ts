@@ -87,7 +87,7 @@ describe("HttpRepository production contract", () => {
     const repo = new HttpRepository("http://example.test/v1", session, captured.fetchImpl);
     const rows = await repo.production.list({ sourceId: SOURCE });
     expect(captured.sent().url).toBe(
-      `http://example.test/v1/preparations?sourceId=${SOURCE}&limit=500`,
+      `http://example.test/v1/preparations?sourceId=${SOURCE}`,
     );
     expect(rows).toHaveLength(1);
   });

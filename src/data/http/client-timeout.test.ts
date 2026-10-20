@@ -117,7 +117,7 @@ describe("offline prep uses the 30s API", () => {
     expect(prep).toContain("listCachedProducts(getPrepPwaApi())");
     expect(prep).toContain("loadDashboardWithOfflineFallback(getPrepPwaApi())");
     expect(hist).not.toContain("getPwaApi()");
-    expect(prep).toContain("PREP_VERSION = 10");
+    expect(prep).toContain("PREP_VERSION = 9");
   });
 });
 

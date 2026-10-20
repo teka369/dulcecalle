@@ -1,9 +1,6 @@
 "use client";
 
-import { errorText } from "@/domain/ux/user-message";
 import { useEffect, useRef, useState } from "react";
-import { usePrefill } from "@/components/ui/use-prefill";
-import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { CASH_COPY, parseCopAmount, validateCashAmount, validateGasto } from "@/domain/cash";
@@ -14,7 +11,7 @@ import { cashStore, useCash } from "@/store/cashStore";
 import { Input } from "@/components/ui/Input";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
+import { AmountField } from "@/components/ui/AmountField";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
@@ -67,9 +64,6 @@ export function CashMoveForm({ kind }: { kind: CashFormKind }) {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
-  usePrefill("monto", setAmountRaw);
-  const rejected = useRejectedCorrection();
-  usePrefill("categoria", setCategoryRaw, "text");
 
   useEffect(() => {
     if (!cashStore.getSnapshot().summary) void cashStore.refresh().catch(() => undefined);
@@ -83,7 +77,6 @@ export function CashMoveForm({ kind }: { kind: CashFormKind }) {
   const after = summary && amount != null && amount > 0 ? expectedAfter(summary.expected, kind, method, amount) : null;
 
   async function confirm() {
-    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (busy) return;
     setError(null);
     const err = validate();
@@ -98,9 +91,9 @@ export function CashMoveForm({ kind }: { kind: CashFormKind }) {
       else if (kind === "retiro") await cashStore.recordRetiro({ amountRaw, method, note, requestId: requestIdRef.current });
       else await cashStore.recordGasto({ amountRaw, categoryRaw, method, note, requestId: requestIdRef.current });
       setToast(cfg.toast);
-      rejected.afterSave(() => navigateOfflineAware(router, cfg.back), 700);
+      setTimeout(() => navigateOfflineAware(router, cfg.back), 700);
     } catch (e) {
-      setError(errorText(e, "Error"));
+      setError(e instanceof Error ? e.message : "Error");
       setBusy(false);
     }
   }
@@ -155,7 +148,6 @@ export function CashMoveForm({ kind }: { kind: CashFormKind }) {
       </Sheet>
       <ActionBar primary={{ label: cfg.cta, onClick: () => void confirm(), disabled: !valid, busy }} />
       <ActionToast text={toast} />
-      {rejected.dialog}
     </div>
   );
 }

@@ -420,8 +420,6 @@ async function carryCashOffline(
   return { mode: "offline", id };
 }
 
-const ASSIGN_NO_CONNECTION = "No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.";
-
 export async function assignMoveWithOfflineFallback(
   moveId: string,
   sessionId: string,
@@ -438,9 +436,7 @@ export async function assignMoveWithOfflineFallback(
     const id = await db.transaction("rw", [db.cashMoves, db.cashSessions, db.outbox], async () => {
       const move = await db.cashMoves.get(moveId);
       const session = await db.cashSessions.get(sessionId);
-      // Not cached on this phone: the real problem is the failed connection, not the move.
-      if (!move) throw new NetworkError(ASSIGN_NO_CONNECTION);
-      if (move.businessId !== business) throw new Error("Ese movimiento no está en este negocio.");
+      if (!move || move.businessId !== business) throw new Error("Ese movimiento no está en este negocio.");
       if (move.sessionId) throw new Error("Ese movimiento ya tiene caja.");
       if (!session || session.businessId !== business || session.closedAt) throw new Error("La caja destino no está abierta.");
       await db.cashMoves.put({ ...move, sessionId, pendingForSessionId: null });

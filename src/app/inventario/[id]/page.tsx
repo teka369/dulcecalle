@@ -1,6 +1,5 @@
 "use client";
 
-import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +13,6 @@ import { QuickTiles } from "@/components/ui/QuickTiles";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
 import { StateBlock } from "@/components/ui/StateBlock";
-import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { primaryImageUrl } from "@/data/media/urls";
@@ -48,7 +46,6 @@ export default function ProductoFichaPage() {
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [moves, setMoves] = useState<RemoteStockMove[]>([]);
   const [ready, setReady] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
@@ -65,30 +62,24 @@ export default function ProductoFichaPage() {
       setReady(true);
       return;
     }
-    setLoadError(null);
-    try {
-      const p = await inventoryStore.getProduct(id);
-      setProduct(p ?? null);
-      if (p) {
-        setEditName(p.name);
-        setEditPrice(String(p.price));
-        setEditLow(String(p.lowStockAt));
-        setEditSellable(p.sellable);
-      }
-      if (p) {
-        setMoves(await inventoryStore.listProductMoves(id));
-        const [from, into] = await Promise.all([
-          inventoryStore.listPreparations({ sourceId: id }).catch(() => [] as RemotePreparation[]),
-          inventoryStore.listPreparations({ targetId: id }).catch(() => [] as RemotePreparation[]),
-        ]);
-        setFromPreparations(from);
-        setIntoPreparations(into);
-      }
-    } catch (e: unknown) {
-      setLoadError(errorText(e, ""));
-    } finally {
-      setReady(true);
+    const p = await inventoryStore.getProduct(id);
+    setProduct(p ?? null);
+    if (p) {
+      setEditName(p.name);
+      setEditPrice(String(p.price));
+      setEditLow(String(p.lowStockAt));
+      setEditSellable(p.sellable);
     }
+    if (p) {
+      setMoves(await inventoryStore.listProductMoves(id));
+      const [from, into] = await Promise.all([
+        inventoryStore.listPreparations({ sourceId: id }).catch(() => [] as RemotePreparation[]),
+        inventoryStore.listPreparations({ targetId: id }).catch(() => [] as RemotePreparation[]),
+      ]);
+      setFromPreparations(from);
+      setIntoPreparations(into);
+    }
+    setReady(true);
   }, [id]);
 
   useEffect(() => {
@@ -100,24 +91,6 @@ export default function ProductoFichaPage() {
       <div className="flex flex-col gap-4">
         <SkeletonHero title="Producto" />
         <SkeletonRows />
-      </div>
-    );
-  }
-
-  if (loadError !== null) {
-    return (
-      <div className="flex flex-col">
-        <HeroBlock offline={offlineBand} size="medium" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Producto" />
-        <Sheet>
-          <ListErrorState
-            message={loadError}
-            online={typeof navigator === "undefined" || navigator.onLine}
-            onRetry={() => {
-              setReady(false);
-              void load();
-            }}
-          />
-        </Sheet>
       </div>
     );
   }
@@ -156,7 +129,7 @@ export default function ProductoFichaPage() {
                   setEditing(false);
                 })
                 .catch((e: unknown) => {
-                  setEditError(errorText(e, "No se pudo guardar."));
+                  setEditError(e instanceof Error ? e.message : "No se pudo guardar.");
                 })
                 .finally(() => setEditBusy(false));
             };
@@ -172,7 +145,7 @@ export default function ProductoFichaPage() {
                     setConfirmArchive(false);
                   })
                   .catch((e: unknown) => {
-                    setEditError(errorText(e, "No se pudo archivar."));
+                    setEditError(e instanceof Error ? e.message : "No se pudo archivar.");
                   })
                   .finally(() => setEditBusy(false));
               };

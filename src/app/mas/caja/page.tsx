@@ -1,6 +1,5 @@
 "use client";
 
-import { errorText } from "@/domain/ux/user-message";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { HeroAmount } from "@/components/ui/HeroAmount";
@@ -9,16 +8,13 @@ import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { SegmentedMetrics, type MetricItem } from "@/components/ui/SegmentedMetrics";
 import { QuickTiles } from "@/components/ui/QuickTiles";
-import { useAfterSync } from "@/components/shell/use-after-sync";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
-import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
+import { AmountField } from "@/components/ui/AmountField";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
-import { usePrefill } from "@/components/ui/use-prefill";
-import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { CASH_OFFLINE_NOCACHE, cashOfflineView, cashPageGate, kindLabel, moveSign, shortDay } from "@/components/cash/cash";
 import { useSync } from "@/store/syncStore";
 import { usePrep } from "@/store/prepStore";
@@ -42,8 +38,6 @@ export default function CajaPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const { online } = useSync();
   const { lastReadyAt } = usePrep();
-  usePrefill("monto", setOpeningRaw); // «Corregir» on a rejected caja open
-  const rejected = useRejectedCorrection();
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -51,7 +45,7 @@ export default function CajaPage() {
       const s = await cashStore.refresh();
       setSummary(s);
     } catch (e) {
-      setLoadError(errorText(e, "No se pudo cargar."));
+      setLoadError(e instanceof Error ? e.message : "No se pudo cargar.");
     } finally {
       setReady(true);
     }
@@ -60,10 +54,8 @@ export default function CajaPage() {
   useEffect(() => {
     void load();
   }, [load]);
-  useAfterSync(load);
 
   async function onAbrir() {
-    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (busy) return;
     setError(null);
     const err = validateOpeningFloat(openingRaw);
@@ -77,16 +69,14 @@ export default function CajaPage() {
       setToast(CASH_COPY.toastCajaAbierta);
       await load();
       setTimeout(() => setToast(null), 2000);
-      rejected.afterSave(() => undefined, 0);
     } catch (e) {
-      setError(errorText(e, "Error"));
+      setError(e instanceof Error ? e.message : "Error");
     } finally {
       setBusy(false);
     }
   }
 
-  // Offline, «Reintentar» cannot succeed: show it only when online again (D9).
-  const retryButton = !online ? undefined : (
+  const retryButton = (
     <button
       type="button"
       onClick={() => void load()}
@@ -107,23 +97,11 @@ export default function CajaPage() {
           size="medium"
           back={{ href: "/mas", label: "Volver a Más" }}
           title={CASH_COPY.titleCaja}
-          offline={null}
+          offline={online ? null : { text: "Sin conexión" }}
         />
         <Sheet>
           {gate === "offline" ? (
-            <StateBlock
-              kind="offline-miss"
-              title={CASH_OFFLINE_NOCACHE.title}
-              body={CASH_OFFLINE_NOCACHE.body}
-              action={
-                <OfflineLink
-                  href="/"
-                  className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
-                >
-                  {CASH_OFFLINE_NOCACHE.action}
-                </OfflineLink>
-              }
-            />
+            <StateBlock kind="offline-miss" title={CASH_OFFLINE_NOCACHE.title} body={CASH_OFFLINE_NOCACHE.body} action={retryButton} />
           ) : (
             <StateBlock kind="error" title="No se pudo cargar." body={loadError ?? undefined} action={retryButton} />
           )}
@@ -132,11 +110,7 @@ export default function CajaPage() {
     );
   }
 
-  // The global sync pill already says «Sin conexión»; the band says what the data is (D9).
-  const band =
-    offlineView === "offline-cache"
-      ? { text: lastReadyAt != null ? `Datos de este teléfono · actualizado ${new Date(lastReadyAt).toLocaleString("es-CO")}` : "Datos de este teléfono" }
-      : null;
+  const band = offlineView === "offline-cache" ? (lastReadyAt != null ? { capturedAt: lastReadyAt } : { text: "Sin conexión · datos de este teléfono" }) : null;
 
   if (!ready || !summary) {
     return (
@@ -209,7 +183,6 @@ export default function CajaPage() {
         </Sheet>
         <ActionBar aboveNav primary={{ label: CASH_COPY.abrirCaja, onClick: () => void onAbrir(), busy }} />
         <ActionToast text={toast} />
-        {rejected.dialog}
       </div>
     );
   }
@@ -279,7 +252,6 @@ export default function CajaPage() {
         </section>
       </Sheet>
       <ActionToast text={toast} />
-        {rejected.dialog}
     </div>
   );
 }

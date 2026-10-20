@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useMemo, useState } from "react";
 import { ApiError } from "@/data/errors";
 import { HttpRepository } from "@/data/http/repository";
 import { getPwaAuthSession } from "@/data/http/session";
@@ -17,25 +17,16 @@ export function StoreLoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const emailRef = useRef<HTMLInputElement>(null);
   const [memberships, setMemberships] = useState<
     Array<{ businessId: string; business: { name: string } }>
   >([]);
 
-  function fail(message: string) {
-    setError(message);
-    setBusy(false);
-    // Keep focus on the form (the submit button was disabled while loading).
-    requestAnimationFrame(() => emailRef.current?.focus());
-  }
-
-  async function onSubmit(e?: FormEvent) {
-    e?.preventDefault();
+  async function onSubmit() {
     if (busy) return;
     setError(null);
     const base = apiBaseUrl();
     if (!base) {
-      fail("El servidor no está configurado.");
+      setError("El servidor no está configurado.");
       return;
     }
     setBusy(true);
@@ -54,13 +45,14 @@ export function StoreLoginForm() {
       }
       router.replace("/");
     } catch (e) {
-      fail(
-        e instanceof ApiError && (e.status === 401 || e.code === "UNAUTHORIZED")
-          ? "Correo o contraseña incorrectos."
+      setError(
+        e instanceof ApiError
+          ? e.message
           : e instanceof Error
             ? e.message
             : "No pudimos entrar.",
       );
+      setBusy(false);
     }
   }
 
@@ -70,7 +62,7 @@ export function StoreLoginForm() {
   }
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={(e) => void onSubmit(e)} noValidate>
+    <div className="flex flex-col gap-4">
       <Card>
         <label className="text-sm font-medium" htmlFor="store-email">
           Correo
@@ -79,13 +71,7 @@ export function StoreLoginForm() {
           id="store-email"
           type="email"
           value={email}
-          ref={emailRef}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            setError(null);
-          }}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? "store-login-error" : undefined}
+          onChange={(e) => setEmail(e.target.value)}
           className="mt-2"
           autoComplete="email"
           autoFocus
@@ -97,20 +83,11 @@ export function StoreLoginForm() {
           id="store-password"
           type="password"
           value={password}
-          onChange={(e) => {
-            setPassword(e.target.value);
-            setError(null);
-          }}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? "store-login-error" : undefined}
+          onChange={(e) => setPassword(e.target.value)}
           className="mt-2"
           autoComplete="current-password"
         />
-        {error && (
-          <p id="store-login-error" role="alert" className="mt-2 text-sm text-danger">
-            {error}
-          </p>
-        )}
+        {error && <p className="mt-2 text-sm text-danger">{error}</p>}
       </Card>
 
       {memberships.length > 0 ? (
@@ -133,14 +110,15 @@ export function StoreLoginForm() {
         </Card>
       ) : (
         <Button
-          type="submit"
+          type="button"
           variant="primary"
           disabled={busy}
+          onClick={() => void onSubmit()}
           className="min-h-12 w-full"
         >
           {busy ? "Entrando…" : "Entrar a la tienda"}
         </Button>
       )}
-    </form>
+    </div>
   );
 }

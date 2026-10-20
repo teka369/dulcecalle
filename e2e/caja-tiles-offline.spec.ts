@@ -11,12 +11,6 @@ const ROUNDS = Number(process.env.TILE_ROUNDS ?? 12);
 test("offline Caja tiles never bounce back to /mas/caja (30+ taps)", async ({ context, page: prep }) => {
   test.setTimeout(600_000);
   const fake = await installFakeApi(context);
-  // DEV-ONLY nav diagnostics (src/data/pwa/nav-debug.ts); console.info only.
-  await context.addInitScript(() => localStorage.setItem("dc:navdebug", "1"));
-  const dbg: string[] = [];
-  prep.on("console", (m) => {
-    if (m.text().startsWith("[dc-nav]")) dbg.push(m.text());
-  });
   await prep.goto("/");
   await prep.waitForFunction(() => navigator.serviceWorker?.ready.then(() => true));
   await prep.reload();
@@ -31,36 +25,21 @@ test("offline Caja tiles never bounce back to /mas/caja (30+ taps)", async ({ co
   fake.offline = true;
   await context.setOffline(true);
 
-  // No raw CDP session here: attaching one (newCDPSession + Page.enable) makes
-  // Chromium drop Playwright's offline emulation on the next document load, so
-  // navigator.onLine read true and every "offline" tap ran the ONLINE path
-  // (Next RSC push -> failed fetch -> MPA fallback), with the offline guard never
-  // armed. Navigation requests are enough to explain a bounce.
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("Page.enable");
   const navs: string[] = [];
-  page.on("request", (r) => {
-    if (r.isNavigationRequest() && r.frame() === page.mainFrame()) navs.push(new URL(r.url()).pathname);
-  });
+  cdp.on("Page.frameRequestedNavigation", (e: { url: string; reason: string; disposition: string }) =>
+    navs.push(`${e.reason} ${new URL(e.url).pathname}`),
+  );
 
   const bounces: string[] = [];
   let taps = 0;
-  let onlineTaps = 0;
   for (let i = 0; i < ROUNDS; i++) {
     for (const [name, path, ready] of TILES) {
       await page.goto("/mas/caja");
-      // Readiness, not a longer timeout: this document is the offline /mas/caja
-      // (URL settled, device really offline) and the tiles are client-rendered
-      // (behind AuthGate + cashStore), so a visible tile means hydrated.
-      await expect(page).toHaveURL(/\/mas\/caja$/);
-      await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
-      await expect(page.locator("main").getByRole("link", { name, exact: true }))
-        .toBeVisible({ timeout: 15_000 })
-        .catch(async (e: unknown) => {
-          console.log(`NOTVISIBLE-LOG ${i} ${name} onLine=${await page.evaluate(() => navigator.onLine)} url=${page.url()}\n  body=${JSON.stringify((await page.locator("body").innerText()).slice(0, 300))}\n  ${dbg.join("\n  ")}`);
-          throw e;
-        });
+      await expect(page.locator("main").getByRole("link", { name, exact: true })).toBeVisible({ timeout: 15_000 });
       await page.waitForTimeout(i % 3 === 0 ? 0 : i % 3 === 1 ? 300 : 1200);
       navs.length = 0;
-      dbg.length = 0;
       // Every other tap, force the competing navigation seen in the field
       // (Next's hard-nav fallback / a reload of the current page) right after the tap.
       if (i % 2 === 1) {
@@ -72,8 +51,6 @@ test("offline Caja tiles never bounce back to /mas/caja (30+ taps)", async ({ co
           );
         }, i);
       }
-      const onLine = await page.evaluate(() => navigator.onLine);
-      if (onLine) onlineTaps++;
       await page.locator("main").getByRole("link", { name, exact: true }).click();
       taps++;
       const ok = await expect
@@ -82,14 +59,10 @@ test("offline Caja tiles never bounce back to /mas/caja (30+ taps)", async ({ co
         .then(() => true, () => false);
       await page.waitForTimeout(600);
       const final = new URL(page.url()).pathname;
-      if (process.env.DC_NAV_DUMP && taps <= 2) console.log(`TAP-LOG ${i} ${name}\n  ${dbg.join("\n  ")}`);
-      if (!ok || final !== path) {
-        bounces.push(`${i} ${name} onLine=${onLine} -> ${final} [${navs.join(" | ")}]`);
-        console.log(`BOUNCE-LOG ${i} ${name} -> ${final}\n  ${dbg.join("\n  ")}`);
-      }
+      if (!ok || final !== path) bounces.push(`${i} ${name} -> ${final} [${navs.join(" | ")}]`);
     }
   }
-  console.log(`tiles offline: taps=${taps} onLineTrueTaps=${onlineTaps} bounces=${bounces.length}`, bounces);
+  console.log(`tiles offline: taps=${taps} bounces=${bounces.length}`, bounces);
   expect(taps).toBeGreaterThanOrEqual(30);
   expect(bounces).toEqual([]);
 });

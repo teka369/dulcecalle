@@ -18,7 +18,7 @@ Error envelope:
 
 | HTTP | code | When |
 |------|------|------|
-| 400 | `VALIDATION` | DTO (incl. any COP amount > `MAX_COP_AMOUNT` = 100.000.000 — `backend/src/shared/money.ts`) |
+| 400 | `VALIDATION` | DTO |
 | 401 | `UNAUTHORIZED` | no/invalid token |
 | 403 | `FORBIDDEN` | no membership for this business, or role cannot do this action |
 | 404 | `NOT_FOUND` | member of this business, but this id is not here (also used for ids that belong to another tenant — do not leak) |

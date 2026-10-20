@@ -10,7 +10,6 @@
  */
 import { parseEntityHref } from "./entity-href";
 import { entityViewStore } from "@/store/entityViewStore";
-import { navDebug } from "./nav-debug";
 
 export function isOffline(): boolean {
   try {
@@ -47,10 +46,7 @@ function guardOfflineDocumentNav(target: string): void {
   guardInstalled = true;
   nav.addEventListener("navigate", (e) => {
     if (leavingTo == null || !e.cancelable) return;
-    if (e.destination.url !== leavingTo) {
-      navDebug("guard-blocked", { to: e.destination.url, leavingTo });
-      e.preventDefault();
-    }
+    if (e.destination.url !== leavingTo) e.preventDefault();
   });
   window.addEventListener?.("pageshow", () => {
     leavingTo = null;
@@ -64,7 +60,6 @@ export function offlineDocumentNavigate(href: string): void {
   } catch {
     /* no guard without a resolvable URL; the navigation itself still happens */
   }
-  navDebug("offline-assign", { from: window.location.pathname, to: href });
   window.location.assign(href);
 }
 

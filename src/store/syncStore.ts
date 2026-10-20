@@ -8,7 +8,7 @@ import {
   readLastCompletedSync,
   writeLastCompletedSync,
 } from "@/data/pwa/last-completed-sync";
-import { SYNC_COMPLETE_EVENT, syncAllPendingAsLeader } from "@/data/pwa/sync-coordinator";
+import { syncAllPending } from "@/data/pwa/sync-coordinator";
 
 export type SyncCounts = {
   pending: number;
@@ -232,13 +232,6 @@ function onOffline() {
   activeFlushes = 0;
 }
 
-/** The leader (this tab or another) finished: no cycle can still be running. */
-function onSyncComplete() {
-  activeFlushes = 0;
-  setState({ flushing: null });
-  void refreshCounts();
-}
-
 function onFocus() {
   void refreshCounts();
 }
@@ -257,7 +250,6 @@ function ensureListening() {
   window.addEventListener("offline", onOffline);
   window.addEventListener("dulcecalle:sync", onSyncEvent);
   window.addEventListener("focus", onFocus);
-  window.addEventListener(SYNC_COMPLETE_EVENT, onSyncComplete);
   void refreshCounts();
 }
 
@@ -296,7 +288,7 @@ export const syncStore = {
     const id = businessId();
     if (!id || !state.online) return;
     setState({ authRequired: false });
-    await syncAllPendingAsLeader(id);
+    await syncAllPending(id);
   },
 };
 

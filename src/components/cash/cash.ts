@@ -128,10 +128,8 @@ export function cashOfflineView(input: {
 }
 
 export const CASH_OFFLINE_NOCACHE = {
-  // The global pill already says «Sin conexión»; this state does not repeat it (D9).
-  title: "Caja todavía se está guardando",
-  body: "Estará lista para usar sin internet cuando vuelva la conexión.",
-  action: "Volver a Inicio",
+  title: "Sin conexión",
+  body: "No hay datos de caja guardados en este teléfono. Conéctate para ver o abrir la caja de hoy.",
 };
 export const GASTOS_OFFLINE_NOCACHE = {
   title: "Sin conexión",

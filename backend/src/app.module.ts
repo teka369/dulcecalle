@@ -1,7 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
-import { PagingHeadersInterceptor } from "./shared/http/paging-headers.interceptor";
+import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -14,7 +13,6 @@ import { CashModule } from "./cash/cash.module";
 import { StatsModule } from "./stats/stats.module";
 import { CustomerAccessModule } from "./customer-access/customer-access.module";
 import { HealthController } from "./health/health.controller";
-import { DiagController } from "./diag/diag.controller";
 import { JwtAuthGuard } from "./identity/jwt.guard";
 import { BusinessGuard } from "./tenancy/business.guard";
 import { RolesGuard } from "./tenancy/roles.guard";
@@ -47,9 +45,8 @@ import { requireJwtSecrets } from "./identity/jwt-secrets";
     StatsModule,
     CustomerAccessModule,
   ],
-  controllers: [HealthController, DiagController],
+  controllers: [HealthController],
   providers: [
-    { provide: APP_INTERCEPTOR, useClass: PagingHeadersInterceptor },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: BusinessGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

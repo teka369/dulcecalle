@@ -210,8 +210,8 @@ export function InicioDashboard({
             {formatCop(days ? weekTotal(days) : snap.todaySalesTotal)}
           </p>
         </div>
-        <div className="-mb-2 mt-0 flex items-center justify-end gap-3">
-          <Link href="/mas/estadisticas" className="inline-flex min-h-11 items-center text-xs font-semibold underline underline-offset-2">
+        <div className="mt-2 flex items-center justify-end gap-3">
+          <Link href="/mas/estadisticas" className="text-xs font-semibold underline underline-offset-2">
             Ver estadísticas
           </Link>
         </div>

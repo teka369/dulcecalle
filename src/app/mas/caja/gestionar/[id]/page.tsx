@@ -1,6 +1,5 @@
 "use client";
 
-import { errorText } from "@/domain/ux/user-message";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
@@ -8,7 +7,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
-import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
+import { AmountField } from "@/components/ui/AmountField";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
@@ -62,25 +61,23 @@ export default function GestionarCajaDetailPage() {
         // B9: prefill the counted field with the expected cash (user can edit it).
         setCounted((prev) => (prev === "" && Number.isFinite(d.expectedEfectivo) ? String(Math.max(0, Math.round(d.expectedEfectivo))) : prev));
       })
-      .catch((e: unknown) => setLoadError(errorText(e, "No se pudo cargar.")));
+      .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : "No se pudo cargar."));
   }
 
   async function closeCounted() {
-    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     setBusy(true);
     setError(null);
     try {
       await getPwaApi().cash.close(params.id, Number(counted));
       router.push("/mas/caja/gestionar");
     } catch (e) {
-      setError(errorText(e, "No se pudo cerrar."));
+      setError(e instanceof Error ? e.message : "No se pudo cerrar.");
     } finally {
       setBusy(false);
     }
   }
 
   async function carry(mode: "counted" | "assumed") {
-    if (mode === "counted" && amountInputInvalid()) return; // never send a rejected amount
     const countedEfectivo = carryCountedEfectivo(mode, counted);
     if (countedEfectivo === null) {
       setError("Escribe cuánto efectivo había.");
@@ -92,7 +89,7 @@ export default function GestionarCajaDetailPage() {
       await carryCashWithOfflineFallback(params.id, { mode, countedEfectivo });
       router.push("/mas/caja");
     } catch (e) {
-      setError(errorText(e, "No se pudo pasar el saldo."));
+      setError(e instanceof Error ? e.message : "No se pudo pasar el saldo.");
     } finally {
       setBusy(false);
     }
