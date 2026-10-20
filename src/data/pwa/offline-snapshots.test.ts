@@ -8,6 +8,7 @@ import { resetCatalogReadCache } from "@/data/local/read-cache";
 import { getPwaAuthSession } from "@/data/http/session";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import {
+  loadDashboardForScreen,
   loadDashboardWithOfflineFallback,
   loadStatsWithOfflineFallback,
 } from "./offline-snapshots";
@@ -85,6 +86,26 @@ describe("offline snapshots", () => {
     const err = new ApiError("INTERNAL", "Falla.", 500);
     api.dashboardResult.mockRejectedValue(err);
     await expect(loadDashboardWithOfflineFallback()).rejects.toBe(err);
+  });
+
+  it("Inicio screen: 5xx with a saved snapshot serves it as cache (band)", async () => {
+    api.dashboardResult.mockResolvedValue(snap(7));
+    const first = await loadDashboardForScreen();
+    api.dashboardResult.mockRejectedValue(new ApiError("INTERNAL", "Falla.", 503));
+    const cached = await loadDashboardForScreen();
+    expect(cached.source).toBe("cache");
+    expect(cached.capturedAt).toBe(first.capturedAt);
+  });
+
+  it("Inicio screen: 5xx with no snapshot keeps the server error; 4xx always rethrown", async () => {
+    const err = new ApiError("INTERNAL", "Falla.", 503);
+    api.dashboardResult.mockRejectedValue(err);
+    await expect(loadDashboardForScreen()).rejects.toBe(err);
+    api.dashboardResult.mockResolvedValue(snap(1));
+    await loadDashboardForScreen();
+    const forbidden = new ApiError("FORBIDDEN", "No.", 403);
+    api.dashboardResult.mockRejectedValue(forbidden);
+    await expect(loadDashboardForScreen()).rejects.toBe(forbidden);
   });
 
   it("never replaces a complete snapshot with a partial one", async () => {

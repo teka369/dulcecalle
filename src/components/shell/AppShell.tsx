@@ -5,12 +5,15 @@ import { BottomNav } from "./BottomNav";
 import { Fab } from "./Fab";
 import { AuthGate } from "./AuthGate";
 import { EntityViewHost } from "./EntityViewHost";
+import { useEntityView } from "@/store/entityViewStore";
 import { shellHidesChrome, shellHidesFab } from "./shell-chrome";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const hideChrome = shellHidesChrome(pathname);
   const hideFab = shellHidesFab(pathname);
+  // A ficha overlay owns the screen: the list underneath is hidden, not just covered.
+  const overlayOpen = useEntityView().stack.length > 0;
 
   // Floating pill + circular action + sync pill above them, plus the home-indicator inset.
   const mainPad = hideChrome
@@ -20,8 +23,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col overflow-x-hidden bg-bg text-ink">
       <AuthGate>
-      <main className={`flex-1 px-4 ${mainPad}`}>
-        {children}
+      <main className={`flex-1 px-4 ${mainPad}`} hidden={overlayOpen} aria-hidden={overlayOpen || undefined}>
+        {/* One h1 on screen: the page underneath is not rendered while a ficha overlay owns it. */}
+        {overlayOpen ? null : children}
       </main>
       <EntityViewHost />
       {!hideChrome && (

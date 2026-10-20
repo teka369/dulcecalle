@@ -8,6 +8,7 @@ import {
   NetworkOnly,
   Serwist,
 } from "serwist";
+import { DOCUMENTS_MAX_ENTRIES, isBusinessApiRequest, swNavigationRoute } from "@/data/pwa/sw-routing";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -28,8 +29,9 @@ declare const self: ServiceWorkerGlobalScope;
  */
 const runtimeCaching = [
   {
-    matcher: ({ sameOrigin, url }: { sameOrigin: boolean; url: URL }) =>
-      sameOrigin && url.pathname.startsWith("/api/"),
+    // Business API (same-origin /api/ and the Nest /v1/ on its own origin):
+    // never cached, so offline reads fail and fall back to Dexie (B5).
+    matcher: ({ sameOrigin, url }: { sameOrigin: boolean; url: URL }) => isBusinessApiRequest(url, sameOrigin),
     handler: new NetworkOnly(),
   },
   {
@@ -48,26 +50,38 @@ const runtimeCaching = [
     }),
   },
   {
-    // Offline document navigation: NetworkFirst into "documents" so an
-    // offline reload boots a prepared static screen. Entity fichas are not
-    // cached here; a cold load of /inventario/[id] (and the other entity
-    // URLs) falls through to /offline. Must register before ...defaultCache.
-    matcher: ({ request, url }: { request: Request; url: URL }) => {
-      if (request.mode !== "navigate") return false;
-      const p = url.pathname;
-      return !(
-        p.startsWith("/api/") ||
-        p.startsWith("/_next/") ||
-        p === "/offline" ||
-        p === "/sw.js"
-      );
+    // Entity URLs (fichas, actions, /mas/caja/gestionar/[id]): network only,
+    // never cached, so visiting fichas cannot evict PREP's static docs.
+    // Offline + miss: serve the parent list document PREP stored (the URL
+    // stays; the shell reopens the ficha from IndexedDB). Otherwise /offline.
+    matcher: ({ request, url }: { request: Request; url: URL }) =>
+      request.mode === "navigate" && swNavigationRoute(url.pathname).kind === "entity",
+    handler: async ({ request, url }: { request: Request; url: URL }): Promise<Response> => {
+      try {
+        return await fetch(request);
+      } catch {
+        const route = swNavigationRoute(url.pathname);
+        if (route.kind === "entity" && route.fallback) {
+          const doc = await (await caches.open("documents")).match(route.fallback);
+          if (doc) return doc;
+        }
+        return (await serwist.matchPrecache("/offline")) ?? Response.error();
+      }
     },
+  },
+  {
+    // Offline document navigation: NetworkFirst into "documents" so an
+    // offline reload boots a prepared static screen. Must register before
+    // ...defaultCache.
+    matcher: ({ request, url }: { request: Request; url: URL }) =>
+      request.mode === "navigate" && swNavigationRoute(url.pathname).kind === "document",
     handler: new NetworkFirst({
       cacheName: "documents",
       plugins: [
         new CacheableResponsePlugin({ statuses: [200] }),
-        // Small PWA: a couple of dozen documents, one week max.
-        new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 7 * 24 * 60 * 60 }),
+        // Static screens only (entities never land here); bound above the
+        // number of static pages so PREP's documents are not evicted.
+        new ExpirationPlugin({ maxEntries: DOCUMENTS_MAX_ENTRIES, maxAgeSeconds: 7 * 24 * 60 * 60 }),
       ],
     }),
   },

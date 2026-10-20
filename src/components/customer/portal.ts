@@ -1,6 +1,26 @@
 /** Pure view helpers for the customer portal (/cliente/*). Read-only; no writes exist here. */
 import type { CustomerLedger } from "@/data/http/customer-api";
 import type { CustomerStatementRow } from "@/data/pwa/customer-portal";
+import { ApiError } from "@/data/errors";
+
+export const PORTAL_OFFLINE_MESSAGE = "Sin conexión.";
+export const PORTAL_LOAD_FAILED_MESSAGE = "No se pudo cargar";
+
+/**
+ * "Sin conexión." only when the device really is offline. With network up,
+ * a failing API (transport error, timeout or 5xx) reads "No se pudo cargar".
+ */
+export function portalErrorMessage(error: unknown, online: boolean): string {
+  if (!online) return PORTAL_OFFLINE_MESSAGE;
+  // A contractual 4xx keeps its message (e.g. session expired); transport
+  // failures, timeouts and 5xx are "the server failed", not "no network".
+  if (error instanceof ApiError && error.status < 500 && error.message) return error.message;
+  return PORTAL_LOAD_FAILED_MESSAGE;
+}
+
+export function browserOnline(): boolean {
+  return typeof navigator === "undefined" ? true : navigator.onLine !== false;
+}
 
 /**
  * Defence in depth: only render a ledger that belongs to the signed-in customer.

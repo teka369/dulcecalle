@@ -75,3 +75,7 @@ backend/test/*.so
 **/dulcecalle-snapshot-*.json
 
 
+
+# Playwright
+/test-results/
+/playwright-report/

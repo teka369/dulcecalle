@@ -134,16 +134,21 @@ export function ThemeSelector() {
             aria-label="Modo oscuro"
             disabled={modeDisabled}
             onClick={() => void onMode(dark ? "light" : "dark")}
-            className={`relative flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors disabled:opacity-50 ${
-              dark ? "border-cta bg-cta" : "border-border bg-surface-2"
-            }`}
+            // 44px+ touch target around the 28px visual track.
+            className="relative flex h-11 min-h-11 w-14 min-w-11 shrink-0 items-center justify-center disabled:opacity-50"
           >
             <span
-              className={`absolute h-5 w-5 rounded-full bg-surface shadow-[var(--shadow-sm)] transition-transform ${
-                dark ? "translate-x-6" : "translate-x-1"
-              }`}
               aria-hidden
-            />
+              className={`relative flex h-7 w-12 items-center rounded-full border transition-colors ${
+                dark ? "border-cta bg-cta" : "border-border bg-surface-2"
+              }`}
+            >
+              <span
+                className={`absolute h-5 w-5 rounded-full bg-surface shadow-[var(--shadow-sm)] transition-transform ${
+                  dark ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </span>
           </button>
         </div>
         <div className="mt-3 flex gap-2">

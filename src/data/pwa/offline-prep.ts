@@ -9,6 +9,7 @@
  *   cache), so an offline reload boots where the user was;
  * - catalogs: the admin read-cache snapshots offline writes depend on.
  */
+import { getPrepPwaApi } from "./api";
 import { NetworkError } from "../errors";
 import { getLocalDb } from "../local/db";
 import type { PrepReadiness, PrepTaskRecord, PrepTaskStatus } from "../local/types";
@@ -89,6 +90,9 @@ export function prepTaskDefs(): PrepTaskDef[] {
     { path: "/mas/caja/aporte", label: "Documento Aporte" },
     { path: "/mas/caja/retiro", label: "Documento Retiro" },
     { path: "/mas/caja/cerrar", label: "Documento Cerrar caja" },
+    // Server-only screen: offline it shows "Necesitas internet…". Also the
+    // parent document for a cold offline load of /mas/caja/gestionar/[id].
+    { path: "/mas/caja/gestionar", label: "Documento Gestionar cajas" },
     { path: "/mas/estadisticas", label: "Documento Estadísticas" },
     { path: "/mas/apariencia", label: "Documento Apariencia" },
     // The supplier list is a segment of /inventario. There is no
@@ -108,7 +112,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
       group: "catalogos" as const,
       label: "Catálogo de productos",
       run: async () => {
-        await listCachedProducts();
+        await listCachedProducts(getPrepPwaApi());
       },
     },
     {
@@ -116,7 +120,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
       group: "catalogos" as const,
       label: "Catálogo de clientes",
       run: async () => {
-        await listCachedCustomers();
+        await listCachedCustomers(getPrepPwaApi());
       },
     },
     {
@@ -124,7 +128,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
       group: "catalogos" as const,
       label: "Catálogo de proveedores",
       run: async () => {
-        await listCachedSuppliers();
+        await listCachedSuppliers(getPrepPwaApi());
       },
     },
     {
@@ -132,7 +136,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
       group: "resumen" as const,
       label: "Resumen del inicio",
       run: async () => {
-        await loadDashboardWithOfflineFallback();
+        await loadDashboardWithOfflineFallback(getPrepPwaApi());
       },
     },
     ...(["hoy", "semana", "mes"] as const).map((period) => ({
@@ -140,7 +144,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
       group: "resumen" as const,
       label: `Estadísticas ${period}`,
       run: async () => {
-        await loadStatsWithOfflineFallback(period);
+        await loadStatsWithOfflineFallback(period, getPrepPwaApi());
       },
     })),
   ];
@@ -203,8 +207,10 @@ export function requiredSnapshotKinds(): string[] {
 
 /**
  * Dynamic entity documents are not part of preparation. Fichas open from
- * the already-loaded shell and IndexedDB. A cold load of /inventario/[id]
- * (and the other entity URLs) stays on the service worker /offline fallback.
+ * the already-loaded shell and IndexedDB; a cold offline load of an entity
+ * URL is served its parent list document (/clientes, /inventario, /ventas,
+ * /mas/caja/gestionar), which is in this list. Adding a document here makes
+ * checkReadiness report existing devices as "stale" so they re-prepare.
  */
 export function requiredStaticDocuments(): string[] {
   return prepTaskDefs()
@@ -391,11 +397,48 @@ export function runPreparation(
   return task;
 }
 
+/** How long first-install prep waits for the service worker to take control. */
+export const SW_CONTROL_WAIT_MS = 20_000;
+
+/**
+ * B6: on a first install the SW registers, activates and claims the page a
+ * few seconds after load. Prep must not start its document tasks before the
+ * page is controlled (they would all fail with "Service Worker aún no
+ * activo"). Waits for navigator.serviceWorker.ready, then for a controller
+ * (clientsClaim → controllerchange), bounded by `timeoutMs`. Resolves
+ * whether or not control arrived; the doc tasks still report honestly.
+ */
+export async function waitForServiceWorkerControl(timeoutMs = SW_CONTROL_WAIT_MS): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  const sw = (window as unknown as { navigator?: Navigator }).navigator?.serviceWorker;
+  if (!sw) return false;
+  if (sw.controller) return true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<false>((resolve) => {
+    timer = setTimeout(() => resolve(false), timeoutMs);
+  });
+  const controlled = (async () => {
+    if (sw.ready) await sw.ready;
+    if (sw.controller) return true;
+    await new Promise<void>((resolve) => {
+      if (typeof sw.addEventListener !== "function") return;
+      sw.addEventListener("controllerchange", () => resolve(), { once: true });
+    });
+    return true;
+  })();
+  try {
+    return await Promise.race([controlled, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function runPreparationInternal(
   businessId: string,
   onProgress?: (progress: PrepProgress) => void,
   refresh = false,
 ): Promise<PrepReadiness> {
+  await waitForServiceWorkerControl();
   const db = getLocalDb();
   const { defs, details } = await buildPrepTaskDefs(businessId);
   const records: PrepTaskRecord[] = [];

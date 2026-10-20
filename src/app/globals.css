@@ -358,3 +358,8 @@ html[data-actionbar="nav"] .prep-tab {
 nav[aria-label="Navegación principal"] :focus-visible {
   outline-color: var(--nav-active-bg);
 }
+
+/* Cold offline ficha load: the list document hides until the ficha opens (no list flash). */
+html[data-dc-boot-entity] main {
+  visibility: hidden;
+}

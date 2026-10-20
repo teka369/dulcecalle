@@ -8,6 +8,7 @@ import { addCop } from "@/domain/money";
 import { bogotaHour } from "@/domain/dashboard/week";
 import { isNetworkError } from "../errors";
 import { getPwaApi } from "./api";
+import type { HttpRepository } from "../http/repository";
 
 function todayKey(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -58,12 +59,11 @@ export async function loadHttpDashboard(): Promise<DashboardSnapshot> {
  * whole dashboard; `networkFailure` tells whether the cause was transport
  * (safe to fall back to a previous snapshot) or a real server error.
  */
-export async function loadDashboardResult(): Promise<{
+export async function loadDashboardResult(api: HttpRepository = getPwaApi()): Promise<{
   snapshot: DashboardSnapshot;
   complete: boolean;
   networkFailure: boolean;
 }> {
-  const api = getPwaApi();
   const today = todayKey();
   let complete = true;
   let networkFailure = false;

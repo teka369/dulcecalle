@@ -17,7 +17,9 @@ import { PendingBadge } from "@/components/ui/StatusBadge";
 import { formatCop } from "@/domain/money";
 import type { RemoteCustomer } from "@/data/http/mappers";
 import { listCachedCustomers } from "@/data/pwa/catalog";
-import { listSalesWithOfflineFallback, type LocalSaleRow } from "@/data/pwa/offline-sales";
+import { listSalesForScreen, type LocalSaleRow } from "@/data/pwa/offline-sales";
+import { LIST_STALE_TEXT } from "@/data/pwa/list-status";
+import { ventasErrorMessage, ventasHero } from "@/components/sale/sales-list";
 import { summarizeSales } from "@/components/sale/checkout";
 import { bogotaKey, dayHeading, groupByDay, saleTime, ventasSheetState } from "@/components/sale/sales-list";
 
@@ -46,19 +48,21 @@ export default function VentasPage() {
   const [sales, setSales] = useState<LocalSaleRow[]>([]);
   const [customers, setCustomers] = useState<RemoteCustomer[]>([]);
   const [fromCache, setFromCache] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [filter, setFilter] = useState<FilterKind>("all");
 
   function load() {
     setError(null);
-    void listSalesWithOfflineFallback()
+    void listSalesForScreen()
       .then((result) => {
         setSales(result.sales);
         setFromCache(result.source === "cache");
+        setFailed(result.failed);
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "No se pudo cargar.");
+        setError(ventasErrorMessage(e, typeof navigator === "undefined" || navigator.onLine !== false));
       })
       .finally(() => setReady(true));
   }
@@ -84,6 +88,7 @@ export default function VentasPage() {
   );
   const totals = useMemo(() => summarizeSales(filtered), [filtered]);
   const groups = useMemo(() => groupByDay(filtered), [filtered]);
+  const hero = ventasHero({ ready, fromCache, salesCount: sales.length, error });
   const sheet = ventasSheetState({ ready, error, salesCount: sales.length, filteredCount: filtered.length });
 
   return (
@@ -91,20 +96,32 @@ export default function VentasPage() {
       <HeroBlock
         title="Ventas"
         action={<HeroPill href="/ventas/nueva" label="Nueva venta" />}
-        offline={fromCache ? { text: "Sin conexión · mostrando ventas guardadas en este dispositivo." } : null}
+        offline={
+          fromCache
+            ? { text: failed ? LIST_STALE_TEXT : "Sin conexión · mostrando ventas guardadas en este dispositivo." }
+            : null
+        }
         busy={!ready}
       >
-        {error && sales.length === 0 ? null : (
+        {hero === "none" ? null : hero === "local" ? (
+          <p className="mt-6 text-sm text-on-hero-muted" data-testid="ventas-local-note">
+            {sales.length} {sales.length === 1 ? "venta guardada" : "ventas guardadas"} en este teléfono. Puede que falten
+            ventas: el total aparece al actualizar.
+          </p>
+        ) : (
           <>
             <HeroAmount
               className="mt-6"
               label="Total listado"
+              loading={hero === "skeleton"}
               value={formatCop(totals.ventas)}
               caption={`${totals.count} ${totals.count === 1 ? "venta" : "ventas"}`}
             />
+            {ready ? (
             <p className="mt-2 text-sm tabular-nums text-on-hero-muted">
               Recibido {formatCop(totals.recibido)} · Fiado {formatCop(totals.fiado)}
             </p>
+            ) : null}
           </>
         )}
         <div className="mt-5">

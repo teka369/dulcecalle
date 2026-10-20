@@ -100,3 +100,17 @@ describe("color mode system", () => {
     expect(localStorage.getItem("dulcecalle.mode")).toBe("dark");
   });
 });
+
+import { effectiveMode as _effectiveMode, PALETTE_META as _META, PALETTE_IDS as _IDS } from "./palettes";
+import { describe as _describe, expect as _expect, it as _it } from "vitest";
+
+_describe("B10: fixed palettes report the scheme they render", () => {
+  _it("closed palettes ignore a saved dark mode; open palettes keep it", () => {
+    _expect(_effectiveMode("menta", "dark")).toBe("light");
+    _expect(_effectiveMode("mora", "dark")).toBe("light");
+    _expect(_effectiveMode("contraste", "dark")).toBe("light");
+    _expect(_effectiveMode("cacao", "light")).toBe("dark");
+    _expect(_effectiveMode("amber", "dark")).toBe("dark");
+    for (const id of _IDS) if (_META[id].closed) _expect(_META[id].scheme, id).toBeDefined();
+  });
+});

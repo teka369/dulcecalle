@@ -132,15 +132,24 @@ describe("M6.3 catalog read cache", () => {
     ).rejects.toBe(forbidden);
   });
 
-  it("8. 5xx does not fall back to cache — server answered, it is still the authority", async () => {
+  it("8. B3: a list 5xx serves the cached rows labeled as cache (never a false empty); without cache it rethrows", async () => {
     const c = cache();
-    await c.listProducts(BIZ_A, async () => [product()]);
-    const boom = new ApiError("INTERNAL", "Algo salió mal.", 500);
+    const boom = new ApiError("INTERNAL", "Algo salió mal.", 503);
     await expect(
       c.listProducts(BIZ_A, async () => {
         throw boom;
       }),
     ).rejects.toBe(boom);
+    await c.listProducts(BIZ_A, async () => [product()]);
+    const result = await c.listProducts(BIZ_A, async () => {
+      throw boom;
+    });
+    expect(result.source).toBe("cache");
+    expect(result.data.map((p) => p.id)).toEqual([PID_A]);
+    const customers = c.listCustomers(BIZ_A, async () => {
+      throw boom;
+    });
+    await expect(customers).rejects.toBe(boom);
   });
 
   it("9-10. Business B cannot read Business A cache; ids do not mix", async () => {

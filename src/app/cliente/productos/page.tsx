@@ -6,6 +6,7 @@ import { CustomerChrome, PortalError, PortalLoading } from "@/components/custome
 import { ProductImageView } from "@/components/product/ProductImageView";
 import type { CustomerCatalogProduct } from "@/data/http/customer-api";
 import { loadCachedCustomerCatalog } from "@/data/pwa/customer-catalog-cache";
+import { browserOnline, portalErrorMessage } from "@/components/customer/portal";
 import { formatCop } from "@/domain/money";
 import { Badge } from "@/components/ui/Badge";
 import { StateBlock } from "@/components/ui/StateBlock";
@@ -25,7 +26,7 @@ export default function CustomerProductsPage() {
         setFromCache(result.source === "cache");
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "No se pudo cargar.");
+        setError(portalErrorMessage(e, browserOnline()));
       });
   }
 

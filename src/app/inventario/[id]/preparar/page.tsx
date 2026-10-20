@@ -1,5 +1,6 @@
 "use client";
 
+import { useOfflineBand } from "@/components/shell/use-online";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -22,6 +23,7 @@ import { inventoryStore, useInventory } from "@/store/inventoryStore";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 
 export default function PrepararPage() {
+  const offlineBand = useOfflineBand();
   const router = useRouter();
   const sourceId = useEntityId();
   const { products } = useInventory();
@@ -63,7 +65,7 @@ export default function PrepararPage() {
 
   if (!sourceId) {
     return (
-      <HeroBlock size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Preparar">
+      <HeroBlock offline={offlineBand} size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Preparar">
         <StateBlock onHero kind="empty" title="No encontramos ese producto." />
       </HeroBlock>
     );
@@ -109,7 +111,7 @@ export default function PrepararPage() {
 
   if (sellable) {
     return (
-      <HeroBlock size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al producto", entity: true }} title="Preparar">
+      <HeroBlock offline={offlineBand} size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al producto", entity: true }} title="Preparar">
         <StateBlock
           onHero
           kind="empty"
@@ -122,7 +124,7 @@ export default function PrepararPage() {
 
   if (loaded && !source) {
     return (
-      <HeroBlock size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Preparar">
+      <HeroBlock offline={offlineBand} size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Preparar">
         <StateBlock onHero kind="empty" title="No encontramos ese producto." />
       </HeroBlock>
     );
@@ -132,7 +134,7 @@ export default function PrepararPage() {
     const target = products.find((p) => p.id === done);
     return (
       <div className={`flex flex-col ${ACTION_BAR_SPACE}`}>
-        <HeroBlock size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al combo", entity: true }} title="Preparación lista">
+        <HeroBlock offline={offlineBand} size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al combo", entity: true }} title="Preparación lista">
           <p className="mt-2 text-sm text-on-hero-muted">
             {qtyRaw} uds de {target?.name ?? "producto"} ya son stock vendible.
           </p>
@@ -157,7 +159,7 @@ export default function PrepararPage() {
 
   return (
     <div className="flex flex-col pb-[calc(var(--actionbar-h)+var(--nav-h)+1.5rem)]">
-      <HeroBlock size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al combo", entity: true }} title="Preparar">
+      <HeroBlock offline={offlineBand} size="compact" back={{ href: `/inventario/${sourceId}`, label: "Volver al combo", entity: true }} title="Preparar">
         {source ? (
           <div className="mt-3 flex items-center gap-3">
             <ProductThumbnail secureUrl={primaryImageUrl(source.images)} alt={source.name} size="sm" decorative />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CustomerChrome, PortalError, PortalLoading } from "@/components/customer/CustomerChrome";
 import { ProductImageView } from "@/components/product/ProductImageView";
 import type { CustomerCatalogProduct } from "@/data/http/customer-api";
@@ -13,6 +13,7 @@ import { routeId } from "@/data/pwa/ids";
 import { formatCop } from "@/domain/money";
 import { Badge } from "@/components/ui/Badge";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { browserOnline, portalErrorMessage } from "@/components/customer/portal";
 
 export default function CustomerProductDetailPage() {
   const params = useParams();
@@ -25,12 +26,13 @@ export default function CustomerProductDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!id) {
       setMissing(true);
       setLoading(false);
       return;
     }
+    setError(null);
     setLoading(true);
     void loadCachedCustomerCatalog()
       .then((result) => {
@@ -41,17 +43,21 @@ export default function CustomerProductDetailPage() {
         setFromCache(result.source === "cache");
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "No se pudo cargar.");
+        setError(portalErrorMessage(e, browserOnline()));
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const BACK = { href: "/cliente/productos", label: "Volver a Productos" };
 
   if (error) {
     return (
       <CustomerChrome title="Producto" back={BACK}>
-        <PortalError message={error} />
+        <PortalError message={error} onRetry={load} />
       </CustomerChrome>
     );
   }
