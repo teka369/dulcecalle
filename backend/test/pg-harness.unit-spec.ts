@@ -14,13 +14,16 @@ import { startLocalPostgres } from "./pg-harness";
 jest.setTimeout(90_000);
 
 test("a taken port is never used: the harness starts its own postgres elsewhere and leaves the other data dir alone", async () => {
-  const taken = 55432 + 7;
+  // Port 0: the OS picks a free port, so this test never collides with a
+  // parallel run (a fixed 55439 hit EADDRINUSE).
   const squatter = net.createServer((s) => s.on("data", () => undefined)); // accepts, never speaks postgres
-  await new Promise<void>((r) => squatter.listen(taken, "127.0.0.1", () => r()));
+  await new Promise<void>((r) => squatter.listen(0, "127.0.0.1", () => r()));
+  const taken = (squatter.address() as net.AddressInfo).port;
   const foreignDir = `/tmp/dc-pg-${taken}`;
   fs.mkdirSync(foreignDir, { recursive: true });
   fs.writeFileSync(`${foreignDir}/OTHER_CLUSTER`, "x");
-  const spy = jest.spyOn(Math, "random").mockReturnValue(7 / 400);
+  const spy = // The old harness mapped Math.random() to `55432 + random*400`: point it at the taken port.
+  jest.spyOn(Math, "random").mockReturnValue((taken - 55432) / 400);
   let handle: Awaited<ReturnType<typeof startLocalPostgres>> | null = null;
   try {
     handle = await startLocalPostgres();
