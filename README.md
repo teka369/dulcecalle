@@ -10,16 +10,16 @@ PWA de ventas para dulcería de barrio (Next.js App Router + NestJS).
 - NestJS 11 + Prisma 6 + PostgreSQL 16 — **fuente de verdad del negocio** (Render: `dulcecalle-teka369`)
 - Dexie repositories — **solo tests de dominio** (IDs numéricos). La UI no los usa.
 - Capas UI: pages → store → `HttpRepository` → `/v1`
-- M6.1: Local Store UUID + Outbox en `src/data/local` (`dulcecalle-local`). **No cableado a la UI.**
+- M6.1: Local Store UUID + Outbox en `src/data/local` (`dulcecalle-local`). Cableado a la UI: es la copia local y la cola de envíos offline.
 - M6.2: sesión local sobrevive `NetworkError` (login inicial sigue online). Contrato: [M6.md](M6.md).
 - M6.3: cache de lectura del catálogo (productos/clientes/proveedores) en `dulcecalle-local`. PostgreSQL sigue siendo la autoridad.
-- M6.4: monitor de conectividad + motor genérico de flush del outbox, con dependencias, reintentos y recuperación de `in_flight`. Las escrituras offline de negocio empiezan en M6.5+.
+- M6.4: monitor de conectividad + motor genérico de flush del outbox, con dependencias, reintentos y recuperación de `in_flight`. Desde M6.5 las escrituras de negocio funcionan offline (ver «Offline / PWA»).
 
 Hay que entrar con cuenta. El servidor arranca vacío: productos, clientes y fiados se cargan a mano. Un fiado viejo es **deuda anterior**, nunca una venta.
 
 El dominio congelado está en [DOMAIN.md](DOMAIN.md). Servidor: [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [API_CONTRACT.md](API_CONTRACT.md) · [MIGRATION.md](MIGRATION.md) · [IDENTITY.md](IDENTITY.md) · [M6.md](M6.md).
 
-M3: la PWA habla HTTP (UUID). No hay dual-write, sync ni import Dexie→PG. `pwaStorage()` es `"http"`.
+M3: la PWA habla HTTP (UUID) con el backend Nest + PostgreSQL. Con conexión, cada escritura va directo al servidor; sin conexión se guarda en el outbox local y se envía al volver la conexión. No hay import Dexie→PG. `pwaStorage()` es `"http"`.
 
 - Dev: `NEXT_PUBLIC_API_URL` opcional; si falta, el cliente usa `/v1` (el PWA reescribe a Nest).
 - Producción: si falta `NEXT_PUBLIC_API_URL`, el cliente usa `https://dulcecalle-teka369.onrender.com/v1`.
@@ -135,14 +135,13 @@ Fuente de cálculo:
 
 No se guardan tres valores independientes inconsistentes.
 
-### Datos locales y demo
+### Datos: servidor + copia en este teléfono
 
-Todo vive en IndexedDB de **este dispositivo**.
+La fuente de verdad es el **servidor** (Nest + PostgreSQL en Render). Este teléfono guarda una copia en IndexedDB (`dulcecalle-local`) para trabajar sin conexión, más la cola de envíos pendientes (outbox).
 
-- Inicio vacío → **Cargar demo**
-- Más → Datos → escribir `BORRAR` → confirmar otra vez → **elimina todos los datos locales**
-
-No hay nube. Borrar es irreversible en este aparato.
+- **Más → Datos:** preparar el dispositivo para trabajar sin conexión y cerrar sesión. Cerrar sesión no borra lo que ya está en el servidor.
+- **Sincronización** (`/sincronizacion`): lo que falta por enviar, lo que el servidor rechazó (con el motivo, **Corregir** o **Descartar**) y el espacio usado en el teléfono.
+- Inicio vacío → **Cargar demo** (sigue existiendo; no se tocó en loop/v1).
 
 ## Estadísticas (S5)
 
@@ -170,12 +169,16 @@ npm run build
 
 ## Offline / PWA
 
-Serwist precachea el *shell* (HTML/CSS/JS, `/offline`, icons, manifest). El negocio vive en PostgreSQL vía Nest. IndexedDB ya no es la fuente de verdad de la UI. El service worker no guarda ventas.
+Serwist precachea el *shell* (HTML/CSS/JS, `/offline`, icons, manifest). El negocio vive en PostgreSQL vía Nest; el service worker no guarda datos de negocio.
+
+Sin conexión (M6.5+): ventas, abonos, deuda inicial, devoluciones, clientes/proveedores nuevos, caja (abrir, aporte, retiro, gasto, cerrar), surtir, mermas y preparaciones se guardan en el outbox de este teléfono y se envían solas al volver la conexión, en orden (FIFO) y con la misma `Idempotency-Key` en cada reintento (nunca se duplican en el servidor). Con varias pestañas abiertas, una sola envía (Web Locks) y las demás se actualizan al terminar.
+
+Si el servidor rechaza una operación de forma definitiva (4xx, p. ej. stock o validación), queda visible en Sincronización con el motivo; las operaciones que dependen de ella esperan, las independientes siguen. Ver [M6.md](M6.md).
 
 ## Limitaciones conocidas (P1 / P2)
 
 - **Motivos de inventario (P1):** existe `adjust` en el tipo, pero la UI usa `me_lo_comi` / `regalar` / `perdido`.
-- **Backend / sync (P2):** un dispositivo con cuenta. No hay sync entre teléfonos ni import Dexie→PG.
+- **Backend / sync (P2):** cada teléfono envía su outbox al servidor y lee de ahí; no hay sync directa entre teléfonos ni import Dexie→PG.
 
 ### Devoluciones
 
