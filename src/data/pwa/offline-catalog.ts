@@ -1,3 +1,4 @@
+import { recordIdAlias } from "@/data/local/id-alias";
 import { NetworkError } from "@/data/errors";
 import type { RemoteCustomer, RemoteProduct, RemoteSupplier } from "@/data/http/mappers";
 import { getPwaApi } from "./api";
@@ -309,6 +310,7 @@ export async function createProductWithOfflineFallback(
 }
 
 async function reconcileCustomer(businessId: string, localId: string, remote: RemoteCustomer) {
+  recordIdAlias(businessId, localId, remote.id);
   const db = getLocalDb();
   await db.transaction(
     "rw",
@@ -357,6 +359,7 @@ async function reconcileCustomer(businessId: string, localId: string, remote: Re
 }
 
 async function reconcileSupplier(businessId: string, localId: string, remote: RemoteSupplier) {
+  recordIdAlias(businessId, localId, remote.id);
   const db = getLocalDb();
   await db.transaction("rw", [db.suppliers, db.stockMoves, db.outbox], async () => {
     const local = await getLocalStore().suppliers.get(businessId, localId);
@@ -381,6 +384,7 @@ async function reconcileSupplier(businessId: string, localId: string, remote: Re
 
 /** Remap local product UUID → server UUID and rewrite pending FK refs. */
 async function reconcileProduct(businessId: string, localId: string, remote: RemoteProduct) {
+  recordIdAlias(businessId, localId, remote.id);
   const db = getLocalDb();
   await db.transaction(
     "rw",

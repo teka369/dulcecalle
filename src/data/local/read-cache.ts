@@ -328,6 +328,13 @@ export class CatalogReadCache {
       await opts.put(stored);
       return opts.projectStored ? opts.toRemote(stored) : row;
     } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        // Created offline and its create is not synced yet: the server does
+        // not know it, but it exists here (D2). Anything else stays a 404.
+        const cached = await opts.get(opts.businessId, opts.id);
+        if (cached && (await this.hasUnsyncedCreate(opts.businessId, cached))) return opts.toRemote(cached);
+        throw e;
+      }
       this.rethrowUnlessNetwork(e);
       const cached = await opts.get(opts.businessId, opts.id);
       if (!cached) throw e;
@@ -340,6 +347,15 @@ export class CatalogReadCache {
    * non-synced outbox operation. Server rows always win by id; client-minted
    * pending rows (unknown to the server) are carried over untouched.
    */
+  private async hasUnsyncedCreate(businessId: string, row: { id: string }): Promise<boolean> {
+    const requestId = (row as { requestId?: unknown }).requestId;
+    for (const status of ["pending", "failed", "in_flight"] as const) {
+      const items = await this.db.outbox.where("[businessId+status]").equals([businessId, status]).toArray();
+      if (items.some((o) => o.operation === "create" && (o.requestId === requestId || o.operationId === row.id || (o.payload as { id?: unknown } | null)?.id === row.id))) return true;
+    }
+    return false;
+  }
+
   private async pendingLocalRows<
     TLocal extends { id: string; businessId: string },
   >(opts: {

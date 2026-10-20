@@ -78,6 +78,7 @@ let server: FakeServer = { extraSales: [], ventasDelta: 0 };
 function respond(p: string, url: URL): unknown {
   if (p === "/products") return [PROD, INSUMO];
   if (p === `/products/${P1}`) return PROD;
+  if (p === `/products/${P2}`) return INSUMO; // Preparar reads its insumo by id
   if (p.endsWith("/moves")) return [];
   if (p === "/suppliers") return [SUP];
   if (p === `/suppliers/${SU}`) return SUP;
