@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useAfterSync } from "@/components/shell/use-after-sync";
 import { OfflineLink } from "@/components/shell/OfflineLink";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { HeroBlock } from "@/components/ui/HeroBlock";
@@ -66,6 +67,8 @@ export default function VentasPage() {
       })
       .finally(() => setReady(true));
   }
+
+  useAfterSync(load);
 
   useEffect(() => {
     load();
