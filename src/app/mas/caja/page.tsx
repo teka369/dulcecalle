@@ -11,7 +11,7 @@ import { QuickTiles } from "@/components/ui/QuickTiles";
 import { useAfterSync } from "@/components/shell/use-after-sync";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
@@ -58,6 +58,7 @@ export default function CajaPage() {
   useAfterSync(load);
 
   async function onAbrir() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (busy) return;
     setError(null);
     const err = validateOpeningFloat(openingRaw);

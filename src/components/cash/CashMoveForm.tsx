@@ -11,7 +11,7 @@ import { cashStore, useCash } from "@/store/cashStore";
 import { Input } from "@/components/ui/Input";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
@@ -77,6 +77,7 @@ export function CashMoveForm({ kind }: { kind: CashFormKind }) {
   const after = summary && amount != null && amount > 0 ? expectedAfter(summary.expected, kind, method, amount) : null;
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (busy) return;
     setError(null);
     const err = validate();

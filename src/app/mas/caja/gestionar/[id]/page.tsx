@@ -7,7 +7,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
@@ -65,6 +65,7 @@ export default function GestionarCajaDetailPage() {
   }
 
   async function closeCounted() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     setBusy(true);
     setError(null);
     try {
@@ -78,6 +79,7 @@ export default function GestionarCajaDetailPage() {
   }
 
   async function carry(mode: "counted" | "assumed") {
+    if (mode === "counted" && amountInputInvalid()) return; // never send a rejected amount
     const countedEfectivo = carryCountedEfectivo(mode, counted);
     if (countedEfectivo === null) {
       setError("Escribe cuánto efectivo había.");

@@ -14,7 +14,7 @@ import { useEntityId } from "@/components/shell/entity-route";
 import { customerStore } from "@/store/customerStore";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
@@ -75,6 +75,7 @@ export default function AgregarDeudaAnteriorPage() {
   }, [customer, amountRaw]);
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (!customer || busy) return;
     setError(null);
     const err = validateInitialDebtAmount(amountRaw);

@@ -18,7 +18,7 @@ import { HeroAmount } from "@/components/ui/HeroAmount";
 import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { ActionBar, ACTION_BAR_SPACE, ABOVE_ACTION_BAR } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
 import {
@@ -128,6 +128,7 @@ export default function CobrarPage() {
   }
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (!valid || busy) return;
     setBusy(true);
     setError(null);

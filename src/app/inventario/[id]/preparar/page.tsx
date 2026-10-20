@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { ListErrorState } from "@/components/ui/ListErrorState";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
@@ -80,6 +80,7 @@ export default function PrepararPage() {
   }
 
   async function onPrepare() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (busy) return;
     if (!sourceId) return;
     setError(null);

@@ -3,7 +3,7 @@
 import { Spinner } from "@/components/ui/Spinner";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
 import { StateBlock } from "@/components/ui/StateBlock";
@@ -51,6 +51,7 @@ export default function CerrarCajaPage() {
   const diff = counted != null ? counted - expectedEf : null;
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (busy || !summary) return;
     setError(null);
     const err = validateCounted(countedRaw);

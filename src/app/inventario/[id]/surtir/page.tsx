@@ -4,7 +4,7 @@ import { useOfflineBand, useOnline } from "@/components/shell/use-online";
 import { Input } from "@/components/ui/Input";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
@@ -133,6 +133,7 @@ export default function SurtirPage() {
   }, [qtyRaw, unitCostRaw, totalCostRaw, method]);
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (!product || busy) return;
     setError(null);
     const r = validateSurtirForm({
