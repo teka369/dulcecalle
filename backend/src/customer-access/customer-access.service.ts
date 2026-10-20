@@ -122,20 +122,30 @@ export class CustomerAccessService {
     });
     const pool = store ? rows.filter((r) => storeMatches(store, r.businessId, r.business.name)) : rows;
     const candidate = pool.length === 1 ? pool[0] : null;
-    // Soft cap per TYPED code (normalized), from any IP: progressive delay,
-    // never a block. Keyed by what was typed, not by a found customer, so an
-    // unknown code gets exactly the same delay schedule (timing reveals nothing).
-    const customerKey = `code:${code}`;
-    const prior = await this.throttle.peek(customerKey, CUSTOMER_SOFT_CAP.windowMs);
-    const wait = softDelayMs(prior);
+    // Soft cap (never a block), counted by the TYPED code before any lookup,
+    // so an unknown code gets exactly the same schedule as a real one:
+    // - progressive delay ONLY per IP+code and per store+code (when the
+    //   store is given via businessId or the store field). A flood on a
+    //   shared code (DC-0001) from one IP never slows other IPs.
+    //   A private/unknown IP (trust proxy wrong) skips the IP key, as above.
+    // - global per code: counted for the alert log only, no delay.
+    const storeKey = businessId ?? (store ? `name:${store}` : null);
+    const softKeys = [
+      ...(shared ? [] : [`softip:${ip}:${code}`]),
+      ...(storeKey ? [`softstore:${storeKey}:${code}`] : []),
+    ];
+    const globalKey = `code:${code}`;
+    const priors = await Promise.all(softKeys.map((k) => this.throttle.peek(k, CUSTOMER_SOFT_CAP.windowMs)));
+    const wait = Math.max(0, ...priors.map(softDelayMs));
     if (wait > 0) await this.sleep(wait);
     // Exactly one bcrypt compare in every branch (real hash or dummy).
     const ok = await bcrypt.compare(pin, candidate ? (candidate.pinHash as string) : await dummyHash());
     if (!candidate || !ok) {
-      await this.throttle.bump(customerKey, CUSTOMER_SOFT_CAP.windowMs);
-      if (softCapAlert(prior + 1)) {
+      await Promise.all([...softKeys, globalKey].map((k) => this.throttle.bump(k, CUSTOMER_SOFT_CAP.windowMs)));
+      const total = (await this.throttle.peek(globalKey, CUSTOMER_SOFT_CAP.windowMs));
+      if (softCapAlert(total)) {
         this.logger.warn(
-          `portal: many failed PINs for one customer code (${prior + 1} in the last hour, any IP); slowing attempts, not locking. code=${code}${candidate ? ` customer=${candidate.id} business=${candidate.businessId}` : " (no single match)"}`,
+          `portal: many failed PINs for one customer code (${total} in the last hour, any IP/store); alert only, per-IP/per-store delays apply. code=${code}${candidate ? ` customer=${candidate.id} business=${candidate.businessId}` : " (no single match)"}`,
         );
       }
     }
@@ -148,7 +158,7 @@ export class CustomerAccessService {
     const matches = [candidate];
     const customer = matches[0];
     await this.throttle.reset(ipCodeKey);
-    await this.throttle.reset(customerKey);
+    await Promise.all(softKeys.map((k) => this.throttle.reset(k)));
     const issued = await this.tokens(customer.id, customer.businessId);
     return {
       customer: {
