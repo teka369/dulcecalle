@@ -1,6 +1,7 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
+import { parseAmountInput } from "@/domain/money/limits";
 
 /** Keep only digits (same rule the forms used inline: value.replace(/\D/g, "")). */
 export function digitsOnly(raw: string): string {
@@ -20,7 +21,11 @@ export function AmountField({ label, value, onChange, hint, error, placeholder =
   const id = useId();
   const hintId = `${id}-hint`;
   const errId = `${id}-err`;
-  const described = [hint ? hintId : null, error ? errId : null].filter(Boolean).join(" ") || undefined;
+  // Format problems (decimals, above the ceiling) are caught here, before the
+  // value reaches the form: the field keeps the last valid amount.
+  const [inputError, setInputError] = useState<string | null>(null);
+  const shownError = inputError ?? error ?? null;
+  const described = [hint ? hintId : null, shownError ? errId : null].filter(Boolean).join(" ") || undefined;
   return (
     <div>
       <label htmlFor={id} className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
@@ -34,10 +39,18 @@ export function AmountField({ label, value, onChange, hint, error, placeholder =
           id={id}
           inputMode="numeric"
           value={value}
-          onChange={(e) => onChange(digitsOnly(e.target.value))}
+          onChange={(e) => {
+            const parsed = parseAmountInput(e.target.value);
+            if ("error" in parsed) {
+              setInputError(parsed.error);
+              return;
+            }
+            setInputError(null);
+            onChange(parsed.digits);
+          }}
           placeholder={placeholder}
           aria-describedby={described}
-          aria-invalid={error ? true : undefined}
+          aria-invalid={shownError ? true : undefined}
           className="h-14 min-w-0 flex-1 bg-transparent text-[28px] font-semibold tabular-nums text-ink outline-none placeholder:text-ink-muted"
         />
       </div>
@@ -46,9 +59,9 @@ export function AmountField({ label, value, onChange, hint, error, placeholder =
           {hint}
         </p>
       ) : null}
-      {error ? (
+      {shownError ? (
         <p id={errId} className="mt-1.5 text-sm text-danger">
-          {error}
+          {shownError}
         </p>
       ) : null}
     </div>

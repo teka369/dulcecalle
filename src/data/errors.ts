@@ -10,6 +10,22 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The server answered, but with data this app cannot represent safely (e.g. a
+ * COP amount above MAX_SAFE_INTEGER). `message` is user copy; `detail` keeps
+ * the developer description for logs/tests.
+ */
+export class ContractError extends Error {
+  readonly code = "CONTRACT";
+  constructor(
+    public readonly detail: string,
+    message = "Recibimos datos que no se pueden mostrar. Tus datos no se han perdido; avísanos si sigue pasando.",
+  ) {
+    super(message);
+    this.name = "ContractError";
+  }
+}
+
 /** Transport failure. Not an auth decision — do not clear the session. */
 export class NetworkError extends Error {
   readonly code = "NETWORK";

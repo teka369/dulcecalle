@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ContractError } from "../errors";
 import {
   asCopJson,
   asDateKey,
@@ -17,10 +18,17 @@ describe("HTTP COP / date mappers", () => {
     }
   });
 
-  it("rejects floats and non-numbers", () => {
-    expect(() => asCopJson(1.5, "x")).toThrow(/integer COP/);
-    expect(() => asCopJson("500", "x")).toThrow(/integer COP/);
-    expect(() => asCopJson(undefined, "x")).toThrow(/integer COP/);
+  it("rejects floats and non-numbers (ContractError: user copy + technical detail)", () => {
+    for (const bad of [1.5, "500", undefined]) {
+      let caught: unknown;
+      try {
+        asCopJson(bad, "x");
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toBeInstanceOf(ContractError);
+      expect((caught as ContractError).detail).toMatch(/integer COP/);
+    }
   });
 
   it("keeps occurredOn as America/Bogota date key, createdAt as UTC epoch", () => {
