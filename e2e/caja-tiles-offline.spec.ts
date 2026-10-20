@@ -31,12 +31,15 @@ test("offline Caja tiles never bounce back to /mas/caja (30+ taps)", async ({ co
   fake.offline = true;
   await context.setOffline(true);
 
-  const cdp = await context.newCDPSession(page);
-  await cdp.send("Page.enable");
+  // No raw CDP session here: attaching one (newCDPSession + Page.enable) makes
+  // Chromium drop Playwright's offline emulation on the next document load, so
+  // navigator.onLine read true and every "offline" tap ran the ONLINE path
+  // (Next RSC push -> failed fetch -> MPA fallback), with the offline guard never
+  // armed. Navigation requests are enough to explain a bounce.
   const navs: string[] = [];
-  cdp.on("Page.frameRequestedNavigation", (e: { url: string; reason: string; disposition: string }) =>
-    navs.push(`${e.reason} ${new URL(e.url).pathname}`),
-  );
+  page.on("request", (r) => {
+    if (r.isNavigationRequest() && r.frame() === page.mainFrame()) navs.push(new URL(r.url()).pathname);
+  });
 
   const bounces: string[] = [];
   let taps = 0;
@@ -44,6 +47,11 @@ test("offline Caja tiles never bounce back to /mas/caja (30+ taps)", async ({ co
   for (let i = 0; i < ROUNDS; i++) {
     for (const [name, path, ready] of TILES) {
       await page.goto("/mas/caja");
+      // Readiness, not a longer timeout: this document is the offline /mas/caja
+      // (URL settled, device really offline) and the tiles are client-rendered
+      // (behind AuthGate + cashStore), so a visible tile means hydrated.
+      await expect(page).toHaveURL(/\/mas\/caja$/);
+      await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
       await expect(page.locator("main").getByRole("link", { name, exact: true }))
         .toBeVisible({ timeout: 15_000 })
         .catch(async (e: unknown) => {

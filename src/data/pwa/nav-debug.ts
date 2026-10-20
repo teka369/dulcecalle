@@ -58,6 +58,9 @@ export function installNavDebug(): void {
       }),
     );
   });
+  // capture: runs before @serwist/next's reloadOnOnline listener.
+  window.addEventListener("online", () => navDebug("window-online", { onLine: navigator.onLine, hidden: document.visibilityState }), { capture: true });
+  window.addEventListener("offline", () => navDebug("window-offline", { onLine: navigator.onLine }), { capture: true });
   window.addEventListener("pagehide", (e) => navDebug("pagehide", { persisted: e.persisted }));
   window.addEventListener("pageshow", (e) => navDebug("pageshow", { persisted: e.persisted }));
   try {
