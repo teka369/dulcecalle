@@ -12,6 +12,24 @@ export const IP_CODE_POLICY: ThrottlePolicy = { freeAttempts: FREE_ATTEMPTS, win
 /** One client (IP) across all codes: stops walking sequential codes (C1, C2, …). */
 export const IP_POLICY: ThrottlePolicy = { freeAttempts: 20, windowMs: WINDOW_MS, maxCooldownMs: MAX_COOLDOWN_MS };
 
+/**
+ * Soft cap per CUSTOMER, from any IP (a distributed guess at one PIN). It
+ * never blocks: after `freeFailures` failures in the window each attempt on
+ * that customer waits a growing delay (capped) and we log an alert.
+ */
+export const CUSTOMER_SOFT_CAP = { freeFailures: 10, windowMs: 60 * 60 * 1000, baseDelayMs: 250, maxDelayMs: 4000 };
+
+export function softDelayMs(priorFailures: number): number {
+  const { freeFailures, baseDelayMs, maxDelayMs } = CUSTOMER_SOFT_CAP;
+  if (priorFailures < freeFailures) return 0;
+  return Math.min(baseDelayMs * 2 ** Math.min(priorFailures - freeFailures, 16), maxDelayMs);
+}
+
+/** Alert at 10, 25, 50, then every 100 failures in the window. */
+export function softCapAlert(failures: number): boolean {
+  return failures === 10 || failures === 25 || failures === 50 || (failures > 0 && failures % 100 === 0);
+}
+
 @Injectable()
 export class PortalLoginThrottle {
   constructor(private readonly prisma: PrismaService) {}
@@ -56,6 +74,29 @@ export class PortalLoginThrottle {
         },
       });
       return "ok";
+    });
+  }
+
+  /** Failures counted for `key` inside the window (0 when stale). Never blocks. */
+  async peek(key: string, windowMs: number): Promise<number> {
+    const row = await this.prisma.portalLoginThrottle.findUnique({ where: { bucket: this.bucket(key) } });
+    if (!row || Date.now() - row.windowStart.getTime() >= windowMs) return 0;
+    return row.failures;
+  }
+
+  /** Count one failure for `key` (new window when stale). Never sets a cooldown. */
+  async bump(key: string, windowMs: number): Promise<void> {
+    const bucket = this.bucket(key);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${bucket}))`;
+      const row = await tx.portalLoginThrottle.findUnique({ where: { bucket } });
+      const now = new Date();
+      const fresh = row != null && now.getTime() - row.windowStart.getTime() < windowMs;
+      await tx.portalLoginThrottle.upsert({
+        where: { bucket },
+        create: { id: randomUUID(), bucket, failures: 1, windowStart: now, cooldownUntil: null },
+        update: { failures: fresh && row ? row.failures + 1 : 1, windowStart: fresh && row ? row.windowStart : now },
+      });
     });
   }
 

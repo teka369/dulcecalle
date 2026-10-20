@@ -31,6 +31,12 @@ function fakeThrottle() {
     async reset(key: string) {
       counts.delete(key);
     },
+    async peek() {
+      return 0;
+    },
+    async bump() {
+      /* soft cap covered in portal-customer-softcap.unit-spec.ts */
+    },
   };
   return t;
 }

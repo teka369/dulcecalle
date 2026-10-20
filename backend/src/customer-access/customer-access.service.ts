@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../prisma/prisma.service";
@@ -9,7 +9,15 @@ import { normalizeCustomerCode } from "../shared/customer-code";
 import type { CustomerAuth, PortalLedgerScope } from "../identity/auth.types";
 import { DEFAULT_TZ } from "../shared/clock";
 import { copToJson } from "../shared/money";
-import { IP_CODE_POLICY, IP_POLICY, isPrivateOrUnknownIp, PortalLoginThrottle } from "./portal-throttle";
+import {
+  CUSTOMER_SOFT_CAP,
+  IP_CODE_POLICY,
+  IP_POLICY,
+  isPrivateOrUnknownIp,
+  PortalLoginThrottle,
+  softCapAlert,
+  softDelayMs,
+} from "./portal-throttle";
 
 const IDENTIFY_FAIL = "No pudimos identificarte.";
 const PIN_RE = /^\d{6}$/;
@@ -47,6 +55,10 @@ export class CustomerAccessService {
     private readonly sessions: AuthSessionService,
     private readonly throttle: PortalLoginThrottle,
   ) {}
+
+  private readonly logger = new Logger("CustomerAccess");
+  /** Overridable in tests. */
+  private sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
   private tokens(customerId: string, businessId: string) {
     return this.sessions.issue({
@@ -110,8 +122,21 @@ export class CustomerAccessService {
     });
     const pool = store ? rows.filter((r) => storeMatches(store, r.businessId, r.business.name)) : rows;
     const candidate = pool.length === 1 ? pool[0] : null;
+    // Soft per-customer cap (any IP): progressive delay, never a block.
+    const customerKey = candidate ? `cust:${candidate.id}` : null;
+    const prior = customerKey ? await this.throttle.peek(customerKey, CUSTOMER_SOFT_CAP.windowMs) : 0;
+    const wait = softDelayMs(prior);
+    if (wait > 0) await this.sleep(wait);
     // Exactly one bcrypt compare in every branch (real hash or dummy).
     const ok = await bcrypt.compare(pin, candidate ? (candidate.pinHash as string) : await dummyHash());
+    if (customerKey && !ok) {
+      await this.throttle.bump(customerKey, CUSTOMER_SOFT_CAP.windowMs);
+      if (softCapAlert(prior + 1)) {
+        this.logger.warn(
+          `portal: many failed PINs for one customer (${prior + 1} in the last hour, any IP); slowing attempts, not locking. customer=${candidate!.id} business=${candidate!.businessId}`,
+        );
+      }
+    }
     // Same code in 2+ stores without a store hint: no candidate, so the SAME
     // generic 401 as a wrong PIN or unknown code (no enumeration). The client
     // then offers the optional store field.
@@ -121,6 +146,7 @@ export class CustomerAccessService {
     const matches = [candidate];
     const customer = matches[0];
     await this.throttle.reset(ipCodeKey);
+    if (customerKey) await this.throttle.reset(customerKey);
     const issued = await this.tokens(customer.id, customer.businessId);
     return {
       customer: {
