@@ -74,13 +74,12 @@ describe("branding único Dulce Calle", () => {
   });
 });
 
-describe("login con Cliente como prioridad", () => {
-  it("muestra Cliente primero y conserva la tienda en ruta privada", () => {
+describe("login con la tienda como prioridad", () => {
+  it("muestra la tienda primero y conserva el portal de cliente como enlace", () => {
     const page = src("src/app/login/page.tsx");
-    expect(page).toContain("CustomerLoginForm");
-    expect(page).toContain("/brand/dulcecalle-logo.png");
-    expect(page).not.toContain("type=\"email\"");
-    expect(page).not.toContain("Contraseña");
+    expect(page).toContain("StoreLoginForm");
+    expect(page).not.toContain("CustomerLoginForm");
+    expect(page).toContain('href="/cliente/login"');
     expect(src("src/app/acceso-tienda/page.tsx")).toContain("StoreLoginForm");
     expect(src("src/components/auth/StoreLoginForm.tsx")).toContain("Correo");
   });
