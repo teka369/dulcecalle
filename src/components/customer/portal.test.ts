@@ -72,3 +72,18 @@ describe("portal softs (P5 visual pass)", () => {
     }
   });
 });
+
+import { ApiError, NetworkError } from "@/data/errors";
+import { PORTAL_LOAD_FAILED_MESSAGE, PORTAL_OFFLINE_MESSAGE, portalErrorMessage } from "./portal";
+
+describe("portal error copy", () => {
+  it("online: a failing API reads 'No se pudo cargar', never 'Sin conexión'", () => {
+    expect(portalErrorMessage(new NetworkError("Sin conexión."), true)).toBe(PORTAL_LOAD_FAILED_MESSAGE);
+    expect(portalErrorMessage(new ApiError("X", "boom", 503), true)).toBe(PORTAL_LOAD_FAILED_MESSAGE);
+    expect(portalErrorMessage(new Error("Sin conexión."), true)).toBe(PORTAL_LOAD_FAILED_MESSAGE);
+    expect(portalErrorMessage(new ApiError("AUTH", "Inicia sesión.", 401), true)).toBe("Inicia sesión.");
+  });
+  it("offline: 'Sin conexión.'", () => {
+    expect(portalErrorMessage(new NetworkError(), false)).toBe(PORTAL_OFFLINE_MESSAGE);
+  });
+});

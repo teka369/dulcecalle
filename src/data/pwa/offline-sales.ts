@@ -1,4 +1,4 @@
-import { NetworkError } from "../errors";
+import { ApiError, NetworkError } from "../errors";
 import type { CreateSaleInput } from "../http/repository";
 import type { RemoteReturn, RemoteSaleLine } from "../http/mappers";
 import type { RemoteSale } from "../http/mappers";
@@ -357,6 +357,36 @@ export async function listSalesWithOfflineFallback(): Promise<SalesListResult> {
     const businessId = getPwaAuthSession().businessId;
     if (!businessId) throw error;
     return { sales: await listLocalSales(businessId), source: "cache" };
+  }
+}
+
+export type SalesScreenResult = SalesListResult & {
+  /** Online read failed (5xx/timeout): local rows are this phone's only, maybe incomplete. */
+  failed: boolean;
+};
+
+/**
+ * Ventas screen read. Same as listSalesWithOfflineFallback, plus B3 for a
+ * failed online read (5xx, or a transport failure while the device says it
+ * is online, i.e. a timeout): this phone's sales with failed=true, or the
+ * original error when there are none (never a false "Sin ventas").
+ * Truly offline keeps the existing behaviour.
+ */
+export async function listSalesForScreen(): Promise<SalesScreenResult> {
+  try {
+    const sales = await getPwaApi().sales.list();
+    return { sales: sales.map((s) => ({ ...s, pending: false })), source: "server", failed: false };
+  } catch (error) {
+    const serverDown = error instanceof ApiError && error.status >= 500;
+    const network = error instanceof NetworkError;
+    if (!serverDown && !network) throw error;
+    const businessId = getPwaAuthSession().businessId;
+    if (!businessId) throw error;
+    const sales = await listLocalSales(businessId);
+    const onlineNow = typeof navigator !== "undefined" && navigator.onLine !== false;
+    const failed = serverDown || onlineNow;
+    if (failed && sales.length === 0) throw error;
+    return { sales, source: "cache", failed };
   }
 }
 

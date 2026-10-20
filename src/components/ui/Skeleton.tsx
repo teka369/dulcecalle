@@ -2,9 +2,14 @@ import { HeroBlock } from "./HeroBlock";
 
 const HERO_BAR = "rounded bg-[color-mix(in_srgb,var(--on-hero)_15%,transparent)] motion-safe:animate-pulse";
 
-export function SkeletonHero() {
+/**
+ * Loading hero. Carries the page's single h1 (sr-only: the visible bars are
+ * placeholders) so the loading state is never a page without a heading.
+ */
+export function SkeletonHero({ title = "Cargando…" }: { title?: string }) {
   return (
     <HeroBlock busy>
+      <h1 className="sr-only">{title}</h1>
       <div className={`h-7 w-40 ${HERO_BAR}`} />
       <div className={`mt-2 h-4 w-28 ${HERO_BAR}`} />
       <div className={`mt-7 h-4 w-16 ${HERO_BAR}`} />

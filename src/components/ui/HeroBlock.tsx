@@ -85,7 +85,7 @@ export function HeroBlock({
       aria-busy={busy || undefined}
     >
       {offline ? (
-        <p className="mb-3 flex items-center gap-1.5 text-xs text-on-hero-muted">
+        <p data-testid="offline-band" className="mb-3 flex items-center gap-1.5 text-xs text-on-hero-muted">
           <Cloud />
           {"text" in offline ? offline.text : offlineBandText(offline.capturedAt)}
         </p>

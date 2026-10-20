@@ -1,5 +1,6 @@
 "use client";
 
+import { useOfflineBand } from "@/components/shell/use-online";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -40,6 +41,7 @@ const REASON_LABEL: Record<string, string> = {
 };
 
 export default function ProductoFichaPage() {
+  const offlineBand = useOfflineBand();
   const id = useEntityId();
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [moves, setMoves] = useState<RemoteStockMove[]>([]);
@@ -87,7 +89,7 @@ export default function ProductoFichaPage() {
   if (!ready) {
     return (
       <div className="flex flex-col gap-4">
-        <SkeletonHero />
+        <SkeletonHero title="Producto" />
         <SkeletonRows />
       </div>
     );
@@ -95,7 +97,7 @@ export default function ProductoFichaPage() {
 
   if (!product) {
     return (
-      <HeroBlock size="medium" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Inventario">
+      <HeroBlock offline={offlineBand} size="medium" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Inventario">
         <StateBlock onHero kind="empty" title="No encontramos ese producto." />
       </HeroBlock>
     );
@@ -151,7 +153,7 @@ export default function ProductoFichaPage() {
 
   return (
     <div className="flex flex-col pb-6">
-      <HeroBlock
+      <HeroBlock offline={offlineBand}
         size="medium"
         back={{ href: "/inventario", label: "Volver a Inventario", entity: true }}
         action={

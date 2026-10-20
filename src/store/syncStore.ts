@@ -46,7 +46,8 @@ const EMPTY_COUNTS: SyncCounts = { pending: 0, active: 0, failed: 0, permanent: 
 
 function initialState(): SyncUiState {
   return {
-    online: typeof navigator === "undefined" ? true : navigator.onLine,
+    // Node 21+ defines `navigator` without onLine: only a real boolean counts.
+    online: typeof navigator === "undefined" || typeof navigator.onLine !== "boolean" ? true : navigator.onLine,
     counts: EMPTY_COUNTS,
     flushing: null,
     lastDoneAt: null,
@@ -291,11 +292,32 @@ export const syncStore = {
   },
 };
 
+/**
+ * B4: SSR and the hydration render must agree (React #418). The server and
+ * the first client render both use this fixed snapshot; the real
+ * connectivity/counts apply right after hydration.
+ */
+const SERVER_SNAPSHOT: SyncUiState = {
+  online: true,
+  counts: EMPTY_COUNTS,
+  flushing: null,
+  lastDoneAt: null,
+  lastResult: null,
+  recent: [],
+  centerOpen: false,
+  itemsVersion: 0,
+  authRequired: false,
+};
+
+export function getSyncServerSnapshot(): SyncUiState {
+  return SERVER_SNAPSHOT;
+}
+
 export function useSync() {
   const snap = useSyncExternalStore(
     syncStore.subscribe,
     syncStore.getSnapshot,
-    syncStore.getSnapshot,
+    getSyncServerSnapshot,
   );
   const sessionBusinessId = readSessionBusinessId();
   useEffect(() => {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { CustomerLedger } from "@/data/http/customer-api";
 import { getCustomerAuthSession } from "@/data/http/customer-session";
 import { loadCachedCustomerLedger } from "@/data/pwa/customer-ledger-cache";
-import { ownLedger } from "./portal";
+import { browserOnline, ownLedger, portalErrorMessage } from "./portal";
 
 /** Loads the signed-in customer's ledger (server, else own cache) and guards ownership. */
 export function usePortalLedger() {
@@ -27,7 +27,7 @@ export function usePortalLedger() {
         setFromCache(result.source === "cache");
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "No se pudo cargar.");
+        setError(portalErrorMessage(e, browserOnline()));
       });
   }, []);
 

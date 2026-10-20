@@ -29,7 +29,7 @@ const api = {
   stats: { get: vi.fn(async (period: string) => ({ period, ventas: 0, emptyPeriod: true })) },
 };
 
-vi.mock("@/data/pwa/api", () => ({ getPwaApi: () => api }));
+vi.mock("@/data/pwa/api", () => ({ getPwaApi: () => api, getPrepPwaApi: () => api }));
 
 function installStubs(online = true) {
   const stored = new Map<string, Response>();
@@ -86,7 +86,7 @@ describe("prepStore evaluate/start", () => {
     expect(snap.modalOpen).toBe(true);
     expect(snap.completed).toBe(snap.total);
     // 19 static docs + 3 catalogs + 4 history + 4 snapshots + 1 thumbs + 3 sistema.
-    expect(snap.total).toBe(34);
+    expect(snap.total).toBe(35);
     expect(snap.lastReadyAt).toBeGreaterThan(0);
   });
 
@@ -122,5 +122,26 @@ describe("prepStore evaluate/start", () => {
     installStubs(false);
     await prepStore.start();
     expect(prepStore.getSnapshot().phase).toBe("idle");
+  });
+
+  it("B1: an offline boot of a prepared device reports ready (lastReadyAt) without starting prep", async () => {
+    getPwaAuthSession().businessId = BIZ;
+    await prepStore.evaluate();
+    const readyAt = prepStore.getSnapshot().lastReadyAt;
+    prepStore.__reset();
+    api.products.list.mockClear();
+    installStubs(false);
+    await prepStore.evaluate();
+    expect(prepStore.getSnapshot().phase).toBe("ready");
+    expect(prepStore.getSnapshot().lastReadyAt).toBe(readyAt);
+    expect(api.products.list).not.toHaveBeenCalled();
+  });
+
+  it("B1: offline without a completed prep stays idle", async () => {
+    getPwaAuthSession().businessId = BIZ;
+    installStubs(false);
+    await prepStore.evaluate();
+    expect(prepStore.getSnapshot().phase).toBe("idle");
+    expect(prepStore.getSnapshot().lastReadyAt).toBeNull();
   });
 });

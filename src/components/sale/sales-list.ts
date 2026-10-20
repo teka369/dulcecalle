@@ -74,3 +74,22 @@ export function ventasSheetState(input: {
   if (input.filteredCount === 0) return "filter-empty";
   return "list";
 }
+
+export type VentasHero = "skeleton" | "total" | "local" | "none";
+
+/**
+ * Ventas hero. Local rows (offline or a failed read) may be incomplete, so
+ * they never get a "Total listado" that reads as complete.
+ */
+export function ventasHero(input: { ready: boolean; fromCache: boolean; salesCount: number; error: string | null }): VentasHero {
+  if (!input.ready) return "skeleton";
+  if (input.error && input.salesCount === 0) return "none";
+  if (input.fromCache) return "local";
+  return "total";
+}
+
+/** Online (timeout / server down): "No se pudo cargar." — never "Sin conexión" on an online device. */
+export function ventasErrorMessage(e: unknown, online: boolean): string {
+  if (online || !(e instanceof Error) || !e.message) return "No se pudo cargar.";
+  return e.message;
+}

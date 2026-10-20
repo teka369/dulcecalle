@@ -1,4 +1,5 @@
-import { NetworkError } from "../errors";
+import { ApiError, NetworkError } from "../errors";
+import type { HttpRepository } from "../http/repository";
 import type { DashboardSnapshot } from "@/domain/dashboard/snapshot";
 import type { RemoteStats } from "../http/mappers";
 import { getPwaApi } from "./api";
@@ -90,12 +91,12 @@ export function isRemoteStats(data: unknown): data is RemoteStats {
  * would silently undercount); offline serves the last snapshot labeled
  * with its capture time. Never a fake zero.
  */
-export async function loadDashboardWithOfflineFallback(): Promise<
+export async function loadDashboardWithOfflineFallback(api?: HttpRepository): Promise<
   SnapshotResult<DashboardSnapshot>
 > {
   let result: { snapshot: DashboardSnapshot; complete: boolean; networkFailure: boolean };
   try {
-    result = await loadDashboardResult();
+    result = await loadDashboardResult(api);
   } catch (e: unknown) {
     // Core queries have no fallback: a transport failure serves the
     // previous snapshot, anything else propagates.
@@ -111,6 +112,24 @@ export async function loadDashboardWithOfflineFallback(): Promise<
     throw new Error("Respuesta incompleta del servidor.");
   }
   return saveSnapshot(DASHBOARD_SNAPSHOT_KIND, snapshot);
+}
+
+/**
+ * Inicio screen read (PREP keeps loadDashboardWithOfflineFallback). B3: a 5xx
+ * also serves this phone's last snapshot (the screen shows the
+ * "No se pudo actualizar" band); with no snapshot the server error stands.
+ */
+export async function loadDashboardForScreen(): Promise<SnapshotResult<DashboardSnapshot>> {
+  try {
+    return await loadDashboardWithOfflineFallback();
+  } catch (e) {
+    if (!(e instanceof ApiError && e.status >= 500)) throw e;
+    try {
+      return await loadCachedSnapshot<DashboardSnapshot>(DASHBOARD_SNAPSHOT_KIND);
+    } catch {
+      throw e;
+    }
+  }
 }
 
 async function loadCachedSnapshot<T>(kind: string): Promise<SnapshotResult<T>> {
@@ -135,10 +154,11 @@ async function saveSnapshot<T>(kind: string, data: T): Promise<SnapshotResult<T>
 
 export function loadStatsWithOfflineFallback(
   period: "hoy" | "semana" | "mes",
+  api?: HttpRepository,
 ): Promise<SnapshotResult<RemoteStats>> {
   return loadWithSnapshot({
     kind: statsSnapshotKind(period),
-    fetch: () => getPwaApi().stats.get(period),
+    fetch: () => (api ?? getPwaApi()).stats.get(period),
     validate: isRemoteStats,
   });
 }

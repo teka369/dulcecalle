@@ -14,7 +14,8 @@ import {
 } from "@/domain/initialDebt";
 import { ApiError } from "@/data/errors";
 import { getPwaApi } from "@/data/pwa/api";
-import { getCachedCustomer, listCachedCustomers } from "@/data/pwa/catalog";
+import { getCachedCustomer, listCachedCustomersResult, peekLocalCustomers } from "@/data/pwa/catalog";
+import { EMPTY_LIST_STATUS, listErrorMessage, type ListReadStatus } from "@/data/pwa/list-status";
 import { createPaymentWithOfflineFallback } from "@/data/pwa/offline-payments";
 import {
   createCustomerWithOfflineFallback,
@@ -27,6 +28,8 @@ import type { DebtStatement } from "@/domain/debt/statement";
 
 type CustomerState = {
   customers: RemoteCustomer[];
+  /** B3: where the list came from / last read error (never a false empty). */
+  listStatus: ListReadStatus;
   loading: boolean;
   lastToast: string | null;
 };
@@ -35,6 +38,7 @@ const listeners = new Set<() => void>();
 
 let state: CustomerState = {
   customers: [],
+  listStatus: EMPTY_LIST_STATUS,
   loading: false,
   lastToast: null,
 };
@@ -66,12 +70,26 @@ export const customerStore = {
   },
   async refresh(): Promise<RemoteCustomer[]> {
     setState({ loading: true });
+    let settled = false;
+    // Hero-first paint: show this device's rows while a slow server read runs.
+    if (state.customers.length === 0) {
+      void peekLocalCustomers().then((rows) => {
+        if (!settled && rows && rows.length > 0 && state.customers.length === 0) setState({ customers: rows });
+      });
+    }
     try {
-      const customers = await listCachedCustomers();
-      setState({ customers, loading: false });
+      const result = await listCachedCustomersResult();
+      settled = true;
+      const customers = result.data;
+      setState({
+        customers,
+        loading: false,
+        listStatus: { source: result.source, cachedAt: result.cachedAt, error: null },
+      });
       return customers;
     } catch (e) {
-      setState({ loading: false });
+      settled = true;
+      setState({ loading: false, listStatus: { ...state.listStatus, error: listErrorMessage(e) } });
       fail(e);
     }
   },

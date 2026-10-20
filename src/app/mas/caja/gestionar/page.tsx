@@ -12,6 +12,8 @@ import { kindLabel, shortDay } from "@/components/cash/cash";
 import { formatCop } from "@/domain/money";
 import { getPwaApi } from "@/data/pwa/api";
 import { assignMoveWithOfflineFallback } from "@/data/pwa/offline-operations";
+import { isOffline } from "@/data/pwa/offline-nav";
+import { GestionarOfflineState, gestionarIsOffline } from "@/components/cash/gestionar-offline";
 
 type Row = {
   id: string;
@@ -35,10 +37,21 @@ export default function GestionarCajasPage() {
   const [target, setTarget] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
+    if (isOffline()) {
+      setOffline(true);
+      return;
+    }
     const api = getPwaApi();
-    void api.cash.listSessions().then((data) => setRows(data as Row[])).catch((e: unknown) => setError(e instanceof Error ? e.message : "No se pudieron cargar las cajas."));
+    void api.cash
+      .listSessions()
+      .then((data) => setRows(data as Row[]))
+      .catch((e: unknown) => {
+        if (gestionarIsOffline(false, e)) setOffline(true);
+        else setError(e instanceof Error ? e.message : "No se pudieron cargar las cajas.");
+      });
     void api.cash.unassigned().then((data) => setOrphans(data as typeof orphans)).catch(() => setOrphans([]));
   }, []);
 
@@ -53,12 +66,14 @@ export default function GestionarCajasPage() {
         size="medium"
         back={{ href: "/mas/caja", label: "Volver a Caja" }}
         title="Gestionar cajas"
-        subtitle={rows ? (pending.length === 1 ? "1 pendiente" : `${pending.length} pendientes`) : undefined}
+        offline={offline ? { text: "Sin conexión" } : null}
+        subtitle={offline ? undefined : rows ? (pending.length === 1 ? "1 pendiente" : `${pending.length} pendientes`) : undefined}
       />
       <Sheet>
-        {error ? <StateBlock kind="error" title="No se pudieron cargar las cajas." body={error} /> : null}
-        {!rows && !error ? <SkeletonRows /> : null}
-        {rows ? (
+        {offline ? <GestionarOfflineState /> : null}
+        {!offline && error ? <StateBlock kind="error" title="No se pudieron cargar las cajas." body={error} /> : null}
+        {!offline && !rows && !error ? <SkeletonRows /> : null}
+        {!offline && rows ? (
           <>
             {orphans.length > 0 ? (
               <section className="flex flex-col gap-2">

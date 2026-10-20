@@ -1,3 +1,4 @@
+import { deriveRequestId } from "@/domain/requestId";
 import { ApiError, NetworkError } from "@/data/errors";
 import { getPwaApi } from "@/data/pwa/api";
 import { getPwaAuthSession } from "@/data/http/session";
@@ -23,6 +24,20 @@ export function todayLocal(at: Date = new Date()): string {
     month: "2-digit",
     day: "2-digit",
   }).format(at);
+}
+
+/**
+ * Deterministic Idempotency-Key for "open today's caja" (one per business
+ * and Bogotá day, via deriveRequestId). A double tap, an online timeout that
+ * falls back offline, or a second offline open all carry the same key, so
+ * the server creates exactly one session when the outbox syncs.
+ */
+export function cashOpenRequestId(business: string, localDate: string): Promise<string> {
+  return deriveRequestId(business, `cash-open:${localDate}`);
+}
+
+export function todayCashOpenRequestId(): Promise<string> {
+  return cashOpenRequestId(businessId(), todayLocal());
 }
 
 export function clean(value?: string): string | undefined {

@@ -149,7 +149,16 @@ export const prepStore = {
   /** Starts preparation without blocking the app. The intro stays closed after dismiss. */
   async evaluate(): Promise<void> {
     const businessId = sessionBusinessId();
-    if (!businessId || !isOnline()) return;
+    if (!businessId) return;
+    if (!isOnline()) {
+      // Offline boot: never start prep, but surface a completed prep so
+      // offline screens (Caja «Abrir caja», bands) know this device is ready.
+      const { row } = await checkReadiness(businessId).catch(() => ({ row: undefined }));
+      if (row?.status === "ready" && row.completedAt != null) {
+        setState({ phase: "ready", businessId, modalOpen: false, lastReadyAt: row.completedAt });
+      }
+      return;
+    }
     if (state.phase === "preparing") return;
     const { status, row } = await checkReadiness(businessId);
     if (status === "ready") {

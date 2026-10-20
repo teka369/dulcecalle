@@ -2,6 +2,7 @@ import { getDb } from "@/storage/db";
 import {
   DEFAULT_PALETTE,
   PALETTE_SETTING_KEY,
+  effectiveMode,
   parsePalette,
   type PaletteId,
 } from "./palettes";
@@ -45,6 +46,7 @@ export function applyPalette(id: PaletteId): void {
   } catch {
     /* private mode */
   }
+  document.documentElement.dataset.mode = effectiveMode(id, readCachedMode());
   syncThemeColor();
 }
 
@@ -76,7 +78,8 @@ export function readCachedMode(): ColorMode {
 /** Apply color mode without touching data-theme (palette). */
 export function applyMode(mode: ColorMode): void {
   if (typeof document === "undefined") return;
-  document.documentElement.dataset.mode = mode;
+  // Saved preference stays as chosen; the attribute reports what renders.
+  document.documentElement.dataset.mode = effectiveMode(parsePalette(document.documentElement.dataset.theme), mode);
   try {
     localStorage.setItem(MODE_CACHE_KEY, mode);
   } catch {
