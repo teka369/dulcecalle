@@ -1,3 +1,4 @@
+import { userFacingMessage } from "@/domain/ux/user-message";
 import type { ReactNode } from "react";
 
 export type StateBlockProps = {
@@ -9,7 +10,9 @@ export type StateBlockProps = {
   onHero?: boolean;
 };
 
-export function StateBlock({ kind, title, body, action, onHero = false }: StateBlockProps) {
+export function StateBlock({ kind, title, body: rawBody, action, onHero = false }: StateBlockProps) {
+  // Error bodies come from caught exceptions: never show technical text.
+  const body = kind === "error" && rawBody ? userFacingMessage(rawBody, "Inténtalo de nuevo con Reintentar.") : rawBody;
   return (
     <div
       role={kind === "error" ? "alert" : "status"}

@@ -1,3 +1,4 @@
+import { userFacingMessage } from "@/domain/ux/user-message";
 import { assertUuid } from "../local/ids";
 import { getLocalDb } from "../local/db";
 import { getOutboxStore, payloadReferences } from "../local/outbox";
@@ -123,7 +124,7 @@ export function humanizeSyncError(message: string | null): string | null {
   if (/failed to fetch|networkerror|load failed|network request failed|aborted|timeout|sin conexi.n/i.test(clean)) {
     return "Se perdió la conexión durante el envío. Se reintentará automáticamente.";
   }
-  return clean || null;
+  return clean ? userFacingMessage(clean, "El servidor no aceptó este envío. Corrígelo o descártalo.") : null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
