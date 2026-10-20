@@ -71,7 +71,12 @@ export async function syncAllPending(businessId: string): Promise<SyncAllResult>
   for (const [key, run] of steps) {
     const flush = await run();
     result[key] = flush;
-    if (flush.authRequired) break;
+    if (flush.authRequired) return result;
+  }
+  // AC4: a preparation queued behind a pending surtir/merma (dependsOn) is
+  // blocked on the first pass; operations just synced, so retry once.
+  if (result.preparations.blocked > 0) {
+    result.preparations = await syncPendingPreparations(businessId);
   }
   return result;
 }

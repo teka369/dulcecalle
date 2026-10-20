@@ -16,6 +16,34 @@ import {
   todayLocal,
 } from "./offline-operations";
 
+/**
+ * An offline preparation must replay AFTER whatever it was computed on:
+ * the pending create of either product (localId → serverId remap) and any
+ * pending stock op (surtir/merma/preparation) on them, so the server sees the
+ * same lot value and averages as this device did.
+ */
+async function productDependencies(
+  business: string,
+  products: ReadonlyArray<{ id: string; requestId?: string }>,
+): Promise<string[]> {
+  const ids = new Set(products.map((p) => p.id));
+  const requestIds = new Set(products.map((p) => p.requestId).filter(Boolean));
+  const rows = await getLocalDb().outbox.where("businessId").equals(business).toArray();
+  return rows
+    .filter((op) => op.status !== "synced")
+    .filter((op) => {
+      if (op.entity === "product" && op.operation === "create") return requestIds.has(op.requestId);
+      if (op.entity === "stockMove" || op.entity === "preparation") {
+        const payload = (op.payload ?? {}) as Record<string, unknown>;
+        return [payload.productId, payload.sourceId, payload.targetId].some(
+          (v) => typeof v === "string" && ids.has(v),
+        );
+      }
+      return false;
+    })
+    .map((op) => op.operationId);
+}
+
 function businessId(): string {
   const id = getPwaAuthSession().businessId;
   if (!id) throw new Error("Selecciona un negocio.");
@@ -108,7 +136,10 @@ export async function prepararWithOfflineFallback(
         `Este costo supera el valor restante del lote (${formatCop(source.avgCost)}).`,
       );
     }
-    const dependsOn = await openDependency(db, business);
+    const dependsOn = [
+      ...(await openDependency(db, business)),
+      ...(await productDependencies(business, [source, target])),
+    ];
     const preparationId = newEntityId();
     const note = clean(input.note) ?? null;
     // Same value-conservation rule as the server: assigned cost transfers

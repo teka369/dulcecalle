@@ -409,6 +409,13 @@ async function reconcileProduct(businessId: string, localId: string, remote: Rem
             next.productId = remote.id;
             changed = true;
           }
+          // Preparation payloads reference products as source/target.
+          for (const key of ["sourceId", "targetId"] as const) {
+            if (next[key] === localId) {
+              next[key] = remote.id;
+              changed = true;
+            }
+          }
           if (op.entity === "product" && next.id === localId) {
             next.id = remote.id;
             changed = true;
