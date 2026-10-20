@@ -18,6 +18,23 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+// DEV-ONLY diagnostics (see src/data/pwa/nav-debug.ts): on only in dev or
+// after a page with localStorage["dc:navdebug"]="1" posts the opt-in message.
+// Logs the route chosen for the Caja tile documents; never alters responses.
+let navDebugSw = process.env.NODE_ENV !== "production";
+const NAV_DEBUG_PATHS = new Set(["/mas/caja", "/mas/caja/aporte", "/mas/caja/retiro", "/mas/caja/gastos/nuevo", "/mas/gastos/nuevo"]);
+self.addEventListener("message", (e) => {
+  if ((e.data as { type?: string } | null)?.type === "dc:navdebug") navDebugSw = true;
+});
+function swNavDebug(request: Request, url: URL, kind: string): void {
+  if (!navDebugSw || request.mode !== "navigate" || !NAV_DEBUG_PATHS.has(url.pathname)) return;
+  try {
+    new BroadcastChannel("dc-navdebug").postMessage({ path: url.pathname, route: kind, document: kind === "document" ? "documents cache (NetworkFirst)" : kind });
+  } catch {
+    /* diagnostics never throw */
+  }
+}
+
 /**
  * Cache Storage = app shell only.
  * Business data (Dexie / IndexedDB) and future /api traffic must never be cached here.
@@ -55,7 +72,7 @@ const runtimeCaching = [
     // Offline + miss: serve the parent list document PREP stored (the URL
     // stays; the shell reopens the ficha from IndexedDB). Otherwise /offline.
     matcher: ({ request, url }: { request: Request; url: URL }) =>
-      request.mode === "navigate" && swNavigationRoute(url.pathname).kind === "entity",
+      request.mode === "navigate" && (swNavDebug(request, url, swNavigationRoute(url.pathname).kind), swNavigationRoute(url.pathname).kind === "entity"),
     handler: async ({ request, url }: { request: Request; url: URL }): Promise<Response> => {
       try {
         return await fetch(request);
