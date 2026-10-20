@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
 import { useEffect, useRef, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
@@ -32,12 +33,20 @@ type Row = {
   closedAt: string | null;
 };
 
+/** Server default page size for GET /cash/sessions. */
+const CLOSED_PAGE = 50;
+
 export default function GestionarCajasPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [orphans, setOrphans] = useState<Array<{ id: string; occurredOn: string; kind: string; method: string; amount: number }>>([]);
   const [target, setTarget] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
+  // Closed cajas come in server pages (cursor = last id); «Cargar más» asks
+  // for the next one while the last page was full.
+  const [moreClosed, setMoreClosed] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
@@ -57,6 +66,7 @@ export default function GestionarCajasPage() {
       api.cash.listSessions("closed"),
     ])
       .then(([open, closed]) => {
+        setMoreClosed((closed as Row[]).length >= CLOSED_PAGE);
         const seen = new Set<string>();
         const merged = [...(open as Row[]), ...(closed as Row[])].filter((row) =>
           seen.has(row.id) ? false : (seen.add(row.id), true),
@@ -69,6 +79,25 @@ export default function GestionarCajasPage() {
       });
     void api.cash.unassigned().then((data) => setOrphans(data as typeof orphans)).catch(() => setOrphans([]));
   }, []);
+
+  async function loadMoreClosed() {
+    const last = rows?.filter((row) => row.regularized).at(-1);
+    if (!last || loadingMore) return;
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      const page = (await getPwaApi().cash.listSessions("closed", { limit: CLOSED_PAGE, cursor: last.id })) as Row[];
+      setRows((current) => {
+        const seen = new Set((current ?? []).map((row) => row.id));
+        return [...(current ?? []), ...page.filter((row) => !seen.has(row.id))];
+      });
+      setMoreClosed(page.length >= CLOSED_PAGE);
+    } catch {
+      setMoreError("No se pudieron cargar más cajas. Intenta de nuevo.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   async function assign(moveId: string) {
     if (!target || assigningId) return;
@@ -213,6 +242,20 @@ export default function GestionarCajasPage() {
                     ))}
                   </RowGroup>
                 )
+              ) : null}
+              {showClosed && moreClosed ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={loadingMore}
+                  onClick={() => void loadMoreClosed()}
+                  className="w-full"
+                >
+                  {loadingMore ? "Cargando…" : "Cargar más"}
+                </Button>
+              ) : null}
+              {showClosed && moreError ? (
+                <p className="text-sm text-danger">{moreError}</p>
               ) : null}
             </section>
           </>
