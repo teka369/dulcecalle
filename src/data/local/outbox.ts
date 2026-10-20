@@ -188,18 +188,75 @@ export class OutboxStore {
    * the local intent. It never reverts a server-side effect and the row is
    * never sent again. Synced rows are history and cannot be discarded.
    */
-  async discard(businessId: string, operationId: string): Promise<void> {
+  async discard(
+    businessId: string,
+    operationId: string,
+    options: { dependentReason?: (discarded: OutboxItem) => string } = {},
+  ): Promise<void> {
     assertUuid(businessId, "businessId");
     assertUuid(operationId, "operationId");
-    const row = await this.db.outbox.get(operationId);
-    if (!row) throw new Error("outbox row not found");
-    if (row.businessId !== businessId) {
-      throw new Error("operationId belongs to another business");
-    }
-    if (row.status !== "pending" && row.status !== "failed") {
-      throw new Error(`only pending/failed operations can be discarded (status: ${row.status})`);
-    }
-    await this.db.outbox.delete(operationId);
+    await this.db.transaction("rw", this.db.outbox, async () => {
+      const row = await this.db.outbox.get(operationId);
+      if (!row) throw new Error("outbox row not found");
+      if (row.businessId !== businessId) {
+        throw new Error("operationId belongs to another business");
+      }
+      if (row.status !== "pending" && row.status !== "failed") {
+        throw new Error(`only pending/failed operations can be discarded (status: ${row.status})`);
+      }
+      await this.db.outbox.delete(operationId);
+      // loop/v1 T-alto2 — Direct dependents can never be sent while waiting on
+      // a row that no longer exists. Surface them as a permanent failure that
+      // says what they were waiting for (Reintentar sends them without it,
+      // Descartar drops them). Deeper descendants still wait on their
+      // existing parent and are handled if that parent is discarded too.
+      const reason =
+        options.dependentReason?.(row) ?? "Esperando a otra operación, que se descartó.";
+      const dependents = await this.db.outbox
+        .where("businessId")
+        .equals(businessId)
+        .filter(
+          (other) =>
+            (other.status === "pending" || other.status === "failed") &&
+            other.dependsOn.includes(operationId),
+        )
+        .toArray();
+      for (const dependent of dependents) {
+        await this.db.outbox.put({
+          ...dependent,
+          status: "failed",
+          nextAttemptAt: null,
+          lastError: reason,
+          dependsOn: dependent.dependsOn.filter((id) => id !== operationId),
+        });
+      }
+    });
+  }
+
+  /**
+   * loop/v1 T-alto2 — Legacy orphans: a pending row whose dependency row is
+   * gone (discarded before dependents were handled) waits forever. Drop the
+   * missing ids so the next flush sends it; existing dependencies are kept.
+   */
+  async detachMissingDependencies(businessId: string, operationId: string): Promise<OutboxItem> {
+    assertUuid(businessId, "businessId");
+    assertUuid(operationId, "operationId");
+    return this.db.transaction("rw", this.db.outbox, async () => {
+      const row = await this.db.outbox.get(operationId);
+      if (!row) throw new Error("outbox row not found");
+      if (row.businessId !== businessId) throw new Error("operationId belongs to another business");
+      if (row.status !== "pending") {
+        throw new Error(`only pending operations can be detached (status: ${row.status})`);
+      }
+      const kept: string[] = [];
+      for (const id of row.dependsOn) {
+        const dependency = await this.db.outbox.get(id);
+        if (dependency && dependency.businessId === businessId) kept.push(id);
+      }
+      const next: OutboxItem = { ...row, dependsOn: kept, nextAttemptAt: null };
+      await this.db.outbox.put(next);
+      return next;
+    });
   }
 
   private async patchStatus(

@@ -177,7 +177,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
         </div>
       )}
 
-      {item.status === "failed" && !confirming && (
+      {(item.status === "failed" || item.orphaned) && !confirming && (
         <div className="mt-3 grid grid-cols-2 gap-2">
           <Button type="button" variant="primary" disabled={busy} onClick={() => void retry()} className="w-full">
             Reintentar
@@ -188,7 +188,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
         </div>
       )}
 
-      {item.status === "failed" && confirming && (
+      {(item.status === "failed" || item.orphaned) && confirming && (
         <div className="mt-3 rounded-[var(--r-lg)] border border-danger/20 bg-danger/5 p-3">
           <p className="text-sm font-semibold">¿Descartar este envío?</p>
           <p className="mt-1 text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>

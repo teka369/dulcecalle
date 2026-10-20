@@ -28,7 +28,11 @@ export type EnrichedTrayItem = TrayItem & {
   retryable: boolean;
   /** Unsatisfied dependency description, when blocked. */
   blockedBy: string | null;
+  /** Pending, but a dependency row no longer exists (it was discarded): actionable. */
+  orphaned: boolean;
 };
+
+export const ORPHAN_BLOCKED_REASON = "Esperando a una operación que se descartó";
 
 const OPERATION_NAMES: Record<string, string> = {
   "cashSession:open": "Apertura de caja",
@@ -217,7 +221,9 @@ export async function resolveBlockedReason(
   const outbox = getOutboxStore();
   for (const dependencyId of item.dependsOn) {
     const dependency = await outbox.get(businessId, dependencyId);
-    if (!dependency || dependency.status === "synced") continue;
+    // A missing row was discarded: it will never sync, so this waits forever.
+    if (!dependency) return ORPHAN_BLOCKED_REASON;
+    if (dependency.status === "synced") continue;
     if (dependency.entity === "supplier") return "Esperando proveedor";
     if (dependency.entity === "cashSession") return "Esperando apertura de caja";
     if (dependency.entity === "customer") return "Esperando cliente";
@@ -250,12 +256,21 @@ export async function listTrayOperations(
     .map(toTrayItem);
 }
 
-/** M6.9 — Manual retry: failed → pending, same requestId, no new intent. */
+/**
+ * M6.9 — Manual retry: failed → pending, same requestId, no new intent.
+ * loop/v1 T-alto2: a pending orphan (its dependency was discarded) is
+ * released from the missing dependency instead.
+ */
 export async function retryOutboxOperation(
   businessId: string,
   operationId: string,
 ): Promise<TrayItem> {
-  const row = await getOutboxStore().requeue(businessId, operationId);
+  const outbox = getOutboxStore();
+  const current = await outbox.get(businessId, operationId);
+  const row =
+    current?.status === "pending"
+      ? await outbox.detachMissingDependencies(businessId, operationId)
+      : await outbox.requeue(businessId, operationId);
   return toTrayItem(row);
 }
 
@@ -267,7 +282,10 @@ export async function discardOutboxOperation(
   businessId: string,
   operationId: string,
 ): Promise<void> {
-  await getOutboxStore().discard(businessId, operationId);
+  await getOutboxStore().discard(businessId, operationId, {
+    dependentReason: (discarded) =>
+      `Esperando a ${describeOutboxOperation(discarded.entity, discarded.operation)}, que se descartó. Reintenta para enviarlo sin eso, o descártalo.`,
+  });
 }
 
 /** UI-friendly session resolution: empty when there is no business. */
@@ -275,6 +293,11 @@ export async function listTrayForSession(): Promise<TrayItem[]> {
   const businessId = getPwaAuthSession().businessId;
   if (!businessId) return [];
   return listTrayOperations(businessId);
+}
+
+async function enrichBlocked(businessId: string, row: TrayItem) {
+  const blockedBy = await resolveBlockedReason(businessId, row);
+  return { blockedBy, orphaned: row.status === "pending" && blockedBy === ORPHAN_BLOCKED_REASON };
 }
 
 /**
@@ -289,7 +312,7 @@ export async function listEnrichedTray(businessId: string): Promise<EnrichedTray
       ...row,
       permanent: isPermanentFailure(row),
       retryable: isRetryableFailure(row),
-      blockedBy: await resolveBlockedReason(businessId, row),
+      ...(await enrichBlocked(businessId, row)),
     })),
   );
 }
