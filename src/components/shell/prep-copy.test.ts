@@ -17,3 +17,14 @@ describe("Preparando popup copy (D8)", () => {
     expect(modal).not.toMatch(TECH);
   });
 });
+
+describe("Preparando popup copy (pass3)", () => {
+  it("system steps use simple words, not «Almacenamiento» / «Verificación»", () => {
+    const prep = readFileSync("src/data/pwa/offline-prep.ts", "utf8");
+    const labels = [...prep.matchAll(/label: "([^"]+)"/g)].map((m) => m[1]);
+    expect(labels).not.toContain("Almacenamiento");
+    expect(labels).not.toContain("Verificación");
+    expect(prep).toMatch(/key: "sys:storage", group: "sistema", label: "Espacio en el teléfono"/);
+    expect(prep).toMatch(/key: "sys:verify",\s+group: "sistema",\s+label: "Revisión"/);
+  });
+});

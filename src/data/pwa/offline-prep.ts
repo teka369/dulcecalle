@@ -342,11 +342,11 @@ export async function buildPrepTaskDefs(
     { key: "history:moves", group: "historial", label: "Movimientos", run: wrap("history:moves", () => warmMoveHistory(businessId)) },
     ...snapshots,
     { key: "media:thumbs", group: "resumen", label: "Fotos de productos", run: wrap("media:thumbs", () => warmPrimaryThumbs(businessId)) },
-    { key: "sys:storage", group: "sistema", label: "Almacenamiento", run: wrap("sys:storage", checkStorage) },
+    { key: "sys:storage", group: "sistema", label: "Espacio en el teléfono", run: wrap("sys:storage", checkStorage) },
     {
       key: "sys:verify",
       group: "sistema",
-      label: "Verificación",
+      label: "Revisión",
       run: async () => {
         const warmed = requiredStaticDocuments();
         details.set("sys:verify", await verifyPreparation(businessId, warmed));
