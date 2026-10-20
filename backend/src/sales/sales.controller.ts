@@ -5,6 +5,7 @@ import { CreateReturnDto, CreateSaleDto } from "./sales.dto";
 import { CurrentBusiness } from "../tenancy/business.decorator";
 import type { BusinessContext } from "../identity/auth.types";
 import { resolveIdempotencyKey } from "../shared/idempotency";
+import { UuidParam, optionalDateQuery } from "../shared/http/params";
 
 @Controller("sales")
 export class SalesController {
@@ -16,11 +17,11 @@ export class SalesController {
     @Query("from") from?: string,
     @Query("to") to?: string,
   ) {
-    return this.sales.list(ctx, from, to);
+    return this.sales.list(ctx, optionalDateQuery(from, "from"), optionalDateQuery(to, "to"));
   }
 
   @Get(":id/returns")
-  listReturns(@CurrentBusiness() ctx: BusinessContext, @Param("id") id: string) {
+  listReturns(@CurrentBusiness() ctx: BusinessContext, @Param("id", UuidParam) id: string) {
     return this.sales.listReturns(ctx, id);
   }
 
@@ -28,7 +29,7 @@ export class SalesController {
   @Post(":id/returns")
   createReturn(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: CreateReturnDto,
     @Headers("idempotency-key") key?: string,
   ) {
@@ -41,7 +42,7 @@ export class SalesController {
   }
 
   @Get(":id")
-  get(@CurrentBusiness() ctx: BusinessContext, @Param("id") id: string) {
+  get(@CurrentBusiness() ctx: BusinessContext, @Param("id", UuidParam) id: string) {
     return this.sales.get(ctx, id);
   }
 

@@ -22,6 +22,7 @@ import { CreatePaymentDto } from "../sales/sales.dto";
 import { CurrentBusiness } from "../tenancy/business.decorator";
 import type { BusinessContext } from "../identity/auth.types";
 import { resolveIdempotencyKey } from "../shared/idempotency";
+import { UuidParam, optionalDateQuery } from "../shared/http/params";
 
 @Controller()
 export class CashController {
@@ -43,7 +44,7 @@ export class CashController {
   @Post("cash/sessions/:id/close")
   close(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: CloseSessionDto,
     @Headers("idempotency-key") key?: string,
   ) {
@@ -61,7 +62,7 @@ export class CashController {
   }
 
   @Get("cash/sessions/:id")
-  detail(@CurrentBusiness() ctx: BusinessContext, @Param("id") id: string) {
+  detail(@CurrentBusiness() ctx: BusinessContext, @Param("id", UuidParam) id: string) {
     return this.manager.detail(ctx, id);
   }
 
@@ -73,7 +74,7 @@ export class CashController {
   @Post("cash/moves/:id/assign")
   assign(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: AssignMoveDto,
     @Headers("idempotency-key") key?: string,
   ) {
@@ -83,7 +84,7 @@ export class CashController {
   @Post("cash/sessions/:id/carry")
   carry(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: CarrySessionDto,
     @Headers("idempotency-key") key?: string,
   ) {
@@ -103,7 +104,7 @@ export class CashController {
     @Query("from") from?: string,
     @Query("to") to?: string,
   ) {
-    return this.cash.listMoves(ctx, date, from, to);
+    return this.cash.listMoves(ctx, optionalDateQuery(date, "date"), optionalDateQuery(from, "from"), optionalDateQuery(to, "to"));
   }
 
   @Get("expenses")
@@ -112,7 +113,7 @@ export class CashController {
     @Query("from") from?: string,
     @Query("to") to?: string,
   ) {
-    return this.cash.listExpenses(ctx, from, to);
+    return this.cash.listExpenses(ctx, optionalDateQuery(from, "from"), optionalDateQuery(to, "to"));
   }
 
   @Throttle({ default: { limit: 30, ttl: 60000 } })
@@ -161,7 +162,7 @@ export class CashController {
   @Post("customers/:id/payments")
   pay(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: CreatePaymentDto,
     @Headers("idempotency-key") key?: string,
   ) {
