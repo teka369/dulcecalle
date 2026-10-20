@@ -11,11 +11,11 @@ import { CustomerAccessService } from "./customer-access.service";
 import type { PortalLoginThrottle } from "./portal-throttle";
 
 /** loop/v1 portal hardening: one bcrypt per attempt; limits per IP(+code), never a lockout others can trigger. */
-type Row = { id: string; businessId: string; code: string; name: string; debt: bigint; pinHash: string; business: { timezone: string } };
+type Row = { id: string; businessId: string; code: string; name: string; debt: bigint; pinHash: string; business: { timezone: string; name: string } };
 const B1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
 const B2 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2";
 const B3 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3";
-const row = (id: string, biz: string, pin: string): Row => ({ id, businessId: biz, code: "DC-0001", name: id, debt: 0n, pinHash: `hash:${pin}`, business: { timezone: "America/Bogota" } });
+const row = (id: string, biz: string, pin: string): Row => ({ id, businessId: biz, code: "DC-0001", name: id, debt: 0n, pinHash: `hash:${pin}`, business: { timezone: "America/Bogota", name: `Tienda ${biz.slice(-1)}` } });
 
 function fakeThrottle() {
   const counts = new Map<string, number>();
@@ -50,8 +50,8 @@ function service(rows: Row[]) {
   return { svc, throttle };
 }
 
-const login = (svc: CustomerAccessService, code: string, pin: string, biz?: string, ip?: string) =>
-  (svc.login as (...a: unknown[]) => Promise<unknown>)(code, pin, biz, ip).then(
+const login = (svc: CustomerAccessService, code: string, pin: string, biz?: string, ip?: string, store?: string) =>
+  (svc.login as (...a: unknown[]) => Promise<unknown>)(code, pin, biz, ip, store).then(
     () => "ok",
     (e: { code?: string }) => e.code ?? "error",
   );
@@ -59,9 +59,18 @@ const login = (svc: CustomerAccessService, code: string, pin: string, biz?: stri
 describe("portal login hardening", () => {
   beforeEach(() => (compares.length = 0));
 
-  it("no businessId + the code exists in 3 stores → exactly one bcrypt compare (dummy), 401", async () => {
+  it("no businessId + the code exists in 3 stores → exactly one bcrypt compare (dummy), generic 401", async () => {
     const { svc } = service([row("a", B1, "111111"), row("b", B2, "222222"), row("c", B3, "333333")]);
     expect(await login(svc, "DC-1", "222222", undefined, "203.0.113.5")).toBe("UNAUTHORIZED");
+    expect(compares).toEqual(["DUMMY"]);
+  });
+
+  it("multi-store + store hint → exactly one compare: real hash for the matched store, dummy otherwise", async () => {
+    const { svc } = service([row("a", B1, "111111"), row("b", B2, "222222"), row("c", B3, "333333")]);
+    expect(await login(svc, "DC-1", "222222", undefined, "203.0.113.5", "tienda 2")).toBe("ok");
+    expect(compares).toEqual(["hash:222222"]);
+    compares.length = 0;
+    expect(await login(svc, "DC-1", "222222", undefined, "203.0.113.5", "tienda 9")).toBe("UNAUTHORIZED");
     expect(compares).toEqual(["DUMMY"]);
   });
 

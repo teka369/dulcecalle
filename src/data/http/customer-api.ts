@@ -104,13 +104,18 @@ export class CustomerApi {
     );
   }
 
-  async login(code: string, pin: string, businessId?: string) {
+  /** `store` (short name or 8-char store code) only matters when the code is in 2+ stores. */
+  async login(code: string, pin: string, businessId?: string, store?: string) {
     const body = await this.http.request<{
       customer: { id: string; code: string; name: string; debt: number };
       accessToken: string;
       refreshToken: string;
     }>("POST", "/customer-access/login", {
-      body: businessId ? { code, pin, businessId } : { code, pin },
+      body: businessId
+        ? { code, pin, businessId }
+        : store?.trim()
+          ? { code, pin, store: store.trim() }
+          : { code, pin },
       skipBusiness: true,
       skipRefresh: true,
     });

@@ -16,7 +16,7 @@ export class CustomerAccessController {
   @Post("customer-access/login")
   login(@Body() dto: CustomerLoginDto, @Ip() ip: string) {
     // req.ip honours `trust proxy` (configureHttp); see CustomerAccessService.login.
-    return this.access.login(dto.code, dto.pin, dto.businessId, ip);
+    return this.access.login(dto.code, dto.pin, dto.businessId, ip, dto.store);
   }
 
   @Public()

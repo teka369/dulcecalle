@@ -14,6 +14,23 @@ import { IP_CODE_POLICY, IP_POLICY, isPrivateOrUnknownIp, PortalLoginThrottle } 
 const IDENTIFY_FAIL = "No pudimos identificarte.";
 const PIN_RE = /^\d{6}$/;
 
+/** Lowercase, no accents, single spaces. Null when empty. */
+function normalizeStore(raw: string | undefined): string | null {
+  const v = (raw ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  return v ? v : null;
+}
+
+/** Store short name (normalized, exact) or store code (first 8 hex of its id). */
+function storeMatches(store: string, businessId: string, name: string): boolean {
+  if (/^[0-9a-f]{8}$/.test(store) && businessId.toLowerCase().startsWith(store)) return true;
+  return normalizeStore(name) === store;
+}
+
 let dummyPinHash: Promise<string> | null = null;
 
 function dummyHash(): Promise<string> {
@@ -56,7 +73,7 @@ export class CustomerAccessService {
    *   everyone) and the per-IP+code bucket degrades to per-code — the previous
    *   behaviour, never weaker against guessing.
    */
-  async login(codeRaw: string, pinRaw: string, businessIdRaw?: string, clientIp?: string) {
+  async login(codeRaw: string, pinRaw: string, businessIdRaw?: string, clientIp?: string, storeRaw?: string) {
     const code = normalizeCustomerCode(codeRaw);
     const pin = pinRaw.trim();
     const businessId = businessIdRaw?.trim() || undefined;
@@ -79,18 +96,25 @@ export class CustomerAccessService {
       );
     }
 
+    const store = businessId ? null : normalizeStore(storeRaw);
     const where = businessId
       ? { code, businessId, archivedAt: null, pinHash: { not: null } }
       : { code, archivedAt: null, pinHash: { not: null } };
-    // At most 2 rows: we only need to know whether the code is unambiguous.
+    // Without a store hint we only need to know whether the code is
+    // unambiguous (2 rows). With one, read a bounded set and pick by store.
     const rows = await this.prisma.customer.findMany({
       where,
-      include: { business: { select: { timezone: true } } },
+      include: { business: { select: { timezone: true, name: true } } },
       orderBy: { id: "asc" },
-      take: 2,
+      take: store ? 50 : 2,
     });
-    const candidate = rows.length === 1 ? rows[0] : null;
+    const pool = store ? rows.filter((r) => storeMatches(store, r.businessId, r.business.name)) : rows;
+    const candidate = pool.length === 1 ? pool[0] : null;
+    // Exactly one bcrypt compare in every branch (real hash or dummy).
     const ok = await bcrypt.compare(pin, candidate ? (candidate.pinHash as string) : await dummyHash());
+    // Same code in 2+ stores without a store hint: no candidate, so the SAME
+    // generic 401 as a wrong PIN or unknown code (no enumeration). The client
+    // then offers the optional store field.
     if (!candidate || !ok) {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
     }
