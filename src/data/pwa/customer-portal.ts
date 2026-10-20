@@ -7,7 +7,8 @@ export type CustomerStatementRow = {
   id: string;
   at: number;
   occurredOn: string;
-  kind: "compra" | "pago" | "fiado" | "inicial" | "devolucion";
+  /** compra = paid at the moment; reembolso = money handed back. Neither moves the debt. */
+  kind: "compra" | "pago" | "fiado" | "inicial" | "devolucion" | "reembolso";
   title: string;
   amount: number;
   href?: string;
@@ -34,20 +35,23 @@ export function customerPortalSummary(ledger: CustomerLedger) {
 /**
  * Ledger sums for the customer home. Derived only, never invented.
  *
- * A partial sale does NOT create a CustomerLedgerPayment (verified in
- * sales.service.ts: only the pay endpoint writes customerPayment rows),
- * so its amountReceived lives only on the sale. Counting it here cannot
- * double-count: payments[] and partial amountReceived are disjoint by
- * construction. Paid sales are purchases, not abonos, and stay out.
+ * Domain rule: ventas ≠ recibido ≠ fiado. Only the fiado part of a sale
+ * (`credit`, already net of what was paid at the counter) and deuda anterior
+ * raise the debt; abonos (customerPayment rows) and returns that reduce debt
+ * lower it. Paid-at-the-moment purchases and cash refunds never move it, so
+ *   totalFiado − totalAbonado − totalDevuelto = DEBES
+ * when the ledger is complete.
  */
 export function customerPortalTotals(ledger: CustomerLedger) {
   return {
-    totalComprado: ledger.sales.reduce((s, sale) => s + sale.saleTotal, 0),
-    totalAbonado:
-      ledger.payments.reduce((s, p) => s + p.amount, 0) +
-      ledger.sales
-        .filter((sale) => sale.paymentKind === "partial")
-        .reduce((s, sale) => s + sale.amountReceived, 0),
+    totalFiado:
+      ledger.initials.reduce((s, d) => s + d.amount, 0) +
+      ledger.sales.reduce((s, sale) => s + Math.max(0, sale.credit), 0),
+    totalAbonado: ledger.payments.reduce((s, p) => s + p.amount, 0),
+    totalDevuelto: ledger.sales.reduce(
+      (s, sale) => s + (sale.returns ?? []).reduce((r, ret) => r + Math.max(0, ret.debtReduced), 0),
+      0,
+    ),
     movimientos:
       ledger.sales.length + ledger.payments.length + ledger.initials.length,
   };
@@ -79,16 +83,30 @@ export function customerStatementRows(
       amount: s.credit > 0 ? s.credit : s.saleTotal,
       href: `/cliente/compras/${s.id}`,
     });
-    for (const r of s.returns) {
-      rows.push({
-        id: `dev-${r.id}`,
-        at: epoch(r.createdAt),
-        occurredOn: r.occurredOn,
-        kind: "devolucion",
-        title: "Devolución",
-        amount: r.debtReduced > 0 ? r.debtReduced : r.refundAmount,
-        href: `/cliente/compras/${s.id}`,
-      });
+    for (const r of s.returns ?? []) {
+      // A return can lower the debt, hand money back, or both: one row per effect.
+      if (r.debtReduced > 0) {
+        rows.push({
+          id: `dev-${r.id}`,
+          at: epoch(r.createdAt),
+          occurredOn: r.occurredOn,
+          kind: "devolucion",
+          title: "Devolución",
+          amount: r.debtReduced,
+          href: `/cliente/compras/${s.id}`,
+        });
+      }
+      if (r.refundAmount > 0) {
+        rows.push({
+          id: `dev-${r.id}-reembolso`,
+          at: epoch(r.createdAt),
+          occurredOn: r.occurredOn,
+          kind: "reembolso",
+          title: "Devolución",
+          amount: r.refundAmount,
+          href: `/cliente/compras/${s.id}`,
+        });
+      }
     }
   }
 
