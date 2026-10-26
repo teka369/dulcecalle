@@ -19,6 +19,7 @@ import { JwtAuthGuard } from "./identity/jwt.guard";
 import { BusinessGuard } from "./tenancy/business.guard";
 import { RolesGuard } from "./tenancy/roles.guard";
 import { requireJwtSecrets } from "./identity/jwt-secrets";
+import { shouldSkipThrottle } from "./http-setup";
 
 @Module({
   imports: [
@@ -35,7 +36,7 @@ import { requireJwtSecrets } from "./identity/jwt-secrets";
     }),
     ThrottlerModule.forRoot({
       throttlers: [{ name: "default", ttl: 60000, limit: 120 }],
-      skipIf: () => process.env.DISABLE_THROTTLE === "1",
+      skipIf: () => shouldSkipThrottle(),
     }),
     PrismaModule,
     TenancyModule,
