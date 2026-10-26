@@ -5,42 +5,57 @@ import { trackRejections, warmUp } from "./loop-v1-helpers";
 /**
  * R2-A A2: /mas/caja/cerrar, /ventas/[id], /ventas/[id]/devolver,
  * /clientes/[id]/abono, and /clientes/[id]/deuda-inicial must show
- * «No se pudo cargar.» + Reintentar on 5xx (and recover when retry succeeds),
- * never hang on an infinite skeleton/spinner or show a false «No encontramos…».
+ * «No se pudo cargar.» + Reintentar on 5xx AND on NetworkError without local cache
+ * (and recover when retry succeeds), never hang on an infinite skeleton/spinner
+ * or show a false «No encontramos…» / «Abre la caja…».
  */
-test("cerrar caja: /cash/today 503 → error + Reintentar (recovers), never infinite spinner", async ({ context, page }) => {
+test("cerrar caja: /cash/today 503 and NetworkError without local session → error + Reintentar (recovers)", async ({ context, page }) => {
   await installFakeApi(context);
   await warmUp(page);
-  let fail = true;
-  await context.route(/\/v1\/cash\/today(\?|$)/, (route) =>
-    fail
-      ? route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "UNAVAILABLE", message: "Servicio no disponible" } }) })
-      : route.fallback(),
-  );
-  const p = await context.newPage();
-  const errors = trackRejections(p);
-  await p.goto("/mas/caja/cerrar");
-  await expect(p.getByRole("button", { name: "Reintentar" })).toBeVisible({ timeout: 5_000 });
-  await expect(p.getByText("No se pudo cargar.")).toBeVisible();
-  fail = false;
-  await p.getByRole("button", { name: "Reintentar" }).click();
-  await expect(p.getByText("No se pudo cargar.")).toHaveCount(0, { timeout: 10_000 });
-  expect(errors).toEqual([]);
-  await p.close();
+  let mode: 0 | 503 | "net" = 503;
+  await context.route(/\/v1\/cash\/today(\?|$)/, (route) => {
+    if (mode === "net") return route.abort("failed");
+    if (mode) {
+      return route.fulfill({
+        status: mode,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { code: "UNAVAILABLE", message: "Servicio no disponible" } }),
+      });
+    }
+    return route.fallback();
+  });
+
+  for (const fault of [503, "net"] as const) {
+    mode = fault;
+    const p = await context.newPage();
+    const errors = trackRejections(p);
+    await p.goto("/mas/caja/cerrar");
+    await expect(p.getByRole("button", { name: "Reintentar" }), `fault=${fault}`).toBeVisible({ timeout: 5_000 });
+    await expect(p.getByText("No se pudo cargar.")).toBeVisible();
+    await expect(p.getByText("Abre la caja para registrar movimientos.")).toHaveCount(0);
+    mode = 0;
+    await p.getByRole("button", { name: "Reintentar" }).click();
+    await expect(p.getByText("No se pudo cargar.")).toHaveCount(0, { timeout: 10_000 });
+    await expect(p.getByText("Abre la caja para registrar movimientos.")).toBeVisible();
+    expect(errors).toEqual([]);
+    await p.close();
+  }
 });
 
-test("ventas/[id] and ventas/[id]/devolver: 503 → error + Reintentar (recovers); 404 → No encontramos esa venta.", async ({ context, page }) => {
+test("ventas/[id] and ventas/[id]/devolver: 503 and NetworkError without cache → error + Reintentar (recovers); 404 → No encontramos esa venta.", async ({ context, page }) => {
   await installFakeApi(context);
   await warmUp(page);
-  const uncachedSale = "00000000-0000-4000-8000-000000000590";
-  let status = 503;
-  await context.route(new RegExp(`/v1/sales/${uncachedSale}(/returns)?$`), (route) => {
-    const isReturns = route.request().url().endsWith("/returns");
-    if (status) {
+  let mode: 0 | 404 | 503 | "net" = 503;
+  await context.route(/\/v1\/sales\/00000000-0000-4000-8000-00000000059\d(\/returns)?$/, (route) => {
+    const u = route.request().url();
+    const id = u.match(/00000000-0000-4000-8000-00000000059\d/)![0];
+    const isReturns = u.endsWith("/returns");
+    if (mode === "net") return route.abort("failed");
+    if (mode) {
       return route.fulfill({
-        status,
+        status: mode,
         contentType: "application/json",
-        body: JSON.stringify({ error: { code: status === 404 ? "NOT_FOUND" : "INTERNAL", message: "x" } }),
+        body: JSON.stringify({ error: { code: mode === 404 ? "NOT_FOUND" : "INTERNAL", message: "x" } }),
       });
     }
     if (isReturns) return route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
@@ -48,7 +63,7 @@ test("ventas/[id] and ventas/[id]/devolver: 503 → error + Reintentar (recovers
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        id: uncachedSale,
+        id,
         customerId: C0,
         paymentKind: "paid",
         method: "Efectivo",
@@ -63,30 +78,32 @@ test("ventas/[id] and ventas/[id]/devolver: 503 → error + Reintentar (recovers
     });
   });
 
-  for (const url of [`/ventas/${uncachedSale}`, `/ventas/${uncachedSale}/devolver`]) {
-    status = 503;
-    const p = await context.newPage();
-    const errors = trackRejections(p);
-    await p.goto(url);
-    await expect(p.getByRole("button", { name: "Reintentar" }), url).toBeVisible({ timeout: 5_000 });
-    await expect(p.getByText("No se pudo cargar.")).toBeVisible();
-    await expect(p.getByText("No encontramos esa venta.")).toHaveCount(0);
-    status = 0;
-    await p.getByRole("button", { name: "Reintentar" }).click();
-    await expect(p.getByText("No se pudo cargar.")).toHaveCount(0, { timeout: 10_000 });
-    await expect(p.getByText("Gomitas Ácidas QA")).toBeVisible();
-    expect(errors).toEqual([]);
-    await p.close();
+  let seq = 0;
+  for (const suffix of ["", "/devolver"]) {
+    for (const fault of [503, "net"] as const) {
+      seq++;
+      const saleId = `00000000-0000-4000-8000-00000000059${seq}`;
+      const url = `/ventas/${saleId}${suffix}`;
+      mode = fault;
+      const p = await context.newPage();
+      const errors = trackRejections(p);
+      await p.goto(url);
+      await expect(p.getByRole("button", { name: "Reintentar" }), `${url} fault=${fault}`).toBeVisible({ timeout: 5_000 });
+      await expect(p.getByText("No se pudo cargar.")).toBeVisible();
+      await expect(p.getByText("No encontramos esa venta.")).toHaveCount(0);
+      mode = 0;
+      await p.getByRole("button", { name: "Reintentar" }).click();
+      await expect(p.getByText("No se pudo cargar.")).toHaveCount(0, { timeout: 10_000 });
+      await expect(p.getByText("Gomitas Ácidas QA")).toBeVisible();
+      expect(errors).toEqual([]);
+      await p.close();
+    }
   }
 
   // Also verify 404 still shows «No encontramos esa venta.»
-  status = 404;
+  mode = 404;
   const p404 = await context.newPage();
-  await p404.goto(`/ventas/00000000-0000-4000-8000-000000000591`);
-  await context.route(/\/v1\/sales\/00000000-0000-4000-8000-000000000591$/, (route) =>
-    route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { code: "NOT_FOUND", message: "not found" } }) }),
-  );
-  await p404.reload();
+  await p404.goto("/ventas/00000000-0000-4000-8000-000000000599");
   await expect(p404.getByText("No encontramos esa venta.")).toBeVisible({ timeout: 5_000 });
   await p404.close();
   void SALE;

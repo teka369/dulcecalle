@@ -451,6 +451,10 @@ export async function getSaleDetailWithOfflineFallback(
     }
   } catch (error) {
     if (!(error instanceof NetworkError)) throw error;
+    const businessId = getPwaAuthSession().businessId;
+    const local = businessId ? await loadLocalReturnable(businessId, saleId) : null;
+    if (!local) throw error;
+    return local;
   }
   const businessId = getPwaAuthSession().businessId;
   if (!businessId) return null;
@@ -484,7 +488,11 @@ async function setOptimisticApplied(
   if (!op || op.businessId !== businessId || !op.payload || typeof op.payload !== "object") return;
   await db.outbox.put({
     ...op,
-    payload: { ...(op.payload as Record<string, unknown>), optimisticApplied: applied },
+    payload: {
+      ...(op.payload as Record<string, unknown>),
+      optimisticApplied: applied,
+      ...(applied ? { optimisticAppliedAt: Date.now() } : {}),
+    },
   });
 }
 

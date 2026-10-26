@@ -39,6 +39,14 @@ export default function CerrarCajaPage() {
     setLoadError(null);
     try {
       const s = await cashStore.refresh();
+      if (
+        cashStore.getSnapshot().source === "local" &&
+        !s.session &&
+        (typeof navigator === "undefined" || navigator.onLine !== false)
+      ) {
+        setLoadError("El servidor no respondió. Tus datos no se han perdido.");
+        return;
+      }
       setSummary(s);
     } catch (e: unknown) {
       setLoadError(errorText(e, ""));

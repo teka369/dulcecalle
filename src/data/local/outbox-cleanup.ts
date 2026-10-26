@@ -8,6 +8,45 @@ function effectApplied(payload: unknown): boolean {
 }
 
 /**
+ * When two offline ops (e.g. preparation then surtir) both shift a product's
+ * avgCost and are rejected in FIFO order, the earlier op's pre-op avgCost is
+ * the baseline that the next still-applied op on that product should restore if
+ * it is also rejected.
+ */
+async function propagatePrevAvgToNextPendingOp(
+  db: DulceCalleLocalDB,
+  businessId: string,
+  currentOp: OutboxItem,
+  productId: string,
+  prevAvg: number,
+): Promise<void> {
+  const all = await db.outbox.where("businessId").equals(businessId).toArray();
+  const later = all
+    .filter(
+      (o) =>
+        o.operationId !== currentOp.operationId &&
+        o.status !== "synced" &&
+        effectApplied(o.payload) &&
+        o.localCreatedAt >= currentOp.localCreatedAt &&
+        ((o.entity === "stockMove" &&
+          o.operation === "surtir" &&
+          (o.payload as Record<string, unknown> | null)?.productId === productId) ||
+          (o.entity === "preparation" &&
+            o.operation === "create" &&
+            (o.payload as Record<string, unknown> | null)?.targetId === productId)),
+    )
+    .sort((a, b) => a.localCreatedAt - b.localCreatedAt);
+  const next = later[0];
+  if (!next || !next.payload || typeof next.payload !== "object") return;
+  const p = next.payload as Record<string, unknown>;
+  const key = next.entity === "preparation" ? "prevTargetAvgCost" : "prevAvgCost";
+  await db.outbox.put({
+    ...next,
+    payload: { ...p, [key]: prevAvg },
+  });
+}
+
+/**
  * R2-A A1: Revert optimistic local effects (stock, avgCost, debt, cashMoves,
  * expenses, stockMoves, preparations) on permanent server rejection, and delete
  * local entity rows when the outbox operation is discarded so discarded intents
@@ -25,6 +64,11 @@ export async function cleanupOutboxLocalEffect(
       ? (row.payload as Record<string, unknown>)
       : {};
   const now = Date.now();
+  const appliedAt =
+    typeof raw.optimisticAppliedAt === "number" ? raw.optimisticAppliedAt : row.localCreatedAt;
+  const productsMeta = await db.cacheMeta.get(`${businessId}::products`);
+  const productOverwrittenByServer =
+    productsMeta != null && productsMeta.cachedAt > appliedAt;
 
   if (row.entity === "sale" && row.operation === "create") {
     const sale = await db.sales.get(row.operationId);
@@ -43,13 +87,15 @@ export async function cleanupOutboxLocalEffect(
       const stockMoves = await db.stockMoves.where("businessId").equals(businessId).toArray();
       for (const move of stockMoves) {
         if (move.requestId !== row.requestId || move.reason !== "sale") continue;
-        const product = await db.products.get(move.productId);
-        if (product && product.businessId === businessId) {
-          await db.products.put({
-            ...product,
-            stock: product.stock - move.delta,
-            updatedAt: now,
-          });
+        if (!productOverwrittenByServer) {
+          const product = await db.products.get(move.productId);
+          if (product && product.businessId === businessId) {
+            await db.products.put({
+              ...product,
+              stock: product.stock - move.delta,
+              updatedAt: now,
+            });
+          }
         }
         await db.stockMoves.delete(move.id);
       }
@@ -140,7 +186,7 @@ export async function cleanupOutboxLocalEffect(
       }
     }
   } else if (row.entity === "stockMove" && row.operation === "surtir") {
-    if (applied) {
+    if (applied && !productOverwrittenByServer) {
       const productId = typeof raw.productId === "string" ? raw.productId : null;
       const qty = typeof raw.qty === "number" ? raw.qty : 0;
       if (productId && qty > 0) {
@@ -158,6 +204,7 @@ export async function cleanupOutboxLocalEffect(
             avgCost: prevAvg,
             updatedAt: now,
           });
+          await propagatePrevAvgToNextPendingOp(db, businessId, row, productId, prevAvg);
         }
       }
     }
@@ -169,7 +216,7 @@ export async function cleanupOutboxLocalEffect(
       }
     }
   } else if (row.entity === "stockMove" && row.operation === "shrink") {
-    if (applied) {
+    if (applied && !productOverwrittenByServer) {
       const productId = typeof raw.productId === "string" ? raw.productId : null;
       const qty = typeof raw.qty === "number" ? raw.qty : 0;
       if (productId && qty > 0) {
@@ -185,7 +232,7 @@ export async function cleanupOutboxLocalEffect(
     }
     await db.stockMoves.delete(row.operationId);
   } else if (row.entity === "preparation" && row.operation === "create") {
-    if (applied) {
+    if (applied && !productOverwrittenByServer) {
       const sourceId = typeof raw.sourceId === "string" ? raw.sourceId : null;
       const targetId = typeof raw.targetId === "string" ? raw.targetId : null;
       const qty = typeof raw.qty === "number" ? raw.qty : 0;
@@ -193,12 +240,15 @@ export async function cleanupOutboxLocalEffect(
       if (targetId && qty > 0) {
         const target = await db.products.get(targetId);
         if (target && target.businessId === businessId) {
+          const prevTargetAvg =
+            typeof raw.prevTargetAvgCost === "number" ? raw.prevTargetAvgCost : target.avgCost;
           await db.products.put({
             ...target,
             stock: Math.max(0, target.stock - qty),
-            avgCost: typeof raw.prevTargetAvgCost === "number" ? raw.prevTargetAvgCost : target.avgCost,
+            avgCost: prevTargetAvg,
             updatedAt: now,
           });
+          await propagatePrevAvgToNextPendingOp(db, businessId, row, targetId, prevTargetAvg);
         }
       }
       if (sourceId && qty > 0 && unitCost > 0) {
@@ -225,7 +275,7 @@ export async function cleanupOutboxLocalEffect(
 
   if (mode === "reject" && applied) {
     const current = await db.outbox.get(row.operationId);
-    if (current && current.businessId === businessId && current.payload && typeof current.payload === "object") {
+    if (current && current.businessId === businessId && current.payload && typeof current.payload !== "string") {
       await db.outbox.put({
         ...current,
         payload: { ...(current.payload as Record<string, unknown>), optimisticApplied: false },
