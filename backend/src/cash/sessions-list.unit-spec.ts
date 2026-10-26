@@ -66,7 +66,6 @@ function world(nSessions: number) {
   return { svc, ctx: { businessId: biz, timezone: "America/Bogota" } as never, reset: () => (queries = 0), count: () => queries };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const list = (w: ReturnType<typeof world>, ...a: unknown[]) => (w.svc as any).list(w.ctx, ...a) as Promise<Row[]>;
 
 describe("GET /cash/sessions list (M5)", () => {

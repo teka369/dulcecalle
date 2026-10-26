@@ -47,3 +47,26 @@ describe("Render cached build + production throttle guard (R2-A)", () => {
     expect(fn!({ NODE_ENV: "test", DISABLE_THROTTLE: "0" })).toBe(false);
   });
 });
+
+describe("Ronda 3: /v1/diag/ip removed & render.yaml points DATABASE_URL to external Neon (B-R3-1, B-R3-2)", () => {
+  const backendRoot = path.resolve(__dirname, "..");
+  const repoRoot = path.resolve(backendRoot, "..");
+
+  it("B-R3-1: backend/src/diag is removed and AppModule does not register DiagController", () => {
+    expect(fs.existsSync(path.join(__dirname, "diag", "diag.controller.ts"))).toBe(false);
+    expect(fs.existsSync(path.join(__dirname, "diag", "diag.unit-spec.ts"))).toBe(false);
+    const appModuleSrc = fs.readFileSync(path.join(__dirname, "app.module.ts"), "utf8");
+    expect(appModuleSrc).not.toContain("DiagController");
+    expect(appModuleSrc).not.toContain("./diag/diag.controller");
+  });
+
+  it("B-R3-2: render.yaml sets DATABASE_URL to sync: false (external Neon) and removes expired dulcecalle-db", () => {
+    const renderYaml = fs.readFileSync(path.join(repoRoot, "render.yaml"), "utf8");
+    expect(renderYaml).toContain("key: DATABASE_URL");
+    expect(renderYaml).toContain("sync: false");
+    expect(renderYaml).toMatch(/Neon|sslmode=require/i);
+    expect(renderYaml).not.toContain("fromDatabase:");
+    expect(renderYaml).not.toContain("dulcecalle-db");
+    expect(renderYaml).not.toContain("\ndatabases:");
+  });
+});

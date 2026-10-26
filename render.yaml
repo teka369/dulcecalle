@@ -1,7 +1,7 @@
-# DulceCalle — Nest API + PostgreSQL 16 on Render (free).
-# One-click: https://render.com/deploy?repo=https://github.com/teka369/dulcecalle
+# DulceCalle — Nest API on Render (free web) + external Neon PostgreSQL.
+# Deploy: https://render.com/deploy?repo=https://github.com/teka369/dulcecalle
 #
-# Free Postgres expires after 30 days — upgrade before that if these are real books.
+# PostgreSQL runs on external Neon (DATABASE_URL with ?sslmode=require set in Render Dashboard).
 # Free web sleeps after 15 min idle; first request can take ~1 min to wake.
 
 services:
@@ -26,14 +26,6 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      # External Neon PostgreSQL connection string: postgresql://...?sslmode=require
       - key: DATABASE_URL
-        fromDatabase:
-          name: dulcecalle-db
-          property: connectionString
-
-databases:
-  - name: dulcecalle-db
-    plan: free
-    postgresMajorVersion: "16"
-    databaseName: dulcecalle
-    user: dulcecalle
+        sync: false

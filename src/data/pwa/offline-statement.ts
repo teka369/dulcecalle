@@ -1,7 +1,6 @@
 import { NetworkError } from "../errors";
 import type { DebtStatement } from "@/domain/debt/statement";
 import { addCop, subCop } from "@/domain/money";
-import { getPwaApi } from "./api";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
 import { loadHttpStatement } from "./statement";

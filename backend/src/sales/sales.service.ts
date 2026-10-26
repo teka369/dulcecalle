@@ -275,7 +275,6 @@ export class SalesService {
             where: { businessId: ctx.businessId, closedAt: null },
           });
           const link = linkForNewMove(opens, occurredOn);
-          const open = opens.find((row) => row.id === link.sessionId) ?? null;
           await tx.cashMove.create({
             data: {
               id: randomUUID(),
@@ -529,7 +528,6 @@ export class SalesService {
             where: { businessId: ctx.businessId, closedAt: null },
           });
           const link = linkForNewMove(opens, occurredOn);
-          const open = opens.find((row) => row.id === link.sessionId) ?? null;
           await tx.cashMove.create({
             data: {
               id: randomUUID(),

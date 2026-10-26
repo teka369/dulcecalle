@@ -13,6 +13,7 @@ import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
 import { isPermanentDebtRejection, isSuppressedLocalEffect } from "./pending-debt";
 import { newEntityId } from "../local/ids";
 import { addCop, mulCop, subCop } from "@/domain/money";
+import { AMOUNT_TOO_LARGE_MESSAGE, MAX_COP_AMOUNT } from "@/domain/money/limits";
 import type { LocalCustomer, LocalProduct, LocalSale, LocalSaleLine, LocalStockMove, LocalCashMove } from "../local/types";
 
 export type CreateSaleResult =
@@ -178,6 +179,9 @@ async function createLocalSale(
         if (!Number.isInteger(unitPrice) || unitPrice < 0) {
           throw new Error("El precio tiene que ser 0 o más.");
         }
+        if (unitPrice > MAX_COP_AMOUNT) {
+          throw new Error(AMOUNT_TOO_LARGE_MESSAGE);
+        }
         const lineTotal = mulCop(unitPrice, line.qty);
         total = addCop(total, lineTotal);
         prepared.push({
@@ -189,6 +193,9 @@ async function createLocalSale(
         });
       }
 
+      if (total > MAX_COP_AMOUNT) {
+        throw new Error(AMOUNT_TOO_LARGE_MESSAGE);
+      }
       const { received, credit } = paymentValues(input, total);
       const saleId = newEntityId();
 

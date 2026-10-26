@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, NetworkError } from "@/data/errors";
-import { __resetLocalDbForTests, getLocalDb } from "@/data/local/db";
+import { __resetLocalDbForTests } from "@/data/local/db";
 import { getCustomerAuthSession } from "@/data/http/customer-session";
 import {
   loadCachedCustomerCatalog,
