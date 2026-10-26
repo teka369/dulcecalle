@@ -15,6 +15,9 @@ export type StockMoveReason =
   | "devolucion"
   | "preparacion";
 
+/** TICKET-A product type. Only `combo` can be a preparation source. */
+export type ProductKind = "standard" | "combo";
+
 export interface Product {
   id?: number;
   name: string;
@@ -27,6 +30,8 @@ export interface Product {
   lowStockAt: number;
   /** False = supply/combo. Missing = sellable (legacy Dexie rows). */
   sellable?: boolean;
+  /** TICKET-A: combo = lot bought to prepare others (never sellable). Missing = unknown/standard. */
+  kind?: ProductKind;
   createdAt: number;
   updatedAt: number;
 }

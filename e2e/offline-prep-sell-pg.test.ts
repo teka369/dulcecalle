@@ -225,7 +225,7 @@ describe("offline prepare → sell → shrink, synced to PostgreSQL", () => {
     applySession();
     offline = false;
     const insumo = await createProductWithOfflineFallback(
-      { name: "Insumo combo", price: 0, stock: 5, avgCost: 1_000, sellable: false },
+      { name: "Insumo combo", price: 0, stock: 5, avgCost: 1_000, sellable: false, kind: "combo" },
       newEntityId(),
     );
     const combo = await createProductWithOfflineFallback(

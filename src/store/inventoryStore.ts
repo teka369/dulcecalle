@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import type { PayMethod } from "@/domain/types";
+import type { PayMethod, ProductKind } from "@/domain/types";
 import { AMOUNT_TOO_LARGE_MESSAGE, exceedsMaxCop, parseAmountInput } from "@/domain/money/limits";
 import {
   INVENTORY_ERRORS,
@@ -222,6 +222,7 @@ export const inventoryStore = {
     avgCostRaw?: string;
     gifted?: boolean;
     sellable?: boolean;
+    kind?: ProductKind;
   }): Promise<{ id: string; mode: "online" | "offline" }> {
     const name = input.name.trim();
     if (!name) throw new Error(INVENTORY_ERRORS.emptyProductName);
@@ -253,6 +254,7 @@ export const inventoryStore = {
           lowStockAt: 5,
           gifted,
           sellable: input.sellable,
+          kind: input.kind,
         },
         crypto.randomUUID(),
       );

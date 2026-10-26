@@ -18,6 +18,8 @@ import {
   todayLocal,
 } from "./offline-operations";
 
+export const ONLY_COMBO_SOURCE = "Solo se prepara desde un combo.";
+
 /**
  * An offline preparation must replay AFTER whatever it was computed on:
  * the pending create of either product (localId → serverId remap) and any
@@ -125,6 +127,11 @@ export async function prepararWithOfflineFallback(
     }
     if (source.archivedAt || target.archivedAt) {
       throw new Error("Hay un producto archivado en la preparación.");
+    }
+    // J-A3: only a combo is a preparation source. A row cached before
+    // TICKET-A has no kind (unknown) and is left for the server to decide.
+    if (source.kind === "standard") {
+      throw new Error(ONLY_COMBO_SOURCE);
     }
     if (source.stock <= 0) {
       throw new Error(INVENTORY_ERRORS.noMaterial);

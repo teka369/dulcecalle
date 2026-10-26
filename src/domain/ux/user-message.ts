@@ -45,3 +45,7 @@ export function errorText(e: unknown, fallback: string): string {
   if (!(e instanceof Error)) return fb;
   return userFacingMessage(e.message, fb);
 }
+
+export function toUserErrorMessage(e: unknown, fallback = GENERIC_FALLBACK): string {
+  return errorText(e, fallback);
+}

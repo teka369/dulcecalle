@@ -229,7 +229,7 @@ describe("Preparar source read with offline / pending / remapped product ids", (
     await listCachedProducts();
     offline = true;
     const created = await createProductWithOfflineFallback(
-      { name: "Insumo offline", price: 0, stock: 4, avgCost: 500, sellable: false },
+      { name: "Insumo offline", price: 0, stock: 4, avgCost: 500, sellable: false, kind: "combo" },
       newEntityId(),
     );
     if (created.mode !== "offline") throw new Error("expected offline create");

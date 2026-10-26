@@ -46,6 +46,11 @@ export class CreateProductDto {
   @IsBoolean()
   sellable?: boolean;
 
+  /** TICKET-A: combo forces sellable=false. Missing = standard. */
+  @IsOptional()
+  @IsEnum(["standard", "combo"])
+  kind?: "standard" | "combo";
+
   @IsOptional()
   @IsUUID()
   requestId?: string;
@@ -78,6 +83,11 @@ export class PatchProductDto {
   @IsOptional()
   @IsBoolean()
   sellable?: boolean;
+
+  /** Changing kind is refused (409 KIND_LOCKED) once there is stock or any move. */
+  @IsOptional()
+  @IsEnum(["standard", "combo"])
+  kind?: "standard" | "combo";
 }
 
 export class CreateCustomerDto {

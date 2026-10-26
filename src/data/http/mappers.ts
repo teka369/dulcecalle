@@ -1,3 +1,4 @@
+import type { ProductKind } from "../../domain/types";
 /** Transport mappers only. No stock/debt/total/caja math. */
 import { ContractError } from "../errors";
 
@@ -67,6 +68,8 @@ export type RemoteProduct = {
   lowStockAt: number;
   /** False = supply/combo. Absent in older payloads means true. */
   sellable: boolean;
+  /** TICKET-A. Absent when the server predates `kind` (unknown). */
+  kind?: ProductKind;
   archivedAt: string | null;
   createdAt: number;
   images: RemoteProductImage[];
@@ -107,6 +110,7 @@ export function mapProduct(raw: Record<string, unknown>): RemoteProduct {
     stock: Number(raw.stock),
     lowStockAt: Number(raw.lowStockAt),
     sellable: raw.sellable === undefined ? true : raw.sellable === true,
+    ...(raw.kind === "combo" || raw.kind === "standard" ? { kind: raw.kind } : {}),
     archivedAt: raw.archivedAt == null ? null : String(raw.archivedAt),
     createdAt: asIsoEpoch(raw.createdAt),
     images: Array.isArray(raw.images)

@@ -27,7 +27,9 @@ export default function AgregarProductoPage() {
   const [stockRaw, setStockRaw] = useState("");
   const [costRaw, setCostRaw] = useState("");
   const [gifted, setGifted] = useState(false);
-  const [sellable, setSellable] = useState(true);
+  // TICKET-A: venta (standard sellable) · insumo (standard, no se vende) · combo.
+  const [tipo, setTipo] = useState<"venta" | "insumo" | "combo">("venta");
+  const sellable = tipo === "venta";
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -55,6 +57,7 @@ export default function AgregarProductoPage() {
         avgCostRaw: gifted ? "0" : costRaw || "0",
         gifted,
         sellable,
+        kind: tipo === "combo" ? "combo" : "standard",
       });
       setToast(
         result.mode === "offline"
@@ -138,23 +141,33 @@ export default function AgregarProductoPage() {
 
         <section className="flex flex-col gap-2">
           <SectionHead title="Tipo" />
-          <div className={group}>
-            <label className="flex min-h-11 items-start gap-3 text-sm">
-              <input
-                type="checkbox"
-                role="switch"
-                aria-checked={!sellable}
-                checked={!sellable}
-                onChange={(e) => setSellable(!e.target.checked)}
-                className="mt-1 h-5 w-5 shrink-0 rounded border-border"
-              />
-              <span>
-                <span className="font-medium">Es insumo o combo para preparar</span>
-                <span className="mt-1 block text-ink-muted">
-                  No aparece para vender ni en el catálogo de clientes. Se compra con proveedor y se transforma con Preparar.
+          <div className={group} role="radiogroup" aria-label="Tipo de producto">
+            {(
+              [
+                ["venta", "Para vender", "Aparece en ventas y en el catálogo de clientes."],
+                ["insumo", "Insumo", "No se vende. Se compra con proveedor."],
+                [
+                  "combo",
+                  "Combo para preparar",
+                  "Lote que se transforma con Preparar. Nunca se vende. El tipo no se puede cambiar cuando ya tiene stock.",
+                ],
+              ] as const
+            ).map(([value, title, hint]) => (
+              <label key={value} className="flex min-h-11 items-start gap-3 text-sm">
+                <input
+                  type="radio"
+                  name="tipo"
+                  value={value}
+                  checked={tipo === value}
+                  onChange={() => setTipo(value)}
+                  className="mt-1 h-5 w-5 shrink-0 border-border"
+                />
+                <span>
+                  <span className="font-medium">{title}</span>
+                  <span className="mt-1 block text-ink-muted">{hint}</span>
                 </span>
-              </span>
-            </label>
+              </label>
+            ))}
           </div>
         </section>
 

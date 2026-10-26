@@ -11,6 +11,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// TICKET-A: combo is an explicit product type (never sellable).
+/// standard = everything else (sellable product or non-sellable insumo).
+enum ProductKind {
+  standard
+  combo
+}
+
 enum MembershipRole {
   owner
   staff
@@ -119,6 +126,8 @@ model Product {
   lowStockAt    Int       @map("low_stock_at")
   /** False = supply/combo: purchasable and preparable, never sold directly. */
   sellable      Boolean   @default(true)
+  /** TICKET-A: combo forces sellable=false and is the only preparation source. */
+  kind          ProductKind @default(standard)
   archivedAt    DateTime? @map("archived_at") @db.Timestamptz(3)
   legacyDexieId Int?      @map("legacy_dexie_id")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)

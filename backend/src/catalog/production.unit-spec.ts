@@ -27,6 +27,7 @@ describe("preparations (AppModule)", () => {
     avgCost: bigint;
     archivedAt: Date | null;
     sellable: boolean;
+    kind: "standard" | "combo";
   };
 
   const products = new Map<string, ProductRow>();
@@ -131,11 +132,11 @@ describe("preparations (AppModule)", () => {
     creates = 0;
     products.set(COMBO, {
       id: COMBO, businessId: BIZ, name: "Combo enchiladas",
-      stock: 1, avgCost: 105000n, archivedAt: null, sellable: false,
+      stock: 1, avgCost: 105000n, archivedAt: null, sellable: false, kind: "combo",
     });
     products.set(TARGET, {
       id: TARGET, businessId: BIZ, name: "Enchilada",
-      stock: 10, avgCost: 400n, archivedAt: null, sellable: true,
+      stock: 10, avgCost: 400n, archivedAt: null, sellable: true, kind: "standard",
     });
   }
 
@@ -473,5 +474,18 @@ describe("preparations (AppModule)", () => {
       where: { businessId: BIZ, archivedAt: null, sellable: true },
     });
     expect(rows.map((r) => r.id)).toEqual([TARGET]);
+  });
+
+  it("J-A3: a non-sellable STANDARD (legacy insumo) cannot be a preparation source", async () => {
+    const combo = products.get(COMBO);
+    if (combo) combo.kind = "standard";
+    const res = await request(app.getHttpServer())
+      .post("/v1/preparations")
+      .set(auth(BIZ, REQ))
+      .send(prepareBody({ unitCost: 200 }));
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("combo");
+    expect(products.get(TARGET)?.stock).toBe(10);
+    expect(preparations).toHaveLength(0);
   });
 });

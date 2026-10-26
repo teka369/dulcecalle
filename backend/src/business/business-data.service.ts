@@ -1,8 +1,37 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { MediaService } from "../catalog/media.service";
+import { asCop, copToJson } from "../shared/money";
 import type { BusinessContext } from "../identity/auth.types";
+
+export type ExportedProduct = {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  avgCost: number;
+  stock: number;
+  lowStockAt: number;
+  sellable: boolean;
+  kind: "standard" | "combo";
+  archivedAt: Date | null;
+  createdAt: Date;
+};
+
+export type ImportedProductInput = {
+  id?: string;
+  name: string;
+  category?: string;
+  price: number;
+  avgCost?: number;
+  stock?: number;
+  lowStockAt?: number;
+  sellable?: boolean;
+  kind?: "standard" | "combo";
+  archivedAt?: Date | string | null;
+};
 
 /**
  * Destructive business data reset. Deletes every business-scoped
@@ -27,6 +56,79 @@ export class BusinessDataService {
     private readonly prisma: PrismaService,
     private readonly media: MediaService,
   ) {}
+
+  async exportData(ctx: BusinessContext): Promise<{ products: ExportedProduct[] }> {
+    const products = await this.prisma.product.findMany({
+      where: { businessId: ctx.businessId },
+      orderBy: { createdAt: "asc" },
+    });
+    return {
+      products: products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        price: copToJson(p.price),
+        avgCost: copToJson(p.avgCost),
+        stock: p.stock,
+        lowStockAt: p.lowStockAt,
+        sellable: p.sellable,
+        kind: p.kind,
+        archivedAt: p.archivedAt,
+        createdAt: p.createdAt,
+      })),
+    };
+  }
+
+  async importData(
+    ctx: BusinessContext,
+    backup: { products?: ReadonlyArray<ImportedProductInput> },
+  ): Promise<{ products: ExportedProduct[] }> {
+    const items = backup.products ?? [];
+    const created = await this.prisma.$transaction(async (tx) => {
+      const out = [];
+      for (const p of items) {
+        const kind: "standard" | "combo" = p.kind === "combo" ? "combo" : "standard";
+        const sellable = kind === "combo" ? false : Boolean(p.sellable ?? true);
+        const row = await tx.product.create({
+          data: {
+            id: p.id ?? randomUUID(),
+            businessId: ctx.businessId,
+            name: p.name.trim() || "Producto",
+            category: (p.category ?? "General").trim() || "General",
+            price: asCop(p.price ?? 0),
+            avgCost: asCop(p.avgCost ?? 0),
+            stock: p.stock ?? 0,
+            lowStockAt: p.lowStockAt ?? 5,
+            sellable,
+            kind,
+            archivedAt:
+              p.archivedAt == null
+                ? null
+                : p.archivedAt instanceof Date
+                  ? p.archivedAt
+                  : new Date(p.archivedAt),
+          },
+        });
+        out.push(row);
+      }
+      return out;
+    });
+    return {
+      products: created.map((p) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        price: copToJson(p.price),
+        avgCost: copToJson(p.avgCost),
+        stock: p.stock,
+        lowStockAt: p.lowStockAt,
+        sellable: p.sellable,
+        kind: p.kind,
+        archivedAt: p.archivedAt,
+        createdAt: p.createdAt,
+      })),
+    };
+  }
 
   async resetData(ctx: BusinessContext): Promise<{
     deleted: Record<string, number>;

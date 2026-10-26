@@ -54,3 +54,25 @@ describe("errorText (inline form errors)", () => {
     expect(errorText(new Error(""), "")).toBe("");
   });
 });
+
+import { toUserErrorMessage } from "./user-message";
+import { KIND_LOCKED_MESSAGE } from "@/data/pwa/offline-catalog";
+import { ONLY_COMBO_SOURCE } from "@/data/pwa/offline-production";
+
+describe("TICKET-A combo domain errors pass through userFacingMessage / errorText / toUserErrorMessage in Spanish", () => {
+  it("preserves KIND_LOCKED and combo preparation/sale errors without replacing with generic fallback", () => {
+    const messages = [
+      KIND_LOCKED_MESSAGE,
+      "No se puede cambiar el tipo de un producto con unidades en inventario.",
+      "Un combo no se puede vender.",
+      ONLY_COMBO_SOURCE,
+      "El combo no tiene material disponible. Súrtelo primero.",
+      "Este costo supera el valor restante del lote ($ 10.000).",
+    ];
+    for (const msg of messages) {
+      expect(userFacingMessage(msg, "FALLBACK")).toBe(msg);
+      expect(errorText(new Error(msg), "FALLBACK")).toBe(msg);
+      expect(toUserErrorMessage(new Error(msg), "FALLBACK")).toBe(msg);
+    }
+  });
+});

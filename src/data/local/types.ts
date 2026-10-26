@@ -1,3 +1,4 @@
+import type { ProductKind } from "../../domain/types";
 /**
  * M6 local cache shapes. PKs are client UUIDs.
  * stock / debt / avgCost / expected* are CACHE / OPTIMISTIC — PostgreSQL is
@@ -150,6 +151,8 @@ export type LocalProduct = {
   lowStockAt: number;
   /** False = supply/combo: purchasable, never sold directly. Missing = true. */
   sellable?: boolean;
+  /** TICKET-A. Missing on rows cached before Dexie v10 (unknown). */
+  kind?: ProductKind;
   archivedAt: string | null;
   /** Request id while this locally-created row is pending/syncing. */
   requestId?: string;

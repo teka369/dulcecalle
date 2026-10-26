@@ -45,7 +45,7 @@ async function seed(id: string, over: Record<string, unknown> = {}) {
 const remoteSource = () =>
   mapProduct({
     id: SERVER_SOURCE, name: "Combo enchiladas", category: "General", price: 0, avgCost: 105000,
-    stock: 1, lowStockAt: 5, sellable: false, archivedAt: null, createdAt: new Date().toISOString(), images: [],
+    stock: 1, lowStockAt: 5, sellable: false, kind: "combo", archivedAt: null, createdAt: new Date().toISOString(), images: [],
   });
 
 const remotePrep = (sourceId: string) => ({
@@ -67,7 +67,7 @@ describe("offline preparation dependencies", () => {
     api.products.create.mockRejectedValue(new NetworkError("offline"));
     api.production.prepare.mockRejectedValue(new NetworkError("offline"));
     const created = await createProductWithOfflineFallback(
-      { name: "Combo enchiladas", price: 0, stock: 1, avgCost: 105000, sellable: false },
+      { name: "Combo enchiladas", price: 0, stock: 1, avgCost: 105000, sellable: false, kind: "combo" },
       crypto.randomUUID(),
     );
     if (created.mode !== "offline") throw new Error("expected offline");
