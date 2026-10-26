@@ -15,6 +15,13 @@ export type AuthStorage = {
 };
 
 export const AUTH_STORAGE_KEY = "dulcecalle.auth";
+export const AUTH_CLEARED_EVENT = "dulcecalle:auth-cleared";
+
+export function emitAuthCleared(): void {
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+    window.dispatchEvent(new CustomEvent(AUTH_CLEARED_EVENT));
+  }
+}
 
 function browserStorage(): AuthStorage | null {
   try {
@@ -104,6 +111,7 @@ export class HttpSession {
     this._businessId = null;
     this._user = null;
     this.persist();
+    emitAuthCleared();
   }
 
   selectBusiness(businessId: string): void {
