@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatCop } from "@/domain/money";
-import { parseAmountInput } from "@/domain/money/limits";
+import { evaluateTilePriceDraft } from "@/domain/sale/validate";
 import { ProductThumbnail } from "./ProductThumbnail";
 
 export type ProductTileProps = {
@@ -17,6 +17,7 @@ export type ProductTileProps = {
   onAdd: () => void;
   onRemove: () => void;
   onPriceChange: (raw: string) => void;
+  onPriceInvalidChange?: (invalid: boolean) => void;
 };
 
 /**
@@ -34,10 +35,21 @@ export function ProductTile({
   onAdd,
   onRemove,
   onPriceChange,
+  onPriceInvalidChange,
 }: ProductTileProps) {
   const [editing, setEditing] = useState(false);
+  const [basePrice, setBasePrice] = useState(price);
   const [draft, setDraft] = useState(String(price));
   const [priceError, setPriceError] = useState<string | null>(null);
+  const invalidCallbackRef = useRef(onPriceInvalidChange);
+  useEffect(() => {
+    invalidCallbackRef.current = onPriceInvalidChange;
+  }, [onPriceInvalidChange]);
+  useEffect(() => {
+    return () => {
+      invalidCallbackRef.current?.(false);
+    };
+  }, []);
   const soldOut = stock <= 0;
   const low = !soldOut && stock <= lowStockAt;
   const custom = price !== catalogPrice;
@@ -72,15 +84,11 @@ export function ProductTile({
             aria-invalid={priceError ? true : undefined}
             value={draft}
             onChange={(e) => {
-              const raw = e.target.value;
-              setDraft(raw);
-              const parsed = parseAmountInput(raw);
-              if ("error" in parsed) {
-                setPriceError(parsed.error);
-                return;
-              }
-              setPriceError(null);
-              onPriceChange(parsed.digits);
+              const next = evaluateTilePriceDraft(e.target.value, basePrice);
+              setDraft(next.draft);
+              setPriceError(next.priceError);
+              onPriceInvalidChange?.(next.invalid);
+              onPriceChange(next.effectiveDigits);
             }}
             onBlur={() => {
               if (!priceError) setEditing(false);
@@ -95,8 +103,10 @@ export function ProductTile({
           <button
             type="button"
             onClick={() => {
+              setBasePrice(price);
               setDraft(String(price));
               setPriceError(null);
+              onPriceInvalidChange?.(false);
               setEditing(true);
             }}
             className="mt-1 min-h-11 self-start text-xs font-semibold text-ink underline underline-offset-2"

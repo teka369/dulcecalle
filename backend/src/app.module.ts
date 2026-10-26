@@ -14,7 +14,6 @@ import { CashModule } from "./cash/cash.module";
 import { StatsModule } from "./stats/stats.module";
 import { CustomerAccessModule } from "./customer-access/customer-access.module";
 import { HealthController } from "./health/health.controller";
-import { DiagController } from "./diag/diag.controller";
 import { JwtAuthGuard } from "./identity/jwt.guard";
 import { BusinessGuard } from "./tenancy/business.guard";
 import { RolesGuard } from "./tenancy/roles.guard";
@@ -48,7 +47,7 @@ import { shouldSkipThrottle } from "./http-setup";
     StatsModule,
     CustomerAccessModule,
   ],
-  controllers: [HealthController, DiagController],
+  controllers: [HealthController],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: PagingHeadersInterceptor },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
