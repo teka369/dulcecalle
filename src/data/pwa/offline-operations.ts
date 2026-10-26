@@ -109,7 +109,6 @@ export async function getLocalCashSnapshot(): Promise<{
     .sort((a, b) => a.createdAt - b.createdAt);
   const expenses = mapLocalExpenses(
     (await db.expenses.where("businessId").equals(business).toArray())
-      .filter((row) => row.occurredOn === date)
       .sort((a, b) => b.createdAt - a.createdAt),
   );
   const base =
