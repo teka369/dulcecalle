@@ -24,6 +24,7 @@ const SERVER_COMBO = "99999999-9999-4999-8999-999999999999";
 const api = {
   session: { businessId },
   products: { create: vi.fn(), get: vi.fn(), patch: vi.fn(), archive: vi.fn() },
+  inventory: { surtir: vi.fn() },
   production: { prepare: vi.fn(), list: vi.fn() },
 };
 vi.mock("./api", () => ({ getPwaApi: () => api }));
@@ -34,6 +35,7 @@ import {
   patchProductWithOfflineFallback,
   syncPendingProducts,
 } from "./offline-catalog";
+import { surtirWithOfflineFallback } from "./offline-operations";
 import {
   ONLY_COMBO_SOURCE,
   prepararWithOfflineFallback,
@@ -261,5 +263,76 @@ describe("TICKET-A offline preparation (AC4)", () => {
     expect((await getLocalDb().products.get(created.productId))?.avgCost).toBe(50000);
     expect((await getLocalDb().products.get(TARGET_ID))?.stock).toBe(10);
     expect((await getLocalDb().products.get(TARGET_ID))?.avgCost).toBe(400);
+  });
+  it("Case A: preparation (t=1, -2000) then surtir (t=2, +20000) on a combo (avgCost=50000) restores 70000 on prep rejection and 50000 on surtir rejection", async () => {
+    const { cleanupOutboxLocalEffect } = await import("@/data/local/outbox-cleanup");
+    const COMBO = "33333333-3333-4333-8333-333333333333";
+    await seed(COMBO, { kind: "combo", sellable: false, stock: 2, avgCost: 50000 });
+    await seed(TARGET_ID, { kind: "standard", sellable: true, stock: 10, avgCost: 400 });
+
+    api.production.prepare.mockRejectedValueOnce(new NetworkError("offline"));
+    const prep = await prepararWithOfflineFallback(
+      { sourceId: COMBO, targetId: TARGET_ID, qty: 10, unitCost: 200 },
+      crypto.randomUUID(),
+    );
+    if (prep.mode !== "offline") throw new Error("expected offline");
+    expect((await getLocalDb().products.get(COMBO))?.avgCost).toBe(48000);
+
+    api.inventory.surtir.mockRejectedValueOnce(new NetworkError("offline"));
+    const surtir = await surtirWithOfflineFallback(
+      { productId: COMBO, qty: 1, unitCost: 20000, totalCost: 20000, method: "Efectivo" },
+      crypto.randomUUID(),
+    );
+    if (surtir.mode !== "offline") throw new Error("expected offline");
+    expect((await getLocalDb().products.get(COMBO))?.avgCost).toBe(68000);
+    expect((await getLocalDb().products.get(COMBO))?.stock).toBe(3);
+
+    // 1) Reject preparation (t=1) while surtir (t=2) stays pending: combo lot pool is 50000 + 20000 = 70000
+    const prepOp = await getLocalDb().outbox.get(prep.id);
+    await cleanupOutboxLocalEffect(getLocalDb(), businessId, prepOp!, "reject");
+    expect((await getLocalDb().products.get(COMBO))?.avgCost).toBe(70000);
+    expect((await getLocalDb().products.get(COMBO))?.stock).toBe(3);
+
+    // 2) Reject surtir (t=2): combo lot pool returns to 50000 (not 70000) and stock returns to 2
+    const surtirOp = await getLocalDb().outbox.get(surtir.id);
+    await cleanupOutboxLocalEffect(getLocalDb(), businessId, surtirOp!, "reject");
+    expect((await getLocalDb().products.get(COMBO))?.avgCost).toBe(50000);
+    expect((await getLocalDb().products.get(COMBO))?.stock).toBe(2);
+  });
+
+  it("Case B: surtir (t=1, +20000) then preparation (t=2, -2000) on a combo (avgCost=50000) restores 48000 on surtir rejection and 50000 on prep rejection", async () => {
+    const { cleanupOutboxLocalEffect } = await import("@/data/local/outbox-cleanup");
+    const COMBO = "33333333-3333-4333-8333-333333333333";
+    await seed(COMBO, { kind: "combo", sellable: false, stock: 2, avgCost: 50000 });
+    await seed(TARGET_ID, { kind: "standard", sellable: true, stock: 10, avgCost: 400 });
+
+    api.inventory.surtir.mockRejectedValueOnce(new NetworkError("offline"));
+    const surtir = await surtirWithOfflineFallback(
+      { productId: COMBO, qty: 1, unitCost: 20000, totalCost: 20000, method: "Efectivo" },
+      crypto.randomUUID(),
+    );
+    if (surtir.mode !== "offline") throw new Error("expected offline");
+    expect((await getLocalDb().products.get(COMBO))?.avgCost).toBe(70000);
+    expect((await getLocalDb().products.get(COMBO))?.stock).toBe(3);
+
+    api.production.prepare.mockRejectedValueOnce(new NetworkError("offline"));
+    const prep = await prepararWithOfflineFallback(
+      { sourceId: COMBO, targetId: TARGET_ID, qty: 10, unitCost: 200 },
+      crypto.randomUUID(),
+    );
+    if (prep.mode !== "offline") throw new Error("expected offline");
+    expect((await getLocalDb().products.get(COMBO))?.avgCost).toBe(68000);
+
+    // 1) Reject surtir (t=1) while preparation (t=2) stays pending: combo lot pool is 50000 - 2000 = 48000
+    const surtirOp = await getLocalDb().outbox.get(surtir.id);
+    await cleanupOutboxLocalEffect(getLocalDb(), businessId, surtirOp!, "reject");
+    expect((await getLocalDb().products.get(COMBO))?.avgCost).toBe(48000);
+    expect((await getLocalDb().products.get(COMBO))?.stock).toBe(2);
+
+    // 2) Reject preparation (t=2): combo lot pool returns to 50000 (not 52000)
+    const prepOp = await getLocalDb().outbox.get(prep.id);
+    await cleanupOutboxLocalEffect(getLocalDb(), businessId, prepOp!, "reject");
+    expect((await getLocalDb().products.get(COMBO))?.avgCost).toBe(50000);
+    expect((await getLocalDb().products.get(COMBO))?.stock).toBe(2);
   });
 });

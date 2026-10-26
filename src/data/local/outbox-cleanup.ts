@@ -202,19 +202,25 @@ export async function cleanupOutboxLocalEffect(
       if (productId && qty > 0) {
         const product = await db.products.get(productId);
         if (product && product.businessId === businessId) {
-          const prevAvg =
-            typeof raw.prevAvgCost === "number"
+          const isPool = product.sellable === false || product.kind === "combo";
+          const surtirCost =
+            typeof raw.totalCost === "number"
+              ? raw.totalCost
+              : (typeof raw.unitCost === "number" ? raw.unitCost : 0) * qty;
+          const prevAvg = isPool
+            ? Math.max(0, (product.avgCost ?? 0) - surtirCost)
+            : typeof raw.prevAvgCost === "number"
               ? raw.prevAvgCost
-              : product.sellable === false || product.kind === "combo"
-                ? Math.max(0, product.avgCost - (typeof raw.totalCost === "number" ? raw.totalCost : 0))
-                : product.avgCost;
+              : product.avgCost;
           await db.products.put({
             ...product,
             stock: Math.max(0, product.stock - qty),
             avgCost: prevAvg,
             updatedAt: now,
           });
-          await propagatePrevAvgToNextPendingOp(db, businessId, row, productId, prevAvg);
+          if (!isPool) {
+            await propagatePrevAvgToNextPendingOp(db, businessId, row, productId, prevAvg);
+          }
         }
       }
     }
@@ -270,7 +276,6 @@ export async function cleanupOutboxLocalEffect(
             avgCost: restoredSourceAvg,
             updatedAt: now,
           });
-          await propagatePrevAvgToNextPendingOp(db, businessId, row, sourceId, restoredSourceAvg);
         }
       }
     }
