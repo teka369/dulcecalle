@@ -2,7 +2,7 @@
 
 import { errorText } from "@/domain/ux/user-message";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
@@ -46,6 +46,8 @@ export default function GestionarCajaDetailPage() {
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mode, setMode] = useState<"contar" | "saldo" | null>(null);
+  const closeRequestIdRef = useRef<string | null>(null);
+  const carryRequestIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     load();
@@ -70,7 +72,8 @@ export default function GestionarCajaDetailPage() {
     setBusy(true);
     setError(null);
     try {
-      await getPwaApi().cash.close(params.id, Number(counted));
+      if (!closeRequestIdRef.current) closeRequestIdRef.current = crypto.randomUUID();
+      await getPwaApi().cash.close(params.id, Number(counted), closeRequestIdRef.current);
       router.push("/mas/caja/gestionar");
     } catch (e) {
       setError(errorText(e, "No se pudo cerrar."));
@@ -89,7 +92,8 @@ export default function GestionarCajaDetailPage() {
     setBusy(true);
     setError(null);
     try {
-      await carryCashWithOfflineFallback(params.id, { mode, countedEfectivo });
+      if (!carryRequestIdRef.current) carryRequestIdRef.current = crypto.randomUUID();
+      await carryCashWithOfflineFallback(params.id, { mode, countedEfectivo }, carryRequestIdRef.current);
       router.push("/mas/caja");
     } catch (e) {
       setError(errorText(e, "No se pudo pasar el saldo."));
@@ -189,7 +193,7 @@ export default function GestionarCajaDetailPage() {
               <p className="text-sm text-ink-muted">Cerrar contando no está disponible: hay que pasar el saldo.</p>
             ) : null}
             {choice === "contar" || !detail.requiresCarry ? (
-              <AmountField label="¿Cuánto efectivo había en esta caja?" value={counted} onChange={setCounted} />
+              <AmountField label="¿Cuánto efectivo había en esta caja?" value={counted} onChange={(v) => { closeRequestIdRef.current = null; carryRequestIdRef.current = null; setCounted(v); }} />
             ) : (
               <p className="text-sm text-ink-muted">
                 Cerrar por paso de saldo no es un conteo físico. Se usa el efectivo esperado como continuidad. El faltante se
