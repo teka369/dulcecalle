@@ -37,6 +37,7 @@ import {
 // 10: loop/v1 paged history lists (devices prepared at 9 re-download history).
 export const PREP_VERSION = 10;
 export const PREP_DOCUMENT_CACHE = "documents";
+const DOC_FETCH_TIMEOUT_MS = 10_000;
 
 export type PrepTaskGroup = "app" | "catalogos" | "historial" | "resumen" | "sistema";
 
@@ -63,10 +64,14 @@ async function warmDocument(path: string): Promise<void> {
     throw new Error("El modo sin conexión aún no está listo. Recarga la página e inténtalo de nuevo.");
   }
   let response: Response;
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), DOC_FETCH_TIMEOUT_MS) : null;
   try {
-    response = await fetch(path, { credentials: "same-origin" });
+    response = await fetch(path, ctrl ? { credentials: "same-origin", signal: ctrl.signal } : { credentials: "same-origin" });
   } catch {
     throw new NetworkError("Sin conexión.");
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   if (!response.ok) {
     throw new Error("No se pudo guardar esta pantalla. Inténtalo de nuevo.");
@@ -421,12 +426,13 @@ export async function waitForServiceWorkerControl(timeoutMs = SW_CONTROL_WAIT_MS
     timer = setTimeout(() => resolve(false), timeoutMs);
   });
   const controlled = (async () => {
-    if (sw.ready) await sw.ready;
-    if (sw.controller) return true;
-    await new Promise<void>((resolve) => {
+    const onControl = new Promise<void>((resolve) => {
       if (typeof sw.addEventListener !== "function") return;
       sw.addEventListener("controllerchange", () => resolve(), { once: true });
     });
+    if (sw.ready) await sw.ready;
+    if (sw.controller) return true;
+    await onControl;
     return true;
   })();
   try {

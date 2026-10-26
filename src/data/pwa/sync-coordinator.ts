@@ -1,5 +1,6 @@
 import { navDebug } from "./nav-debug";
 import { getPwaAuthSession } from "../http/session";
+import { getLocalDb } from "../local/db";
 import { ConnectivityMonitor, getOutboxStore, getOutboxSyncEngine, type SyncFlushResult } from "../local/outbox";
 import type { OutboxItem } from "../local/types";
 import { syncPendingCustomers, syncPendingProducts, syncPendingSuppliers } from "./offline-catalog";
@@ -221,6 +222,31 @@ async function hasLocalPending(businessId: string): Promise<boolean> {
   }
 }
 
+async function releaseRetryBackoffOnReconnect(businessId: string): Promise<void> {
+  try {
+    const db = getLocalDb();
+    const failed = await getOutboxStore().listByStatus(businessId, "failed");
+    for (const row of failed) {
+      if (row.nextAttemptAt != null && row.nextAttemptAt > 0) {
+        await db.outbox.put({ ...row, nextAttemptAt: 0 });
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+async function nextRetryDelayMs(businessId: string): Promise<number | null> {
+  try {
+    const failed = await getOutboxStore().listByStatus(businessId, "failed");
+    const due = failed.map((r) => r.nextAttemptAt).filter((t): t is number => t != null);
+    if (due.length === 0) return null;
+    return Math.max(50, Math.min(...due) - Date.now());
+  } catch {
+    return null;
+  }
+}
+
 let stopOutboxSync: (() => void) | null = null;
 
 /**
@@ -231,14 +257,30 @@ let stopOutboxSync: (() => void) | null = null;
 export function startOutboxSync(): () => void {
   if (stopOutboxSync) return stopOutboxSync;
   const monitor = new ConnectivityMonitor();
-  const run = () => {
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  const clearRetryTimer = () => {
+    if (retryTimer != null) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+  };
+  const run = (reconnect = false) => {
+    clearRetryTimer();
     const businessId = getPwaAuthSession().businessId;
     navDebug("outbox-sync-run", { online: monitor.online, hasBusiness: !!businessId });
     if (businessId && monitor.online) {
       // Reconnect data refresh (reloadOnOnline is off): open screens re-run their
       // store load once the LEADER's outbox flush is done, so they show server
       // data including what was just sent. Data only; never a page reload.
-      void syncAllPendingAsLeader(businessId);
+      const prep = reconnect ? releaseRetryBackoffOnReconnect(businessId) : Promise.resolve();
+      void prep.then(() => syncAllPendingAsLeader(businessId)).then(async () => {
+        if (!monitor.online) return;
+        const delay = await nextRetryDelayMs(businessId);
+        if (delay != null && monitor.online) {
+          clearRetryTimer();
+          retryTimer = setTimeout(() => run(false), delay);
+        }
+      });
     }
   };
   channel = openSyncChannel();
@@ -274,9 +316,11 @@ export function startOutboxSync(): () => void {
   run();
   const unsubscribe = monitor.subscribe((online) => {
     navDebug("connectivity", { online });
-    if (online) run();
+    if (online) run(true);
+    else clearRetryTimer();
   });
   stopOutboxSync = () => {
+    clearRetryTimer();
     unsubscribe();
     monitor.stop();
     window.removeEventListener("dulcecalle:sync", forward);

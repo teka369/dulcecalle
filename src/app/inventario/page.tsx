@@ -1,6 +1,7 @@
 "use client";
 
 import { OfflineLink } from "@/components/shell/OfflineLink";
+import { useAfterSync } from "@/components/shell/use-after-sync";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
@@ -59,6 +60,12 @@ export default function InventarioPage() {
     void refreshAll().catch(() => undefined);
     void getPendingSupplierIds().then(setPendingSupplierIds);
   }, [refreshAll]);
+  // loop/v1 MEDIO: rows created offline carry the local id until re-read; after
+  // the reconnect sync remaps them, re-read so links use the server id at once.
+  useAfterSync(() => {
+    void getPendingSupplierIds().then(setPendingSupplierIds);
+    return refreshAll();
+  });
 
   const counts = useMemo(() => inventoryCounts(products), [products]);
   const split = useMemo(() => splitByStock(products, query), [products, query]);

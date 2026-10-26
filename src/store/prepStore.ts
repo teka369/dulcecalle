@@ -188,6 +188,10 @@ export const prepStore = {
   closeModal() {
     this.continueUsing();
   },
+  /** Hide the overlay without marking preparation permanently dismissed. */
+  hideModal() {
+    setState({ modalOpen: false });
+  },
   /** Test-only reset. */
   __reset() {
     starting = null;
@@ -218,5 +222,6 @@ export function usePrep() {
   const openPanel = useCallback(() => prepStore.openPanel(), []);
   const closePanel = useCallback(() => prepStore.closePanel(), []);
   const closeModal = useCallback(() => prepStore.closeModal(), []);
-  return { ...snap, start, evaluate, continueUsing, openPanel, closePanel, closeModal };
+  const hideModal = useCallback(() => prepStore.hideModal(), []);
+  return { ...snap, start, evaluate, continueUsing, openPanel, closePanel, closeModal, hideModal };
 }

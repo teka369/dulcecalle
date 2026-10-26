@@ -1,6 +1,7 @@
 "use client";
 
 import { OfflineLink } from "@/components/shell/OfflineLink";
+import { useAfterSync } from "@/components/shell/use-after-sync";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop } from "@/domain/money";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
@@ -33,6 +34,12 @@ export default function ClientesPage() {
     void refresh().catch(() => undefined);
     void getPendingCustomerIds().then(setPendingIds);
   }, [refresh]);
+  // loop/v1 MEDIO: same as Inventario — re-read after the reconnect sync so a
+  // remapped row links to the server id at once (no stale local id).
+  useAfterSync(() => {
+    void getPendingCustomerIds().then(setPendingIds);
+    return refresh();
+  });
 
   const summary = useMemo(() => porCobrar(customers), [customers]);
   const filtered = useMemo(() => filterCustomers(customers, query, segment), [customers, query, segment]);
