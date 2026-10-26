@@ -1,5 +1,6 @@
 import { ApiError, NetworkError } from "../errors";
 import { getLocalDb, type DulceCalleLocalDB } from "./db";
+import { cleanupOutboxLocalEffect } from "./outbox-cleanup";
 import { assertUuid } from "./ids";
 import type { OutboxItem, OutboxStatus } from "./types";
 
@@ -200,15 +201,18 @@ export class OutboxStore {
   ): Promise<void> {
     assertUuid(businessId, "businessId");
     assertUuid(operationId, "operationId");
+    const preRow = await this.db.outbox.get(operationId);
+    if (!preRow) throw new Error("outbox row not found");
+    if (preRow.businessId !== businessId) {
+      throw new Error("operationId belongs to another business");
+    }
+    if (preRow.status !== "pending" && preRow.status !== "failed") {
+      throw new Error(`only pending/failed operations can be discarded (status: ${preRow.status})`);
+    }
+    await cleanupOutboxLocalEffect(this.db, businessId, preRow, "discard");
     await this.db.transaction("rw", this.db.outbox, async () => {
       const row = await this.db.outbox.get(operationId);
-      if (!row) throw new Error("outbox row not found");
-      if (row.businessId !== businessId) {
-        throw new Error("operationId belongs to another business");
-      }
-      if (row.status !== "pending" && row.status !== "failed") {
-        throw new Error(`only pending/failed operations can be discarded (status: ${row.status})`);
-      }
+      if (!row) return;
       await this.db.outbox.delete(operationId);
       // loop/v1 T-alto2 — Direct dependents can never be sent while waiting on
       // a row that no longer exists. Surface them as a permanent failure that

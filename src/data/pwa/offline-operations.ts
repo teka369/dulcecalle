@@ -1,12 +1,14 @@
 import { deriveRequestId } from "@/domain/requestId";
 import { ApiError, NetworkError } from "@/data/errors";
+import { cleanupOutboxLocalEffect } from "@/data/local/outbox-cleanup";
+import { isPermanentDebtRejection, isSuppressedLocalEffect } from "./pending-debt";
 import { getPwaApi } from "@/data/pwa/api";
 import { getPwaAuthSession } from "@/data/http/session";
 import { getLocalDb, type DulceCalleLocalDB } from "@/data/local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "@/data/local/outbox";
 import { newEntityId, assertUuid } from "@/data/local/ids";
 import type { LocalCashMove, LocalCashSession, LocalExpense } from "@/data/local/types";
-import type { RemoteExpense, RemoteStockMove } from "@/data/http/mappers";
+import type { RemoteExpense, RemoteStockMove, RemoteToday } from "@/data/http/mappers";
 import type { DayCashSummary } from "@/store/cashStore";
 import { addCop, subCop } from "@/domain/money";
 
@@ -724,7 +726,7 @@ export async function surtirWithOfflineFallback(
         entity: "stockMove",
         operation: "surtir",
         requestId,
-        payload: input,
+        payload: { ...input, prevAvgCost: product.avgCost },
         dependsOn: [...new Set(dependsOn)],
         localCreatedAt: now,
       });
@@ -877,6 +879,7 @@ export async function syncPendingOperations(business: string) {
   return getOutboxSyncEngine().flush(
     business,
     async (item) => {
+      try {
       if (item.entity === "cashSession" && item.operation === "open") {
         const payload = item.payload as { openingFloat: number };
         const remote = await getPwaApi().cash.open(payload.openingFloat, item.requestId);
@@ -956,20 +959,27 @@ export async function syncPendingOperations(business: string) {
             supplierId = dependency.remoteId;
           }
         }
+        const { prevAvgCost: _prev, optimisticApplied: _opt, ...cleanPayload } = payload as Record<string, unknown>;
+        void _prev;
+        void _opt;
+        const surtirBody = (supplierId === payload.supplierId ? cleanPayload : { ...cleanPayload, supplierId }) as typeof payload;
         const remote = await getPwaApi().inventory.surtir(
           payload.productId,
-          supplierId === payload.supplierId ? payload : { ...payload, supplierId },
+          surtirBody,
           item.requestId,
         );
         return { remoteId: remote.id };
       }
       if (item.entity === "stockMove" && item.operation === "shrink") {
-        const payload = item.payload as {
+        const rawPayload = item.payload as {
           productId: string;
           qty: number;
           reason: "me_lo_comi" | "regalar" | "perdido";
           note?: string;
+          optimisticApplied?: unknown;
         };
+        const { optimisticApplied: _opt, ...payload } = rawPayload;
+        void _opt;
         const remote = await getPwaApi().inventory.shrink(
           payload.productId,
           payload,
@@ -978,6 +988,13 @@ export async function syncPendingOperations(business: string) {
         return { remoteId: remote.id };
       }
       throw new Error("Operación de outbox no compatible con M6.8.");
+      } catch (error) {
+        if (isPermanentDebtRejection(error)) {
+          const current = await getLocalDb().outbox.get(item.operationId);
+          await cleanupOutboxLocalEffect(getLocalDb(), business, current ?? item, "reject");
+        }
+        throw error;
+      }
     },
     (item) =>
       item.entity === "cashSession" ||
@@ -1002,5 +1019,105 @@ export function startOperationsSync() {
   return () => {
     unsubscribe();
     monitor.stop();
+  };
+}
+
+/**
+ * R2-A A3: When online, preserve an unsynced local open cash session and
+ * pending cash moves / expenses until their outbox operations finish syncing.
+ */
+export async function mergePendingCashIntoServer(
+  today: RemoteToday,
+  serverExpenses: RemoteExpense[],
+): Promise<{ today: RemoteToday; expenses: RemoteExpense[] }> {
+  const business = getPwaAuthSession().businessId;
+  if (!business) return { today, expenses: serverExpenses };
+  const db = getLocalDb();
+  const ops = await db.outbox.where("businessId").equals(business).toArray();
+  const activeOps = ops.filter((op) => op.status !== "synced" && !isSuppressedLocalEffect(op));
+  if (activeOps.length === 0) return { today, expenses: serverExpenses };
+
+  const activeOpIds = new Set(activeOps.map((op) => op.operationId));
+  const activeReqIds = new Set(activeOps.map((op) => op.requestId));
+
+  let session = today.session;
+  let localSessionUsed = false;
+  if (!session) {
+    const localSession = await db.cashSessions
+      .where("[businessId+localDate]")
+      .equals([business, today.localDate])
+      .first();
+    if (localSession && activeOpIds.has(localSession.id)) {
+      localSessionUsed = true;
+      session = {
+        id: localSession.id,
+        localDate: localSession.localDate,
+        openedAt: localSession.openedAt,
+        closedAt: localSession.closedAt,
+        openingFloat: localSession.openingFloat,
+        closingCount: localSession.closingCount,
+        expectedEfectivo: localSession.expectedEfectivo,
+        expectedNequi: localSession.expectedNequi,
+        difference: localSession.difference,
+      };
+    }
+  }
+
+  const serverMoveIds = new Set(today.moves.map((m) => m.id));
+  const serverRefIds = new Set(
+    today.moves.map((m) => m.refId).filter((id): id is string => typeof id === "string"),
+  );
+  const localMoves = (await db.cashMoves.where("businessId").equals(business).toArray()).filter(
+    (m) =>
+      m.occurredOn === today.localDate &&
+      !serverMoveIds.has(m.id) &&
+      !(m.refId && serverRefIds.has(m.refId)) &&
+      (activeOpIds.has(m.id) ||
+        (m.refId != null && activeOpIds.has(m.refId)) ||
+        (m.requestId != null && activeReqIds.has(m.requestId))),
+  );
+
+  const serverExpIds = new Set(serverExpenses.map((e) => e.id));
+  const localExpenses = (await db.expenses.where("businessId").equals(business).toArray()).filter(
+    (e) => activeOpIds.has(e.id) && !serverExpIds.has(e.id),
+  );
+
+  if (!localSessionUsed && localMoves.length === 0 && localExpenses.length === 0) {
+    return { today, expenses: serverExpenses };
+  }
+
+  const pendingRemoteMoves = localMoves.map((move) => ({
+    id: move.id,
+    amount: move.amount,
+    direction: move.direction,
+    method: move.method,
+    kind: move.kind,
+    refType: move.refType,
+    refId: move.refId,
+    occurredOn: move.occurredOn,
+    createdAt: move.createdAt,
+  }));
+  const mergedMoves = [...today.moves, ...pendingRemoteMoves].sort((a, b) => a.createdAt - b.createdAt);
+
+  let efectivo = localSessionUsed ? (session?.openingFloat ?? 0) : today.expected.efectivo;
+  let nequi = localSessionUsed ? 0 : today.expected.nequi;
+  const movesToSum = localSessionUsed ? mergedMoves : pendingRemoteMoves;
+  for (const move of movesToSum) {
+    const delta = move.direction === "in" ? move.amount : -move.amount;
+    if (move.method === "Efectivo") efectivo = addCop(efectivo, delta);
+    else nequi = addCop(nequi, delta);
+  }
+
+  const closed = session?.closedAt != null;
+  return {
+    today: {
+      ...today,
+      session,
+      closed,
+      canOpen: session == null && !closed,
+      expected: { efectivo, nequi, total: addCop(efectivo, nequi) },
+      moves: mergedMoves,
+    },
+    expenses: [...mapLocalExpenses(localExpenses), ...serverExpenses].sort((a, b) => b.createdAt - a.createdAt),
   };
 }

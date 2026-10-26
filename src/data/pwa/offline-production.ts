@@ -1,4 +1,6 @@
 import { NetworkError } from "../errors";
+import { cleanupOutboxLocalEffect } from "../local/outbox-cleanup";
+import { isPermanentDebtRejection } from "./pending-debt";
 import { formatCop } from "@/domain/money";
 import type { RemotePreparation } from "../http/mappers";
 import { getPwaApi } from "./api";
@@ -205,6 +207,7 @@ export async function prepararWithOfflineFallback(
             qty: input.qty,
             unitCost: input.unitCost,
             note,
+            prevTargetAvgCost: target.avgCost,
           },
           dependsOn: [...new Set(dependsOn)],
           localCreatedAt: now,
@@ -271,16 +274,25 @@ export async function syncPendingPreparations(business: string) {
         unitCost: number | null;
         note?: string | null;
       };
-      const remote = await api.production.prepare(
-        {
-          sourceId: payload.sourceId,
-          targetId: payload.targetId,
-          qty: payload.qty,
-          unitCost: payload.unitCost,
-          note: payload.note ?? undefined,
-        },
-        item.requestId,
-      );
+      let remote: RemotePreparation;
+      try {
+        remote = await api.production.prepare(
+          {
+            sourceId: payload.sourceId,
+            targetId: payload.targetId,
+            qty: payload.qty,
+            unitCost: payload.unitCost,
+            note: payload.note ?? undefined,
+          },
+          item.requestId,
+        );
+      } catch (error) {
+        if (isPermanentDebtRejection(error)) {
+          const current = await getLocalDb().outbox.get(item.operationId);
+          await cleanupOutboxLocalEffect(getLocalDb(), business, current ?? item, "reject");
+        }
+        throw error;
+      }
       // Pending-only mirror: the server row is now the source of truth.
       try {
         await getLocalDb().preparations.where({ requestId: item.requestId }).delete();
