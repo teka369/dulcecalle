@@ -2,6 +2,7 @@
 
 import { errorText } from "@/domain/ux/user-message";
 import { useRouter } from "next/navigation";
+import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useState } from "react";
 import { INVENTORY_ERRORS } from "@/domain/inventory";
 import { useInventory } from "@/store/inventoryStore";
@@ -84,7 +85,7 @@ export default function AgregarProductoPage() {
             onChanged={() => void reloadCreatedImages(createdId)}
           />
         </Sheet>
-        <ActionBar primary={{ label: "Terminar", onClick: () => router.push(`/inventario/${createdId}`) }} />
+        <ActionBar primary={{ label: "Terminar", onClick: () => navigateOfflineAware(router, `/inventario/${createdId}`) }} />
       </div>
     );
   }
