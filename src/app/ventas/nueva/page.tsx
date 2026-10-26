@@ -86,8 +86,7 @@ export default function NuevaVentaPage() {
   }
 
   function onPriceChange(product: RemoteProduct, raw: string) {
-    const digits = raw.replace(/\D/g, "");
-    const parsed = parseSaleUnitPrice(digits, product.price);
+    const parsed = parseSaleUnitPrice(raw, product.price);
     if ("error" in parsed) return;
     if (qtyOf(product.id) > 0) {
       setUnitPrice(product.id, parsed.unitPrice);

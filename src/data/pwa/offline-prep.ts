@@ -35,7 +35,7 @@ import {
 } from "./offline-history";
 
 // 10: loop/v1 paged history lists (devices prepared at 9 re-download history).
-export const PREP_VERSION = 10;
+export const PREP_VERSION = 11;
 export const PREP_DOCUMENT_CACHE = "documents";
 const DOC_FETCH_TIMEOUT_MS = 10_000;
 
@@ -101,6 +101,7 @@ export function prepTaskDefs(): PrepTaskDef[] {
     { path: "/mas/caja/gestionar", label: "Pantalla Gestionar cajas" },
     { path: "/mas/estadisticas", label: "Pantalla Estadísticas" },
     { path: "/mas/apariencia", label: "Pantalla Apariencia" },
+    { path: "/mas/portal", label: "Pantalla Portal de clientes" },
     // The supplier list is a segment of /inventario. There is no
     // /inventario/proveedores page, so that path is not a document.
     { path: "/inventario/proveedores/nuevo", label: "Pantalla Nuevo proveedor" },

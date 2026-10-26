@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatCop } from "@/domain/money";
+import { parseAmountInput } from "@/domain/money/limits";
 import { ProductThumbnail } from "./ProductThumbnail";
 
 export type ProductTileProps = {
@@ -35,6 +36,8 @@ export function ProductTile({
   onPriceChange,
 }: ProductTileProps) {
   const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(price));
+  const [priceError, setPriceError] = useState<string | null>(null);
   const soldOut = stock <= 0;
   const low = !soldOut && stock <= lowStockAt;
   const custom = price !== catalogPrice;
@@ -66,18 +69,36 @@ export function ProductTile({
           <input
             inputMode="numeric"
             aria-label={`Precio de ${name}`}
-            value={String(price)}
-            onChange={(e) => onPriceChange(e.target.value)}
-            onBlur={() => setEditing(false)}
+            aria-invalid={priceError ? true : undefined}
+            value={draft}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setDraft(raw);
+              const parsed = parseAmountInput(raw);
+              if ("error" in parsed) {
+                setPriceError(parsed.error);
+                return;
+              }
+              setPriceError(null);
+              onPriceChange(parsed.digits);
+            }}
+            onBlur={() => {
+              if (!priceError) setEditing(false);
+            }}
             autoFocus
             className="mt-1 h-11 w-full rounded-[var(--r-md)] border border-border bg-bg px-2 text-sm font-semibold normal-case text-ink"
           />
+          {priceError ? <span role="alert" className="mt-1 block text-xs normal-case text-danger">{priceError}</span> : null}
         </label>
       ) : (
         !soldOut && (
           <button
             type="button"
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              setDraft(String(price));
+              setPriceError(null);
+              setEditing(true);
+            }}
             className="mt-1 min-h-11 self-start text-xs font-semibold text-ink underline underline-offset-2"
           >
             Editar precio

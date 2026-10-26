@@ -164,9 +164,11 @@ describe("offline sales readers", () => {
     expect(result?.remainingValue).toBe(1500);
   });
 
-  it("detail returns null when neither server nor local knows the sale", async () => {
-    api.sales.get.mockRejectedValue(new NetworkError("offline"));
+  it("detail returns null on 404 when neither server nor local knows the sale, and rethrows NetworkError when uncached", async () => {
+    api.sales.get.mockRejectedValueOnce(new ApiError("NOT_FOUND", "not found", 404));
     expect(await getSaleDetailWithOfflineFallback(SALE_ID)).toBeNull();
+    api.sales.get.mockRejectedValueOnce(new NetworkError("offline"));
+    await expect(getSaleDetailWithOfflineFallback(SALE_ID)).rejects.toBeInstanceOf(NetworkError);
   });
 
   it("local stock moves are listed for the offline fallback", async () => {

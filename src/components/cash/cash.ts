@@ -134,8 +134,9 @@ export const CASH_OFFLINE_NOCACHE = {
   action: "Volver a Inicio",
 };
 export const GASTOS_OFFLINE_NOCACHE = {
-  title: "Sin conexión",
-  body: "No hay gastos guardados en este teléfono. Conéctate para verlos.",
+  title: "Gastos todavía se están guardando",
+  body: "Estarán listos para usar sin internet cuando vuelva la conexión.",
+  action: "Volver a Inicio",
 };
 
 /**

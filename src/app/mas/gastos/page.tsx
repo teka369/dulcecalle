@@ -1,6 +1,8 @@
 "use client";
 
 import { errorText } from "@/domain/ux/user-message";
+import { OfflineLink } from "@/components/shell/OfflineLink";
+import { useAfterSync } from "@/components/shell/use-after-sync";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { HeroAmount } from "@/components/ui/HeroAmount";
@@ -46,6 +48,7 @@ export default function GastosPage() {
   useEffect(() => {
     void load();
   }, [load]);
+  useAfterSync(load);
 
   const total = useMemo(() => sumAmounts(expenses), [expenses]);
   const days = useMemo(() => groupByDay(expenses), [expenses]);
@@ -63,26 +66,44 @@ export default function GastosPage() {
   const canAdd = !closed && hasSession;
   const offlineView = cashOfflineView({ online, preparedAt: lastReadyAt, hasLocalData: hasSession || expenses.length > 0 });
 
+  const retryButton = !online ? undefined : (
+    <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg">
+      Reintentar
+    </button>
+  );
+
   const gate = cashPageGate({ source: cashStore.getSnapshot().source, loadError, offlineView, hasLocalData: hasSession || expenses.length > 0 });
   if (gate !== "ok") {
     return (
       <div className="flex flex-col pb-6">
-        <HeroBlock size="medium" back={{ href: "/mas", label: "Volver a Más" }} title={CASH_COPY.masGastos} offline={online ? null : { text: "Sin conexión" }} />
+        <HeroBlock size="medium" back={{ href: "/mas", label: "Volver a Más" }} title={CASH_COPY.masGastos} offline={null} />
         <Sheet>
-          <StateBlock
-            kind={gate === "offline" ? "offline-miss" : "error"}
-            title={gate === "offline" ? GASTOS_OFFLINE_NOCACHE.title : "No se pudo cargar."}
-            body={gate === "offline" ? GASTOS_OFFLINE_NOCACHE.body : (loadError ?? undefined)}
-            action={
-              <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg">
-                Reintentar
-              </button>
-            }
-          />
+          {gate === "offline" ? (
+            <StateBlock
+              kind="offline-miss"
+              title={GASTOS_OFFLINE_NOCACHE.title}
+              body={GASTOS_OFFLINE_NOCACHE.body}
+              action={
+                <OfflineLink
+                  href="/"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
+                >
+                  {GASTOS_OFFLINE_NOCACHE.action}
+                </OfflineLink>
+              }
+            />
+          ) : (
+            <StateBlock kind="error" title="No se pudo cargar." body={loadError ?? undefined} action={retryButton} />
+          )}
         </Sheet>
       </div>
     );
   }
+
+  const band =
+    offlineView === "offline-cache"
+      ? { text: lastReadyAt != null ? `Datos de este teléfono · actualizado ${new Date(lastReadyAt).toLocaleString("es-CO")}` : "Datos de este teléfono" }
+      : null;
 
   return (
     <div className="flex flex-col pb-6">
@@ -90,7 +111,7 @@ export default function GastosPage() {
         size="medium"
         back={{ href: "/mas", label: "Volver a Más" }}
         title={CASH_COPY.masGastos}
-        offline={offlineView === "offline-cache" ? (lastReadyAt != null ? { capturedAt: lastReadyAt } : { text: "Sin conexión · datos de este teléfono" }) : null}
+        offline={band}
         action={canAdd ? <HeroPill label="Nuevo gasto" href="/mas/gastos/nuevo" /> : undefined}
       >
         <div className="mt-5">

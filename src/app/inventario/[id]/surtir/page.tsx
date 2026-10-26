@@ -244,19 +244,11 @@ export default function SurtirPage() {
           onChange={onTotalChange}
           hint={unitCostRaw ? `Costo unitario ${formatCop(Number.parseInt(unitCostRaw, 10) || 0)}` : undefined}
         />
-        <div>
-          <label className={label} htmlFor="unit-cost">
-            Costo unitario
-          </label>
-          <Input
-            id="unit-cost"
-            inputMode="numeric"
-            value={unitCostRaw}
-            onChange={(e) => onUnitChange(e.target.value)}
-            className="mt-2"
-            placeholder="0"
-          />
-        </div>
+        <AmountField
+          label="Costo unitario"
+          value={unitCostRaw}
+          onChange={onUnitChange}
+        />
 
         <div className="flex flex-col gap-2">
           <p className={label}>¿Cómo pagaste?</p>

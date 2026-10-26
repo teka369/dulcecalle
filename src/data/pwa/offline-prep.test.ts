@@ -149,7 +149,7 @@ await runPreparation(BIZ);
     const stored = installCacheStubs();
     await runPreparation(BIZ);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
-    expect(PREP_VERSION).toBe(10);
+    expect(PREP_VERSION).toBe(11);
     stored.delete("/mas/caja/gestionar"); // old device: doc never cached
     expect((await checkReadiness(BIZ)).status).toBe("stale");
     await runPreparation(BIZ);
@@ -159,7 +159,7 @@ await runPreparation(BIZ);
 
   it("loop/v1 paged history: a device prepared at PREP_VERSION 9 (history cut at 200 by the paged server) reads stale and re-prepares", async () => {
     await runPreparation(BIZ);
-    expect(PREP_VERSION).toBe(10);
+    expect(PREP_VERSION).toBe(11);
     const db = getLocalDb();
     const row = (await db.prepState.get("readiness::" + BIZ))!;
     await db.prepState.put({ ...row, prepVersion: 9 });
@@ -316,15 +316,16 @@ await runPreparation(BIZ);
 
   it("task list covers documents, catalogs and summaries", () => {
     const defs = prepTaskDefs();
-    expect(defs.filter((d) => d.group === "app")).toHaveLength(20);
+    expect(defs.filter((d) => d.group === "app")).toHaveLength(21);
     expect(defs.filter((d) => d.group === "catalogos")).toHaveLength(3);
     expect(defs.filter((d) => d.group === "resumen")).toHaveLength(4);
-    expect(defs).toHaveLength(27);
+    expect(defs).toHaveLength(28);
     const keys = defs.map((d) => d.key);
     expect(keys).toContain("doc:/inventario/proveedores/nuevo");
     expect(keys).not.toContain("doc:/inventario/proveedores");
     expect(keys).toContain("doc:/mas/estadisticas");
     expect(keys).toContain("doc:/mas/apariencia");
+    expect(keys).toContain("doc:/mas/portal");
     expect(keys).toContain("doc:/mas/gastos/nuevo");
     expect(keys).toContain("doc:/mas/caja/aporte");
     expect(keys).toContain("doc:/mas/caja/retiro");

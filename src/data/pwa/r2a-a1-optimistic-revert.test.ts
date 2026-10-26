@@ -228,4 +228,69 @@ describe("R2-A A1: optimistic Dexie rows are cleaned on permanent rejection and 
     expect((await getLocalDb().products.get(prodId))?.avgCost).toBe(500);
     expect((await getLocalDb().products.get(insumoId))?.avgCost).toBe(10_000);
   });
+
+  it("A1 edge notes: FIFO rejection of preparation + surtir restores original avgCost, and concurrent server products refresh is not double-reverted", async () => {
+    // 1. Offline preparation (+2 units @ 100) then surtir (+4 units @ 600 = 2.400) on prodId (starts at stock=10, avgCost=500)
+    api.production.prepare.mockRejectedValueOnce(new NetworkError("offline"));
+    const prep = await prepararWithOfflineFallback(
+      { sourceId: insumoId, targetId: prodId, qty: 2, unitCost: 100 },
+      newEntityId(),
+    );
+    if (prep.mode !== "offline") throw new Error("expected offline");
+
+    api.inventory.surtir.mockRejectedValueOnce(new NetworkError("offline"));
+    const surtir = await surtirWithOfflineFallback(
+      { productId: prodId, qty: 4, unitCost: 600, totalCost: 2_400, method: "Efectivo" },
+      newEntityId(),
+    );
+    if (surtir.mode !== "offline") throw new Error("expected offline");
+
+    // Both rejected in FIFO order (preparation first, then surtir):
+    const closedErr = new ApiError("CLOSED_DAY", "La caja de hoy ya está cerrada.", 409);
+    api.production.prepare.mockRejectedValue(closedErr);
+    api.inventory.surtir.mockRejectedValue(closedErr);
+
+    await syncPendingPreparations(BIZ);
+    await syncPendingOperations(BIZ);
+
+    // Must restore prodId to stock=10 AND original avgCost=500 (not the intermediate post-preparation 433):
+    const pAfterFifo = await getLocalDb().products.get(prodId);
+    expect(pAfterFifo?.stock).toBe(10);
+    expect(pAfterFifo?.avgCost).toBe(500);
+
+    await discardOutboxOperation(BIZ, prep.id);
+    await discardOutboxOperation(BIZ, surtir.id);
+
+    // 2. Concurrent GET /v1/products overwrites db.products with server baseline BEFORE outbox rejection:
+    api.inventory.surtir.mockRejectedValueOnce(new NetworkError("offline"));
+    const surtir2 = await surtirWithOfflineFallback(
+      { productId: prodId, qty: 5, unitCost: 700, totalCost: 3_500, method: "Efectivo" },
+      newEntityId(),
+    );
+    if (surtir2.mode !== "offline") throw new Error("expected offline");
+    expect((await getLocalDb().products.get(prodId))?.stock).toBe(15);
+
+    // Simulate online catalog refresh (GET /v1/products) overwriting db.products + cacheMeta with server baseline (stock=10, avgCost=500):
+    const serverFetchedAt = Date.now() + 50;
+    await getLocalDb().products.put({
+      ...(await getLocalDb().products.get(prodId))!,
+      stock: 10,
+      avgCost: 500,
+      updatedAt: serverFetchedAt,
+    });
+    await getLocalDb().cacheMeta.put({
+      id: `${BIZ}::products`,
+      businessId: BIZ,
+      resource: "products",
+      cachedAt: serverFetchedAt,
+    });
+
+    // Now syncPendingOperations rejects surtir2 with 409:
+    await syncPendingOperations(BIZ);
+
+    // Must NOT subtract 5 from the already-clean server baseline (stays stock=10, avgCost=500):
+    const pAfterConcurrentGet = await getLocalDb().products.get(prodId);
+    expect(pAfterConcurrentGet?.stock).toBe(10);
+    expect(pAfterConcurrentGet?.avgCost).toBe(500);
+  });
 });

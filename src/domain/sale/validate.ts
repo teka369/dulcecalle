@@ -1,3 +1,5 @@
+import { parseAmountInput } from "@/domain/money/limits";
+
 export const SALE_ERRORS = {
   empty: "Agrega al menos un producto.",
   badPrice: "El precio tiene que ser 0 o más.",
@@ -6,7 +8,7 @@ export const SALE_ERRORS = {
 
 /**
  * Parse an optional per-sale unit price override.
- * Empty → fallback (catalog price). Must be integer ≥ 0.
+ * Empty → fallback (catalog price). Must be integer ≥ 0 and ≤ MAX_COP_AMOUNT.
  */
 export function parseSaleUnitPrice(
   raw: string,
@@ -14,7 +16,10 @@ export function parseSaleUnitPrice(
 ): { unitPrice: number } | { error: string } {
   const t = raw.trim();
   if (t === "") return { unitPrice: fallback };
-  const n = Number.parseInt(t, 10);
+  const amount = parseAmountInput(t);
+  if ("error" in amount) return amount;
+  if (amount.digits === "") return { unitPrice: fallback };
+  const n = Number.parseInt(amount.digits, 10);
   if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
     return { error: SALE_ERRORS.badPrice };
   }

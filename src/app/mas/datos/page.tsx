@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getPwaAuthSession } from "@/data/http/session";
-import { resetPwaApi } from "@/data/pwa/api";
+import { getPwaApi, resetPwaApi } from "@/data/pwa/api";
 import { usePrep } from "@/store/prepStore";
 import { Button } from "@/components/ui/Button";
 import { HeroBlock } from "@/components/ui/HeroBlock";
@@ -34,8 +34,12 @@ export default function DatosPage() {
     };
   }, []);
 
-  function onLogout() {
-    getPwaAuthSession().clear();
+  async function onLogout() {
+    try {
+      await getPwaApi().auth.logout();
+    } catch {
+      getPwaAuthSession().clear();
+    }
     resetPwaApi();
     setDone(true);
     router.replace("/login");
@@ -86,7 +90,7 @@ export default function DatosPage() {
             <p className="mt-1 text-sm text-ink-muted">Quita la sesión de aquí. No toca productos, ventas ni deudas.</p>
             <button
               type="button"
-              onClick={onLogout}
+              onClick={() => void onLogout()}
               className="mt-3 flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-danger bg-surface text-sm font-semibold text-danger"
             >
               Cerrar sesión

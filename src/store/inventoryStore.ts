@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 import type { PayMethod } from "@/domain/types";
+import { AMOUNT_TOO_LARGE_MESSAGE, exceedsMaxCop, parseAmountInput } from "@/domain/money/limits";
 import {
   INVENTORY_ERRORS,
   INVENTORY_TOASTS,
@@ -224,6 +225,9 @@ export const inventoryStore = {
   }): Promise<{ id: string; mode: "online" | "offline" }> {
     const name = input.name.trim();
     if (!name) throw new Error(INVENTORY_ERRORS.emptyProductName);
+    if (exceedsMaxCop(input.priceRaw.trim()) || exceedsMaxCop((input.avgCostRaw ?? "").trim())) {
+      throw new Error(AMOUNT_TOO_LARGE_MESSAGE);
+    }
     const price = Number.parseInt(input.priceRaw.trim() || "0", 10);
     if (!Number.isFinite(price) || price < 0 || !Number.isInteger(price)) {
       throw new Error(INVENTORY_ERRORS.badCost);
@@ -329,7 +333,11 @@ export const inventoryStore = {
   }): Promise<"online" | "offline"> {
     const trimmed = input.name.trim();
     if (!trimmed) throw new Error(INVENTORY_ERRORS.emptyProductName);
-    const price = Number.parseInt(input.priceRaw.trim() || "0", 10);
+    const parsedPrice = parseAmountInput(input.priceRaw);
+    if ("error" in parsedPrice) {
+      throw new Error(parsedPrice.error);
+    }
+    const price = Number.parseInt(parsedPrice.digits || "0", 10);
     if (!Number.isInteger(price) || price < 0) {
       throw new Error(INVENTORY_ERRORS.badCost);
     }

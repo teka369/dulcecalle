@@ -2,7 +2,7 @@
 
 import { errorText } from "@/domain/ux/user-message";
 import { Button } from "@/components/ui/Button";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
@@ -53,33 +53,41 @@ export default function GestionarCajasPage() {
   const [assignError, setAssignError] = useState<string | null>(null);
   const attemptRef = useRef<AssignAttempt | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (isOffline()) {
       setOffline(true);
       return;
     }
+    setOffline(false);
+    setError(null);
     const api = getPwaApi();
     // M5: the list is paginated server-side. Every pending (open) caja must be
     // shown, so fetch open ones at the max page size and only the most recent
-    // closed page; merge by id.
+    // closed page; merge by id. Unassigned moves settle together so orphans
+    // are never silently hidden on a 5xx.
     void Promise.all([
       api.cash.listSessions("open", { limit: 200 }),
       api.cash.listSessions("closed"),
+      api.cash.unassigned(),
     ])
-      .then(([open, closed]) => {
+      .then(([open, closed, unassigned]) => {
         setMoreClosed((closed as Row[]).length >= CLOSED_PAGE);
         const seen = new Set<string>();
         const merged = [...(open as Row[]), ...(closed as Row[])].filter((row) =>
           seen.has(row.id) ? false : (seen.add(row.id), true),
         );
         setRows(merged);
+        setOrphans(unassigned as typeof orphans);
       })
       .catch((e: unknown) => {
         if (gestionarIsOffline(false, e)) setOffline(true);
         else setError(errorText(e, "No se pudieron cargar las cajas."));
       });
-    void api.cash.unassigned().then((data) => setOrphans(data as typeof orphans)).catch(() => setOrphans([]));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   async function loadMoreClosed() {
     const last = rows?.filter((row) => row.regularized).at(-1);
@@ -133,7 +141,22 @@ export default function GestionarCajasPage() {
       />
       <Sheet>
         {offline ? <GestionarOfflineState /> : null}
-        {!offline && error ? <StateBlock kind="error" title="No se pudieron cargar las cajas." body={error} /> : null}
+        {!offline && error ? (
+          <StateBlock
+            kind="error"
+            title="No se pudieron cargar las cajas."
+            body={error}
+            action={
+              <button
+                type="button"
+                onClick={load}
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-md)] bg-cta px-4 text-sm font-semibold text-cta-fg"
+              >
+                Reintentar
+              </button>
+            }
+          />
+        ) : null}
         {!offline && !rows && !error ? <SkeletonRows /> : null}
         {!offline && rows ? (
           <>
