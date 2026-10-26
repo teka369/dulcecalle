@@ -66,9 +66,19 @@ export async function cleanupOutboxLocalEffect(
   const now = Date.now();
   const appliedAt =
     typeof raw.optimisticAppliedAt === "number" ? raw.optimisticAppliedAt : row.localCreatedAt;
-  const productsMeta = await db.cacheMeta.get(`${businessId}::products`);
-  const productOverwrittenByServer =
-    productsMeta != null && productsMeta.cachedAt > appliedAt;
+  let productOverwrittenByServer = false;
+  if (
+    applied &&
+    (row.entity === "sale" || row.entity === "stockMove" || row.entity === "preparation")
+  ) {
+    try {
+      const productsMeta = await db.cacheMeta.get(`${businessId}::products`);
+      productOverwrittenByServer =
+        productsMeta != null && productsMeta.cachedAt > appliedAt;
+    } catch {
+      productOverwrittenByServer = false;
+    }
+  }
 
   if (row.entity === "sale" && row.operation === "create") {
     const sale = await db.sales.get(row.operationId);
