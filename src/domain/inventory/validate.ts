@@ -1,4 +1,5 @@
 import type { PayMethod, StockMoveReason } from "@/domain/types";
+import { AMOUNT_TOO_LARGE_MESSAGE, MAX_COP_AMOUNT, exceedsMaxCop } from "@/domain/money/limits";
 
 /** Exact Escritor Tanda 3 FINAL error / toast strings. */
 export const INVENTORY_ERRORS = {
@@ -114,13 +115,14 @@ export function resolveSurtirCost(input: {
   const unitRaw = input.unitCostRaw.trim();
   const totalRaw = input.totalCostRaw.trim();
 
-  const parseOpt = (raw: string): number | null | "bad" => {
+  const parseOpt = (raw: string): number | null | "bad" | "too_large" => {
     if (raw === "") return null;
+    if (!/^\d+$/.test(raw)) return "bad";
+    if (exceedsMaxCop(raw)) return "too_large";
     const n = Number.parseInt(raw, 10);
-    if (!Number.isFinite(n) || Number.isNaN(n) || !Number.isInteger(n)) {
+    if (!Number.isFinite(n) || Number.isNaN(n) || !Number.isInteger(n) || n < 0) {
       return "bad";
     }
-    if (n < 0) return "bad";
     return n;
   };
 
@@ -129,20 +131,27 @@ export function resolveSurtirCost(input: {
   if (unit === "bad" || total === "bad") {
     return { error: INVENTORY_ERRORS.badCost };
   }
+  if (unit === "too_large" || total === "too_large") {
+    return { error: AMOUNT_TOO_LARGE_MESSAGE };
+  }
 
+  let resolved: { unitCost: number; totalCost: number };
   if (unit == null && total == null) {
-    return { unitCost: 0, totalCost: 0 };
-  }
-  if (unit != null && total == null) {
-    return { unitCost: unit, totalCost: unit * input.qty };
-  }
-  if (unit == null && total != null) {
-    return {
+    resolved = { unitCost: 0, totalCost: 0 };
+  } else if (unit != null && total == null) {
+    resolved = { unitCost: unit, totalCost: unit * input.qty };
+  } else if (unit == null && total != null) {
+    resolved = {
       unitCost: Math.round(total / input.qty),
       totalCost: total,
     };
+  } else {
+    resolved = reconcileSurtirCost(input.qty, unit!, total!);
   }
-  return reconcileSurtirCost(input.qty, unit!, total!);
+  if (resolved.unitCost > MAX_COP_AMOUNT || resolved.totalCost > MAX_COP_AMOUNT) {
+    return { error: AMOUNT_TOO_LARGE_MESSAGE };
+  }
+  return resolved;
 }
 
 export function validatePayMethod(
@@ -206,11 +215,13 @@ export function validatePreparationForm(input: {
   if (raw === "") {
     return { sourceId: input.sourceId, targetId: input.targetId, qty: qtyParsed.qty, unitCost: null };
   }
-  const digits = raw.replace(/\D/g, "");
-  if (digits === "") {
+  if (!/^\d+$/.test(raw)) {
     return { error: INVENTORY_ERRORS.badCost };
   }
-  const unitCost = Number.parseInt(digits, 10);
+  if (exceedsMaxCop(raw)) {
+    return { error: AMOUNT_TOO_LARGE_MESSAGE };
+  }
+  const unitCost = Number.parseInt(raw, 10);
   if (!Number.isInteger(unitCost) || unitCost < 0) {
     return { error: INVENTORY_ERRORS.badCost };
   }

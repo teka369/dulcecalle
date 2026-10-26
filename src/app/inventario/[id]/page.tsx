@@ -21,6 +21,7 @@ import { primaryImageUrl } from "@/data/media/urls";
 import { dmy, inventoryValue, isLowStock, moveDelta, moveMeta, units } from "@/components/inventory/inventory";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
+import { parseAmountInput } from "@/domain/money/limits";
 import type {
   RemotePreparation,
   RemoteProduct,
@@ -132,8 +133,14 @@ export default function ProductoFichaPage() {
 
   const isInsumo = product.sellable === false;
   const low = isLowStock(product);
+  const editPriceParsed = parseAmountInput(editPrice);
+  const editPriceError = "error" in editPriceParsed ? editPriceParsed.error : null;
   const saveEdit = () => {
               if (editBusy) return;
+              if (editPriceError) {
+                setEditError(editPriceError);
+                return;
+              }
               setEditBusy(true);
               setEditError(null);
               void inventoryStore
@@ -339,7 +346,11 @@ export default function ProductoFichaPage() {
                 id="editar-precio-prod"
                 inputMode="numeric"
                 value={editPrice}
-                onChange={(e) => setEditPrice(e.target.value.replace(/\D/g, ""))}
+                aria-invalid={editPriceError ? true : undefined}
+                onChange={(e) => {
+                  setEditPrice(e.target.value);
+                  setEditError(null);
+                }}
                 className="mt-2"
               />
               <label className="mt-3 block text-sm font-medium" htmlFor="editar-low-prod">
@@ -366,7 +377,7 @@ export default function ProductoFichaPage() {
                   </span>
                 </span>
               </label>
-              {editError && !confirmArchive && <p className="mt-2 text-sm text-danger">{editError}</p>}
+              {(editPriceError ?? (confirmArchive ? null : editError)) && <p role="alert" className="mt-2 text-sm text-danger">{editPriceError ?? editError}</p>}
               <Button type="button" variant="primary" disabled={editBusy} onClick={saveEdit} className="mt-3 w-full">
                 Guardar cambios
               </Button>
