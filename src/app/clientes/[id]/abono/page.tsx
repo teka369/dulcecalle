@@ -24,6 +24,7 @@ import { usePrefill } from "@/components/ui/use-prefill";
 import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
@@ -42,6 +43,7 @@ export default function RegistrarAbonoPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingSync, setPendingSync] = useState(false);
   const requestIdRef = useRef<string | null>(null);
 
@@ -50,14 +52,20 @@ export default function RegistrarAbonoPage() {
       setReady(true);
       return;
     }
-    const c = await customerStore.getCustomer(id);
-    setCustomer(c ?? null);
-    if (c) {
-      void getPendingCustomerIds().then((ids) =>
-        setPendingSync(ids.includes(c.id)),
-      );
+    setLoadError(null);
+    try {
+      const c = await customerStore.getCustomer(id);
+      setCustomer(c ?? null);
+      if (c) {
+        void getPendingCustomerIds().then((ids) =>
+          setPendingSync(ids.includes(c.id)),
+        );
+      }
+    } catch (e: unknown) {
+      setLoadError(errorText(e, ""));
+    } finally {
+      setReady(true);
     }
-    setReady(true);
   }, [id]);
 
   useEffect(() => {
@@ -129,6 +137,24 @@ export default function RegistrarAbonoPage() {
       <div className="flex flex-col gap-4">
         <SkeletonHero title="Registrar abono" />
         <SkeletonRows rows={3} />
+      </div>
+    );
+  }
+
+  if (loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock offline={offlineBand} size="compact" back={{ href: "/clientes", label: "Volver a Clientes", entity: true }} title="Registrar abono" />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={typeof navigator === "undefined" || navigator.onLine}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
+        </Sheet>
       </div>
     );
   }

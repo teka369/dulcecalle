@@ -10,7 +10,7 @@ import { getLocalDb } from "../local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
 import { getLocalStore } from "../local/store";
 import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
-import { isPermanentDebtRejection } from "./pending-debt";
+import { isPermanentDebtRejection, isSuppressedLocalEffect } from "./pending-debt";
 import { newEntityId } from "../local/ids";
 import { addCop, mulCop, subCop } from "@/domain/money";
 import type { LocalCustomer, LocalProduct, LocalSale, LocalSaleLine, LocalStockMove, LocalCashMove } from "../local/types";
@@ -65,8 +65,10 @@ export async function listLocalSales(businessId: string): Promise<LocalSaleRow[]
   const sales = await db.sales.where("businessId").equals(businessId).toArray();
   const rows: LocalSaleRow[] = [];
   for (const sale of sales.sort((a, b) => b.createdAt - a.createdAt)) {
+    const op = await getOutboxStore().get(businessId, sale.id);
+    if (op && op.entity === "sale" && isSuppressedLocalEffect(op)) continue;
     const lines = await db.saleLines.where("[businessId+saleId]").equals([businessId, sale.id]).toArray();
-    rows.push(localSaleToRow(sale, lines, await salePending(businessId, sale.id)));
+    rows.push(localSaleToRow(sale, lines, !!op && op.entity === "sale" && op.status !== "synced"));
   }
   return rows;
 }
@@ -345,11 +347,33 @@ export type SalesListResult = {
  * their pending flag). Any other error is rethrown: an empty array always
  * means "no sales", never "could not reach the server".
  */
+async function mergePendingLocalSales(
+  businessId: string | null | undefined,
+  serverSales: RemoteSale[],
+): Promise<LocalSaleRow[]> {
+  const fromServer: LocalSaleRow[] = serverSales.map((s) => ({ ...s, pending: false }));
+  if (!businessId) return fromServer;
+  const serverIds = new Set(serverSales.map((s) => s.id));
+  const serverLineIds = new Set(serverSales.flatMap((s) => s.lines.map((l) => l.id)));
+  const locals = (await listLocalSales(businessId)).filter((r) => r.pending);
+  if (locals.length === 0) return fromServer;
+  const pending: LocalSaleRow[] = [];
+  for (const local of locals) {
+    if (serverIds.has(local.id)) continue;
+    if (local.lines.some((l) => serverLineIds.has(l.id))) continue;
+    const op = await getOutboxStore().get(businessId, local.id);
+    if (op?.remoteId && serverIds.has(op.remoteId)) continue;
+    pending.push(local);
+  }
+  if (pending.length === 0) return fromServer;
+  return [...pending, ...fromServer].sort((a, b) => b.createdAt - a.createdAt);
+}
+
 export async function listSalesWithOfflineFallback(): Promise<SalesListResult> {
   try {
     const sales = await getPwaApi().sales.list();
     return {
-      sales: sales.map((s) => ({ ...s, pending: false })),
+      sales: await mergePendingLocalSales(getPwaAuthSession().businessId, sales),
       source: "server",
     };
   } catch (error) {
@@ -375,7 +399,11 @@ export type SalesScreenResult = SalesListResult & {
 export async function listSalesForScreen(): Promise<SalesScreenResult> {
   try {
     const sales = await getPwaApi().sales.list();
-    return { sales: sales.map((s) => ({ ...s, pending: false })), source: "server", failed: false };
+    return {
+      sales: await mergePendingLocalSales(getPwaAuthSession().businessId, sales),
+      source: "server",
+      failed: false,
+    };
   } catch (error) {
     const serverDown = error instanceof ApiError && error.status >= 500;
     const network = error instanceof NetworkError;

@@ -149,11 +149,13 @@ export const customerStore = {
       fail(e);
     }
   },
+  /** Only a real 404 means "not found"; any other error reaches the page (No se pudo cargar + Reintentar). */
   async getCustomer(id: string): Promise<RemoteCustomer | undefined> {
     try {
       return await getCachedCustomer(id);
-    } catch {
-      return undefined;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return undefined;
+      throw e;
     }
   },
   async getStatement(

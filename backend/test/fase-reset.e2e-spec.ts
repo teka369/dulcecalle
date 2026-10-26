@@ -103,6 +103,25 @@ describe("Business data reset (owner-only, transactional, tenant-scoped)", () =>
     const customerA = await seedBusinessData(authA(), "ProdA");
     await seedBusinessData(authB(), "ProdB");
 
+    const sessA = await prisma.cashSession.create({
+      data: { id: randomUUID(), businessId: bizA, localDate: new Date("2026-10-01T00:00:00.000Z"), openedAt: new Date(), openingFloat: 1000n },
+    });
+    await prisma.cashCarry.create({
+      data: { id: randomUUID(), businessId: bizA, requestId: randomUUID(), currentSessionId: sessA.id, mode: "counted", openingFloat: 1000n, reassignedCount: 0 },
+    });
+    await prisma.authSession.create({
+      data: { id: randomUUID(), kind: "customer", subjectId: customerA, businessId: bizA, tokenHash: randomUUID(), expiresAt: new Date(Date.now() + 60_000) },
+    });
+    const sessB = await prisma.cashSession.create({
+      data: { id: randomUUID(), businessId: bizB, localDate: new Date("2026-10-01T00:00:00.000Z"), openedAt: new Date(), openingFloat: 1000n },
+    });
+    await prisma.cashCarry.create({
+      data: { id: randomUUID(), businessId: bizB, requestId: randomUUID(), currentSessionId: sessB.id, mode: "counted", openingFloat: 1000n, reassignedCount: 0 },
+    });
+    await prisma.authSession.create({
+      data: { id: randomUUID(), kind: "customer", subjectId: randomUUID(), businessId: bizB, tokenHash: randomUUID(), expiresAt: new Date(Date.now() + 60_000) },
+    });
+
     const res = await api().delete("/v1/business/data").set(authA()).expect(200);
     expect(res.body.deletedCustomerIds).toEqual([customerA]);
     expect(res.body.deleted.products).toBe(1);
@@ -112,6 +131,11 @@ describe("Business data reset (owner-only, transactional, tenant-scoped)", () =>
     expect(await prisma.product.count({ where: { businessId: bizA } })).toBe(0);
     expect(await prisma.customer.count({ where: { businessId: bizA } })).toBe(0);
     expect(await prisma.expense.count({ where: { businessId: bizA } })).toBe(0);
+    expect(await prisma.cashCarry.count({ where: { businessId: bizA } })).toBe(0);
+    expect(await prisma.authSession.count({ where: { businessId: bizA, kind: "customer" } })).toBe(0);
+    expect(await prisma.authSession.count({ where: { subjectId: userIdA, kind: "owner" } })).toBeGreaterThanOrEqual(1);
+    expect(await prisma.cashCarry.count({ where: { businessId: bizB } })).toBe(1);
+    expect(await prisma.authSession.count({ where: { businessId: bizB, kind: "customer" } })).toBe(1);
     expect(await prisma.product.count({ where: { businessId: bizB } })).toBe(1);
     expect(await prisma.customer.count({ where: { businessId: bizB } })).toBe(1);
 

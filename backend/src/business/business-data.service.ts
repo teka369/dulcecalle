@@ -58,7 +58,9 @@ export class BusinessDataService {
       await wipe(tx, "initialDebts", (where) => tx.initialDebt.deleteMany({ where }));
       await wipe(tx, "stockMoves", (where) => tx.stockMove.deleteMany({ where }));
       await wipe(tx, "cashMoves", (where) => tx.cashMove.deleteMany({ where }));
+      await wipe(tx, "cashCarries", (where) => tx.cashCarry.deleteMany({ where }));
       await wipe(tx, "cashSessions", (where) => tx.cashSession.deleteMany({ where }));
+      await wipe(tx, "authSessions", (where) => tx.authSession.deleteMany({ where: { ...where, kind: "customer" } }));
       await wipe(tx, "expenses", (where) => tx.expense.deleteMany({ where }));
       await wipe(tx, "customers", (where) => tx.customer.deleteMany({ where }));
       await wipe(tx, "suppliers", (where) => tx.supplier.deleteMany({ where }));

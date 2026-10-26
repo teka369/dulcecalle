@@ -49,3 +49,8 @@ export function configureHttp(app: NestExpressApplication, env: Env = process.en
     allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "X-Business-Id"],
   });
 }
+
+/** B3: DISABLE_THROTTLE=1 is only honored outside production. */
+export function shouldSkipThrottle(env: Env = process.env): boolean {
+  return env.NODE_ENV !== "production" && env.DISABLE_THROTTLE === "1";
+}
