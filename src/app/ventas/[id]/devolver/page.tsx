@@ -21,6 +21,7 @@ import { SectionHead } from "@/components/ui/SectionHead";
 import { RowGroup } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE, ABOVE_ACTION_BAR } from "@/components/ui/ActionBar";
 
@@ -33,6 +34,7 @@ export default function DevolverVentaPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const imageMap = useProductImageMap(getPwaAuthSession().businessId);
@@ -42,20 +44,26 @@ export default function DevolverVentaPage() {
       setReady(true);
       return;
     }
-    const row = await getSaleDetailWithOfflineFallback(id);
-    setData(row);
-    if (row) {
-      const next: Record<string, string> = {};
-      for (const l of row.lines) next[l.id] = "";
-      setQtyByLine(next);
-      if (row.sale.customerId) {
-        const cid = row.sale.customerId;
-        void listCachedCustomers()
-          .then((cs) => setCustomerName(cs.find((c) => c.id === cid)?.name ?? null))
-          .catch(() => setCustomerName(null));
+    setLoadError(null);
+    try {
+      const row = await getSaleDetailWithOfflineFallback(id);
+      setData(row);
+      if (row) {
+        const next: Record<string, string> = {};
+        for (const l of row.lines) next[l.id] = "";
+        setQtyByLine(next);
+        if (row.sale.customerId) {
+          const cid = row.sale.customerId;
+          void listCachedCustomers()
+            .then((cs) => setCustomerName(cs.find((c) => c.id === cid)?.name ?? null))
+            .catch(() => setCustomerName(null));
+        }
       }
+    } catch (e: unknown) {
+      setLoadError(errorText(e, ""));
+    } finally {
+      setReady(true);
     }
-    setReady(true);
   }, [id]);
 
   useEffect(() => {
@@ -138,6 +146,24 @@ export default function DevolverVentaPage() {
         <SkeletonHero title="Devolver" />
         <Sheet>
           <SkeletonRows rows={3} />
+        </Sheet>
+      </div>
+    );
+  }
+
+  if (loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock size="compact" back={{ href: "/ventas", label: "Volver a Ventas", entity: true }} title="Devolver" />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={typeof navigator === "undefined" || navigator.onLine}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
         </Sheet>
       </div>
     );

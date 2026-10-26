@@ -1,3 +1,4 @@
+import { ApiError } from "../errors";
 import { getPwaApi } from "./api";
 import type { RemoteReturn, RemoteSale, RemoteSaleLine } from "../http/mappers";
 
@@ -20,8 +21,9 @@ export async function getHttpReturnable(
   let sale: RemoteSale;
   try {
     sale = await api.sales.get(saleId);
-  } catch {
-    return null;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
   }
   const returns = await api.sales.returns(saleId);
   const returned = new Map<string, number>();
