@@ -1,9 +1,12 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePrefill } from "@/components/ui/use-prefill";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import type { RemoteProduct } from "@/data/http/mappers";
 import {
   validateMotivo,
@@ -21,6 +24,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
@@ -47,11 +51,14 @@ export function ShrinkForm({
   const id = useEntityId();
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [qtyRaw, setQtyRaw] = useState("");
+  usePrefill("cantidad", setQtyRaw);
+  const rejected = useRejectedCorrection();
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
@@ -59,9 +66,16 @@ export function ShrinkForm({
       setReady(true);
       return;
     }
-    const p = await inventoryStore.getProduct(id);
-    setProduct(p ?? null);
-    setReady(true);
+    setLoadError(null);
+    try {
+      // Only a real 404 comes back as undefined («No encontramos»); other errors → Reintentar.
+      const p = await inventoryStore.getProduct(id);
+      setProduct(p ?? null);
+    } catch (e: unknown) {
+      setLoadError(errorText(e, ""));
+    } finally {
+      setReady(true);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -103,11 +117,11 @@ export function ShrinkForm({
         requestId: requestIdRef.current,
       });
       setToast(toastText);
-      setTimeout(() => {
+      rejected.afterSave(() => {
         navigateOfflineAware(router, `/inventario/${product.id}`);
       }, 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(errorText(e, "Error"));
       setBusy(false);
     }
   }
@@ -117,6 +131,24 @@ export function ShrinkForm({
       <div className="flex flex-col gap-4">
         <SkeletonHero title={title} />
         <SkeletonRows rows={3} />
+      </div>
+    );
+  }
+
+  if (loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock offline={offlineBand} size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title={title} />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={typeof navigator === "undefined" || navigator.onLine}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
+        </Sheet>
       </div>
     );
   }
@@ -169,6 +201,7 @@ export function ShrinkForm({
 
       <ActionBar primary={{ label: cta, onClick: () => void confirm(), disabled: !valid, busy }} />
       <ActionToast text={toast} />
+      {rejected.dialog}
     </div>
   );
 }

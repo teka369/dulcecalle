@@ -233,7 +233,6 @@ describe("offline close E2E against PostgreSQL", () => {
   });
 
   it("E2E-6 and E2E-7 apply return stock once", async () => {
-    const person = await customer("Dora");
     const goods = await product(1_000, 10);
     const sale = await api()
       .post("/v1/sales")

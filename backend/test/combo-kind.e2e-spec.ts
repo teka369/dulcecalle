@@ -5,6 +5,8 @@ import { randomUUID } from "crypto";
 import * as path from "path";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
+import { BusinessDataService } from "../src/business/business-data.service";
+import { importDexieDump } from "../migration/importer";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { installBigIntJson } from "../src/shared/bigint";
 import { HttpErrorFilter } from "../src/shared/http/http-error.filter";
@@ -185,5 +187,63 @@ describe("TICKET-A product kind", () => {
       { ...base, id: "d", name: "Ya combo", sellable: false, kind: "combo" },
     ]);
     expect(list.map((x) => [x.id, x.confidence])).toEqual([["c", "alta"], ["b", "baja"]]);
+  });
+
+  it("exportData / importData and importDexieDump preserve kind=combo (forcing sellable=false) and default missing kind to standard", async () => {
+    const owner2 = await seedOwner(app, "kind-import@test.co", "KindImport");
+    const biz2 = owner2.business.id;
+    const ctx2 = { userId: owner2.user.id, businessId: biz2, role: "owner" as const, timezone: "America/Bogota" };
+    const dataSvc = app.get(BusinessDataService);
+
+    const imported = await dataSvc.importData(ctx2, {
+      products: [
+        { name: "Combo importado", price: 0, avgCost: 50000, stock: 2, kind: "combo", sellable: true },
+        { name: "Legado sin kind", price: 1500, avgCost: 800, stock: 5 },
+        { name: "Insumo legado", price: 0, avgCost: 12000, stock: 1, sellable: false },
+      ],
+    });
+    expect(imported.products.map((p) => ({ name: p.name, kind: p.kind, sellable: p.sellable }))).toEqual([
+      { name: "Combo importado", kind: "combo", sellable: false },
+      { name: "Legado sin kind", kind: "standard", sellable: true },
+      { name: "Insumo legado", kind: "standard", sellable: false },
+    ]);
+
+    const exported = await dataSvc.exportData(ctx2);
+    expect(exported.products.find((p) => p.name === "Combo importado")?.kind).toBe("combo");
+    expect(exported.products.find((p) => p.name === "Legado sin kind")?.kind).toBe("standard");
+
+    process.env.MIGRATION_ENV = "TEST";
+    const now = Date.now();
+    await importDexieDump(
+      prisma as never,
+      {
+        source: "TEST_FIXTURE",
+        notProduction: true,
+        tables: {
+          settings: [],
+          products: [
+            { id: 901, name: "Dexie Combo", category: "General", price: 0, avgCost: 30000, stock: 1, lowStockAt: 5, kind: "combo", sellable: true, createdAt: now, updatedAt: now },
+            { id: 902, name: "Dexie Legacy", category: "General", price: 1200, avgCost: 600, stock: 4, lowStockAt: 5, createdAt: now, updatedAt: now },
+          ],
+          customers: [],
+          suppliers: [],
+          sales: [],
+          saleLines: [],
+          saleReturns: [],
+          saleReturnLines: [],
+          stockMoves: [],
+          cashSessions: [],
+          cashMoves: [],
+          customerPayments: [],
+          initialDebts: [],
+          expenses: [],
+        },
+      },
+      { businessId: biz2 },
+    );
+    const dexieCombo = await prisma.product.findFirstOrThrow({ where: { businessId: biz2, name: "Dexie Combo" } });
+    const dexieLegacy = await prisma.product.findFirstOrThrow({ where: { businessId: biz2, name: "Dexie Legacy" } });
+    expect({ kind: dexieCombo.kind, sellable: dexieCombo.sellable }).toEqual({ kind: "combo", sellable: false });
+    expect({ kind: dexieLegacy.kind, sellable: dexieLegacy.sellable }).toEqual({ kind: "standard", sellable: true });
   });
 });

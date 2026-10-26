@@ -27,6 +27,7 @@ import { CurrentBusiness } from "../tenancy/business.decorator";
 import { Roles } from "../shared/http/decorators";
 import type { BusinessContext } from "../identity/auth.types";
 import { resolveIdempotencyKey } from "../shared/idempotency";
+import { UuidParam, optionalUuidQuery } from "../shared/http/params";
 
 @Controller()
 export class CatalogController {
@@ -38,16 +39,18 @@ export class CatalogController {
   }
 
   @Get("products/:id")
-  getProduct(@CurrentBusiness() ctx: BusinessContext, @Param("id") id: string) {
+  getProduct(@CurrentBusiness() ctx: BusinessContext, @Param("id", UuidParam) id: string) {
     return this.catalog.getProduct(ctx, id);
   }
 
   @Get("products/:id/moves")
   listProductMoves(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
+    @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
   ) {
-    return this.catalog.listProductMoves(ctx, id);
+    return this.catalog.listProductMoves(ctx, id, { limit, cursor });
   }
 
   @Post("products")
@@ -66,7 +69,7 @@ export class CatalogController {
   @Patch("products/:id")
   patchProduct(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: PatchProductDto,
   ) {
     return this.catalog.patchProduct(ctx, id, dto);
@@ -91,15 +94,24 @@ export class CatalogController {
     @CurrentBusiness() ctx: BusinessContext,
     @Query("sourceId") sourceId?: string,
     @Query("targetId") targetId?: string,
+    @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
   ) {
-    return this.catalog.listPreparations(ctx, { sourceId, targetId });
+    return this.catalog.listPreparations(
+      ctx,
+      {
+        sourceId: optionalUuidQuery(sourceId, "sourceId"),
+        targetId: optionalUuidQuery(targetId, "targetId"),
+      },
+      { limit, cursor },
+    );
   }
 
   @Roles("owner")
   @Post("products/:id/archive")
   archiveProduct(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
   ) {
     return this.catalog.archiveProduct(ctx, id);
   }
@@ -108,7 +120,7 @@ export class CatalogController {
   @Post("products/:id/surtir")
   surtir(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: SurtirDto,
     @Headers("idempotency-key") key?: string,
   ) {
@@ -124,7 +136,7 @@ export class CatalogController {
   @Post("products/:id/shrink")
   shrink(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: ShrinkDto,
     @Headers("idempotency-key") key?: string,
   ) {
@@ -142,14 +154,14 @@ export class CatalogController {
   }
 
   @Get("customers/:id")
-  getCustomer(@CurrentBusiness() ctx: BusinessContext, @Param("id") id: string) {
+  getCustomer(@CurrentBusiness() ctx: BusinessContext, @Param("id", UuidParam) id: string) {
     return this.catalog.getCustomer(ctx, id);
   }
 
   @Get("customers/:id/ledger")
   customerLedger(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
   ) {
     return this.catalog.customerLedger(ctx, id);
   }
@@ -170,7 +182,7 @@ export class CatalogController {
   @Patch("customers/:id")
   patchCustomer(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: PatchCustomerDto,
   ) {
     return this.catalog.patchCustomer(ctx, id, dto);
@@ -179,7 +191,7 @@ export class CatalogController {
   @Post("customers/:id/pin")
   setCustomerPin(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: SetCustomerPinDto,
   ) {
     return this.catalog.setCustomerPin(ctx, id, dto.pin);
@@ -189,7 +201,7 @@ export class CatalogController {
   @Post("customers/:id/initial-debts")
   recordInitialDebt(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: CreateInitialDebtDto,
     @Headers("idempotency-key") key?: string,
   ) {
@@ -207,14 +219,14 @@ export class CatalogController {
   }
 
   @Get("suppliers/:id")
-  getSupplier(@CurrentBusiness() ctx: BusinessContext, @Param("id") id: string) {
+  getSupplier(@CurrentBusiness() ctx: BusinessContext, @Param("id", UuidParam) id: string) {
     return this.catalog.getSupplier(ctx, id);
   }
 
   @Get("suppliers/:id/surtidas")
   supplierSurtidas(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
   ) {
     return this.catalog.listSupplierSurtidas(ctx, id);
   }
@@ -235,7 +247,7 @@ export class CatalogController {
   @Patch("suppliers/:id")
   patchSupplier(
     @CurrentBusiness() ctx: BusinessContext,
-    @Param("id") id: string,
+    @Param("id", UuidParam) id: string,
     @Body() dto: PatchSupplierDto,
   ) {
     return this.catalog.patchSupplier(ctx, id, dto);

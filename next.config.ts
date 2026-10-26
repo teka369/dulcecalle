@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
+import { securityHeaders } from "./src/security-headers";
 
 const revision =
   spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" }).stdout?.trim() ||
@@ -32,6 +33,11 @@ const nextConfig: NextConfig = {
   // The preview browser calls the dev server as 127.0.0.1. Next blocks
   // that host unless it is listed, and the client bundle never hydrates.
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  async headers() {
+    // CSP / clickjacking (see src/security-headers.ts). Also served on /sw.js,
+    // whose CSP governs the service worker's own fetches.
+    return [{ source: "/:path*", headers: securityHeaders() }];
+  },
   async rewrites() {
     // Same-origin /v1 → Nest. Dev/preview only.
     // Production uses NEXT_PUBLIC_API_URL; never proxy to loopback.

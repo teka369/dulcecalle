@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
@@ -18,9 +19,12 @@ import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { customerStore } from "@/store/customerStore";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
+import { usePrefill } from "@/components/ui/use-prefill";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
@@ -32,11 +36,14 @@ export default function RegistrarAbonoPage() {
   const id = useEntityId();
   const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [amountRaw, setAmountRaw] = useState("");
+  usePrefill("monto", setAmountRaw);
+  const rejected = useRejectedCorrection();
   const [method, setMethod] = useState<PayMethod>("Efectivo");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingSync, setPendingSync] = useState(false);
   const requestIdRef = useRef<string | null>(null);
 
@@ -45,14 +52,20 @@ export default function RegistrarAbonoPage() {
       setReady(true);
       return;
     }
-    const c = await customerStore.getCustomer(id);
-    setCustomer(c ?? null);
-    if (c) {
-      void getPendingCustomerIds().then((ids) =>
-        setPendingSync(ids.includes(c.id)),
-      );
+    setLoadError(null);
+    try {
+      const c = await customerStore.getCustomer(id);
+      setCustomer(c ?? null);
+      if (c) {
+        void getPendingCustomerIds().then((ids) =>
+          setPendingSync(ids.includes(c.id)),
+        );
+      }
+    } catch (e: unknown) {
+      setLoadError(errorText(e, ""));
+    } finally {
+      setReady(true);
     }
-    setReady(true);
   }, [id]);
 
   useEffect(() => {
@@ -82,6 +95,7 @@ export default function RegistrarAbonoPage() {
   }, [customer, amountRaw, method]);
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (!customer || busy) return;
     setError(null);
     const err = validateAbono({
@@ -109,11 +123,11 @@ export default function RegistrarAbonoPage() {
           ? "Abono guardado sin conexión"
           : "Abono registrado",
       );
-      setTimeout(() => {
+      rejected.afterSave(() => {
         navigateOfflineAware(router, `/clientes/${customer.id}`);
       }, 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar abono");
+      setError(errorText(e, "Error al registrar abono"));
       setBusy(false);
     }
   }
@@ -123,6 +137,24 @@ export default function RegistrarAbonoPage() {
       <div className="flex flex-col gap-4">
         <SkeletonHero title="Registrar abono" />
         <SkeletonRows rows={3} />
+      </div>
+    );
+  }
+
+  if (loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock offline={offlineBand} size="compact" back={{ href: "/clientes", label: "Volver a Clientes", entity: true }} title="Registrar abono" />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={typeof navigator === "undefined" || navigator.onLine}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
+        </Sheet>
       </div>
     );
   }
@@ -189,6 +221,7 @@ export default function RegistrarAbonoPage() {
         }}
       />
       <ActionToast text={toast} />
+      {rejected.dialog}
     </div>
   );
 }

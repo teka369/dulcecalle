@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, NetworkError } from "@/data/errors";
+import { NetworkError } from "@/data/errors";
 import {
   __resetLocalDbForTests,
   getLocalDb,
@@ -188,7 +188,7 @@ describe("online upload flow", () => {
     );
     script = [{ kind: "ok", body: uploadBody("p") }];
     api.products.registerImage.mockImplementation(
-      async (_pid: string, input: Record<string, unknown>, req: string) => ({
+      async (_pid: string, input: Record<string, unknown>) => ({
         id: "img-1",
         productId: PRODUCT_ID,
         publicId: input.publicId,

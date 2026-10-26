@@ -1,14 +1,18 @@
 "use client";
 
-import { useOfflineBand } from "@/components/shell/use-online";
+import { errorText } from "@/domain/ux/user-message";
+import { useOfflineBand, useOnline } from "@/components/shell/use-online";
 import { Input } from "@/components/ui/Input";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
+import { usePrefill } from "@/components/ui/use-prefill";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
@@ -39,6 +43,8 @@ export default function SurtirPage() {
   const [supplierId, setSupplierId] = useState("");
   const [supplierCreate, setSupplierCreate] = useState("");
   const [qtyRaw, setQtyRaw] = useState("");
+  usePrefill("cantidad", setQtyRaw);
+  const rejected = useRejectedCorrection();
   const [unitCostRaw, setUnitCostRaw] = useState("");
   const [totalCostRaw, setTotalCostRaw] = useState("");
   const [method, setMethod] = useState<PayMethod>("Efectivo");
@@ -47,6 +53,8 @@ export default function SurtirPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const online = useOnline();
   const [totalLocked, setTotalLocked] = useState(false);
   const requestIdRef = useRef<string | null>(null);
 
@@ -55,12 +63,19 @@ export default function SurtirPage() {
       setReady(true);
       return;
     }
-    const p = await inventoryStore.getProduct(id);
-    setProduct(p ?? null);
-    const s = await inventoryStore.refreshSuppliers();
-    setSuppliers(s);
-    void getPendingSupplierIds().then(setPendingSupplierIds);
-    setReady(true);
+    setLoadError(null);
+    try {
+      // Only a real 404 comes back as undefined («No encontramos»); other errors → Reintentar.
+      const p = await inventoryStore.getProduct(id);
+      setProduct(p ?? null);
+      const s = await inventoryStore.refreshSuppliers();
+      setSuppliers(s);
+      void getPendingSupplierIds().then(setPendingSupplierIds);
+    } catch (e: unknown) {
+      setLoadError(errorText(e, ""));
+    } finally {
+      setReady(true);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -123,6 +138,7 @@ export default function SurtirPage() {
   }, [qtyRaw, unitCostRaw, totalCostRaw, method]);
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (!product || busy) return;
     setError(null);
     const r = validateSurtirForm({
@@ -156,11 +172,11 @@ export default function SurtirPage() {
           ? `Stock actualizado · salieron ${formatCop(r.totalCost)} de ${method}`
           : "Stock actualizado",
       );
-      setTimeout(() => {
+      rejected.afterSave(() => {
         navigateOfflineAware(router, `/inventario/${product.id}`);
       }, 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al surtir");
+      setError(errorText(e, "Error al surtir"));
       setBusy(false);
     }
   }
@@ -170,6 +186,24 @@ export default function SurtirPage() {
       <div className="flex flex-col gap-4">
         <SkeletonHero title="Surtir" />
         <SkeletonRows rows={4} />
+      </div>
+    );
+  }
+
+  if (loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock offline={offlineBand} size="compact" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Surtir" />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={online}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
+        </Sheet>
       </div>
     );
   }
@@ -210,19 +244,11 @@ export default function SurtirPage() {
           onChange={onTotalChange}
           hint={unitCostRaw ? `Costo unitario ${formatCop(Number.parseInt(unitCostRaw, 10) || 0)}` : undefined}
         />
-        <div>
-          <label className={label} htmlFor="unit-cost">
-            Costo unitario
-          </label>
-          <Input
-            id="unit-cost"
-            inputMode="numeric"
-            value={unitCostRaw}
-            onChange={(e) => onUnitChange(e.target.value)}
-            className="mt-2"
-            placeholder="0"
-          />
-        </div>
+        <AmountField
+          label="Costo unitario"
+          value={unitCostRaw}
+          onChange={onUnitChange}
+        />
 
         <div className="flex flex-col gap-2">
           <p className={label}>¿Cómo pagaste?</p>
@@ -296,6 +322,7 @@ export default function SurtirPage() {
         primary={{ label: "Confirmar surtir", onClick: () => void confirm(), disabled: !valid, busy }}
       />
       <ActionToast text={toast} />
+      {rejected.dialog}
     </div>
   );
 }

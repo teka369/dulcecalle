@@ -149,11 +149,22 @@ await runPreparation(BIZ);
     const stored = installCacheStubs();
     await runPreparation(BIZ);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
-    expect(PREP_VERSION).toBe(9);
+    expect(PREP_VERSION).toBe(11);
     stored.delete("/mas/caja/gestionar"); // old device: doc never cached
     expect((await checkReadiness(BIZ)).status).toBe("stale");
     await runPreparation(BIZ);
     expect(stored.has("/mas/caja/gestionar")).toBe(true);
+    expect((await checkReadiness(BIZ)).status).toBe("ready");
+  });
+
+  it("loop/v1 paged history: a device prepared at PREP_VERSION 9 (history cut at 200 by the paged server) reads stale and re-prepares", async () => {
+    await runPreparation(BIZ);
+    expect(PREP_VERSION).toBe(11);
+    const db = getLocalDb();
+    const row = (await db.prepState.get("readiness::" + BIZ))!;
+    await db.prepState.put({ ...row, prepVersion: 9 });
+    expect((await checkReadiness(BIZ)).status).toBe("stale");
+    await runPreparation(BIZ);
     expect((await checkReadiness(BIZ)).status).toBe("ready");
   });
 
@@ -262,7 +273,7 @@ await runPreparation(BIZ);
     expect(row.status).toBe("failed");
     const sw = row.tasks.find((t) => t.key === "sys:sw");
     expect(sw?.status).toBe("failed");
-    expect(sw?.error).toContain("Service Worker");
+    expect(sw?.error).toContain("modo sin conexión");
     expect(row.tasks.find((t) => t.key === "catalog:products")?.status).toBe("done");
   });
 
@@ -300,20 +311,21 @@ await runPreparation(BIZ);
     const row = await runPreparation(BIZ);
     const thumbs = row.tasks.find((t) => t.key === "media:thumbs");
     expect(thumbs?.status).toBe("done");
-    expect(thumbs?.detail).toBe("1/1 miniaturas");
+    expect(thumbs?.detail).toBe("1 de 1 fotos");
   });
 
   it("task list covers documents, catalogs and summaries", () => {
     const defs = prepTaskDefs();
-    expect(defs.filter((d) => d.group === "app")).toHaveLength(20);
+    expect(defs.filter((d) => d.group === "app")).toHaveLength(21);
     expect(defs.filter((d) => d.group === "catalogos")).toHaveLength(3);
     expect(defs.filter((d) => d.group === "resumen")).toHaveLength(4);
-    expect(defs).toHaveLength(27);
+    expect(defs).toHaveLength(28);
     const keys = defs.map((d) => d.key);
     expect(keys).toContain("doc:/inventario/proveedores/nuevo");
     expect(keys).not.toContain("doc:/inventario/proveedores");
     expect(keys).toContain("doc:/mas/estadisticas");
     expect(keys).toContain("doc:/mas/apariencia");
+    expect(keys).toContain("doc:/mas/portal");
     expect(keys).toContain("doc:/mas/gastos/nuevo");
     expect(keys).toContain("doc:/mas/caja/aporte");
     expect(keys).toContain("doc:/mas/caja/retiro");
@@ -374,7 +386,7 @@ await runPreparation(BIZ);
     }
     const verify = row.tasks.find((task) => task.key === "sys:verify");
     expect(verify?.status).toBe("done");
-    expect(verify?.detail).toBe(`${declared.length} documentos verificados`);
+    expect(verify?.detail).toBe(`${declared.length} pantallas revisadas`);
   });
 
   it("is not ready when a required static document is missing", async () => {

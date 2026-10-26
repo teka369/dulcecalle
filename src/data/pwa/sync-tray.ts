@@ -1,6 +1,7 @@
+import { userFacingMessage } from "@/domain/ux/user-message";
 import { assertUuid } from "../local/ids";
 import { getLocalDb } from "../local/db";
-import { getOutboxStore } from "../local/outbox";
+import { getOutboxStore, payloadReferences } from "../local/outbox";
 import type { OutboxItem } from "../local/types";
 import { getPwaAuthSession } from "../http/session";
 import { formatCop } from "@/domain/money";
@@ -19,6 +20,7 @@ export type TrayItem = {
   nextAttemptAt: number | null;
   dependsOn: string[];
   payload: unknown;
+  discardedDependency?: OutboxItem["discardedDependency"];
 };
 
 export type EnrichedTrayItem = TrayItem & {
@@ -28,7 +30,25 @@ export type EnrichedTrayItem = TrayItem & {
   retryable: boolean;
   /** Unsatisfied dependency description, when blocked. */
   blockedBy: string | null;
+  /** Pending, but a dependency row no longer exists (it was discarded): actionable. */
+  orphaned: boolean;
+  /** Reintentar is offered only when a retry can actually work. */
+  canRetry: boolean;
+  /** Why only Descartar is offered (Spanish, user-facing), when it applies. */
+  orphanNote: string | null;
+  /** Permanent rejection: «Corregir» target + explanation. */
+  correction: Correction | null;
 };
+
+export function orphanLocalNote(label: string): string {
+  return `Dependía de «${label}», que se descartó y nunca llegó al servidor, así que no se puede enviar. Descártalo y vuelve a crearlo.`;
+}
+export const ORPHAN_LOCAL_UNKNOWN_PARENT_NOTE =
+  "Dependía de una operación que se descartó y nunca llegó al servidor, así que no se puede enviar. Descártalo y vuelve a crearlo.";
+export const ORPHAN_UNDETERMINED_NOTE =
+  "Dependía de una operación que se descartó. No podemos confirmar si se puede enviar sin ella, así que por seguridad solo se puede descartar. Descártalo y vuelve a crearlo.";
+
+export const ORPHAN_BLOCKED_REASON = "Esperando a una operación que se descartó";
 
 const OPERATION_NAMES: Record<string, string> = {
   "cashSession:open": "Apertura de caja",
@@ -82,6 +102,7 @@ function toTrayItem(row: OutboxItem): TrayItem {
     nextAttemptAt: row.nextAttemptAt,
     dependsOn: [...row.dependsOn],
     payload: row.payload,
+    ...(row.discardedDependency ? { discardedDependency: row.discardedDependency } : {}),
   };
 }
 
@@ -103,7 +124,7 @@ export function humanizeSyncError(message: string | null): string | null {
   if (/failed to fetch|networkerror|load failed|network request failed|aborted|timeout|sin conexi.n/i.test(clean)) {
     return "Se perdió la conexión durante el envío. Se reintentará automáticamente.";
   }
-  return clean || null;
+  return clean ? userFacingMessage(clean, "El servidor no aceptó este envío. Corrígelo o descártalo.") : null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -206,6 +227,72 @@ export function describeOutboxDetail(item: Pick<TrayItem, "entity" | "operation"
   }
 }
 
+export type Correction = {
+  /** Form to redo the operation, prefilled where feasible; null = no form. */
+  href: string | null;
+  /** What «Corregir» does / what to do by hand (Spanish, user-facing). */
+  note: string;
+};
+
+const AFTER_FIX = "Cuando la guardes corregida, descarta esta.";
+
+/**
+ * loop/v1 conflict UI — the way out of a permanent server rejection.
+ * Navigates to the relevant form with `?monto=` / `?cantidad=` /
+ * `?categoria=` prefilled from the rejected payload. Ops whose form cannot
+ * be prefilled (a sale's cart, cash open/close) get an explanation instead.
+ */
+export function correctionFor(item: Pick<TrayItem, "entity" | "operation" | "payload">): Correction {
+  const p = asRecord(item.payload) ?? {};
+  const amount = asMoney(p.amount);
+  const qty = asQty(p.qty);
+  const id = (v: unknown) => (typeof v === "string" && /^[0-9a-zA-Z-]{1,64}$/.test(v) ? v : null);
+  const q = (params: Record<string, string | number | null>) => {
+    const sp = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v != null && v !== "") sp.set(k, String(v));
+    const text = sp.toString();
+    return text ? `?${text}` : "";
+  };
+  const key = `${item.entity}:${item.operation}`;
+  if (key === "cashMove:create" && (p.kind === "aporte" || p.kind === "retiro")) {
+    return { href: `/mas/caja/${p.kind}${q({ monto: amount })}`, note: `Abre el formulario con el monto. ${AFTER_FIX}` };
+  }
+  if (key === "expense:create") {
+    return { href: `/mas/gastos/nuevo${q({ monto: amount, categoria: asText(p.category) })}`, note: `Abre el formulario con el monto y la categoría. ${AFTER_FIX}` };
+  }
+  if (key === "customerPayment:pay" && id(p.customerId)) {
+    return { href: `/clientes/${id(p.customerId)}/abono${q({ monto: amount })}`, note: `Abre el abono del cliente con el monto. ${AFTER_FIX}` };
+  }
+  if (key === "initialDebt:create" && id(p.customerId)) {
+    return { href: `/clientes/${id(p.customerId)}/deuda-inicial${q({ monto: amount })}`, note: `Abre la deuda inicial del cliente con el monto. ${AFTER_FIX}` };
+  }
+  if (key === "stockMove:surtir" && id(p.productId)) {
+    return { href: `/inventario/${id(p.productId)}/surtir${q({ cantidad: qty })}`, note: `Abre el surtido del producto con la cantidad. ${AFTER_FIX}` };
+  }
+  if (key === "stockMove:shrink" && id(p.productId)) {
+    const page = p.reason === "me_lo_comi" ? "me-lo-comi" : p.reason === "regalar" ? "regalo" : "perdido";
+    return { href: `/inventario/${id(p.productId)}/${page}${q({ cantidad: qty })}`, note: `Abre la salida del producto con la cantidad. ${AFTER_FIX}` };
+  }
+  if (key === "sale:create") {
+    return { href: "/ventas/nueva", note: `Vuelve a registrar la venta con los productos de arriba (el carrito no se puede rellenar solo). ${AFTER_FIX}` };
+  }
+  if (key === "cashSession:open") {
+    // Only the opening base is stored with the op (no date/notes to restore).
+    const base = asMoney(p.openingFloat);
+    return { href: `/mas/caja${q({ monto: base && base > 0 ? base : null })}`, note: `Abre Caja con la base que habías puesto. ${AFTER_FIX}` };
+  }
+  if (item.entity === "cashSession") {
+    return { href: "/mas/caja", note: `Revisa la caja de hoy y vuelve a hacerlo desde Caja. ${AFTER_FIX}` };
+  }
+  if (item.entity === "customer" && item.operation === "create") {
+    return { href: "/clientes/nuevo", note: `Vuelve a crear el cliente con el nombre de arriba. ${AFTER_FIX}` };
+  }
+  if (item.entity === "product" || item.entity === "productImage") {
+    return { href: "/inventario", note: `Revisa el producto en Inventario y vuelve a hacer el cambio. ${AFTER_FIX}` };
+  }
+  return { href: null, note: `Revisa el motivo, vuelve a registrarla a mano y luego descarta esta.` };
+}
+
 /**
  * First unsatisfied dependency described in user terms, or null when the
  * operation is not blocked. Reads the same outbox rows the engine uses.
@@ -217,7 +304,14 @@ export async function resolveBlockedReason(
   const outbox = getOutboxStore();
   for (const dependencyId of item.dependsOn) {
     const dependency = await outbox.get(businessId, dependencyId);
-    if (!dependency || dependency.status === "synced") continue;
+    // A missing row was discarded: it will never sync, so this waits forever.
+    if (!dependency) return ORPHAN_BLOCKED_REASON;
+    if (dependency.status === "synced") continue;
+    // FIFO decision: a dependent op WAITS for a permanently rejected parent
+    // (never sent without it); independent later ops proceed.
+    if (dependency.status === "failed" && dependency.nextAttemptAt == null) {
+      return `Esperando a «${describeOutboxOperation(dependency.entity, dependency.operation)}», que el servidor rechazó. Corrígela o descártala.`;
+    }
     if (dependency.entity === "supplier") return "Esperando proveedor";
     if (dependency.entity === "cashSession") return "Esperando apertura de caja";
     if (dependency.entity === "customer") return "Esperando cliente";
@@ -250,12 +344,21 @@ export async function listTrayOperations(
     .map(toTrayItem);
 }
 
-/** M6.9 — Manual retry: failed → pending, same requestId, no new intent. */
+/**
+ * M6.9 — Manual retry: failed → pending, same requestId, no new intent.
+ * loop/v1 T-alto2: a pending orphan (its dependency was discarded) is
+ * released from the missing dependency instead.
+ */
 export async function retryOutboxOperation(
   businessId: string,
   operationId: string,
 ): Promise<TrayItem> {
-  const row = await getOutboxStore().requeue(businessId, operationId);
+  const outbox = getOutboxStore();
+  const current = await outbox.get(businessId, operationId);
+  const row =
+    current?.status === "pending"
+      ? await outbox.detachMissingDependencies(businessId, operationId)
+      : await outbox.requeue(businessId, operationId);
   return toTrayItem(row);
 }
 
@@ -267,7 +370,45 @@ export async function discardOutboxOperation(
   businessId: string,
   operationId: string,
 ): Promise<void> {
-  await getOutboxStore().discard(businessId, operationId);
+  const outbox = getOutboxStore();
+  const parent = await outbox.get(businessId, operationId);
+  const parentLabel = parent ? describeOutboxOperation(parent.entity, parent.operation) : "otra operación";
+  await outbox.discard(businessId, operationId, {
+    parentLabel,
+    parentLocalIds: parent ? await localIdsFor(businessId, parent) : [],
+    dependentReason: (_discarded, local) =>
+      local
+        ? orphanLocalNote(parentLabel)
+        : `Esperando a ${parentLabel}, que se descartó. Reintenta para enviarlo sin eso, o descártalo.`,
+  });
+}
+
+/**
+ * Local ids an operation stands for: its operationId (sales, cash sessions
+ * and moves use it as the local entity id) plus the local customer/supplier/
+ * product/cash-session row created with the same requestId.
+ */
+async function localIdsFor(businessId: string, op: OutboxItem): Promise<string[]> {
+  const ids = [op.operationId];
+  const db = getLocalDb();
+  const byRequest = async (table: "customers" | "suppliers" | "products" | "cashSessions") => {
+    try {
+      const rows = await db
+        .table(table)
+        .where("businessId")
+        .equals(businessId)
+        .filter((row: { requestId?: string | null }) => row.requestId === op.requestId)
+        .toArray();
+      for (const row of rows as Array<{ id?: string }>) if (row.id) ids.push(row.id);
+    } catch {
+      /* table/index unavailable: the operationId alone still counts */
+    }
+  };
+  if (op.entity === "customer") await byRequest("customers");
+  if (op.entity === "supplier") await byRequest("suppliers");
+  if (op.entity === "product") await byRequest("products");
+  if (op.entity === "cashSession") await byRequest("cashSessions");
+  return ids;
 }
 
 /** UI-friendly session resolution: empty when there is no business. */
@@ -275,6 +416,23 @@ export async function listTrayForSession(): Promise<TrayItem[]> {
   const businessId = getPwaAuthSession().businessId;
   if (!businessId) return [];
   return listTrayOperations(businessId);
+}
+
+async function enrichBlocked(businessId: string, row: TrayItem & { discardedDependency?: OutboxItem["discardedDependency"] }) {
+  const blockedBy = await resolveBlockedReason(businessId, row);
+  const orphaned = row.status === "pending" && blockedBy === ORPHAN_BLOCKED_REASON;
+  if (row.discardedDependency?.local) {
+    return { blockedBy, orphaned, canRetry: false, orphanNote: orphanLocalNote(row.discardedDependency.label) };
+  }
+  if (orphaned) {
+    // Legacy orphan: the parent row is gone, so we only know its id.
+    const outbox = getOutboxStore();
+    const missing: string[] = [];
+    for (const id of row.dependsOn) if (!(await outbox.get(businessId, id))) missing.push(id);
+    const note = payloadReferences(row.payload, missing) ? ORPHAN_LOCAL_UNKNOWN_PARENT_NOTE : ORPHAN_UNDETERMINED_NOTE;
+    return { blockedBy, orphaned, canRetry: false, orphanNote: note };
+  }
+  return { blockedBy, orphaned, canRetry: true, orphanNote: null };
 }
 
 /**
@@ -289,7 +447,8 @@ export async function listEnrichedTray(businessId: string): Promise<EnrichedTray
       ...row,
       permanent: isPermanentFailure(row),
       retryable: isRetryableFailure(row),
-      blockedBy: await resolveBlockedReason(businessId, row),
+      ...(await enrichBlocked(businessId, row)),
+      correction: isPermanentFailure(row) ? correctionFor(row) : null,
     })),
   );
 }

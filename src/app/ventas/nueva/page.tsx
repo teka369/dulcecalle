@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatCop, mulCop, addCop } from "@/domain/money";
+import { AMOUNT_TOO_LARGE_MESSAGE, MAX_COP_AMOUNT } from "@/domain/money/limits";
 import { parseSaleUnitPrice } from "@/domain/sale/validate";
+import { canProceedToCobrar } from "@/components/sale/checkout";
 import type { RemoteProduct } from "@/data/http/mappers";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductTile } from "@/components/product/ProductTile";
@@ -25,6 +27,7 @@ export default function NuevaVentaPage() {
   const [category, setCategory] = useState<string | null>(null);
   const [stockError, setStockError] = useState<string | null>(null);
   const [pendingPrices, setPendingPrices] = useState<Record<string, number>>({});
+  const [invalidPrices, setInvalidPrices] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     void listCachedProducts()
@@ -65,6 +68,13 @@ export default function NuevaVentaPage() {
     }, 0);
   }, [items, products]);
 
+  const hasInvalidPrice = useMemo(
+    () => Object.values(invalidPrices).some(Boolean),
+    [invalidPrices],
+  );
+  const totalTooLarge = total > MAX_COP_AMOUNT;
+  const canCobrar = canProceedToCobrar(total, hasInvalidPrice);
+
   function qtyOf(productId: string): number {
     return items.find((i) => i.productId === productId)?.qty ?? 0;
   }
@@ -86,14 +96,20 @@ export default function NuevaVentaPage() {
   }
 
   function onPriceChange(product: RemoteProduct, raw: string) {
-    const digits = raw.replace(/\D/g, "");
-    const parsed = parseSaleUnitPrice(digits, product.price);
+    const parsed = parseSaleUnitPrice(raw, product.price);
     if ("error" in parsed) return;
     if (qtyOf(product.id) > 0) {
       setUnitPrice(product.id, parsed.unitPrice);
       return;
     }
     setPendingPrices((prev) => ({ ...prev, [product.id]: parsed.unitPrice }));
+  }
+
+  function onPriceInvalidChange(productId: string, invalid: boolean) {
+    setInvalidPrices((prev) => {
+      if (Boolean(prev[productId]) === invalid) return prev;
+      return { ...prev, [productId]: invalid };
+    });
   }
 
   const sellable = products.filter((p) => p.sellable !== false && p.kind !== "combo");
@@ -142,6 +158,7 @@ export default function NuevaVentaPage() {
                 onAdd={() => bump(p, 1)}
                 onRemove={() => bump(p, -1)}
                 onPriceChange={(raw) => onPriceChange(p, raw)}
+                onPriceInvalidChange={(invalid) => onPriceInvalidChange(p.id, invalid)}
               />
             ))}
           </div>
@@ -151,14 +168,22 @@ export default function NuevaVentaPage() {
             {stockError}
           </p>
         )}
+        {totalTooLarge && (
+          <p role="alert" className="text-center text-sm text-danger">
+            {AMOUNT_TOO_LARGE_MESSAGE}
+          </p>
+        )}
       </Sheet>
 
       <ActionBar
         summary={`${totalQty} ${totalQty === 1 ? "producto" : "productos"} · ${formatCop(total)}`}
         primary={{
           label: "Cobrar",
-          disabled: total === 0,
-          onClick: () => navigateOfflineAware(router, "/ventas/cobrar"),
+          disabled: !canCobrar,
+          onClick: () => {
+            if (!canCobrar) return;
+            navigateOfflineAware(router, "/ventas/cobrar");
+          },
         }}
       />
     </div>

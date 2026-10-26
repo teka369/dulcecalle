@@ -1,5 +1,6 @@
 import type { PayMethod } from "@/domain/types";
 import { CASH_ERRORS } from "./copy";
+import { AMOUNT_TOO_LARGE_MESSAGE, exceedsMaxCop } from "@/domain/money/limits";
 
 export type CashAmountInput = {
   amountRaw: string;
@@ -21,6 +22,7 @@ export function parseCopAmount(amountRaw: string): number | null {
 export function validateCashAmount(input: CashAmountInput): string | null {
   const raw = input.amountRaw.trim();
   if (raw === "") return CASH_ERRORS.emptyAmount;
+  if (exceedsMaxCop(raw)) return AMOUNT_TOO_LARGE_MESSAGE;
   const amount = parseCopAmount(input.amountRaw);
   if (amount == null) return CASH_ERRORS.emptyAmount;
   if (amount <= 0) return CASH_ERRORS.notPositive;
@@ -40,6 +42,7 @@ export function validateGasto(input: GastoInput): string | null {
 export function validateOpeningFloat(amountRaw: string): string | null {
   const raw = amountRaw.trim();
   if (raw === "") return null; // default 0
+  if (exceedsMaxCop(raw)) return AMOUNT_TOO_LARGE_MESSAGE;
   const amount = parseCopAmount(amountRaw);
   if (amount == null) return CASH_ERRORS.emptyAmount;
   if (amount < 0) return CASH_ERRORS.openingNegative;
@@ -49,6 +52,7 @@ export function validateOpeningFloat(amountRaw: string): string | null {
 export function validateCounted(amountRaw: string): string | null {
   const raw = amountRaw.trim();
   if (raw === "") return CASH_ERRORS.emptyCounted;
+  if (exceedsMaxCop(raw)) return AMOUNT_TOO_LARGE_MESSAGE;
   const amount = parseCopAmount(amountRaw);
   if (amount == null) return CASH_ERRORS.badCounted;
   if (amount < 0) return CASH_ERRORS.badCounted;

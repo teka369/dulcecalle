@@ -13,7 +13,7 @@ import {
   validateOpeningFloat,
 } from "@/domain/cash";
 import { ApiError, NetworkError } from "@/data/errors";
-import { getLocalCashSnapshot, openCashWithOfflineFallback, todayCashOpenRequestId, closeCashWithOfflineFallback, recordAporteOffline, recordRetiroOffline, recordExpenseWithOfflineFallback } from "@/data/pwa/offline-operations";
+import { getLocalCashSnapshot, mergePendingCashIntoServer, openCashWithOfflineFallback, todayCashOpenRequestId, closeCashWithOfflineFallback, recordAporteOffline, recordRetiroOffline, recordExpenseWithOfflineFallback } from "@/data/pwa/offline-operations";
 import { getPwaApi } from "@/data/pwa/api";
 import type { RemoteExpense, RemoteToday } from "@/data/http/mappers";
 import { addCop } from "@/domain/money";
@@ -90,7 +90,8 @@ export const cashStore = {
     setState({ loading: true });
     try {
       const api = getPwaApi();
-      const [today, expenses] = await Promise.all([api.cash.today(), api.cash.expenses()]);
+      const [rawToday, rawExpenses] = await Promise.all([api.cash.today(), api.cash.expenses()]);
+      const { today, expenses } = await mergePendingCashIntoServer(rawToday, rawExpenses);
       const summary = toSummary(today);
       setState({ summary, expenses, loading: false, source: "server" });
       return summary;

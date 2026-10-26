@@ -1,4 +1,5 @@
 import { addCop, mulCop, subCop } from "@/domain/money";
+import { MAX_COP_AMOUNT } from "@/domain/money/limits";
 import type { PayMethod, PaymentKind } from "@/domain/types";
 
 /**
@@ -73,12 +74,17 @@ export function fiadoFor(s: CheckoutState, total: number): number {
   return 0;
 }
 
+/** Whether the Cobrar button on /ventas/nueva can proceed to /ventas/cobrar. */
+export function canProceedToCobrar(total: number, hasInvalidPrice = false): boolean {
+  return total > 0 && total <= MAX_COP_AMOUNT && !hasInvalidPrice;
+}
+
 export function canRegister(s: CheckoutState, total: number, lineCount: number): boolean {
-  if (total <= 0 || lineCount === 0) return false;
+  if (total <= 0 || total > MAX_COP_AMOUNT || lineCount === 0) return false;
   if (s.paymentKind === "paid") return true;
   if (s.paymentKind === "partial") {
     const a = abonoOf(s);
-    return a > 0 && a < total && s.customerId != null;
+    return a > 0 && a < total && a <= MAX_COP_AMOUNT && s.customerId != null;
   }
   return s.customerId != null;
 }

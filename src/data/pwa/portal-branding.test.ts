@@ -74,13 +74,12 @@ describe("branding único Dulce Calle", () => {
   });
 });
 
-describe("login con Cliente como prioridad", () => {
-  it("muestra Cliente primero y conserva la tienda en ruta privada", () => {
+describe("login con la tienda como prioridad", () => {
+  it("muestra la tienda primero y conserva el portal de cliente como enlace", () => {
     const page = src("src/app/login/page.tsx");
-    expect(page).toContain("CustomerLoginForm");
-    expect(page).toContain("/brand/dulcecalle-logo.png");
-    expect(page).not.toContain("type=\"email\"");
-    expect(page).not.toContain("Contraseña");
+    expect(page).toContain("StoreLoginForm");
+    expect(page).not.toContain("CustomerLoginForm");
+    expect(page).toContain('href="/cliente/login"');
     expect(src("src/app/acceso-tienda/page.tsx")).toContain("StoreLoginForm");
     expect(src("src/components/auth/StoreLoginForm.tsx")).toContain("Correo");
   });
@@ -136,18 +135,19 @@ describe("total abonado sin doble conteo", () => {
     };
   }
 
-  it("suma pagos + abono parcial sin contar dos veces ni incluir contado", () => {
+  it("fiado = inicial + crédito; abonado = solo pagos; contado y lo recibido en el parcial no cuentan", () => {
     const totals = customerPortalTotals(fullLedger());
-    // Comprado: 10000 + 20000. Abonado: 3000 (pago) + 8000 (parcial).
-    // El contado (10000) no es abono; la inicial y la devolución tampoco.
-    expect(totals).toEqual({ totalComprado: 30000, totalAbonado: 11000, movimientos: 4 });
+    // loop/v1 D6: Fiado 5000 (inicial) + 12000 (crédito del parcial). Abonado: 3000 (pago).
+    // Lo recibido en el parcial (8000) ya está descontado del crédito; el contado (10000) no es deuda.
+    expect(totals).toEqual({ totalFiado: 17000, totalAbonado: 3000, totalDevuelto: 2000, movimientos: 4 });
   });
 });
 
 describe("portal cliente comprensible", () => {
   it("calcula totales del home desde el ledger real", () => {
     const totals = customerPortalTotals(ledger());
-    expect(totals).toEqual({ totalComprado: 30000, totalAbonado: 4800, movimientos: 3 });
+    expect(totals).toEqual({ totalFiado: 50000, totalAbonado: 4800, totalDevuelto: 0, movimientos: 3 });
+    expect(totals.totalFiado - totals.totalAbonado - totals.totalDevuelto).toBe(customerPortalSummary(ledger()).debt);
     expect(customerPortalSummary(ledger()).debt).toBe(45200);
   });
 

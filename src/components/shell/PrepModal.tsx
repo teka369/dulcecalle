@@ -14,6 +14,21 @@ const GROUP_TITLES = {
   sistema: "Sistema",
 } as const;
 
+/** Max time the blocking overlay may cover the screen while preparing. */
+const PREP_MODAL_MAX_MS = 8_000;
+
+function mainHasErrorOrRetry(): boolean {
+  if (typeof document === "undefined") return false;
+  const main = document.querySelector("main");
+  if (!main) return false;
+  const buttons = main.querySelectorAll("button");
+  for (const btn of buttons) {
+    if ((btn.textContent ?? "").trim() === "Reintentar") return true;
+  }
+  const text = main.textContent ?? "";
+  return text.includes("No se pudo cargar");
+}
+
 const TASK_DOT: Record<string, string> = {
   done: "bg-ok",
   running: "bg-warning animate-pulse",
@@ -29,7 +44,7 @@ function TaskIcon({ status }: { status: string }) {
  * The app stays usable; the indicator keeps the status.
  */
 export function PrepModal() {
-  const { phase, tasks, completed, total, modalOpen, evaluate, continueUsing, start } = usePrep();
+  const { phase, tasks, completed, total, modalOpen, evaluate, continueUsing, hideModal, start } = usePrep();
 
   const pathname = usePathname();
   useEffect(() => {
@@ -40,10 +55,40 @@ export function PrepModal() {
   }, [evaluate, pathname]);
 
   useEffect(() => {
-    if (phase !== "ready" || !modalOpen) return;
-    const timer = window.setTimeout(() => continueUsing(), 1600);
+    if (!modalOpen) return;
+    if (phase === "ready") {
+      const timer = window.setTimeout(() => continueUsing(), 1600);
+      return () => window.clearTimeout(timer);
+    }
+    if (phase === "failed") {
+      const timer = window.setTimeout(() => hideModal(), 1600);
+      return () => window.clearTimeout(timer);
+    }
+    const timer = window.setTimeout(() => hideModal(), PREP_MODAL_MAX_MS);
     return () => window.clearTimeout(timer);
-  }, [phase, modalOpen, continueUsing]);
+  }, [phase, modalOpen, continueUsing, hideModal]);
+
+  useEffect(() => {
+    if (!modalOpen || typeof window === "undefined") return;
+    if (navigator.onLine === false || mainHasErrorOrRetry()) {
+      hideModal();
+      return;
+    }
+    const onOffline = () => hideModal();
+    window.addEventListener("offline", onOffline);
+    const target = document.querySelector("main") ?? document.body;
+    const obs =
+      typeof MutationObserver !== "undefined" && target
+        ? new MutationObserver(() => {
+            if (mainHasErrorOrRetry()) hideModal();
+          })
+        : null;
+    obs?.observe(target, { childList: true, subtree: true, characterData: true });
+    return () => {
+      window.removeEventListener("offline", onOffline);
+      obs?.disconnect();
+    };
+  }, [modalOpen, hideModal, pathname]);
 
   if (!modalOpen) return null;
 
@@ -89,7 +134,7 @@ export function PrepModal() {
             <div>
               <div className="flex items-center justify-between text-xs font-medium tabular-nums text-ink-muted">
                 <span>
-                  {completed} de {total} tareas completadas
+                  {completed} de {total} pasos listos
                 </span>
                 <span>{progress}%</span>
               </div>
@@ -139,7 +184,7 @@ export function PrepModal() {
               <div className="mt-4 rounded-[var(--r-lg)] border border-danger/30 bg-danger-soft p-3">
                 <p className="text-sm font-semibold">Preparación incompleta</p>
                 <p className="mt-1 text-xs leading-relaxed text-ink">
-                  {completed} de {total} tareas completadas. Faltan datos
+                  {completed} de {total} pasos listos. Faltan datos
                   necesarios:
                 </p>
                 <ul className="mt-2 flex flex-col gap-1">

@@ -146,6 +146,8 @@ async function runImport(
   }
 
   for (const p of dump.tables.products) {
+    const kind = p.kind === "combo" ? "combo" : "standard";
+    const sellable = kind === "combo" ? false : Boolean(p.sellable ?? true);
     await ensure("products", p.id, async (id) => {
       await tx.product.create({
         data: {
@@ -157,6 +159,8 @@ async function runImport(
           avgCost: BigInt(p.avgCost),
           stock: p.stock,
           lowStockAt: p.lowStockAt,
+          sellable,
+          kind,
           createdAt: epochToUtcDate(p.createdAt),
           updatedAt: epochToUtcDate(p.updatedAt),
           legacyDexieId: p.id,

@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useRouter } from "next/navigation";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useState } from "react";
@@ -35,7 +36,7 @@ export default function AgregarClientePage() {
         navigateOfflineAware(router, "/clientes");
       }, 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : CUSTOMER_ERRORS.emptyName);
+      setError(errorText(e, CUSTOMER_ERRORS.emptyName));
       setBusy(false);
     }
   }

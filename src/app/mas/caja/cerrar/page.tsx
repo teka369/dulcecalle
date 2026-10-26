@@ -1,12 +1,14 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { Spinner } from "@/components/ui/Spinner";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
 import { closeDifference } from "@/components/cash/cash";
@@ -31,11 +33,26 @@ export default function CerrarCajaPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const s = await cashStore.refresh();
-    setSummary(s);
-    setReady(true);
+    setLoadError(null);
+    try {
+      const s = await cashStore.refresh();
+      if (
+        cashStore.getSnapshot().source === "local" &&
+        !s.session &&
+        (typeof navigator === "undefined" || navigator.onLine !== false)
+      ) {
+        setLoadError("El servidor no respondió. Tus datos no se han perdido.");
+        return;
+      }
+      setSummary(s);
+    } catch (e: unknown) {
+      setLoadError(errorText(e, ""));
+    } finally {
+      setReady(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -51,6 +68,7 @@ export default function CerrarCajaPage() {
   const diff = counted != null ? counted - expectedEf : null;
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (busy || !summary) return;
     setError(null);
     const err = validateCounted(countedRaw);
@@ -69,9 +87,28 @@ export default function CerrarCajaPage() {
       setToast(CASH_COPY.toastCajaCerrada);
       setTimeout(() => navigateOfflineAware(router, "/mas/caja"), 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(errorText(e, "Error"));
       setBusy(false);
     }
+  }
+
+  const back = { href: "/mas/caja", label: "Volver a Caja" };
+  if (ready && loadError !== null) {
+    return (
+      <div className="flex flex-col pb-6">
+        <HeroBlock size="compact" back={back} title={CASH_COPY.cerrarCaja} />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={typeof navigator === "undefined" || navigator.onLine}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
+        </Sheet>
+      </div>
+    );
   }
 
   if (!ready || !summary) {
@@ -81,8 +118,6 @@ export default function CerrarCajaPage() {
       </div>
     );
   }
-
-  const back = { href: "/mas/caja", label: "Volver a Caja" };
   if (summary.closed || !summary.session) {
     return (
       <HeroBlock size="compact" back={back} title={CASH_COPY.cerrarCaja}>

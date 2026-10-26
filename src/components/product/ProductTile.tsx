@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatCop } from "@/domain/money";
+import { evaluateTilePriceDraft } from "@/domain/sale/validate";
 import { ProductThumbnail } from "./ProductThumbnail";
 
 export type ProductTileProps = {
@@ -16,6 +17,7 @@ export type ProductTileProps = {
   onAdd: () => void;
   onRemove: () => void;
   onPriceChange: (raw: string) => void;
+  onPriceInvalidChange?: (invalid: boolean) => void;
 };
 
 /**
@@ -33,8 +35,21 @@ export function ProductTile({
   onAdd,
   onRemove,
   onPriceChange,
+  onPriceInvalidChange,
 }: ProductTileProps) {
   const [editing, setEditing] = useState(false);
+  const [basePrice, setBasePrice] = useState(price);
+  const [draft, setDraft] = useState(String(price));
+  const [priceError, setPriceError] = useState<string | null>(null);
+  const invalidCallbackRef = useRef(onPriceInvalidChange);
+  useEffect(() => {
+    invalidCallbackRef.current = onPriceInvalidChange;
+  }, [onPriceInvalidChange]);
+  useEffect(() => {
+    return () => {
+      invalidCallbackRef.current?.(false);
+    };
+  }, []);
   const soldOut = stock <= 0;
   const low = !soldOut && stock <= lowStockAt;
   const custom = price !== catalogPrice;
@@ -66,18 +81,34 @@ export function ProductTile({
           <input
             inputMode="numeric"
             aria-label={`Precio de ${name}`}
-            value={String(price)}
-            onChange={(e) => onPriceChange(e.target.value)}
-            onBlur={() => setEditing(false)}
+            aria-invalid={priceError ? true : undefined}
+            value={draft}
+            onChange={(e) => {
+              const next = evaluateTilePriceDraft(e.target.value, basePrice);
+              setDraft(next.draft);
+              setPriceError(next.priceError);
+              onPriceInvalidChange?.(next.invalid);
+              onPriceChange(next.effectiveDigits);
+            }}
+            onBlur={() => {
+              if (!priceError) setEditing(false);
+            }}
             autoFocus
             className="mt-1 h-11 w-full rounded-[var(--r-md)] border border-border bg-bg px-2 text-sm font-semibold normal-case text-ink"
           />
+          {priceError ? <span role="alert" className="mt-1 block text-xs normal-case text-danger">{priceError}</span> : null}
         </label>
       ) : (
         !soldOut && (
           <button
             type="button"
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              setBasePrice(price);
+              setDraft(String(price));
+              setPriceError(null);
+              onPriceInvalidChange?.(false);
+              setEditing(true);
+            }}
             className="mt-1 min-h-11 self-start text-xs font-semibold text-ink underline underline-offset-2"
           >
             Editar precio

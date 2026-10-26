@@ -85,7 +85,7 @@ test("inicio: totals and shortcuts are divided rows in the sheet, not cards/tile
   await page.goto("/cliente");
   const totals = page.getByRole("list", { name: "Tus totales" });
   await expect(totals.getByRole("listitem")).toHaveCount(2);
-  await expect(totals).toContainText("Total abonado");
+  await expect(totals).toContainText("Abonos a tu deuda");
   const shortcuts = page.getByRole("list", { name: "Accesos" });
   await expect(shortcuts.getByRole("link")).toHaveCount(3);
   for (const name of ["Cuenta", "Compras", "Pagos"]) await expect(shortcuts.getByRole("link", { name: new RegExp(name) })).toBeVisible();

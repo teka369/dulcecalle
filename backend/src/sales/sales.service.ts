@@ -10,6 +10,7 @@ import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard
 import { assertPaymentMath, resolveUnitPrice } from "../shared/sale-math";
 import { splitReturnSettlement } from "../shared/returns";
 import type { BusinessContext } from "../identity/auth.types";
+import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import type { CreateReturnDto, CreateSaleDto } from "./sales.dto";
 
 function saleJson(s: {
@@ -274,7 +275,6 @@ export class SalesService {
             where: { businessId: ctx.businessId, closedAt: null },
           });
           const link = linkForNewMove(opens, occurredOn);
-          const open = opens.find((row) => row.id === link.sessionId) ?? null;
           await tx.cashMove.create({
             data: {
               id: randomUUID(),
@@ -321,19 +321,23 @@ export class SalesService {
     }
   }
 
-  async list(ctx: BusinessContext, from?: string, to?: string) {
+  async list(ctx: BusinessContext, from?: string, to?: string, page: PageQuery = {}) {
     const where: Prisma.SaleWhereInput = { businessId: ctx.businessId };
     if (from || to) {
       where.occurredOn = {};
       if (from) where.occurredOn.gte = new Date(`${from}T00:00:00.000Z`);
       if (to) where.occurredOn.lte = new Date(`${to}T00:00:00.000Z`);
     }
+    const after = await afterCursor(page.cursor, (id) =>
+      this.prisma.sale.findFirst({ where: { id, businessId: ctx.businessId }, select: { id: true, createdAt: true } }),
+    );
     const rows = await this.prisma.sale.findMany({
-      where,
+      where: after ? { AND: [where, after] } : where,
       include: { lines: true },
-      orderBy: { createdAt: "desc" },
+      orderBy: NEWEST_FIRST,
+      take: pageProbe(page.limit),
     });
-    return rows.map(saleJson);
+    return paged(rows, page.limit, saleJson);
   }
 
   async get(ctx: BusinessContext, id: string) {
@@ -524,7 +528,6 @@ export class SalesService {
             where: { businessId: ctx.businessId, closedAt: null },
           });
           const link = linkForNewMove(opens, occurredOn);
-          const open = opens.find((row) => row.id === link.sessionId) ?? null;
           await tx.cashMove.create({
             data: {
               id: randomUUID(),

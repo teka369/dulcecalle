@@ -34,8 +34,10 @@ import {
   warmSalesHistory,
 } from "./offline-history";
 
-export const PREP_VERSION = 9;
+// 10: loop/v1 paged history lists (devices prepared at 9 re-download history).
+export const PREP_VERSION = 11;
 export const PREP_DOCUMENT_CACHE = "documents";
+const DOC_FETCH_TIMEOUT_MS = 10_000;
 
 export type PrepTaskGroup = "app" | "catalogos" | "historial" | "resumen" | "sistema";
 
@@ -52,53 +54,58 @@ function readinessId(businessId: string): string {
 
 async function warmDocument(path: string): Promise<void> {
   if (typeof window === "undefined" || !("caches" in window)) {
-    throw new Error("Este dispositivo no soporta cache de documentos.");
+    throw new Error("Este teléfono no permite guardar pantallas para usar sin conexión.");
   }
   const scope = window as unknown as {
     navigator: Navigator & { serviceWorker?: { controller: unknown } };
     caches: CacheStorage;
   };
   if (!scope.navigator.serviceWorker?.controller) {
-    throw new Error("Service Worker aún no activo. Recarga la página e inténtalo de nuevo.");
+    throw new Error("El modo sin conexión aún no está listo. Recarga la página e inténtalo de nuevo.");
   }
   let response: Response;
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), DOC_FETCH_TIMEOUT_MS) : null;
   try {
-    response = await fetch(path, { credentials: "same-origin" });
+    response = await fetch(path, ctrl ? { credentials: "same-origin", signal: ctrl.signal } : { credentials: "same-origin" });
   } catch {
     throw new NetworkError("Sin conexión.");
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   if (!response.ok) {
-    throw new Error(`No se pudo cargar ${path} (${response.status}).`);
+    throw new Error("No se pudo guardar esta pantalla. Inténtalo de nuevo.");
   }
   await (await scope.caches.open(PREP_DOCUMENT_CACHE)).put(path, response);
 }
 
 export function prepTaskDefs(): PrepTaskDef[] {
   const documents: Array<{ path: string; label: string }> = [
-    { path: "/", label: "Documento Inicio" },
-    { path: "/ventas", label: "Documento Ventas" },
-    { path: "/ventas/nueva", label: "Documento Nueva venta" },
-    { path: "/ventas/cobrar", label: "Documento Cobrar" },
-    { path: "/clientes", label: "Documento Clientes" },
-    { path: "/clientes/nuevo", label: "Documento Nuevo cliente" },
-    { path: "/inventario", label: "Documento Inventario" },
-    { path: "/inventario/nuevo", label: "Documento Nuevo producto" },
-    { path: "/mas", label: "Documento Más" },
-    { path: "/mas/caja", label: "Documento Caja" },
-    { path: "/mas/gastos", label: "Documento Gastos" },
-    { path: "/mas/gastos/nuevo", label: "Documento Nuevo gasto" },
-    { path: "/mas/caja/aporte", label: "Documento Aporte" },
-    { path: "/mas/caja/retiro", label: "Documento Retiro" },
-    { path: "/mas/caja/cerrar", label: "Documento Cerrar caja" },
+    { path: "/", label: "Pantalla Inicio" },
+    { path: "/ventas", label: "Pantalla Ventas" },
+    { path: "/ventas/nueva", label: "Pantalla Nueva venta" },
+    { path: "/ventas/cobrar", label: "Pantalla Cobrar" },
+    { path: "/clientes", label: "Pantalla Clientes" },
+    { path: "/clientes/nuevo", label: "Pantalla Nuevo cliente" },
+    { path: "/inventario", label: "Pantalla Inventario" },
+    { path: "/inventario/nuevo", label: "Pantalla Nuevo producto" },
+    { path: "/mas", label: "Pantalla Más" },
+    { path: "/mas/caja", label: "Pantalla Caja" },
+    { path: "/mas/gastos", label: "Pantalla Gastos" },
+    { path: "/mas/gastos/nuevo", label: "Pantalla Nuevo gasto" },
+    { path: "/mas/caja/aporte", label: "Pantalla Aporte" },
+    { path: "/mas/caja/retiro", label: "Pantalla Retiro" },
+    { path: "/mas/caja/cerrar", label: "Pantalla Cerrar caja" },
     // Server-only screen: offline it shows "Necesitas internet…". Also the
     // parent document for a cold offline load of /mas/caja/gestionar/[id].
-    { path: "/mas/caja/gestionar", label: "Documento Gestionar cajas" },
-    { path: "/mas/estadisticas", label: "Documento Estadísticas" },
-    { path: "/mas/apariencia", label: "Documento Apariencia" },
+    { path: "/mas/caja/gestionar", label: "Pantalla Gestionar cajas" },
+    { path: "/mas/estadisticas", label: "Pantalla Estadísticas" },
+    { path: "/mas/apariencia", label: "Pantalla Apariencia" },
+    { path: "/mas/portal", label: "Pantalla Portal de clientes" },
     // The supplier list is a segment of /inventario. There is no
     // /inventario/proveedores page, so that path is not a document.
-    { path: "/inventario/proveedores/nuevo", label: "Documento Nuevo proveedor" },
-    { path: "/sincronizacion", label: "Documento Sincronización" },
+    { path: "/inventario/proveedores/nuevo", label: "Pantalla Nuevo proveedor" },
+    { path: "/sincronizacion", label: "Pantalla Sincronización" },
   ];
   return [
     ...documents.map((d) => ({
@@ -159,10 +166,10 @@ export function prepTaskDefs(): PrepTaskDef[] {
  */
 async function warmPrimaryThumbs(businessId: string): Promise<string> {
   if (typeof window === "undefined" || !("caches" in window)) {
-    return "0 miniaturas (sin Cache Storage)";
+    return "Sin fotos guardadas";
   }
   const scope = window as unknown as { caches?: CacheStorage };
-  if (!scope.caches) return "0 miniaturas (sin Cache Storage)";
+  if (!scope.caches) return "Sin fotos guardadas";
   const { getLocalDb } = await import("../local/db");
   const { variantUrl } = await import("../media/urls");
   const db = getLocalDb();
@@ -191,7 +198,7 @@ async function warmPrimaryThumbs(businessId: string): Promise<string> {
       /* best-effort per image */
     }
   }
-  return `${warmed}/${total} miniaturas`;
+  return `${warmed} de ${total} fotos`;
 }
 
 // Snapshot kinds the preparation guarantees. checkReadiness treats a
@@ -282,9 +289,9 @@ function swControlling(): boolean {
 
 async function checkServiceWorker(): Promise<string> {
   if (!swControlling()) {
-    throw new Error("Service Worker aún no controla esta página. Recarga e inténtalo de nuevo.");
+    throw new Error("El modo sin conexión aún no está listo. Recarga la página e inténtalo de nuevo.");
   }
-  return "Service Worker activo";
+  return "Listo";
 }
 
 async function checkStorage(): Promise<string> {
@@ -293,24 +300,26 @@ async function checkStorage(): Promise<string> {
   return formatStorageProbeDetail(snapshot);
 }
 
+const RESOURCE_ES = { products: "productos", customers: "clientes", suppliers: "proveedores" } as const;
+
 async function verifyPreparation(businessId: string, warmedPaths: string[]): Promise<string> {
   const scope = window as unknown as { caches?: CacheStorage };
-  if (!scope.caches) throw new Error("Cache Storage no disponible.");
+  if (!scope.caches) throw new Error("Este teléfono no permite guardar pantallas para usar sin conexión.");
   const cache = await scope.caches.open(PREP_DOCUMENT_CACHE);
   const missing: string[] = [];
   for (const path of warmedPaths) {
     if (!(await cache.match(path))) missing.push(path);
   }
   if (missing.length > 0) {
-    throw new Error(`Sin documento cacheado: ${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}`);
+    throw new Error(`Faltan ${missing.length} ${missing.length === 1 ? "pantalla" : "pantallas"} por guardar.`);
   }
   const db = getLocalDb();
   for (const resource of ["products", "customers", "suppliers"] as const) {
     if (!(await db.cacheMeta.get(`${businessId}::${resource}`))) {
-      throw new Error(`Sin snapshot de ${resource}.`);
+      throw new Error(`Faltan datos de ${RESOURCE_ES[resource]}.`);
     }
   }
-  return `${warmedPaths.length} documentos verificados`;
+  return `${warmedPaths.length} pantallas revisadas`;
 }
 
 /**
@@ -331,7 +340,7 @@ export async function buildPrepTaskDefs(
   const catalogs = base.filter((task) => task.key.startsWith("catalog:"));
   const snapshots = base.filter((task) => task.key.startsWith("snapshot:"));
   const defs: PrepTaskDef[] = [
-    { key: "sys:sw", group: "sistema", label: "Service Worker", run: wrap("sys:sw", checkServiceWorker) },
+    { key: "sys:sw", group: "sistema", label: "Modo sin conexión", run: wrap("sys:sw", checkServiceWorker) },
     ...documents,
     ...catalogs,
     { key: "history:sales", group: "historial", label: "Ventas", run: wrap("history:sales", () => warmSalesHistory(businessId)) },
@@ -339,12 +348,12 @@ export async function buildPrepTaskDefs(
     { key: "history:cash", group: "historial", label: "Caja", run: wrap("history:cash", () => warmCashHistory(businessId)) },
     { key: "history:moves", group: "historial", label: "Movimientos", run: wrap("history:moves", () => warmMoveHistory(businessId)) },
     ...snapshots,
-    { key: "media:thumbs", group: "resumen", label: "Miniaturas de productos", run: wrap("media:thumbs", () => warmPrimaryThumbs(businessId)) },
-    { key: "sys:storage", group: "sistema", label: "Almacenamiento", run: wrap("sys:storage", checkStorage) },
+    { key: "media:thumbs", group: "resumen", label: "Fotos de productos", run: wrap("media:thumbs", () => warmPrimaryThumbs(businessId)) },
+    { key: "sys:storage", group: "sistema", label: "Espacio en el teléfono", run: wrap("sys:storage", checkStorage) },
     {
       key: "sys:verify",
       group: "sistema",
-      label: "Verificación",
+      label: "Revisión",
       run: async () => {
         const warmed = requiredStaticDocuments();
         details.set("sys:verify", await verifyPreparation(businessId, warmed));
@@ -418,12 +427,13 @@ export async function waitForServiceWorkerControl(timeoutMs = SW_CONTROL_WAIT_MS
     timer = setTimeout(() => resolve(false), timeoutMs);
   });
   const controlled = (async () => {
-    if (sw.ready) await sw.ready;
-    if (sw.controller) return true;
-    await new Promise<void>((resolve) => {
+    const onControl = new Promise<void>((resolve) => {
       if (typeof sw.addEventListener !== "function") return;
       sw.addEventListener("controllerchange", () => resolve(), { once: true });
     });
+    if (sw.ready) await sw.ready;
+    if (sw.controller) return true;
+    await onControl;
     return true;
   })();
   try {

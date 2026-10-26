@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useRouter } from "next/navigation";
 import { isOffline, navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -14,9 +15,12 @@ import { useEntityId } from "@/components/shell/entity-route";
 import { customerStore } from "@/store/customerStore";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
+import { usePrefill } from "@/components/ui/use-prefill";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
@@ -29,10 +33,13 @@ export default function AgregarDeudaAnteriorPage() {
   const id = useEntityId();
   const [customer, setCustomer] = useState<RemoteCustomer | null>(null);
   const [amountRaw, setAmountRaw] = useState("");
+  usePrefill("monto", setAmountRaw);
+  const rejected = useRejectedCorrection();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const [offline, setOffline] = useState(false);
 
@@ -53,9 +60,15 @@ export default function AgregarDeudaAnteriorPage() {
       setReady(true);
       return;
     }
-    const c = await customerStore.getCustomer(id);
-    setCustomer(c ?? null);
-    setReady(true);
+    setLoadError(null);
+    try {
+      const c = await customerStore.getCustomer(id);
+      setCustomer(c ?? null);
+    } catch (e: unknown) {
+      setLoadError(errorText(e, ""));
+    } finally {
+      setReady(true);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -75,6 +88,7 @@ export default function AgregarDeudaAnteriorPage() {
   }, [customer, amountRaw]);
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (!customer || busy) return;
     setError(null);
     const err = validateInitialDebtAmount(amountRaw);
@@ -97,12 +111,12 @@ export default function AgregarDeudaAnteriorPage() {
           ? "Deuda anterior guardada sin conexión"
           : INITIAL_DEBT_TOAST,
       );
-      setTimeout(() => {
+      rejected.afterSave(() => {
         navigateOfflineAware(router, `/clientes/${customer.id}`);
       }, 700);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Error al registrar la deuda anterior",
+        errorText(e, "Error al registrar la deuda anterior"),
       );
       setBusy(false);
     }
@@ -142,6 +156,24 @@ export default function AgregarDeudaAnteriorPage() {
     );
   }
 
+  if (loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock size="compact" back={{ href: "/clientes", label: "Volver a Clientes", entity: true }} title="Agregar deuda anterior" />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={typeof navigator === "undefined" || navigator.onLine}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
+        </Sheet>
+      </div>
+    );
+  }
+
   if (!customer) {
     return (
       <HeroBlock size="compact" back={{ href: "/clientes", label: "Volver a Clientes", entity: true }} title="Clientes">
@@ -177,6 +209,7 @@ export default function AgregarDeudaAnteriorPage() {
         primary={{ label: "Agregar deuda anterior", onClick: () => void confirm(), disabled: !canSubmit, busy }}
       />
       <ActionToast text={toast} />
+      {rejected.dialog}
     </div>
   );
 }

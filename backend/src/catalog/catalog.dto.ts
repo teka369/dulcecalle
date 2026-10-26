@@ -7,8 +7,10 @@ import {
   IsUUID,
   Matches,
   Min,
+  Max,
   MinLength,
 } from "class-validator";
+import { MAX_COP_AMOUNT, MAX_COP_MESSAGE } from "../shared/money";
 
 export class CreateProductDto {
   @IsString()
@@ -17,6 +19,7 @@ export class CreateProductDto {
 
   @IsInt()
   @Min(0)
+  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   price!: number;
 
   @IsOptional()
@@ -27,6 +30,7 @@ export class CreateProductDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   avgCost?: number;
 
   @IsOptional()
@@ -61,6 +65,7 @@ export class PatchProductDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   price?: number;
 
   @IsOptional()
@@ -103,6 +108,7 @@ export class CreateCustomerDto {
 export class CreateCustomerPaymentDto {
   @IsInt()
   @Min(1)
+  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   amount!: number;
 
   @IsEnum(["Efectivo", "Nequi"])
@@ -141,6 +147,7 @@ export class PatchCustomerDto {
 export class CreateInitialDebtDto {
   @IsInt()
   @Min(1)
+  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   amount!: number;
 
   @IsOptional()
@@ -159,10 +166,12 @@ export class SurtirDto {
 
   @IsInt()
   @Min(0)
+  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   unitCost!: number;
 
   @IsInt()
   @Min(0)
+  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   totalCost!: number;
 
   @IsEnum(["Efectivo", "Nequi"])
@@ -245,6 +254,7 @@ export class CreatePreparationDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   unitCost?: number;
 
   @IsOptional()

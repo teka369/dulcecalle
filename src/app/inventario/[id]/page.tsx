@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useOfflineBand } from "@/components/shell/use-online";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -13,12 +14,14 @@ import { QuickTiles } from "@/components/ui/QuickTiles";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { primaryImageUrl } from "@/data/media/urls";
 import { canPrepareFrom, dmy, inventoryValue, isCombo, isLowStock, moveDelta, moveMeta, units } from "@/components/inventory/inventory";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
+import { parseAmountInput } from "@/domain/money/limits";
 import type {
   RemotePreparation,
   RemoteProduct,
@@ -46,6 +49,7 @@ export default function ProductoFichaPage() {
   const [product, setProduct] = useState<RemoteProduct | null>(null);
   const [moves, setMoves] = useState<RemoteStockMove[]>([]);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
@@ -62,24 +66,30 @@ export default function ProductoFichaPage() {
       setReady(true);
       return;
     }
-    const p = await inventoryStore.getProduct(id);
-    setProduct(p ?? null);
-    if (p) {
-      setEditName(p.name);
-      setEditPrice(String(p.price));
-      setEditLow(String(p.lowStockAt));
-      setEditSellable(p.sellable);
+    setLoadError(null);
+    try {
+      const p = await inventoryStore.getProduct(id);
+      setProduct(p ?? null);
+      if (p) {
+        setEditName(p.name);
+        setEditPrice(String(p.price));
+        setEditLow(String(p.lowStockAt));
+        setEditSellable(p.sellable);
+      }
+      if (p) {
+        setMoves(await inventoryStore.listProductMoves(id));
+        const [from, into] = await Promise.all([
+          inventoryStore.listPreparations({ sourceId: id }).catch(() => [] as RemotePreparation[]),
+          inventoryStore.listPreparations({ targetId: id }).catch(() => [] as RemotePreparation[]),
+        ]);
+        setFromPreparations(from);
+        setIntoPreparations(into);
+      }
+    } catch (e: unknown) {
+      setLoadError(errorText(e, ""));
+    } finally {
+      setReady(true);
     }
-    if (p) {
-      setMoves(await inventoryStore.listProductMoves(id));
-      const [from, into] = await Promise.all([
-        inventoryStore.listPreparations({ sourceId: id }).catch(() => [] as RemotePreparation[]),
-        inventoryStore.listPreparations({ targetId: id }).catch(() => [] as RemotePreparation[]),
-      ]);
-      setFromPreparations(from);
-      setIntoPreparations(into);
-    }
-    setReady(true);
   }, [id]);
 
   useEffect(() => {
@@ -95,6 +105,24 @@ export default function ProductoFichaPage() {
     );
   }
 
+  if (loadError !== null) {
+    return (
+      <div className="flex flex-col">
+        <HeroBlock offline={offlineBand} size="medium" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Producto" />
+        <Sheet>
+          <ListErrorState
+            message={loadError}
+            online={typeof navigator === "undefined" || navigator.onLine}
+            onRetry={() => {
+              setReady(false);
+              void load();
+            }}
+          />
+        </Sheet>
+      </div>
+    );
+  }
+
   if (!product) {
     return (
       <HeroBlock offline={offlineBand} size="medium" back={{ href: "/inventario", label: "Volver a Inventario", entity: true }} title="Inventario">
@@ -105,8 +133,14 @@ export default function ProductoFichaPage() {
 
   const isInsumo = product.sellable === false;
   const low = isLowStock(product);
+  const editPriceParsed = parseAmountInput(editPrice);
+  const editPriceError = "error" in editPriceParsed ? editPriceParsed.error : null;
   const saveEdit = () => {
               if (editBusy) return;
+              if (editPriceError) {
+                setEditError(editPriceError);
+                return;
+              }
               setEditBusy(true);
               setEditError(null);
               void inventoryStore
@@ -129,7 +163,7 @@ export default function ProductoFichaPage() {
                   setEditing(false);
                 })
                 .catch((e: unknown) => {
-                  setEditError(e instanceof Error ? e.message : "No se pudo guardar.");
+                  setEditError(errorText(e, "No se pudo guardar."));
                 })
                 .finally(() => setEditBusy(false));
             };
@@ -145,7 +179,7 @@ export default function ProductoFichaPage() {
                     setConfirmArchive(false);
                   })
                   .catch((e: unknown) => {
-                    setEditError(e instanceof Error ? e.message : "No se pudo archivar.");
+                    setEditError(errorText(e, "No se pudo archivar."));
                   })
                   .finally(() => setEditBusy(false));
               };
@@ -316,7 +350,11 @@ export default function ProductoFichaPage() {
                 id="editar-precio-prod"
                 inputMode="numeric"
                 value={editPrice}
-                onChange={(e) => setEditPrice(e.target.value.replace(/\D/g, ""))}
+                aria-invalid={editPriceError ? true : undefined}
+                onChange={(e) => {
+                  setEditPrice(e.target.value);
+                  setEditError(null);
+                }}
                 className="mt-2"
               />
               <label className="mt-3 block text-sm font-medium" htmlFor="editar-low-prod">
@@ -349,7 +387,7 @@ export default function ProductoFichaPage() {
                   </span>
                 </label>
               )}
-              {editError && !confirmArchive && <p className="mt-2 text-sm text-danger">{editError}</p>}
+              {(editPriceError ?? (confirmArchive ? null : editError)) && <p role="alert" className="mt-2 text-sm text-danger">{editPriceError ?? editError}</p>}
               <Button type="button" variant="primary" disabled={editBusy} onClick={saveEdit} className="mt-3 w-full">
                 Guardar cambios
               </Button>

@@ -229,4 +229,37 @@ describe("TICKET-A offline preparation (AC4)", () => {
     expect(api.production.prepare).not.toHaveBeenCalled();
     expect(flush.blocked).toBe(1);
   });
+
+  it("CatalogReadCache preserves kind=combo on pending offline creates and cleanupOutboxLocalEffect reverts combo lot avgCost on rejection", async () => {
+    const { getCatalogReadCache } = await import("@/data/local/read-cache");
+    const { cleanupOutboxLocalEffect } = await import("@/data/local/outbox-cleanup");
+    api.products.create.mockRejectedValue(new NetworkError("offline"));
+    const created = await createProductWithOfflineFallback(
+      { name: "Combo offline", price: 0, stock: 2, avgCost: 25000, kind: "combo" },
+      crypto.randomUUID(),
+    );
+    if (created.mode !== "offline") throw new Error("expected offline");
+
+    // Online listProducts returns only a server standard product while the offline combo is still pending:
+    const listed = await getCatalogReadCache().listProducts(businessId, async () => [
+      remoteProduct({ id: TARGET_ID, name: "Enchilada", kind: "standard", sellable: true, stock: 10, avgCost: 400 }),
+    ]);
+    const mergedCombo = listed.data.find((p) => p.id === created.productId);
+    expect(mergedCombo).toMatchObject({ name: "Combo offline", kind: "combo", sellable: false, avgCost: 50000 });
+
+    // Queue an offline preparation from the combo (lot avgCost: 50000 -> 48000), then revert on rejection:
+    api.production.prepare.mockRejectedValue(new NetworkError("offline"));
+    const prep = await prepararWithOfflineFallback(
+      { sourceId: created.productId, targetId: TARGET_ID, qty: 10, unitCost: 200 },
+      crypto.randomUUID(),
+    );
+    if (prep.mode !== "offline") throw new Error("expected offline");
+    expect((await getLocalDb().products.get(created.productId))?.avgCost).toBe(48000);
+
+    const prepOp = await getLocalDb().outbox.get(prep.id);
+    await cleanupOutboxLocalEffect(getLocalDb(), businessId, prepOp!, "reject");
+    expect((await getLocalDb().products.get(created.productId))?.avgCost).toBe(50000);
+    expect((await getLocalDb().products.get(TARGET_ID))?.stock).toBe(10);
+    expect((await getLocalDb().products.get(TARGET_ID))?.avgCost).toBe(400);
+  });
 });

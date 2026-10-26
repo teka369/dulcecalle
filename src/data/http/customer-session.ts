@@ -3,7 +3,7 @@
  * Not a User membership. Tokens never go in NEXT_PUBLIC_*.
  */
 
-import type { AuthStorage } from "./session";
+import { emitAuthCleared, type AuthStorage } from "./session";
 import { jwtExpIsPast } from "./jwt-exp";
 
 export const CUSTOMER_AUTH_STORAGE_KEY = "dulcecalle.customer.auth";
@@ -75,6 +75,7 @@ export class CustomerSession {
     this._refreshToken = null;
     this._customer = null;
     this.persist();
+    emitAuthCleared();
   }
 
   private hydrate(): void {

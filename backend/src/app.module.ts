@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { PagingHeadersInterceptor } from "./shared/http/paging-headers.interceptor";
 import { JwtModule } from "@nestjs/jwt";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -17,6 +18,7 @@ import { JwtAuthGuard } from "./identity/jwt.guard";
 import { BusinessGuard } from "./tenancy/business.guard";
 import { RolesGuard } from "./tenancy/roles.guard";
 import { requireJwtSecrets } from "./identity/jwt-secrets";
+import { shouldSkipThrottle } from "./http-setup";
 
 @Module({
   imports: [
@@ -33,7 +35,7 @@ import { requireJwtSecrets } from "./identity/jwt-secrets";
     }),
     ThrottlerModule.forRoot({
       throttlers: [{ name: "default", ttl: 60000, limit: 120 }],
-      skipIf: () => process.env.DISABLE_THROTTLE === "1",
+      skipIf: () => shouldSkipThrottle(),
     }),
     PrismaModule,
     TenancyModule,
@@ -47,6 +49,7 @@ import { requireJwtSecrets } from "./identity/jwt-secrets";
   ],
   controllers: [HealthController],
   providers: [
+    { provide: APP_INTERCEPTOR, useClass: PagingHeadersInterceptor },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: BusinessGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

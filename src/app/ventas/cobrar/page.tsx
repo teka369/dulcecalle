@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@/domain/ux/user-message";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
@@ -18,7 +19,7 @@ import { HeroAmount } from "@/components/ui/HeroAmount";
 import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
-import { AmountField } from "@/components/ui/AmountField";
+import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { ActionBar, ACTION_BAR_SPACE, ABOVE_ACTION_BAR } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
 import {
@@ -71,10 +72,10 @@ export default function CobrarPage() {
   useEffect(() => {
     void listCachedProducts()
       .then(setProducts)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Sin conexión."));
+      .catch((e: unknown) => setError(errorText(e, "Sin conexión.")));
     void listCachedCustomers()
       .then(setCustomers)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Sin conexión."));
+      .catch((e: unknown) => setError(errorText(e, "Sin conexión.")));
     void getPendingCustomerIds().then(setPendingCustomerIds);
   }, []);
 
@@ -128,6 +129,7 @@ export default function CobrarPage() {
   }
 
   async function confirm() {
+    if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (!valid || busy) return;
     setBusy(true);
     setError(null);
@@ -145,7 +147,7 @@ export default function CobrarPage() {
       );
       setTimeout(() => navigateOfflineAware(router, "/"), 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar venta");
+      setError(errorText(e, "Error al registrar venta"));
       setBusy(false);
     }
   }

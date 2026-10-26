@@ -18,7 +18,7 @@ export const AUTH = { accessToken: jwt, refreshToken: jwt, businessId: BIZ, user
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
 const iso = new Date().toISOString();
 export const PROD = { id: P1, name: "Gomitas Ácidas QA", category: "Dulces", price: 1500, avgCost: 400, stock: 10, lowStockAt: 2, sellable: true, archivedAt: null, createdAt: iso, images: [] };
-export const INSUMO = { ...PROD, id: P2, name: "Azúcar Insumo QA", sellable: false };
+export const INSUMO = { ...PROD, id: P2, name: "Azúcar Insumo QA", sellable: false, kind: "combo" as const };
 export const SUP = { id: SU, name: "Distribuidora Norte QA", phone: null, notes: null, createdAt: iso };
 export const CUS = { id: C0, code: "C0", name: "Marta Cliente QA", phone: null, debt: 12000, archivedAt: null, createdAt: iso };
 export const SALEO = {
@@ -26,7 +26,7 @@ export const SALEO = {
   occurredOn: today, createdAt: iso,
   lines: [{ id: LINE, productId: P1, productName: PROD.name, qty: 2, unitPrice: 1500, unitCost: 400, lineTotal: 3000 }],
 };
-const TODAY = { localDate: today, session: null, expected: { efectivo: 0, nequi: 0, total: 0 }, closed: false, pendingCount: 0, pendingSessions: [], needsReviewCount: 0, conflict: false, canOpen: true, moves: [] };
+export const TODAY = { localDate: today, session: null, expected: { efectivo: 0, nequi: 0, total: 0 }, closed: false, pendingCount: 0, pendingSessions: [], needsReviewCount: 0, conflict: false, canOpen: true, moves: [] };
 const STATS = (period: string) => ({ period, from: today, to: today, ventas: 3000, ventasCount: 1, devoluciones: 0, devolucionesCount: 0, recibido: 0, recibidoEfectivo: 0, recibidoNequi: 0, porCobrar: 3000, gaste: 0, inverti: 0, ganancia: 2200, valorInventario: 4000, stockBajo: 0, emptyPeriod: false });
 
 /** B1/B5: minimal server-side caja with Idempotency-Key semantics. */
@@ -78,6 +78,7 @@ let server: FakeServer = { extraSales: [], ventasDelta: 0 };
 function respond(p: string, url: URL): unknown {
   if (p === "/products") return [PROD, INSUMO];
   if (p === `/products/${P1}`) return PROD;
+  if (p === `/products/${P2}`) return INSUMO; // Preparar reads its insumo by id
   if (p.endsWith("/moves")) return [];
   if (p === "/suppliers") return [SUP];
   if (p === `/suppliers/${SU}`) return SUP;

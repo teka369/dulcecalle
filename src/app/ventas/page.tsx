@@ -22,7 +22,7 @@ import { listSalesForScreen, type LocalSaleRow } from "@/data/pwa/offline-sales"
 import { LIST_STALE_TEXT } from "@/data/pwa/list-status";
 import { ventasErrorMessage, ventasHero } from "@/components/sale/sales-list";
 import { summarizeSales } from "@/components/sale/checkout";
-import { bogotaKey, dayHeading, groupByDay, saleTime, ventasSheetState } from "@/components/sale/sales-list";
+import { bogotaKey, dayHeading, groupByDay, saleCustomerLabel, saleDateLabel, saleMethodLabel, ventasSheetState } from "@/components/sale/sales-list";
 
 const kindLabel: Record<string, string> = {
   paid: "Pagada",
@@ -187,9 +187,7 @@ export default function VentasPage() {
               <RowGroup>
                 {g.rows.map((s) => {
                   const name = s.customerId ? customerName.get(s.customerId) : null;
-                  const time = saleTime(s.createdAt);
-                  const who = name ?? "Venta";
-                  const title = [time, [who, s.method].filter(Boolean).join(" · ")].filter(Boolean).join("  ");
+                  const title = `${saleCustomerLabel(s.customerId, name)} · ${saleMethodLabel(s.paymentKind, s.method)}`;
                   const meta =
                     s.paymentKind === "partial"
                       ? `Recibió ${formatCop(s.amountReceived)} · Fía ${formatCop(s.credit)}`
@@ -203,6 +201,7 @@ export default function VentasPage() {
                       title={title}
                       meta={
                         <span className="flex flex-col gap-1">
+                          <span>{saleDateLabel(s)}</span>
                           {meta ? <span>{meta}</span> : null}
                           <span className="flex flex-wrap gap-1.5">
                             <Badge tone={kindTone(s.paymentKind)}>{kindLabel[s.paymentKind] ?? s.paymentKind}</Badge>

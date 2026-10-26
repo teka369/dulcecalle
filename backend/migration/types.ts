@@ -30,6 +30,8 @@ export type DexieProduct = {
   avgCost: number;
   stock: number;
   lowStockAt: number;
+  sellable?: boolean;
+  kind?: "standard" | "combo";
   createdAt: number;
   updatedAt: number;
 };
