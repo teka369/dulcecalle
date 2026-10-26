@@ -24,18 +24,21 @@ export default function InicioPage() {
   const [fromCache, setFromCache] = useState(false);
 
   const refresh = useCallback(async () => {
-    setFailed(false);
-    const result = await loadDashboardForScreen();
-    setSnap(result.data);
-    setCapturedAt(result.capturedAt);
-    setFromCache(result.source === "cache");
+    try {
+      const result = await loadDashboardForScreen();
+      setFailed(false);
+      setToast(null);
+      setSnap(result.data);
+      setCapturedAt(result.capturedAt);
+      setFromCache(result.source === "cache");
+    } catch (e: unknown) {
+      setFailed(true);
+      setToast(errorText(e, "No se pudo cargar el inicio"));
+    }
   }, []);
 
   useEffect(() => {
-    void refresh().catch((e: unknown) => {
-      setFailed(true);
-      setToast(errorText(e, "No se pudo cargar el inicio"));
-    });
+    void refresh();
   }, [refresh, pathname]);
 
   useAfterSync(refresh);
@@ -59,7 +62,7 @@ export default function InicioPage() {
             </p>
             <button
               type="button"
-              onClick={() => void refresh().catch(() => setFailed(true))}
+              onClick={() => void refresh()}
               className="inline-flex min-h-11 w-fit items-center rounded-[var(--r-pill)] bg-on-hero px-4 text-sm font-semibold text-hero"
             >
               Reintentar
