@@ -45,7 +45,7 @@ test("B1/B5: open caja offline + offline aporte -> esperado includes pending mov
   await context.setOffline(false);
   await expect.poll(() => fake.cash.posts.filter((x) => x.path === "/cash/sessions").length, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
   // Second sync: the user retries the failed "Apertura de caja" from the sync center (same intent).
-  await page.getByRole("button", { name: /^Datos y sincronización/ }).first().click();
+  await page.getByRole("button", { name: /^Pendientes/ }).first().click();
   await page.getByRole("button", { name: /Apertura de caja/ }).first().click();
   await page.getByRole("button", { name: "Reintentar" }).first().click();
   await expect
