@@ -213,7 +213,7 @@ export class CashManagerService {
       if (!move) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
       await tx.cashMove.update({
         where: { id: move.id },
-        data: { sessionId: session.id, pendingForSessionId: null },
+        data: { sessionId: session.id, pendingForSessionId: null, needsReview: false },
       });
       const row = await tx.cashCarry.create({
         data: {
@@ -479,9 +479,11 @@ function moveJson(move: {
   occurredOn: Date;
   createdAt: Date;
   note: string | null;
+  needsReview?: boolean;
 }) {
   return {
     id: move.id,
+    needsReview: move.needsReview ?? false,
     amount: copToJson(move.amount),
     direction: move.direction,
     method: move.method,

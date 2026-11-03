@@ -48,7 +48,10 @@ export class CashController {
     @Body() dto: CloseSessionDto,
     @Headers("idempotency-key") key?: string,
   ) {
-    return this.cash.close(ctx, id, dto.countedEfectivo, resolveIdempotencyKey(key, dto.requestId));
+    return this.cash.close(ctx, id, dto.countedEfectivo, resolveIdempotencyKey(key, dto.requestId), {
+      unresolvedCount: dto.unresolvedCount,
+      unresolvedAmount: dto.unresolvedAmount,
+    });
   }
 
   @Get("cash/today")

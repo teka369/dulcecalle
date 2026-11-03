@@ -342,6 +342,9 @@ model CashSession {
   note             String?
   requestId        String?   @map("request_id") @db.Uuid
   closeRequestId   String?   @map("close_request_id") @db.Uuid
+  /// C01: closed with N rejected money operations still unresolved on a device («Cerrar igual»).
+  unresolvedCount  Int?      @map("unresolved_count")
+  unresolvedAmount BigInt?   @map("unresolved_amount")
   legacyDexieId    Int?      @map("legacy_dexie_id")
 
   business      Business    @relation(fields: [businessId], references: [id])
@@ -372,6 +375,8 @@ model CashMove {
   legacyDexieId Int?          @map("legacy_dexie_id")
 
   pendingForSessionId String? @map("pending_for_session_id") @db.Uuid
+  /// C01: received after its day was closed and not yet assigned to a caja.
+  needsReview         Boolean @default(false) @map("needs_review")
 
   business         Business     @relation(fields: [businessId], references: [id])
   session          CashSession? @relation("SessionMoves", fields: [sessionId], references: [id])
@@ -433,6 +438,10 @@ model CustomerPayment {
   requestId     String?   @map("request_id") @db.Uuid
   note          String?
   occurredOn    DateTime  @map("occurred_on") @db.Date
+  /// C01/C03: when the money was actually received (device clock), if sent.
+  occurredAt    DateTime? @map("occurred_at") @db.Timestamptz(3)
+  /// C01: accepted after its day was closed; shown as «De otro día» / requires review.
+  needsReview   Boolean   @default(false) @map("needs_review")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   legacyDexieId Int?      @map("legacy_dexie_id")
 

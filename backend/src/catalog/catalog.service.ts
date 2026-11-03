@@ -696,6 +696,10 @@ export class CatalogService {
 
     try {
       const row = await this.prisma.$transaction(async (tx) => {
+        // C01 / DC-16 — serialized with every other debt write of the
+        // business. Still allowed on a closed day (no cash involved), now
+        // consistent with abonos, which are also accepted after the close.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
         const customer = await tx.customer.findFirst({
           where: { id: customerId, businessId: ctx.businessId },
         });
