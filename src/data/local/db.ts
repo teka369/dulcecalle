@@ -21,6 +21,7 @@ import type {
   LocalStockMove,
   LocalSupplier,
   OutboxItem,
+  LocalDiscardedOp,
 } from "./types";
 
 /**
@@ -51,6 +52,7 @@ export class DulceCalleLocalDB extends Dexie {
   preparations!: EntityTable<LocalPreparation, "id">;
   pendingMedia!: EntityTable<LocalPendingMedia, "id">;
   outbox!: EntityTable<OutboxItem, "operationId">;
+  discardedOps!: EntityTable<LocalDiscardedOp, "id">;
 
   constructor() {
     super(LOCAL_DB_NAME);
@@ -108,6 +110,11 @@ export class DulceCalleLocalDB extends Dexie {
     this.version(9).stores({
       preparations:
         "id, businessId, sourceId, targetId, requestId, [businessId+sourceId], [businessId+targetId], [businessId+requestId]",
+    });
+    // v10 (C01 / DC-14): audit trail of discarded or replaced outbox
+    // operations. Append-only from the app's point of view.
+    this.version(10).stores({
+      discardedOps: "id, businessId, operationId, [businessId+discardedAt]",
     });
   }
 }

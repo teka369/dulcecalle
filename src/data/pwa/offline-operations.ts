@@ -1,7 +1,10 @@
+import { formatCop } from "@/domain/money";
+import { listUnresolvedFinancialOps, unresolvedTotals } from "./unresolved-financial";
 import { deriveRequestId } from "@/domain/requestId";
 import { ApiError, NetworkError } from "@/data/errors";
-import { cleanupOutboxLocalEffect } from "@/data/local/outbox-cleanup";
 import { isPermanentDebtRejection, isSuppressedLocalEffect } from "./pending-debt";
+import { cleanupOutboxLocalEffect } from "@/data/local/outbox-cleanup";
+import { isFinancialOp } from "@/data/local/outbox-money";
 import { getPwaApi } from "@/data/pwa/api";
 import { getPwaAuthSession } from "@/data/http/session";
 import { getLocalDb, type DulceCalleLocalDB } from "@/data/local/db";
@@ -273,13 +276,36 @@ export async function openCashWithOfflineFallback(
   }
 }
 
+/** C01 — the close was stopped because rejected money operations are unresolved. */
+export class UnresolvedCloseError extends Error {
+  constructor(
+    public readonly count: number,
+    public readonly amount: number,
+  ) {
+    super(
+      count === 1
+        ? `Hay 1 operación de dinero rechazada sin resolver (${formatCop(amount)}). Resuélvela o cierra igual.`
+        : `Hay ${count} operaciones de dinero rechazadas sin resolver (${formatCop(amount)}). Resuélvelas o cierra igual.`,
+    );
+    this.name = "UnresolvedCloseError";
+  }
+}
+
 export async function closeCashWithOfflineFallback(
   sessionId: string,
   countedEfectivo: number,
   requestId: string,
+  opts: { closeAnyway?: boolean } = {},
 ): Promise<OfflineOperationResult<Awaited<ReturnType<ReturnType<typeof getPwaApi>["cash"]["close"]>>>> {
   assertNonNegativeMoney(countedEfectivo, "Revisa el monto contado.");
   const business = businessId();
+  // C01 — pending money ops only warn (UI). Rejected ones need an explicit
+  // «Cerrar igual», and the close then carries a traceable mark.
+  const totals = unresolvedTotals(await listUnresolvedFinancialOps(business));
+  if (totals.rejectedCount > 0 && !opts.closeAnyway) {
+    throw new UnresolvedCloseError(totals.rejectedCount, totals.rejectedAmount);
+  }
+  const mark = totals.rejectedCount > 0 ? { count: totals.rejectedCount, amount: totals.rejectedAmount } : undefined;
   // D5 — An offline-opened session is known to the server under a different
   // id once its open operation syncs (operationId === local session id).
   // Resolve it for online calls; when the open is still unsynced, queue the
@@ -292,10 +318,10 @@ export async function closeCashWithOfflineFallback(
         : false
       : null;
   if (openSynced === false) {
-    return closeCashOffline(business, sessionId, countedEfectivo, requestId);
+    return closeCashOffline(business, sessionId, countedEfectivo, requestId, mark);
   }
   try {
-    const value = await getPwaApi().cash.close(openSynced ?? sessionId, countedEfectivo, requestId);
+    const value = await getPwaApi().cash.close(openSynced ?? sessionId, countedEfectivo, requestId, ...(mark ? [mark] : []));
     const local = await getLocalDb().cashSessions.get(sessionId);
     // D8 — No local row (e.g. session opened on another device) is not a
     // block: the server is the authority and already scoped the close by
@@ -309,13 +335,15 @@ export async function closeCashWithOfflineFallback(
         expectedEfectivo: value.expectedEfectivo,
         expectedNequi: value.expectedNequi,
         difference: value.difference,
+        unresolvedCount: mark?.count ?? null,
+        unresolvedAmount: mark?.amount ?? null,
         updatedAt: Date.now(),
       });
     }
     return { mode: "online", value };
   } catch (error) {
     if (!(error instanceof NetworkError)) throw error;
-    return closeCashOffline(business, sessionId, countedEfectivo, requestId);
+    return closeCashOffline(business, sessionId, countedEfectivo, requestId, mark);
   }
 }
 
@@ -324,6 +352,7 @@ async function closeCashOffline(
   sessionId: string,
   countedEfectivo: number,
   requestId: string,
+  mark?: { count: number; amount: number },
 ): Promise<OfflineOperationResult<Awaited<ReturnType<ReturnType<typeof getPwaApi>["cash"]["close"]>>>> {
     const db = getLocalDb();
     const now = Date.now();
@@ -346,6 +375,8 @@ async function closeCashOffline(
         expectedEfectivo: expected.efectivo,
         expectedNequi: expected.nequi,
         difference,
+        unresolvedCount: mark?.count ?? null,
+        unresolvedAmount: mark?.amount ?? null,
         updatedAt: now,
       });
       const operationId = newEntityId();
@@ -355,7 +386,7 @@ async function closeCashOffline(
         entity: "cashSession",
         operation: "close",
         requestId,
-        payload: { sessionId, countedEfectivo },
+        payload: { sessionId, countedEfectivo, ...(mark ? { unresolved: mark } : {}) },
         dependsOn,
         localCreatedAt: now,
       });
@@ -905,12 +936,21 @@ export async function syncPendingOperations(business: string) {
         }
       }
       if (item.entity === "cashSession" && item.operation === "close") {
-        const payload = item.payload as { sessionId: string; countedEfectivo: number };
+        const payload = item.payload as {
+          sessionId: string;
+          countedEfectivo: number;
+          unresolved?: { count: number; amount: number };
+        };
         const dependency = item.dependsOn[0]
           ? await getOutboxStore().get(business, item.dependsOn[0])
           : undefined;
         const sessionId = dependency?.remoteId ?? payload.sessionId;
-        const remote = await getPwaApi().cash.close(sessionId, payload.countedEfectivo, item.requestId);
+        const remote = await getPwaApi().cash.close(
+          sessionId,
+          payload.countedEfectivo,
+          item.requestId,
+          ...(payload.unresolved ? [payload.unresolved] : []),
+        );
         return { remoteId: remote.id };
       }
       if (item.entity === "cashMove" && item.operation === "create") {
@@ -988,9 +1028,15 @@ export async function syncPendingOperations(business: string) {
       }
       throw new Error("Operación de outbox no compatible con M6.8.");
       } catch (error) {
+        // C01 / DC-01 — a permanent rejection of a MONEY op keeps the local record
+        // and its effect («Rechazada») until the owner retries, corrects or
+        // discards it. Non-money ops (e.g. a caja open) keep the old revert so
+        // «Corregir» can redo them.
         if (isPermanentDebtRejection(error)) {
-          const current = await getLocalDb().outbox.get(item.operationId);
-          await cleanupOutboxLocalEffect(getLocalDb(), business, current ?? item, "reject");
+          const current = (await getLocalDb().outbox.get(item.operationId)) ?? item;
+          if (!isFinancialOp(current)) {
+            await cleanupOutboxLocalEffect(getLocalDb(), business, current, "reject");
+          }
         }
         throw error;
       }

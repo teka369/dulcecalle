@@ -434,7 +434,7 @@ export class HttpRepository {
 
     pay: async (
       customerId: string,
-      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string },
+      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string; occurredAt?: string },
       requestId: string,
     ): Promise<RemotePayment> => {
       const row = await this.http.request<Record<string, unknown>>(
@@ -753,11 +753,18 @@ export class HttpRepository {
       sessionId: string,
       countedEfectivo: number,
       requestId: string = crypto.randomUUID(),
+      unresolved?: { count: number; amount: number },
     ): Promise<RemoteSession> => {
+      // C01 — «Cerrar igual»: the close carries a traceable mark of the
+      // rejected money operations still unresolved on this device.
+      const mark =
+        unresolved && unresolved.count > 0
+          ? { unresolvedCount: unresolved.count, unresolvedAmount: unresolved.amount }
+          : {};
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         `/cash/sessions/${sessionId}/close`,
-        { body: { countedEfectivo }, idempotencyKey: requestId },
+        { body: { countedEfectivo, ...mark }, idempotencyKey: requestId },
       );
       return mapSession(row);
     },

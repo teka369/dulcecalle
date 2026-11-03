@@ -10,7 +10,7 @@ import { getLocalDb } from "../local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
 import { getLocalStore } from "../local/store";
 import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
-import { isPermanentDebtRejection, isSuppressedLocalEffect } from "./pending-debt";
+import { isSuppressedLocalEffect } from "./pending-debt";
 import { newEntityId } from "../local/ids";
 import { addCop, mulCop, subCop } from "@/domain/money";
 import { AMOUNT_TOO_LARGE_MESSAGE, MAX_COP_AMOUNT } from "@/domain/money/limits";
@@ -503,44 +503,6 @@ async function setOptimisticApplied(
   });
 }
 
-/** Put the local stock, cash and credit back when the server rejects the sale. */
-async function revertOptimisticSale(businessId: string, operationId: string): Promise<void> {
-  const db = getLocalDb();
-  const op = await db.outbox.get(operationId);
-  if (!op || op.businessId !== businessId || !effectApplied(op.payload)) return;
-  const sale = await db.sales.get(operationId);
-  if (sale && sale.businessId === businessId && sale.credit > 0 && sale.customerId) {
-    const customer = await db.customers.get(sale.customerId);
-    if (customer && customer.businessId === businessId) {
-      const next = subCop(customer.debt, sale.credit);
-      await db.customers.put({
-        ...customer,
-        debt: next < 0 ? 0 : next,
-        updatedAt: Date.now(),
-      });
-    }
-  }
-  const stockMoves = await db.stockMoves.where("businessId").equals(businessId).toArray();
-  for (const move of stockMoves) {
-    if (move.requestId !== op.requestId || move.reason !== "sale") continue;
-    const product = await db.products.get(move.productId);
-    if (product && product.businessId === businessId) {
-      await db.products.put({
-        ...product,
-        stock: product.stock - move.delta,
-        updatedAt: Date.now(),
-      });
-    }
-    await db.stockMoves.delete(move.id);
-  }
-  const cashMoves = await db.cashMoves.where("businessId").equals(businessId).toArray();
-  for (const move of cashMoves) {
-    if (move.requestId !== op.requestId || move.refType !== "sale") continue;
-    await db.cashMoves.delete(move.id);
-  }
-  await setOptimisticApplied(businessId, operationId, false);
-}
-
 /** A manual retry must re-apply the effect that a rejection rolled back. */
 async function ensureSaleOptimistic(businessId: string, operationId: string): Promise<void> {
   const db = getLocalDb();
@@ -621,9 +583,8 @@ export async function syncPendingSales(businessId: string) {
       );
       return { remoteId: remote.id };
     } catch (error) {
-      if (isPermanentDebtRejection(error)) {
-        await revertOptimisticSale(businessId, item.operationId);
-      }
+      // C01 / DC-01 — a permanent rejection keeps the local record and its effect
+      // («Rechazada») until the owner retries, corrects or discards it.
       throw error;
     }
   }, (item) => item.entity === "sale" && item.operation === "create");

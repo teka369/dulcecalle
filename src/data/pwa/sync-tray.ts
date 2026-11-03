@@ -369,6 +369,7 @@ export async function retryOutboxOperation(
 export async function discardOutboxOperation(
   businessId: string,
   operationId: string,
+  opts: { replacedBy?: string | null } = {},
 ): Promise<void> {
   const outbox = getOutboxStore();
   const parent = await outbox.get(businessId, operationId);
@@ -380,6 +381,7 @@ export async function discardOutboxOperation(
       local
         ? orphanLocalNote(parentLabel)
         : `Esperando a ${parentLabel}, que se descartó. Reintenta para enviarlo sin eso, o descártalo.`,
+    ...(opts.replacedBy ? { replacedBy: opts.replacedBy } : {}),
   });
 }
 

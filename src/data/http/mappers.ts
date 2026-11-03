@@ -230,6 +230,10 @@ export type RemotePayment = {
   note: string | null;
   occurredOn: string;
   createdAt: number;
+  /** C01/C03 — when the money was received; defaults to createdAt. */
+  occurredAt?: number;
+  /** C01 — accepted after its day closed; waiting to be assigned to a caja. */
+  needsReview?: boolean;
 };
 
 export function mapPayment(raw: Record<string, unknown>): RemotePayment {
@@ -241,6 +245,8 @@ export function mapPayment(raw: Record<string, unknown>): RemotePayment {
     note: raw.note == null ? null : String(raw.note),
     occurredOn: asDateKey(raw.occurredOn),
     createdAt: asIsoEpoch(raw.createdAt),
+    ...(raw.occurredAt != null ? { occurredAt: asIsoEpoch(raw.occurredAt) } : {}),
+    ...(raw.needsReview === true ? { needsReview: true } : {}),
   };
 }
 
@@ -254,6 +260,9 @@ export type RemoteSession = {
   expectedEfectivo: number | null;
   expectedNequi: number | null;
   difference: number | null;
+  /** C01 — closed with rejected money operations unresolved («Cerrar igual»). */
+  unresolvedCount?: number | null;
+  unresolvedAmount?: number | null;
 };
 
 export function mapSession(raw: Record<string, unknown>): RemoteSession {
@@ -273,6 +282,10 @@ export function mapSession(raw: Record<string, unknown>): RemoteSession {
       raw.expectedNequi == null ? null : asCopJson(raw.expectedNequi, "expectedNequi"),
     difference:
       raw.difference == null ? null : asCopJson(raw.difference, "difference"),
+    unresolvedCount:
+      typeof raw.unresolvedCount === "number" && Number.isInteger(raw.unresolvedCount) ? raw.unresolvedCount : null,
+    unresolvedAmount:
+      raw.unresolvedAmount == null ? null : asCopJson(raw.unresolvedAmount, "unresolvedAmount"),
   };
 }
 

@@ -101,7 +101,7 @@ describe("Dexie v3 → current migration (M6.10/M6.12/M6.13)", () => {
     old.close();
 
     const db = getLocalDb();
-    expect(db.verno).toBe(9);
+    expect(db.verno).toBe(10);
     expect(await db.snapshots.count()).toBe(0);
     expect(
       (await db.products.get("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))?.stock,

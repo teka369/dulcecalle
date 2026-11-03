@@ -1,6 +1,7 @@
 import { ApiError, NetworkError } from "../errors";
 import { getLocalDb, type DulceCalleLocalDB } from "./db";
 import { cleanupOutboxLocalEffect } from "./outbox-cleanup";
+import { isFinancialOp, summarizeOutboxMoney } from "./outbox-money";
 import { assertUuid } from "./ids";
 import type { OutboxItem, OutboxStatus } from "./types";
 
@@ -146,6 +147,7 @@ export class OutboxStore {
       remoteId,
       lastError: null,
       nextAttemptAt: null,
+      rejection: null,
     });
   }
 
@@ -154,11 +156,14 @@ export class OutboxStore {
     operationId: string,
     lastError: string,
     nextAttemptAt?: number | null,
+    rejectionCode?: string | null,
   ): Promise<OutboxItem> {
+    const permanent = (nextAttemptAt ?? null) == null;
     return this.patchStatus(businessId, operationId, {
       status: "failed",
       lastError,
       nextAttemptAt: nextAttemptAt ?? null,
+      rejection: permanent ? { code: rejectionCode ?? null, at: Date.now() } : null,
     });
   }
 
@@ -179,7 +184,7 @@ export class OutboxStore {
     if (row.status !== "failed") {
       throw new Error(`only failed operations can be retried (status: ${row.status})`);
     }
-    const next: OutboxItem = { ...row, status: "pending", nextAttemptAt: null };
+    const next: OutboxItem = { ...row, status: "pending", nextAttemptAt: null, rejection: null };
     await this.db.outbox.put(next);
     return next;
   }
@@ -197,6 +202,8 @@ export class OutboxStore {
       /** Local ids the discarded operation stood for (its operationId, local entity ids…). */
       parentLocalIds?: string[];
       parentLabel?: string;
+      /** C01 — the correction that replaces this operation (state «replaced»). */
+      replacedBy?: string | null;
     } = {},
   ): Promise<void> {
     assertUuid(businessId, "businessId");
@@ -208,6 +215,28 @@ export class OutboxStore {
     }
     if (preRow.status !== "pending" && preRow.status !== "failed") {
       throw new Error(`only pending/failed operations can be discarded (status: ${preRow.status})`);
+    }
+    // C01 / DC-14 — keep an audit trail of money operations before any
+    // local effect is undone (Descartar never leaves them without a trace).
+    if (isFinancialOp(preRow)) {
+      const summary = await summarizeOutboxMoney(this.db, preRow);
+      await this.db.discardedOps.put({
+        id: preRow.operationId,
+        operationId: preRow.operationId,
+        businessId,
+        entity: preRow.entity,
+        operation: preRow.operation,
+        requestId: preRow.requestId,
+        payload: preRow.payload,
+        amount: summary.amount,
+        customerId: summary.customerId,
+        lastError: preRow.lastError,
+        rejectionCode: preRow.rejection?.code ?? null,
+        state: options.replacedBy ? "replaced" : "discarded",
+        replacedBy: options.replacedBy ?? null,
+        localCreatedAt: preRow.localCreatedAt,
+        discardedAt: Date.now(),
+      });
     }
     await cleanupOutboxLocalEffect(this.db, businessId, preRow, "discard");
     await this.db.transaction("rw", this.db.outbox, async () => {
@@ -281,6 +310,7 @@ export class OutboxStore {
       lastError: string | null;
       nextAttemptAt?: number | null;
       attemptsDelta?: number;
+      rejection?: OutboxItem["rejection"];
     },
   ): Promise<OutboxItem> {
     assertUuid(businessId, "businessId");
@@ -309,6 +339,7 @@ export class OutboxStore {
       nextAttemptAt:
         patch.nextAttemptAt === undefined ? row.nextAttemptAt : patch.nextAttemptAt,
       attempts: row.attempts + (patch.attemptsDelta ?? 0),
+      ...(patch.rejection !== undefined ? { rejection: patch.rejection } : {}),
     };
     await this.db.outbox.put(next);
     return next;
@@ -541,6 +572,7 @@ export class OutboxSyncEngine {
             current.operationId,
             message,
             retryable ? retryAt(flying.attempts, this.clock()) : null,
+            error instanceof ApiError ? error.code : null,
           );
           failed += 1;
           emitSyncEvent({

@@ -19,7 +19,7 @@ describe("TICKET-A Dexie compatibility (AC5)", () => {
   it("keeps verno, pending outbox and kind-less rows across a reopen", async () => {
     const db = getLocalDb();
     await db.open();
-    expect(db.verno).toBe(9);
+    expect(db.verno).toBe(10);
     const now = Date.now();
     const base = { businessId: BIZ, category: "General", price: 0, lowStockAt: 5, archivedAt: null, createdAt: now, updatedAt: now, images: [] };
     await db.products.put({ ...base, id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Insumo viejo", avgCost: 5000, stock: 1, sellable: false } as never);
@@ -39,7 +39,7 @@ describe("TICKET-A Dexie compatibility (AC5)", () => {
     db.close();
 
     await db.open();
-    expect(db.verno).toBe(9);
+    expect(db.verno).toBe(10);
     expect(await db.outbox.count()).toBe(1);
     expect((await db.outbox.get("cccccccc-cccc-4ccc-8ccc-cccccccccccc"))?.status).toBe("pending");
     expect((await db.products.get("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))?.kind).toBeUndefined();

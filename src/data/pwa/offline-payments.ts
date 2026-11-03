@@ -6,8 +6,7 @@ import { getLocalDb } from "../local/db";
 import { ConnectivityMonitor, getOutboxSyncEngine } from "../local/outbox";
 import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
 import { newEntityId } from "../local/ids";
-import { subCop, addCop } from "@/domain/money";
-import { isPermanentDebtRejection } from "./pending-debt";
+import { subCop } from "@/domain/money";
 
 export type CreatePaymentInput = {
   customerId: string;
@@ -82,6 +81,7 @@ async function createLocalPayment(
         requestId,
         note: input.note ?? null,
         occurredOn,
+        occurredAt: now,
         createdAt: now,
       });
 
@@ -118,6 +118,8 @@ async function createLocalPayment(
           amount: input.amount,
           method: input.method,
           ...(input.note ? { note: input.note } : {}),
+          // C01/C03 — the server keeps when the money was really received.
+          occurredAt: new Date(now).toISOString(),
         },
         dependsOn: [],
         localCreatedAt: now,
@@ -174,29 +176,6 @@ async function setPaymentApplied(operationId: string, applied: boolean): Promise
   });
 }
 
-async function revertOptimisticPayment(businessId: string, operationId: string): Promise<void> {
-  const db = getLocalDb();
-  const op = await db.outbox.get(operationId);
-  if (!op || op.businessId !== businessId || !paymentEffectApplied(op.payload)) return;
-  const payment = await db.customerPayments.get(operationId);
-  if (payment && payment.businessId === businessId) {
-    const customer = await db.customers.get(payment.customerId);
-    if (customer && customer.businessId === businessId) {
-      await db.customers.put({
-        ...customer,
-        debt: addCop(customer.debt, payment.amount),
-        updatedAt: Date.now(),
-      });
-    }
-  }
-  const cash = await db.cashMoves.where("businessId").equals(businessId).toArray();
-  for (const move of cash) {
-    if (move.requestId !== op.requestId || move.refType !== "customer_payment") continue;
-    await db.cashMoves.delete(move.id);
-  }
-  await setPaymentApplied(operationId, false);
-}
-
 async function ensurePaymentOptimistic(businessId: string, operationId: string): Promise<void> {
   const db = getLocalDb();
   const op = await db.outbox.get(operationId);
@@ -208,7 +187,8 @@ async function ensurePaymentOptimistic(businessId: string, operationId: string):
     const next = subCop(customer.debt, payment.amount);
     await db.customers.put({
       ...customer,
-      debt: next < 0 ? 0 : next,
+      // C01 / DC-15 — exact delta, no clamp: a later revert must land on the true prior debt.
+            debt: next,
       updatedAt: Date.now(),
     });
   }
@@ -239,7 +219,7 @@ export async function syncPendingPayments(businessId: string) {
       }
       await ensurePaymentOptimistic(businessId, item.operationId);
       const current = await getLocalDb().outbox.get(item.operationId);
-      const payload = (current?.payload ?? item.payload) as CreatePaymentInput;
+      const payload = (current?.payload ?? item.payload) as CreatePaymentInput & { occurredAt?: string };
       try {
         return {
           remoteId: (
@@ -249,15 +229,15 @@ export async function syncPendingPayments(businessId: string) {
                 amount: payload.amount,
                 method: payload.method,
                 ...(payload.note ? { note: payload.note } : {}),
+                ...(payload.occurredAt ? { occurredAt: payload.occurredAt } : {}),
               },
               item.requestId,
             )
           ).id,
         };
       } catch (error) {
-        if (isPermanentDebtRejection(error)) {
-          await revertOptimisticPayment(businessId, item.operationId);
-        }
+        // C01 / DC-01 — a permanent rejection keeps the local record and its effect
+        // («Rechazada») until the owner retries, corrects or discards it.
         throw error;
       }
     },

@@ -312,6 +312,9 @@ export type LocalCashSession = {
   difference: number | null;
   closeMode?: string | null;
   carriedEfectivo?: number;
+  /** C01 — closed with N rejected money operations unresolved («Cerrar igual»). */
+  unresolvedCount?: number | null;
+  unresolvedAmount?: number | null;
   note: string | null;
   createdAt: number;
   updatedAt: number;
@@ -358,6 +361,8 @@ export type LocalCustomerPayment = {
   note: string | null;
   occurredOn: string;
   createdAt: number;
+  /** C01/C03 — device time the money was received (epoch ms). */
+  occurredAt?: number;
 };
 
 export type LocalInitialDebt = {
@@ -392,4 +397,33 @@ export type OutboxItem = {
    * Optional, not indexed: no Dexie schema change.
    */
   discardedDependency?: { label: string; local: boolean } | null;
+  /**
+   * C01 — permanent server rejection metadata (not indexed). The local
+   * effect is kept until the owner retries, corrects or discards.
+   */
+  rejection?: { code: string | null; at: number } | null;
+  /** C01 — this operation was saved as the correction of another one. */
+  replaces?: string | null;
+};
+
+/**
+ * C01 / DC-14 — Audit trail of an outbox operation the owner discarded or
+ * replaced with a correction. Never deleted by the app.
+ */
+export type LocalDiscardedOp = {
+  id: string;
+  operationId: string;
+  businessId: string;
+  entity: OutboxEntity;
+  operation: OutboxOperation;
+  requestId: string;
+  payload: unknown;
+  amount: number | null;
+  customerId: string | null;
+  lastError: string | null;
+  rejectionCode: string | null;
+  state: "discarded" | "replaced";
+  replacedBy: string | null;
+  localCreatedAt: number;
+  discardedAt: number;
 };
