@@ -205,7 +205,12 @@ export default function VentasPage() {
                           {meta ? <span>{meta}</span> : null}
                           <span className="flex flex-wrap gap-1.5">
                             <Badge tone={kindTone(s.paymentKind)}>{kindLabel[s.paymentKind] ?? s.paymentKind}</Badge>
-                            {s.pending && <PendingBadge />}
+                            {s.syncState === "rejected" ? (
+                              <Badge tone="danger" data-testid="sale-rejected-badge">! Rechazada</Badge>
+                            ) : s.pending ? (
+                              <PendingBadge />
+                            ) : null}
+                            {s.localRef ? <span className="text-xs text-ink-muted">Ref. local {s.localRef}</span> : null}
                           </span>
                         </span>
                       }

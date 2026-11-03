@@ -13,6 +13,7 @@ import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { listCachedCustomers, listCachedProducts } from "@/data/pwa/catalog";
 import { useCart } from "@/store/cartStore";
+import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { CustomerPicker } from "@/components/customers/CustomerPicker";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { HeroAmount } from "@/components/ui/HeroAmount";
@@ -68,6 +69,7 @@ export default function CobrarPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
+  const rejected = useRejectedCorrection();
 
   useEffect(() => {
     void listCachedProducts()
@@ -145,7 +147,12 @@ export default function CobrarPage() {
           ? "Venta guardada en este dispositivo · se sincronizará automáticamente."
           : "Venta registrada",
       );
-      setTimeout(() => navigateOfflineAware(router, "/"), 700);
+      // C01.1 — «Registrar de nuevo»: the rejected original becomes «Reemplazada por» this sale.
+      rejected.afterSave(
+        () => navigateOfflineAware(router, "/"),
+        700,
+        result.mode === "online" ? result.sale.id : result.saleId,
+      );
     } catch (e) {
       setError(errorText(e, "Error al registrar venta"));
       setBusy(false);
@@ -271,6 +278,7 @@ export default function CobrarPage() {
           {toast}
         </div>
       )}
+      {rejected.dialog}
     </div>
   );
 }

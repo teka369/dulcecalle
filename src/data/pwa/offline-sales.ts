@@ -1,3 +1,5 @@
+import type { OutboxItem } from "@/data/local/types";
+import { localRef } from "./local-ref";
 import { ApiError, NetworkError } from "../errors";
 import type { CreateSaleInput } from "../http/repository";
 import type { RemoteReturn, RemoteSaleLine } from "../http/mappers";
@@ -20,14 +22,32 @@ export type CreateSaleResult =
   | { mode: "online"; sale: RemoteSale }
   | { mode: "offline"; saleId: string };
 
-export type LocalSaleRow = RemoteSale & { pending: boolean };
+export type LocalSaleRow = RemoteSale & {
+  pending: boolean;
+  /** C01.1 — «Pendiente» or «Rechazada» (permanent rejection) for an unsynced local sale. */
+  syncState?: "pending" | "rejected";
+  /** C01.1 — server reason of the rejection. */
+  rejectionReason?: string | null;
+  /** C01.1 — local ref `L-AAMMDD-XXXX` of an unsynced sale (UX-C01 A6). */
+  localRef?: string;
+};
 
 function localSaleToRow(
   sale: LocalSale,
   lines: LocalSaleLine[],
-  pending: boolean,
+  pendingOrOp: boolean | OutboxItem | undefined,
 ): LocalSaleRow {
+  const op = typeof pendingOrOp === "object" ? pendingOrOp : undefined;
+  const pending = typeof pendingOrOp === "boolean" ? pendingOrOp : !!op && op.entity === "sale" && op.status !== "synced";
+  const rejected = !!op && pending && op.status === "failed" && op.nextAttemptAt == null;
   return {
+    ...(pending
+      ? {
+          syncState: rejected ? ("rejected" as const) : ("pending" as const),
+          localRef: localRef(sale.id, op?.localCreatedAt ?? sale.createdAt),
+          ...(rejected ? { rejectionReason: op?.lastError ?? null } : {}),
+        }
+      : {}),
     id: sale.id,
     customerId: sale.customerId,
     paymentKind: sale.paymentKind,
@@ -51,10 +71,6 @@ function localSaleToRow(
   };
 }
 
-async function salePending(businessId: string, saleId: string): Promise<boolean> {
-  const op = await getOutboxStore().get(businessId, saleId);
-  return !!op && op.entity === "sale" && op.status !== "synced";
-}
 
 /**
  * Local-first sales read for offline lists/detail. Reads the same Dexie
@@ -69,7 +85,7 @@ export async function listLocalSales(businessId: string): Promise<LocalSaleRow[]
     const op = await getOutboxStore().get(businessId, sale.id);
     if (op && op.entity === "sale" && isSuppressedLocalEffect(op)) continue;
     const lines = await db.saleLines.where("[businessId+saleId]").equals([businessId, sale.id]).toArray();
-    rows.push(localSaleToRow(sale, lines, !!op && op.entity === "sale" && op.status !== "synced"));
+    rows.push(localSaleToRow(sale, lines, op && op.entity === "sale" ? op : false));
   }
   return rows;
 }
@@ -82,7 +98,8 @@ export async function getLocalSale(
   const sale = await getLocalStoreSafe(businessId, saleId);
   if (!sale) return undefined;
   const lines = await db.saleLines.where("[businessId+saleId]").equals([businessId, sale.id]).toArray();
-  return localSaleToRow(sale, lines, await salePending(businessId, sale.id));
+  const op = await getOutboxStore().get(businessId, sale.id);
+  return localSaleToRow(sale, lines, op && op.entity === "sale" ? op : false);
 }
 
 async function getLocalStoreSafe(businessId: string, saleId: string) {
@@ -442,6 +459,23 @@ export type SaleDetailResult = {
 export async function getSaleDetailWithOfflineFallback(
   saleId: string,
 ): Promise<SaleDetailResult | null> {
+  // C01.1 — a sale still in the outbox (pending or «Rechazada») only exists on
+  // this phone under its local id: read it locally, never ask the server.
+  const owner = getPwaAuthSession().businessId;
+  if (owner) {
+    const op = await getOutboxStore().get(owner, saleId);
+    if (op && op.entity === "sale" && op.status !== "synced") {
+      const local = await loadLocalReturnable(owner, saleId);
+      const row = await getLocalSale(owner, saleId);
+      if (local && row) {
+        return {
+          ...local,
+          sale: { ...local.sale, syncState: row.syncState, rejectionReason: row.rejectionReason, localRef: row.localRef },
+        } as SaleDetailResult;
+      }
+      if (local) return local;
+    }
+  }
   try {
     const found = await getHttpReturnable(saleId);
     if (found) {
