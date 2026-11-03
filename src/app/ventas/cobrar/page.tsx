@@ -14,6 +14,7 @@ import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
 import { listCachedCustomers, listCachedProducts } from "@/data/pwa/catalog";
 import { useCart } from "@/store/cartStore";
 import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
+import { payloadBoundRequestId, type PayloadBoundId } from "@/domain/requestId";
 import { CustomerPicker } from "@/components/customers/CustomerPicker";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { HeroAmount } from "@/components/ui/HeroAmount";
@@ -68,7 +69,8 @@ export default function CobrarPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const requestIdRef = useRef<string | null>(null);
+  // C02 / NEW-02 — the requestId is bound to the sale payload.
+  const requestIdRef = useRef<PayloadBoundId>(null);
   const rejected = useRejectedCorrection();
 
   useEffect(() => {
@@ -140,11 +142,9 @@ export default function CobrarPage() {
     setBusy(true);
     setError(null);
     try {
-      if (!requestIdRef.current) requestIdRef.current = crypto.randomUUID();
-      const result = await createSaleWithOfflineFallback(
-        buildSaleRequest(state, lines, note),
-        requestIdRef.current,
-      );
+      const request = buildSaleRequest(state, lines, note);
+      requestIdRef.current = payloadBoundRequestId(requestIdRef.current, JSON.stringify(request));
+      const result = await createSaleWithOfflineFallback(request, requestIdRef.current.id);
       // C01.3 — open the discard dialog before clear() so a store emit after
       // this await cannot navigate away with pending still false.
       rejected.afterSave(

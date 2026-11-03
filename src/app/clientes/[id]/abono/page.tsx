@@ -21,6 +21,7 @@ import { HeroBlock } from "@/components/ui/HeroBlock";
 import { Sheet } from "@/components/ui/Sheet";
 import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { usePrefill } from "@/components/ui/use-prefill";
+import { payloadBoundRequestId, type PayloadBoundId } from "@/domain/requestId";
 import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
@@ -45,6 +46,8 @@ export default function RegistrarAbonoPage() {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingSync, setPendingSync] = useState(false);
+  // C02 / NEW-01 — the requestId is bound to the payload (see payloadBoundRequestId).
+  const boundIdRef = useRef<PayloadBoundId>(null);
   const requestIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
@@ -109,9 +112,11 @@ export default function RegistrarAbonoPage() {
     }
     setBusy(true);
     try {
-      if (!requestIdRef.current) {
-        requestIdRef.current = crypto.randomUUID();
-      }
+      boundIdRef.current = payloadBoundRequestId(
+        boundIdRef.current,
+        JSON.stringify({ customerId: customer.id, amount: amountRaw.replace(/\D/g, ""), method }),
+      );
+      requestIdRef.current = boundIdRef.current.id;
       const result = await customerStore.recordAbono({
         customerId: customer.id,
         amountRaw,
