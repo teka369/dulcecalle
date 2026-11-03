@@ -103,7 +103,13 @@ async function replayInOrder(
   const queue = [
     ...(await store.listByStatus(businessId, "pending")),
     ...(await store.listByStatus(businessId, "failed")).filter((r) => r.nextAttemptAt != null && r.nextAttemptAt <= now),
-  ].sort((a, b) => a.localCreatedAt - b.localCreatedAt || a.operationId.localeCompare(b.operationId));
+  ].sort(
+    (a, b) =>
+      // C012-INV-01 — server traces (clientEvent) replay after every money op.
+      Number(a.entity === "clientEvent") - Number(b.entity === "clientEvent") ||
+      a.localCreatedAt - b.localCreatedAt ||
+      a.operationId.localeCompare(b.operationId),
+  );
   for (const item of queue) {
     const step = stepForItem(item);
     const flush = step ? run.get(step) : undefined;

@@ -417,6 +417,9 @@ export function isAuthRequiredError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
 }
 
+/** C012-INV-01 — after this many attempts a trace becomes a visible permanent failure. */
+export const CLIENT_EVENT_MAX_ATTEMPTS = 8;
+
 function isRetryableError(error: unknown): boolean {
   if (error instanceof NetworkError) return true;
   if (error instanceof ApiError) {
@@ -553,6 +556,9 @@ export class OutboxSyncEngine {
       .filter((row) => !filter || filter(row))
       .filter((row) => this.only == null || row.operationId === this.only)
       .sort((a, b) => {
+      // C012-INV-01 — server traces go last: they never hold back money ops.
+      const trace = Number(a.entity === "clientEvent") - Number(b.entity === "clientEvent");
+      if (trace !== 0) return trace;
       if (a.localCreatedAt !== b.localCreatedAt) {
         return a.localCreatedAt - b.localCreatedAt;
       }
@@ -621,13 +627,15 @@ export class OutboxSyncEngine {
           // C01.2 / C011-INV-02 — a server trace (clientEvent) must not die on a
           // transient 4xx (403 role/session, 409, 429…): keep retrying with
           // backoff. Only a validation 400 stays a visible permanent failure.
+          const capped = current.entity === "clientEvent" && flying.attempts >= CLIENT_EVENT_MAX_ATTEMPTS;
           const retryable =
-            isRetryableError(error) ||
+            !capped &&
+            (isRetryableError(error) ||
             (current.entity === "clientEvent" &&
               error instanceof ApiError &&
               error.status >= 400 &&
               error.status < 500 &&
-              error.code !== "VALIDATION");
+              error.code !== "VALIDATION"));
           const message = error instanceof Error ? error.message : "Error de sincronización.";
           await this.outbox.markFailed(
             businessId,
@@ -647,7 +655,8 @@ export class OutboxSyncEngine {
             total: rows.length,
             message,
           });
-          if (retryable || (error instanceof ApiError && error.status === 403)) {
+          // C012-INV-01 — a failing trace never stops the run.
+          if (current.entity !== "clientEvent" && (retryable || (error instanceof ApiError && error.status === 403))) {
             stopped = true;
             break;
           }
