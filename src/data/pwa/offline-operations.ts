@@ -1,3 +1,4 @@
+import type { RemoteClientEventInput } from "@/data/http/repository";
 import { formatCop } from "@/domain/money";
 import { listUnresolvedFinancialOps, unresolvedTotals } from "./unresolved-financial";
 import { deriveRequestId } from "@/domain/requestId";
@@ -935,6 +936,14 @@ export async function syncPendingOperations(business: string) {
           throw error;
         }
       }
+      if (item.entity === "clientEvent" && item.operation === "record") {
+        // C01.1 / C01-INV-04 — idempotent on the server per (operationId, kind).
+        const remote = await getPwaApi().audit.record(
+          item.payload as RemoteClientEventInput,
+          item.requestId,
+        );
+        return { remoteId: remote.id };
+      }
       if (item.entity === "cashSession" && item.operation === "close") {
         const payload = item.payload as {
           sessionId: string;
@@ -1045,7 +1054,8 @@ export async function syncPendingOperations(business: string) {
       item.entity === "cashSession" ||
       item.entity === "cashMove" ||
       item.entity === "expense" ||
-      item.entity === "stockMove",
+      item.entity === "stockMove" ||
+      item.entity === "clientEvent",
   );
 }
 

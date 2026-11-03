@@ -106,7 +106,9 @@ export type OutboxEntity =
   | "stockMove"
   | "cashSession"
   | "cashMove"
-  | "expense";
+  | "expense"
+  /** C01.1 — server trace of a rejection/discard; never discardable. */
+  | "clientEvent";
 
 export type OutboxOperation =
   | "create"
@@ -120,7 +122,8 @@ export type OutboxOperation =
   | "assign"
   | "pay"
   | "remove"
-  | "return";
+  | "return"
+  | "record";
 
 export type LocalProductImage = {
   id: string;
