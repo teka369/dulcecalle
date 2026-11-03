@@ -1,3 +1,4 @@
+import { assertSamePayload, payloadHash } from "../shared/payload-hash";
 import { Injectable } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
@@ -100,11 +101,23 @@ export class SalesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(ctx: BusinessContext, dto: CreateSaleDto, requestId: string) {
+    // C02 / DC-13 — the key is bound to the sale payload (lines in order).
+    const hash = payloadHash({
+      lines: (dto.lines ?? []).map((l) => [l.productId, l.qty, l.unitPrice ?? null]),
+      paymentKind: dto.paymentKind,
+      customerId: dto.customerId ?? null,
+      amountReceived: String(dto.amountReceived),
+      method: dto.method ?? null,
+      note: dto.note ?? null,
+    });
     const existing = await this.prisma.sale.findUnique({
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
       include: { lines: true },
     });
-    if (existing) return saleJson(existing);
+    if (existing) {
+      assertSamePayload(existing.payloadHash, hash);
+      return saleJson(existing);
+    }
 
     if (!dto.lines?.length) {
       throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.emptySale);
@@ -217,6 +230,7 @@ export class SalesService {
             amountReceived,
             credit,
             requestId,
+            payloadHash: hash,
             note: dto.note,
             occurredOn,
             createdAt: now,
@@ -315,7 +329,10 @@ export class SalesService {
           },
           include: { lines: true },
         });
-        if (again) return saleJson(again);
+        if (again) {
+          assertSamePayload(again.payloadHash, hash);
+          return saleJson(again);
+        }
       }
       throw e;
     }

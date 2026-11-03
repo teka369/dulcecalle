@@ -1,3 +1,4 @@
+import { assertSamePayload, payloadHash } from "../shared/payload-hash";
 import { Injectable } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
@@ -397,10 +398,24 @@ export class CashService {
     dto: CreatePaymentDto,
     requestId: string,
   ) {
+    // C02 / DC-13 — the key is bound to (customer, amount, method, note).
+    const hash = payloadHash({
+      customerId,
+      amount: String(dto.amount),
+      method: dto.method,
+      note: dto.note ?? null,
+    });
+    const replay = (row: { payloadHash: string | null; customerId: string; amount: bigint; method: string }) => {
+      if (row.payloadHash != null) assertSamePayload(row.payloadHash, hash);
+      else if (row.customerId !== customerId || row.amount !== BigInt(dto.amount) || row.method !== dto.method) {
+        assertSamePayload("legacy-mismatch", hash);
+      }
+    };
     const existing = await this.prisma.customerPayment.findUnique({
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
     });
     if (existing) {
+      replay(existing);
       return paymentJson(existing);
     }
 
@@ -444,6 +459,7 @@ export class CashService {
             occurredOn,
             occurredAt,
             needsReview,
+            payloadHash: hash,
             createdAt: now,
           },
         });
@@ -490,6 +506,7 @@ export class CashService {
           },
         });
         if (again) {
+          replay(again);
           return paymentJson(again);
         }
       }
