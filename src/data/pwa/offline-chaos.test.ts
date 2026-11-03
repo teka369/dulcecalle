@@ -249,7 +249,12 @@ describe("offline chaos and financial consistency", () => {
     expect(listed.data[0]?.debt).toBe(120_000);
     const statement = await getStatementWithOfflineFallback(customerId);
     expect(statement?.statement.entries.some((entry) => entry.kind === "inicial")).toBe(true);
-    const [op] = await getLocalDb().outbox.where("businessId").equals(BIZ).toArray();
+    // C01.2 / C011-INV-01 — the rejection also queues a clientEvent trace row;
+    // pick the initial-debt op itself (clientEvent rows cannot be discarded).
+    const op = (await getLocalDb().outbox.where("businessId").equals(BIZ).toArray()).find(
+      (row) => row.entity !== "clientEvent",
+    );
+    expect(op?.entity).toBe("initialDebt");
     if (op) await discardOutboxOperation(BIZ, op.operationId);
     const after = await cache.listCustomers(BIZ, async () => [{
       id: customerId, code: "DC-0001", name: "Ana", phone: null, debt: 100_000, archivedAt: null, createdAt: 1,
