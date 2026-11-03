@@ -1,0 +1,1446 @@
+
+> dulcecalle-backend@0.1.0 pretest
+> prisma generate
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 175ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+
+
+> dulcecalle-backend@0.1.0 test
+> jest --runInBand --forceExit
+
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-40363-ZVaEcH ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-40363-ZVaEcH -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:40363"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-43987-xIcQ4b ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-43987-xIcQ4b -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:43987"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-43963-caV9Cz ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-43963-caV9Cz -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:43963"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-37319-JzuJU9 ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-37319-JzuJU9 -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:37319"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-40577-nZBXLH ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-40577-nZBXLH -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:40577"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-33813-nD3mN5 ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-33813-nD3mN5 -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:33813"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-36241-rW2B5W ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-36241-rW2B5W -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:36241"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-33329-AnBm4U ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-33329-AnBm4U -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:33329"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-43637-ZMPo1K ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-43637-ZMPo1K -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:43637"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+[Nest] 78253  - 11/03/2026, 9:46:41 AM    WARN [BusinessData] reset cloudinary cleanup failed: business=[REDACTED] assets=1 error=cloudinary down
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-41403-gRHSGa ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-41403-gRHSGa -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:41403"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-40297-NPIjIH ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-40297-NPIjIH -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:40297"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+[Nest] 78253  - 11/03/2026, 9:46:47 AM   ERROR [HttpError] Error: boom
+    at Object.<anonymous> (/workspace/deep-audit/dev/dulcecalle/backend/src/shared/http/param-validation.unit-spec.ts:132:16)
+    at Promise.finally.completed (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:1834:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:1774:10)
+    at _callCircusTest (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:1167:40)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at _runTestInContext (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:1103:3)
+    at runTestWithContext (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:996:5)
+    at _runTestsForDescribeBlockOnce (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:1008:11)
+    at _runTestsForDescribeBlock (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at _runTestsForDescribeBlockOnce (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:1003:11)
+    at _runTestsForDescribeBlock (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at run (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:789:3)
+    at runAndTransformResultsToJestFormat (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/jestAdapterInit.js:2300:21)
+    at jestAdapter (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-circus/build/runner.js:111:19)
+    at runTestInternal (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-runner/build/index.js:247:16)
+    at runTest (/workspace/deep-audit/dev/dulcecalle/backend/node_modules/jest-runner/build/index.js:315:7)
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-42141-eoxwqR ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-42141-eoxwqR -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:42141"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-44845-uBVgkl ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-44845-uBVgkl -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:44845"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-41925-dScXCz ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-41925-dScXCz -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:41925"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-41625-BDPZe1 ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-41625-BDPZe1 -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:41625"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-39765-MH02Zu ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-39765-MH02Zu -l logfile start
+
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-46065-nsjSKy ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-46065-nsjSKy -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:46065"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-41387-ssp6aC ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-41387-ssp6aC -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:41387"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-43559-UESRi6 ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-43559-UESRi6 -l logfile start
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "dulcecalle_test", schema "public" at "127.0.0.1:43559"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+waiting for server to shut down.... done
+server stopped
+The files belonging to this database system will be owned by user "sand-host".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /tmp/dc-pg-42053-O5lUEB ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Bogota
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/workspace/deep-audit/dev/dulcecalle/backend/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/dc-pg-42053-O5lUEB -l logfile start
+
+waiting for server to shut down.... done
+server stopped
+
+Test Suites: 1 skipped, 37 passed, 37 of 38 total
+Tests:       1 skipped, 270 passed, 271 total
+Snapshots:   0 total
+Time:        92.01 s
+Ran all test suites.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+exit 0

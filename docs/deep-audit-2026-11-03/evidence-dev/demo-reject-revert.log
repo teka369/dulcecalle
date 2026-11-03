@@ -1,0 +1,13 @@
+
+ RUN  v3.2.4 /workspace/deep-audit/dev/dulcecalle
+
+stdout | src/data/local/zz-audit-d3-reject.test.ts > AUDIT D3 rechazo abono offline (p.ej. 409 CLOSED_DAY / ABONO_EXCEEDS_DEBT) > revierte deuda y borra cashMove debt_collect
+deuda tras rechazo: 10000 cashMoves: 0 fila abono local existe: true
+
+ ✓ src/data/local/zz-audit-d3-reject.test.ts (1 test) 38ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  09:48:59
+   Duration  403ms (transform 106ms, setup 28ms, collect 118ms, tests 38ms, environment 0ms, prepare 67ms)
+

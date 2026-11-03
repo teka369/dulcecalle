@@ -1,0 +1,3 @@
+customer Ana debt 1500
+abono after day closed: 409 {"error":{"code":"CLOSED_DAY","message":"No se puede editar el día."}}
+initial-debt after day closed: 201

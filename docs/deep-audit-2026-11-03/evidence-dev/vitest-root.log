@@ -1,0 +1,215 @@
+
+ RUN  v3.2.4 /workspace/deep-audit/dev/dulcecalle
+
+ ✓ src/data/pwa/offline-combo-kind.test.ts (12 tests) 332ms
+ ✓ src/data/pwa/offline-operations.test.ts (27 tests) 589ms
+ ✓ src/data/pwa/offline-chaos.test.ts (11 tests) 424ms
+ ✓ src/data/pwa/offline-debt-m71.test.ts (12 tests) 475ms
+ ✓ src/domain/__tests__/p0-integrity.test.ts (23 tests) 350ms
+ ✓ src/data/pwa/sync-ux.test.ts (17 tests) 396ms
+ ✓ src/data/pwa/offline-prep.test.ts (19 tests) 618ms
+ ✓ src/data/pwa/origin-storage.test.ts (17 tests) 30ms
+ ✓ src/data/pwa/product-images.test.ts (14 tests) 289ms
+ ✓ src/data/pwa/offline-production.test.ts (14 tests) 300ms
+ ✓ src/data/http/client.test.ts (13 tests) 64ms
+ ✓ src/data/pwa/r2a-a1-optimistic-revert.test.ts (3 tests) 172ms
+ ✓ src/data/pwa/offline-catalog.test.ts (16 tests) 366ms
+ ✓ src/data/pwa/offline-returns.test.ts (8 tests) 370ms
+ ✓ src/data/local/outbox.test.ts (11 tests) 254ms
+stdout | src/theme/contrast.test.ts > WCAG AA contrast from globals.css tokens > toasts: text-bg on bg-ink reaches AA in every theme/mode
+amber:light #fff9f2 on #3b241c = 13.80
+amber:dark #0f1117 on #f3eee8 = 16.36
+ocean:light #f3f8fc on #1c2e3b = 13.07
+ocean:dark #0f1117 on #f3eee8 = 16.36
+emerald:light #f3f8f4 on #1e3328 = 12.53
+emerald:dark #0f1117 on #f3eee8 = 16.36
+violet:light #f7f4fb on #2c2438 = 13.62
+violet:dark #0f1117 on #f3eee8 = 16.36
+rose:light #fdf6f6 on #3a2428 = 13.46
+rose:dark #0f1117 on #f3eee8 = 16.36
+slate:light #f4f6f8 on #1f2933 = 13.62
+slate:dark #0f1117 on #f3eee8 = 16.36
+cacao:light #1c1310 on #f6ebe1 = 15.56
+menta:light #f2faf6 on #12352a = 12.61
+mora:light #faf6fb on #2b1633 = 15.52
+contraste:light #ffffff on #000000 = 21.00
+
+stdout | src/theme/contrast.test.ts > WCAG AA contrast from globals.css tokens > PrepModal «Preparación incompleta» card: body text on danger-soft reaches AA (muted was <4.5)
+amber:light ink 11.81 muted(before) 4.63 danger 4.70
+amber:dark ink 12.96 muted(before) 6.12 danger 5.40
+ocean:light ink 11.44 muted(before) 4.29 danger 4.70
+ocean:dark ink 12.96 muted(before) 6.12 danger 5.40
+emerald:light ink 11.02 muted(before) 4.42 danger 4.70
+emerald:dark ink 12.96 muted(before) 6.12 danger 5.40
+violet:light ink 12.14 muted(before) 4.78 danger 4.70
+violet:dark ink 12.96 muted(before) 6.12 danger 5.40
+rose:light ink 11.75 muted(before) 4.42 danger 4.70
+rose:dark ink 12.96 muted(before) 6.12 danger 5.40
+slate:light ink 12.08 muted(before) 4.87 danger 4.70
+slate:dark ink 12.96 muted(before) 6.12 danger 5.40
+cacao:light ink 12.73 muted(before) 6.99 danger 6.55
+menta:light ink 11.07 muted(before) 4.92 danger 5.44
+mora:light ink 13.72 muted(before) 5.28 danger 5.44
+contraste:light ink 16.66 muted(before) 10.02 danger 6.51
+
+stdout | src/theme/contrast.test.ts > WCAG AA contrast from globals.css tokens > H2: Inicio «Te deben» amount (text-danger on surface) reaches AA
+amber:light danger 5.74 accent(before) 2.72
+amber:dark danger 6.08 accent(before) 6.19
+ocean:light danger 5.74 accent(before) 4.22
+ocean:dark danger 6.08 accent(before) 3.99
+emerald:light danger 5.74 accent(before) 4.22
+emerald:dark danger 6.08 accent(before) 3.99
+violet:light danger 5.74 accent(before) 4.22
+violet:dark danger 6.08 accent(before) 3.99
+rose:light danger 5.74 accent(before) 4.22
+rose:dark danger 6.08 accent(before) 3.99
+slate:light danger 5.74 accent(before) 4.22
+slate:dark danger 6.08 accent(before) 3.99
+cacao:light danger 7.15 accent(before) 7.56
+menta:light danger 6.57 accent(before) 5.63
+mora:light danger 6.57 accent(before) 5.11
+contraste:light danger 8.21 accent(before) 8.01
+
+ ✓ src/theme/contrast.test.ts (22 tests) 28ms
+ ✓ src/data/pwa/offline-catalog-create-product.test.ts (11 tests) 201ms
+ ✓ src/domain/__tests__/s4-caja.test.ts (10 tests) 144ms
+ ✓ src/domain/__tests__/f3-devoluciones.test.ts (11 tests) 214ms
+ ✓ src/data/http/offline-session.test.ts (7 tests) 26ms
+ ✓ src/data/local/read-cache.test.ts (13 tests) 302ms
+ ✓ src/domain/__tests__/f2-dia-real.test.ts (4 tests) 132ms
+ ✓ src/components/shell/auth-gate.test.ts (11 tests) 15ms
+ ✓ src/data/pwa/business-reset.test.ts (8 tests) 183ms
+ ✓ src/data/pwa/offline-routes.test.ts (24 tests) 17ms
+ ✓ src/data/pwa/offline-catalog-patch.test.ts (11 tests) 211ms
+ ✓ src/data/pwa/offline-prep-deps.test.ts (4 tests) 149ms
+ ✓ src/data/pwa/offline-surtir-supplier.test.ts (5 tests) 149ms
+ ✓ src/domain/__tests__/initial-debt.test.ts (10 tests) 124ms
+ ✓ src/data/pwa/r2a-a3-online-pending.test.ts (2 tests) 107ms
+ ✓ src/data/pwa/offline-snapshots.test.ts (10 tests) 211ms
+ ✓ src/data/pwa/offline-references.test.ts (7 tests) 228ms
+ ✓ src/data/pwa/portal-branding.test.ts (9 tests) 39ms
+ ✓ src/components/ui/primitives.test.ts (14 tests) 53ms
+ ✓ src/domain/money/r2b-m1-price-inputs.test.ts (6 tests) 28ms
+ ✓ src/data/local/outbox-recovery.test.ts (11 tests) 203ms
+ ✓ src/domain/dashboard/snapshot.test.ts (11 tests) 18ms
+ ✓ src/data/pwa/sync-coordinator.test.ts (4 tests) 227ms
+ ✓ src/data/pwa/offline-lists.test.ts (11 tests) 210ms
+ ✓ src/repositories/dashboardRepository.test.ts (6 tests) 184ms
+ ✓ src/domain/__tests__/s5-stats.test.ts (6 tests) 117ms
+ ✓ src/data/http/session.test.ts (12 tests) 8ms
+ ✓ src/data/local/outbox-orphan-local.test.ts (6 tests) 174ms
+ ✓ src/data/http/repository-contracts.test.ts (6 tests) 23ms
+ ✓ src/domain/__tests__/f45-gifted-stock.test.ts (7 tests) 110ms
+ ✓ src/data/local/read-cache-pending.test.ts (6 tests) 160ms
+ ✓ src/data/pwa/customer-ledger-cache.test.ts (10 tests) 207ms
+ ✓ src/data/local/db-migration.test.ts (1 test) 70ms
+ ✓ src/data/http/client-timeout.test.ts (9 tests) 28ms
+ ✓ src/domain/__tests__/s2-abono.test.ts (9 tests) 151ms
+ ✓ src/components/sale/checkout.test.ts (11 tests) 11ms
+ ✓ src/domain/__tests__/s3-inventario.test.ts (6 tests) 149ms
+ ✓ src/data/pwa/offline-initial-debt.test.ts (4 tests) 120ms
+ ✓ src/domain/debt/statement.test.ts (5 tests) 8ms
+ ✓ src/data/pwa/offline-history.test.ts (5 tests) 154ms
+ ✓ src/components/cash/cash.test.ts (17 tests) 6ms
+ ✓ src/data/http/customer-session.test.ts (9 tests) 5ms
+ ✓ src/store/prepStore.test.ts (8 tests) 195ms
+ ✓ src/data/http/mappers.test.ts (7 tests) 7ms
+ ✓ src/data/pwa/offline-readers.test.ts (5 tests) 104ms
+ ✓ src/data/local/outbox-orphan.test.ts (4 tests) 131ms
+ ✓ src/data/http/customer-api.test.ts (4 tests) 28ms
+ ✓ src/app/p6-hardening.test.ts (14 tests) 26ms
+ ✓ src/store/cashStore-source.test.ts (6 tests) 66ms
+ ✓ src/components/customer/portal.test.ts (11 tests) 14ms
+ ✓ src/data/pwa/sync-leader.test.ts (6 tests) 183ms
+ ✓ src/data/http/repository-images.test.ts (2 tests) 14ms
+ ✓ src/domain/ux/user-message.test.ts (5 tests) 13ms
+ ✓ src/data/pwa/sync-tray.test.ts (4 tests) 113ms
+ ✓ src/data/media/media.test.ts (7 tests) 5ms
+ ✓ src/data/preflight.test.ts (2 tests) 10ms
+ ✓ src/theme/palettes.test.ts (10 tests) 54ms
+ ✓ src/domain/inventory/validate.test.ts (9 tests) 5ms
+ ✓ src/components/shell/OfflineLink.entity.test.ts (6 tests) 6ms
+ ✓ src/data/local/store.test.ts (5 tests) 132ms
+ ✓ src/components/customers/clientes.test.ts (10 tests) 21ms
+ ✓ src/components/customer/portal-reconcile.test.ts (5 tests) 4ms
+ ✓ src/storage/canonical.test.ts (7 tests) 31ms
+ ✓ src/data/pwa/customer-cache-ownership.test.ts (6 tests) 128ms
+ ✓ src/data/pwa/product-image-map.test.ts (5 tests) 153ms
+ ✓ src/domain/__tests__/day1-metrics.test.ts (1 test) 68ms
+ ✓ src/components/inventory/inventory.test.ts (12 tests) 11ms
+ ✓ src/store/cartStore.test.ts (6 tests) 10ms
+ ✓ src/data/pwa/customer-portal.test.ts (3 tests) 5ms
+ ✓ src/components/dashboard/week-source.test.ts (7 tests) 120ms
+ ✓ src/data/http/repository-production.test.ts (2 tests) 7ms
+ ✓ src/data/pwa/sync-correction.test.ts (5 tests) 11ms
+ ✓ src/components/sale/sales-list.test.ts (7 tests) 6ms
+ ✓ src/data/identity.test.ts (6 tests) 7ms
+ ✓ src/data/pwa/offline-sales.test.ts (4 tests) 48ms
+ ✓ src/data/pwa/customer-catalog-cache.test.ts (4 tests) 88ms
+ ✓ src/store/list-status-stores.test.ts (2 tests) 155ms
+ ✓ src/storage/snapshot.test.ts (1 test) 68ms
+ ✓ src/domain/dashboard/week.test.ts (6 tests) 19ms
+ ✓ src/data/pwa/offline-nav.test.ts (4 tests) 4ms
+ ✓ src/data/pwa/prep-stats-timeout.test.ts (4 tests) 77ms
+ ✓ src/store/cashStore-slow-api.test.ts (1 test) 67ms
+ ✓ src/data/pwa/prep-fifo.test.ts (1 test) 99ms
+ ✓ src/data/pwa/dashboard-result.test.ts (4 tests) 8ms
+ ✓ src/data/http/jwt-exp.test.ts (5 tests) 3ms
+ ✓ src/domain/__tests__/demo-inicio.test.ts (4 tests) 107ms
+ ✓ src/data/local/db-combo-kind.test.ts (1 test) 50ms
+ ✓ src/data/pwa/list-status.test.ts (3 tests) 3ms
+ ✓ src/components/shell/sync-items.test.ts (1 test) 135ms
+ ✓ src/components/shell/r2b-m5-session-expiry-logout.test.ts (2 tests) 17ms
+ ✓ src/data/http/repository-pay.test.ts (1 test) 8ms
+ ✓ src/data/pwa/entity-href.test.ts (2 tests) 7ms
+ ✓ src/components/shell/OfflineLink.test.ts (3 tests) 5ms
+ ✓ src/data/local/read-cache-peek.test.ts (3 tests) 113ms
+ ✓ src/domain/money/amount-input.test.ts (5 tests) 3ms
+ ✓ src/repositories/customerStatement.test.ts (2 tests) 36ms
+ ✓ src/data/pwa/offline-nav-guard.test.ts (2 tests) 18ms
+ ✓ src/components/shell/prep-copy.test.ts (4 tests) 8ms
+ ✓ src/components/cash/r2b-m2-gastos-offline.test.ts (2 tests) 60ms
+ ✓ src/data/pwa/assign-network-copy.test.ts (2 tests) 82ms
+ ✓ src/data/pwa/last-completed-sync.test.ts (3 tests) 4ms
+ ✓ src/components/shell/entity-route.test.ts (3 tests) 15ms
+ ✓ src/components/cash/gestionar-detail.test.ts (5 tests) 6ms
+ ✓ src/components/ui/skeleton-h1.test.ts (3 tests) 19ms
+ ✓ src/data/pwa/prep-sw-wait.test.ts (3 tests) 11ms
+ ✓ src/store/hero-first-paint.test.ts (2 tests) 212ms
+ ✓ src/domain/money/money-limits.test.ts (2 tests) 6ms
+ ✓ src/domain/abono/validate.test.ts (6 tests) 17ms
+ ✓ src/data/http/page-all.test.ts (2 tests) 5ms
+ ✓ src/data/pwa/statement.test.ts (1 test) 6ms
+ ✓ src/components/cash/caja-offline-copy.test.ts (3 tests) 3ms
+ ✓ src/security-headers.test.ts (2 tests) 5ms
+ ✓ src/domain/sale/returns.test.ts (4 tests) 2ms
+ ✓ src/data/http/errors.test.ts (1 test) 3ms
+ ✓ src/components/cash/r2b-m3-gestionar-error-retry.test.ts (2 tests) 2ms
+ ✓ src/components/cash/assign-attempt.test.ts (3 tests) 3ms
+ ✓ src/components/customer/r2b-b1-b4.test.ts (2 tests) 4ms
+ ✓ src/components/inventory/surtir-page.test.ts (3 tests) 2ms
+ ✓ src/domain/customer-code.test.ts (3 tests) 6ms
+ ✓ src/store/entityViewStore.test.ts (2 tests) 4ms
+ ✓ src/data/pwa/offline-payments.test.ts (3 tests) 3ms
+ ✓ src/data/local/ids.test.ts (3 tests) 3ms
+ ✓ src/components/cash/caja-offline-page.test.ts (3 tests) 4ms
+ ✓ src/theme/storage-fallback.test.ts (1 test) 22ms
+ ✓ src/domain/requestId.test.ts (3 tests) 3ms
+ ✓ src/components/sale/sale-labels.test.ts (3 tests) 3ms
+ ✓ src/domain/initialDebt/validate.test.ts (3 tests) 5ms
+ ✓ src/domain/money/money.test.ts (3 tests) 23ms
+ ✓ src/data/pwa/sync-notes-orphan.test.ts (2 tests) 7ms
+ ✓ src/components/shell/entity-view-chrome.test.ts (2 tests) 2ms
+ ✓ src/domain/store-code.test.ts (2 tests) 3ms
+ ✓ src/data/pwa/dashboard-label.test.ts (2 tests) 2ms
+ ✓ src/app/login/login-secret.test.ts (1 test) 2ms
+ ✓ src/data/pwa/ids.test.ts (1 test) 4ms
+ ✓ src/data/pwa/reload-on-online.test.ts (1 test) 5ms
+ ✓ src/data/backend.test.ts (1 test) 2ms
+
+ Test Files  151 passed (151)
+      Tests  947 passed (947)
+   Start at  09:45:33
+   Duration  10.60s (transform 4.20s, setup 5.47s, collect 14.59s, tests 13.34s, environment 21ms, prepare 11.53s)
+
+exit 0
