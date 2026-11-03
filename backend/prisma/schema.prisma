@@ -216,6 +216,8 @@ model Sale {
   credit          BigInt
   requestId       String?      @map("request_id") @db.Uuid
   legacyRequestId String?      @map("legacy_request_id")
+  /// C02 — sha256 of the canonical create payload bound to request_id.
+  payloadHash     String?      @map("payload_hash")
   note            String?
   occurredOn      DateTime     @map("occurred_on") @db.Date
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -442,6 +444,8 @@ model CustomerPayment {
   occurredAt    DateTime? @map("occurred_at") @db.Timestamptz(3)
   /// C01: accepted after its day was closed; shown as «De otro día» / requires review.
   needsReview   Boolean   @default(false) @map("needs_review")
+  /// C02 — sha256 of the canonical abono payload bound to request_id.
+  payloadHash   String?   @map("payload_hash")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   legacyDexieId Int?      @map("legacy_dexie_id")
 
