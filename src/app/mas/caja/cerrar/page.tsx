@@ -177,32 +177,41 @@ export default function CerrarCajaPage() {
         ) : null}
         {totals && totals.pendingCount > 0 ? (
           <p role="status" className="rounded-[var(--r-lg)] border border-warning bg-warning-soft p-3 text-sm" data-testid="close-pending-warning">
-            {totals.pendingCount === 1
-              ? `1 operación de dinero (${formatCop(totals.pendingAmount)}) todavía no llega al servidor. Puedes cerrar: se enviará cuando haya conexión.`
-              : `${totals.pendingCount} operaciones de dinero (${formatCop(totals.pendingAmount)}) todavía no llegan al servidor. Puedes cerrar: se enviarán cuando haya conexión.`}
+            {closePendingCopy(totals.pendingCount, typeof navigator === "undefined" || navigator.onLine !== false)}
           </p>
         ) : null}
         {totals && totals.rejectedCount > 0 ? (
           <section className="rounded-[var(--r-lg)] border border-danger bg-danger-soft p-3" data-testid="close-rejected-card">
-            <p className="text-sm font-semibold text-danger">
+            <p className="text-sm font-semibold text-danger">! Antes de cerrar</p>
+            <p className="mt-1 text-sm">
               {totals.rejectedCount === 1
-                ? `1 operación de dinero rechazada (${formatCop(totals.rejectedAmount)})`
-                : `${totals.rejectedCount} operaciones de dinero rechazadas (${formatCop(totals.rejectedAmount)})`}
+                ? `1 operación de hoy no está en el servidor: ${formatCop(totals.rejectedAmount)}.`
+                : `${totals.rejectedCount} operaciones de hoy no están en el servidor: ${formatCop(totals.rejectedAmount)}.`}{" "}
+              Si cierras ahora, el conteo puede no cuadrar.
             </p>
-            <p className="mt-1 text-sm">El servidor no las aceptó. Resuélvelas antes de cerrar o cierra igual.</p>
-            <Link href="/sincronizacion" className="mt-2 inline-block text-sm font-semibold underline">
+            <Link href="/sincronizacion" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold underline">
               {`Resolver (${totals.rejectedCount})`}
             </Link>
             {confirmAnyway ? (
-              <div role="alertdialog" aria-labelledby="cerrar-igual-title" className="mt-3 flex flex-col gap-2">
+              <div
+                role="alertdialog"
+                aria-labelledby="cerrar-igual-title"
+                aria-describedby="cerrar-igual-desc"
+                className="mt-3 flex flex-col gap-2"
+              >
                 <p id="cerrar-igual-title" className="text-sm font-semibold">
-                  ¿Cerrar igual? El cierre quedará marcado con {totals.rejectedCount} sin resolver ({formatCop(totals.rejectedAmount)}).
+                  {totals.rejectedCount === 1
+                    ? "¿Cerrar la caja con 1 operación sin resolver?"
+                    : `¿Cerrar la caja con ${totals.rejectedCount} operaciones sin resolver?`}
+                </p>
+                <p id="cerrar-igual-desc" className="text-sm">
+                  Quedarán marcadas en el cierre y seguirán en Pendientes. No se borra nada.
                 </p>
                 <div className="flex gap-2">
                   <Button variant="secondary" onClick={() => setConfirmAnyway(false)} disabled={busy}>
-                    Volver
+                    Cancelar
                   </Button>
-                  <Button onClick={() => void confirm(true)} disabled={busy}>
+                  <Button variant="danger" onClick={() => void confirm(true)} disabled={busy}>
                     Cerrar igual
                   </Button>
                 </div>
@@ -223,4 +232,12 @@ export default function CerrarCajaPage() {
       <ActionToast text={toast} />
     </div>
   );
+}
+
+/** C01.1 (UX-C01 §7) — copy for pending (not rejected) money ops before closing. */
+function closePendingCopy(n: number, online: boolean): string {
+  const ops = n === 1 ? "1 operación de hoy" : `${n} operaciones de hoy`;
+  return online
+    ? `Hay ${ops} enviándose. Espera un momento para que el conteo cuadre.`
+    : `Hay ${ops} guardada${n === 1 ? "" : "s"} en este teléfono. El cierre también se guardará aquí y se enviará con ${n === 1 ? "ella" : "ellas"} cuando vuelva la señal.`;
 }
