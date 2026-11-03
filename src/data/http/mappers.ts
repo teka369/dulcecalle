@@ -234,6 +234,8 @@ export type RemotePayment = {
   occurredAt?: number;
   /** C01 — accepted after its day closed; waiting to be assigned to a caja. */
   needsReview?: boolean;
+  /** C01.1 — local_date of the caja the abono entered (ledger only). */
+  cajaDay?: string | null;
 };
 
 export function mapPayment(raw: Record<string, unknown>): RemotePayment {
@@ -247,6 +249,7 @@ export function mapPayment(raw: Record<string, unknown>): RemotePayment {
     createdAt: asIsoEpoch(raw.createdAt),
     ...(raw.occurredAt != null ? { occurredAt: asIsoEpoch(raw.occurredAt) } : {}),
     ...(raw.needsReview === true ? { needsReview: true } : {}),
+    ...(typeof raw.cajaDay === "string" ? { cajaDay: asDateKey(raw.cajaDay) } : {}),
   };
 }
 

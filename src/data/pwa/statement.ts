@@ -9,12 +9,14 @@ function localDayKey(epoch: number): string {
 }
 
 /** C01 — «De otro día»: received on one day, applied to the caja of another. */
-export function otherDayOf(p: { occurredAt?: number; occurredOn: string }): {
+export function otherDayOf(p: { occurredAt?: number; occurredOn: string; cajaDay?: string | null }): {
   otherDay?: { occurredOn: string; appliedOn: string };
 } {
   if (p.occurredAt == null) return {};
   const day = localDayKey(p.occurredAt);
-  return day !== p.occurredOn ? { otherDay: { occurredOn: day, appliedOn: p.occurredOn } } : {};
+  // C01.1 — compare against the caja day it entered (server ledger), else the day it was received.
+  const appliedOn = p.cajaDay ?? p.occurredOn;
+  return day !== appliedOn ? { otherDay: { occurredOn: day, appliedOn } } : {};
 }
 
 export async function loadHttpStatement(
