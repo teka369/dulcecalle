@@ -97,7 +97,8 @@ function StatusChip({ item, flushing }: { item: EnrichedTrayItem; flushing: bool
     return <Badge tone="danger" className="shrink-0">! No se puede enviar</Badge>;
   }
   if (item.status === "failed" && item.permanent) {
-    return <Badge tone="danger" className="shrink-0">! Necesita atención</Badge>;
+    // C01.1 (UX-C01 §1) — a permanent rejection is «Rechazada» (icon + word).
+    return <Badge tone="danger" className="shrink-0" data-testid="chip-rechazada">! Rechazada</Badge>;
   }
   if (item.status === "failed") {
     return <Badge tone="danger" className="shrink-0">! Reintentando</Badge>;
@@ -153,6 +154,8 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
       await discardOutboxOperation(businessId, item.operationId);
       setConfirming(false);
       await syncStore.refresh();
+      // C01.1 — send the server trace of the discard right away when online.
+      void syncStore.syncNow().catch(() => undefined);
     } catch (e) {
       setError(errorText(e, "No se pudo descartar."));
     } finally {
@@ -213,12 +216,15 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
               href={withRejected(item.correction.href, item.operationId)}
               className="flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-border bg-surface px-4 text-sm font-semibold"
             >
-              Corregir
+              {item.correction.label ?? "Corregir"}
             </Link>
           )}
         </div>
       )}
 
+      {(item.status === "failed" || item.orphaned) && !confirming && item.entity === "clientEvent" && (
+        <p className="mt-3 text-sm text-ink-muted">Es un respaldo en el servidor: no se puede descartar. Reintenta cuando haya conexión.</p>
+      )}
       {(item.status === "failed" || item.orphaned) && !confirming && (
         <div className={`mt-3 grid gap-2 ${item.canRetry ? "grid-cols-2" : "grid-cols-1"}`}>
           {item.canRetry && (
@@ -226,9 +232,11 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
               Reintentar
             </Button>
           )}
-          <Button ref={discardTriggerRef} type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(true)} className="w-full text-ink-muted">
-            Descartar
-          </Button>
+          {item.entity !== "clientEvent" && (
+            <Button ref={discardTriggerRef} type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(true)} className="w-full text-ink-muted">
+              Descartar
+            </Button>
+          )}
         </div>
       )}
 
@@ -269,6 +277,12 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
         >
           <p id={`discard-title-${item.operationId}`} className="text-sm font-semibold">¿Descartar este envío?</p>
           <p id={`discard-desc-${item.operationId}`} className="mt-1 text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>
+          {item.attempts > 0 ? (
+            // C01.1 / C01-INV-03 — it was already sent at least once: it may exist on the server.
+            <p className="mt-1 text-xs font-semibold text-danger" data-testid="discard-attempted-warning">
+              Ya se intentó enviar. Puede que haya llegado al servidor: revisa antes de registrarla de nuevo.
+            </p>
+          ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(false)} className="w-full">
               Cancelar

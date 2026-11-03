@@ -53,6 +53,7 @@ export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?:
         if (businessId && op && op.status === "failed") {
           await discardOutboxOperation(businessId, rejectedId, { replacedBy: replacedByRef.current });
           await syncStore.refresh();
+          void syncStore.syncNow().catch(() => undefined);
         }
       }
     } catch {
