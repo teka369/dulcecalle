@@ -31,6 +31,7 @@ function summaryJson(
   session: {
     id: string; localDate: Date; openedAt: Date; closedAt: Date | null; openingFloat: bigint;
     closingCount: bigint | null; difference: bigint | null; closeMode: string | null; note: string | null;
+    unresolvedCount?: number | null; unresolvedAmount?: bigint | null;
   },
   expected: { efectivo: bigint; nequi: bigint },
   moveCount: number,
@@ -59,6 +60,9 @@ function summaryJson(
     requiresCarry: session.closedAt == null && stamped > 0,
     hasLaterOpenSession: laterOpen > 0,
     regularized: session.closedAt != null,
+    // C01.1 / C01-INV-05 — «Cerrar igual» mark, shown in the caja history.
+    unresolvedCount: session.unresolvedCount ?? null,
+    unresolvedAmount: session.unresolvedAmount == null ? null : copToJson(session.unresolvedAmount),
   };
 }
 
@@ -215,6 +219,13 @@ export class CashManagerService {
         where: { id: move.id },
         data: { sessionId: session.id, pendingForSessionId: null, needsReview: false },
       });
+      // C01.1 / C01-INV-01 — the abono behind the move is no longer «requiere revisión».
+      if (move.refType === "payment" && move.refId) {
+        await tx.customerPayment.updateMany({
+          where: { id: move.refId, businessId: ctx.businessId },
+          data: { needsReview: false },
+        });
+      }
       const row = await tx.cashCarry.create({
         data: {
           id: randomUUID(),
