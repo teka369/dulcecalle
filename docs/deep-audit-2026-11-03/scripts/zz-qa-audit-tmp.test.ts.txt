@@ -1,0 +1,149 @@
+import "fake-indexeddb/auto";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError, NetworkError } from "@/data/errors";
+import { getPwaAuthSession } from "@/data/http/session";
+import { __resetLocalDbForTests, getLocalDb } from "@/data/local/db";
+import { newEntityId } from "@/data/local/ids";
+import {
+  resetOutboxStoreSingleton,
+  resetOutboxSyncEngineSingleton,
+} from "@/data/local/outbox";
+import { resetCatalogReadCache } from "@/data/local/read-cache";
+import { resetLocalStoreSingleton } from "@/data/local/store";
+import { createInitialDebtWithOfflineFallback, syncPendingInitialDebts } from "./offline-initial-debt";
+import {
+  getLocalCashSnapshot,
+  recordAporteOffline,
+  recordExpenseWithOfflineFallback,
+  shrinkWithOfflineFallback,
+  surtirWithOfflineFallback,
+  syncPendingOperations,
+} from "./offline-operations";
+import { createPaymentWithOfflineFallback, syncPendingPayments } from "./offline-payments";
+import { prepararWithOfflineFallback, syncPendingPreparations } from "./offline-production";
+import { createSaleWithOfflineFallback, listLocalSales, syncPendingSales } from "./offline-sales";
+import { getStatementWithOfflineFallback } from "./offline-statement";
+import { discardOutboxOperation } from "./sync-tray";
+
+const BIZ = "[REDACTED]";
+
+const api = {
+  session: { businessId: BIZ },
+  sales: { create: vi.fn(), list: vi.fn(), get: vi.fn(), returns: vi.fn() },
+  customers: { get: vi.fn(), pay: vi.fn(), initialDebt: vi.fn(), ledger: vi.fn() },
+  cash: {
+    open: vi.fn(),
+    close: vi.fn(),
+    carry: vi.fn(),
+    assignMove: vi.fn(),
+    aporte: vi.fn(),
+    retiro: vi.fn(),
+    recordExpense: vi.fn(),
+  },
+  inventory: { surtir: vi.fn(), shrink: vi.fn() },
+  production: { prepare: vi.fn(), list: vi.fn() },
+};
+
+vi.mock("./api", () => ({
+  getPwaApi: () => api,
+  getPrepPwaApi: () => api,
+}));
+
+describe("QA-AUDIT temp repro (NOT TO COMMIT)", () => {
+  const customerId = "[REDACTED]";
+  const prodId = "[REDACTED]";
+  const insumoId = "[REDACTED]";
+
+  beforeEach(async () => {
+    resetOutboxStoreSingleton();
+    resetOutboxSyncEngineSingleton();
+    resetLocalStoreSingleton();
+    resetCatalogReadCache();
+    await __resetLocalDbForTests();
+    vi.clearAllMocks();
+    getPwaAuthSession().businessId = BIZ;
+    const now = Date.now();
+    await getLocalDb().customers.put({
+      id: customerId,
+      businessId: BIZ,
+      code: "DC-0001",
+      name: "Marta",
+      phone: null,
+      debt: 50_000,
+      archivedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await getLocalDb().products.put({
+      id: prodId,
+      businessId: BIZ,
+      name: "Gomitas",
+      category: "General",
+      price: 2_000,
+      avgCost: 500,
+      stock: 10,
+      lowStockAt: 2,
+      sellable: true,
+      archivedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      images: [],
+    });
+    await getLocalDb().products.put({
+      id: insumoId,
+      businessId: BIZ,
+      name: "Azúcar Lote",
+      category: "General",
+      price: 0,
+      avgCost: 10_000,
+      stock: 2,
+      lowStockAt: 1,
+      sellable: false,
+      archivedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      images: [],
+    });
+  });
+
+  it("R2: offline abono rejected 409 CLOSED_DAY (caja cerrada online antes del sync) -> deuda vuelve a mostrarse", async () => {
+    api.customers.pay.mockRejectedValueOnce(new NetworkError("offline"));
+    const pay = await createPaymentWithOfflineFallback({ customerId, amount: 20_000, method: "Efectivo" }, newEntityId());
+    expect(pay.mode).toBe("offline");
+    const afterLocal = (await getLocalDb().customers.get(customerId))?.debt;
+    console.log("QA R2 debt after offline abono:", afterLocal);
+    api.customers.pay.mockRejectedValueOnce(new ApiError("CLOSED_DAY", "No se puede editar el día.", 409));
+    await syncPendingPayments(BIZ);
+    const op = await getLocalDb().outbox.get((pay as { paymentId: string }).paymentId);
+    const debt = (await getLocalDb().customers.get(customerId))?.debt;
+    const cash = (await getLocalDb().cashMoves.toArray()).filter((m) => m.kind === "debt_collect");
+    api.customers.ledger.mockRejectedValueOnce(new NetworkError("offline"));
+    const st = await getStatementWithOfflineFallback(customerId);
+    console.log("QA R2 after reject:", JSON.stringify({ debt, opStatus: op?.status, nextAttemptAt: op?.nextAttemptAt, lastError: op?.lastError, cashDebtCollect: cash.length, statementTotal: st?.statement.total, abonoEntries: st?.statement.entries.filter((e) => e.kind === "abono").length }));
+    expect(afterLocal).toBe(30_000);
+    expect(debt).toBe(50_000);
+    expect(op?.status).toBe("failed");
+    expect(op?.nextAttemptAt).toBeNull();
+    expect(cash.length).toBe(0);
+  });
+
+  it("R3: fiada offline rechazada (409 stock) + abono offline mayor a deuda del servidor -> abono rechazado 409 y revertido", async () => {
+    api.sales.create.mockRejectedValueOnce(new NetworkError("offline"));
+    const sale = await createSaleWithOfflineFallback(
+      { lines: [{ productId: prodId, qty: 3, unitPrice: 2_000 }], paymentKind: "credit", customerId, amountReceived: 0 },
+      newEntityId(),
+    );
+    expect(sale.mode).toBe("offline");
+    api.customers.pay.mockRejectedValueOnce(new NetworkError("offline"));
+    const pay = await createPaymentWithOfflineFallback({ customerId, amount: 56_000, method: "Efectivo" }, newEntityId());
+    expect(pay.mode).toBe("offline");
+    console.log("QA R3 local debt after fiada+abono total:", (await getLocalDb().customers.get(customerId))?.debt);
+    api.sales.create.mockRejectedValueOnce(new ApiError("INSUFFICIENT_STOCK", "No hay suficiente stock.", 409));
+    api.customers.pay.mockRejectedValueOnce(new ApiError("ABONO_EXCEEDS_DEBT", "El abono no puede ser mayor al saldo.", 409));
+    await syncPendingSales(BIZ);
+    await syncPendingPayments(BIZ);
+    const debt = (await getLocalDb().customers.get(customerId))?.debt;
+    console.log("QA R3 debt after both rejected:", debt, "pay calls:", api.customers.pay.mock.calls.length);
+    expect(debt).toBe(50_000);
+  });
+});

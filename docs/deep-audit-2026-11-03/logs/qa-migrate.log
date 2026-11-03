@@ -1,0 +1,50 @@
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "qa", schema "public" at "127.0.0.1:54291"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20260917120000_init`
+Applying migration `20260920120000_customer_code`
+Applying migration `20260920180000_customer_supplier_request_id`
+Applying migration `20260920200000_cash_session_request_id`
+Applying migration `20260923000000_product_images`
+Applying migration `20260923120000_preparations`
+Applying migration `20260923130000_preparation_pending_cost`
+Applying migration `20261004000000_portal_pin_and_sessions`
+Applying migration `20261007120000_cash_pending_manager`
+Applying migration `20261007140000_cash_continuity`
+Applying migration `20261007160000_cash_one_open_guard`
+Applying migration `20261013150000_product_kind`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260917120000_init/
+    └─ migration.sql
+  └─ 20260920120000_customer_code/
+    └─ migration.sql
+  └─ 20260920180000_customer_supplier_request_id/
+    └─ migration.sql
+  └─ 20260920200000_cash_session_request_id/
+    └─ migration.sql
+  └─ 20260923000000_product_images/
+    └─ migration.sql
+  └─ 20260923120000_preparations/
+    └─ migration.sql
+  └─ 20260923130000_preparation_pending_cost/
+    └─ migration.sql
+  └─ 20261004000000_portal_pin_and_sessions/
+    └─ migration.sql
+  └─ 20261007120000_cash_pending_manager/
+    └─ migration.sql
+  └─ 20261007140000_cash_continuity/
+    └─ migration.sql
+  └─ 20261007160000_cash_one_open_guard/
+    └─ migration.sql
+  └─ 20261013150000_product_kind/
+    └─ migration.sql
+      
+All migrations have been successfully applied.

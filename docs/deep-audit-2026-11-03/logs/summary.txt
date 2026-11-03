@@ -1,0 +1,11 @@
+fe-tsc exit=0
+fe-eslint exit=0
+fe-vitest exit=0
+be-tsc exit=0
+be-eslint exit=0
+be-build exit=0
+be-jest exit=0
+fe-vitest-clientpg exit=0
+fe-build exit=0
+fe-playwright-full exit=0
+fe-playwright-prodcfg exit=0

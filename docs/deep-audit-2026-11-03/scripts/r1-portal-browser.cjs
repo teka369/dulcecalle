@@ -1,0 +1,34 @@
+const { chromium } = require("/workspace/deep-audit/qa/dulcecalle/node_modules/@playwright/test");
+const fs = require("fs");
+const r1 = JSON.parse(fs.readFileSync("/tmp/qa-r1.json", "utf8"));
+const OUT = "/workspace/qa-plans/deep-audit/logs";
+(async () => {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ viewport: { width: 390, height: 780 }, serviceWorkers: "block" });
+  const leaks = [];
+  await context.route(/onrender\.com|vercel\.app/, (r) => { leaks.push(r.request().url()); return r.abort(); });
+  await context.route(/\/v1\//, async (route) => {
+    const u = new URL(route.request().url());
+    const target = "http://127.0.0.1:4291" + u.pathname.replace(/^.*\/v1/, "/v1") + u.search;
+    const resp = await route.fetch({ url: target });
+    await route.fulfill({ response: resp });
+  });
+  const page = await context.newPage();
+  await page.goto(`http://127.0.0.1:3293/cliente/login?tienda=${r1.businessId}`);
+  await page.getByLabel("Código de cliente").fill(r1.code);
+  await page.getByLabel("PIN").fill("482913");
+  await page.getByRole("button", { name: "Consultar saldo" }).click();
+  await page.waitForURL(/\/cliente$/);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: OUT + "/r1-portal-home.png", fullPage: true });
+  const home = await page.locator("main").innerText().catch(() => page.innerText("body"));
+  await page.goto("http://127.0.0.1:3293/cliente/compras"); await page.waitForTimeout(1500);
+  await page.screenshot({ path: OUT + "/r1-portal-compras.png", fullPage: true });
+  const compras = await page.innerText("body");
+  await page.goto(`http://127.0.0.1:3293/cliente/compras/${r1.saleId}`); await page.waitForTimeout(1500);
+  await page.screenshot({ path: OUT + "/r1-portal-compra-detalle.png", fullPage: true });
+  const detalle = await page.innerText("body");
+  fs.writeFileSync(OUT + "/r1-portal-browser.log", JSON.stringify({ leaks, home, compras, detalle }, null, 2));
+  console.log(JSON.stringify({ leaks, home, compras, detalle }, null, 2));
+  await browser.close();
+})().catch((e) => { console.error(e); process.exit(1); });
