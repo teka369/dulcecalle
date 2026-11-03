@@ -618,7 +618,16 @@ export class OutboxSyncEngine {
             });
             break;
           }
-          const retryable = isRetryableError(error);
+          // C01.2 / C011-INV-02 — a server trace (clientEvent) must not die on a
+          // transient 4xx (403 role/session, 409, 429…): keep retrying with
+          // backoff. Only a validation 400 stays a visible permanent failure.
+          const retryable =
+            isRetryableError(error) ||
+            (current.entity === "clientEvent" &&
+              error instanceof ApiError &&
+              error.status >= 400 &&
+              error.status < 500 &&
+              error.code !== "VALIDATION");
           const message = error instanceof Error ? error.message : "Error de sincronización.";
           await this.outbox.markFailed(
             businessId,
