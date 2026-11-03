@@ -23,6 +23,12 @@ import {
 } from "@/domain/cash";
 import type { DayCashSummary } from "@/store/cashStore";
 import { cashStore } from "@/store/cashStore";
+import Link from "next/link";
+import { Button } from "@/components/ui/Button";
+import { getPwaAuthSession } from "@/data/http/session";
+import { listUnresolvedFinancialOps, unresolvedTotals } from "@/data/pwa/unresolved-financial";
+
+type Totals = ReturnType<typeof unresolvedTotals>;
 
 export default function CerrarCajaPage() {
   const router = useRouter();
@@ -34,6 +40,8 @@ export default function CerrarCajaPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [totals, setTotals] = useState<Totals | null>(null);
+  const [confirmAnyway, setConfirmAnyway] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -48,6 +56,11 @@ export default function CerrarCajaPage() {
         return;
       }
       setSummary(s);
+      const businessId = getPwaAuthSession().businessId;
+      if (businessId) {
+        // C01 / DC-01 — money ops not confirmed by the server are shown before closing.
+        setTotals(unresolvedTotals(await listUnresolvedFinancialOps(businessId)));
+      }
     } catch (e: unknown) {
       setLoadError(errorText(e, ""));
     } finally {
@@ -67,13 +80,17 @@ export default function CerrarCajaPage() {
   const expectedEf = summary?.expected.efectivo ?? 0;
   const diff = counted != null ? counted - expectedEf : null;
 
-  async function confirm() {
+  async function confirm(closeAnyway = false) {
     if (amountInputInvalid()) return; // a rejected amount is on screen: never send
     if (busy || !summary) return;
     setError(null);
     const err = validateCounted(countedRaw);
     if (err) {
       setError(err);
+      return;
+    }
+    if (!closeAnyway && totals && totals.rejectedCount > 0) {
+      setConfirmAnyway(true);
       return;
     }
     if (diff != null && diff !== 0 && !confirmDiff) {
@@ -83,7 +100,7 @@ export default function CerrarCajaPage() {
     }
     setBusy(true);
     try {
-      await cashStore.closeCaja(countedRaw);
+      await cashStore.closeCaja(countedRaw, closeAnyway ? { closeAnyway: true } : {});
       setToast(CASH_COPY.toastCajaCerrada);
       setTimeout(() => navigateOfflineAware(router, "/mas/caja"), 700);
     } catch (e) {
@@ -157,6 +174,41 @@ export default function CerrarCajaPage() {
               }
             />
           </RowGroup>
+        ) : null}
+        {totals && totals.pendingCount > 0 ? (
+          <p role="status" className="rounded-[var(--r-lg)] border border-warning bg-warning-soft p-3 text-sm" data-testid="close-pending-warning">
+            {totals.pendingCount === 1
+              ? `1 operación de dinero (${formatCop(totals.pendingAmount)}) todavía no llega al servidor. Puedes cerrar: se enviará cuando haya conexión.`
+              : `${totals.pendingCount} operaciones de dinero (${formatCop(totals.pendingAmount)}) todavía no llegan al servidor. Puedes cerrar: se enviarán cuando haya conexión.`}
+          </p>
+        ) : null}
+        {totals && totals.rejectedCount > 0 ? (
+          <section className="rounded-[var(--r-lg)] border border-danger bg-danger-soft p-3" data-testid="close-rejected-card">
+            <p className="text-sm font-semibold text-danger">
+              {totals.rejectedCount === 1
+                ? `1 operación de dinero rechazada (${formatCop(totals.rejectedAmount)})`
+                : `${totals.rejectedCount} operaciones de dinero rechazadas (${formatCop(totals.rejectedAmount)})`}
+            </p>
+            <p className="mt-1 text-sm">El servidor no las aceptó. Resuélvelas antes de cerrar o cierra igual.</p>
+            <Link href="/sincronizacion" className="mt-2 inline-block text-sm font-semibold underline">
+              {`Resolver (${totals.rejectedCount})`}
+            </Link>
+            {confirmAnyway ? (
+              <div role="alertdialog" aria-labelledby="cerrar-igual-title" className="mt-3 flex flex-col gap-2">
+                <p id="cerrar-igual-title" className="text-sm font-semibold">
+                  ¿Cerrar igual? El cierre quedará marcado con {totals.rejectedCount} sin resolver ({formatCop(totals.rejectedAmount)}).
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => setConfirmAnyway(false)} disabled={busy}>
+                    Volver
+                  </Button>
+                  <Button onClick={() => void confirm(true)} disabled={busy}>
+                    Cerrar igual
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </section>
         ) : null}
         {error ? <StateBlock kind="error" title={error} /> : null}
       </Sheet>

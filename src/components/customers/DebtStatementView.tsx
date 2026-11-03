@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/Badge";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
 import { Row } from "@/components/ui/Row";
 import { SectionHead } from "@/components/ui/SectionHead";
@@ -13,8 +14,32 @@ function entryMeta(entry: DebtEntry): string {
     if (entry.amountReceived > 0) parts.push(`Pagó ${formatCop(entry.amountReceived)}`);
     return parts.join(" · ");
   }
-  if ((entry.kind === "inicial" || entry.kind === "abono") && entry.note) return `${when} · Nota: ${entry.note}`;
+  if (entry.kind === "abono") {
+    const parts = [when];
+    if (entry.syncState === "rejected") parts.push("No aplicado en el servidor");
+    if (entry.otherDay) {
+      parts.push(`Registrado el ${dayLabel(entry.otherDay.occurredOn)}, entró a la caja del ${dayLabel(entry.otherDay.appliedOn)}`);
+    }
+    if (entry.note) parts.push(`Nota: ${entry.note}`);
+    return parts.join(" · ");
+  }
+  if (entry.kind === "inicial" && entry.note) return `${when} · Nota: ${entry.note}`;
   return when;
+}
+
+const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+function dayLabel(key: string): string {
+  const [, m, d] = key.split("-").map(Number);
+  return m && d ? `${d} ${MONTHS[m - 1]}` : key;
+}
+
+/** C01 — state badge of an abono row: always icon-free text + tone (never color alone). */
+function AbonoBadge({ entry }: { entry: DebtEntry }) {
+  if (entry.kind !== "abono") return null;
+  if (entry.syncState === "rejected") return <Badge tone="danger">Rechazada</Badge>;
+  if (entry.syncState === "pending") return <Badge tone="warning">Pendiente</Badge>;
+  if (entry.otherDay) return <Badge tone="info">De otro día</Badge>;
+  return null;
 }
 
 /** ESTADO DE CUENTA as RowGroup. Cargos «+» danger, abonos «−» ok, always with a word. */
@@ -37,6 +62,7 @@ export function DebtStatementView({ statement }: { statement: DebtStatement }) {
                 meta={entryMeta(entry)}
                 trailing={
                   <>
+                    <AbonoBadge entry={entry} />
                     <span className={`text-[15px] font-semibold tabular-nums ${v.tone === "danger" ? "text-danger" : "text-ok"}`}>
                       {v.sign} {formatCop(v.amount)}
                     </span>

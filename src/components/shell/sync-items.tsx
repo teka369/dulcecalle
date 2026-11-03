@@ -2,6 +2,7 @@
 
 import { errorText } from "@/domain/ux/user-message";
 import Link from "next/link";
+import { localRef } from "@/data/pwa/local-ref";
 
 import { PendingBadge } from "@/components/ui/StatusBadge";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -174,6 +175,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
           {detail && (
             <span className="mt-0.5 block truncate text-xs text-ink-muted">{detail}</span>
           )}
+          <span className="mt-0.5 block text-xs text-ink-muted">{localRef(item.operationId, item.localCreatedAt)}</span>
           {item.blockedBy && (
             <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
               {!item.orphaned && <PendingBadge label="En espera" />}
@@ -290,7 +292,7 @@ export function SyncOperationList({ items, flushing }: { items: EnrichedTrayItem
     );
   }
   return (
-    <ul className="flex flex-col gap-3">
+    <ul data-testid="sync-operations" className="flex flex-col gap-3">
       {items.map((item) => (
         <SyncOperationRow key={item.operationId} item={item} flushing={flushing} />
       ))}

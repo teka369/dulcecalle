@@ -3,6 +3,7 @@
 import { useSync } from "@/store/syncStore";
 import { SyncOperationList, useSyncItems } from "@/components/shell/sync-items";
 import { SyncStatusSummary } from "@/components/shell/SyncStatusSummary";
+import { DiscardedHistory } from "@/components/shell/DiscardedHistory";
 import { StorageProtectionCard } from "@/components/shell/StorageProtectionCard";
 import { DISCARD_NOTICE } from "@/data/pwa/sync-copy";
 import { HeroBlock } from "@/components/ui/HeroBlock";
@@ -22,7 +23,7 @@ export default function SincronizacionPage() {
       <HeroBlock
         size="medium"
         back={{ href: "/", label: "Volver" }}
-        title="Datos y sincronización"
+        title="Pendientes"
         subtitle={`Este teléfono · ${counts.total} ${counts.total === 1 ? "pendiente" : "pendientes"}`}
         offline={online ? null : { text: "Sin conexión · Lo guardado aquí se enviará cuando vuelva la conexión." }}
         busy={flushing != null}
@@ -59,6 +60,7 @@ export default function SincronizacionPage() {
             <SyncOperationList items={items} flushing={flushing != null} />
           )}
         </section>
+        <DiscardedHistory refreshKey={items} />
         <StorageProtectionCard />
         <p className="text-xs leading-relaxed text-ink-muted">{DISCARD_NOTICE}</p>
       </Sheet>

@@ -16,11 +16,12 @@ const ID = /^[0-9a-zA-Z-]{1,64}$/;
  * still failed), Cancelar keeps it; both then `go()`. Without the param,
  * `go()` runs after `delayMs` as before.
  */
-export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?: number) => void; dialog: ReactNode } {
+export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?: number, replacedBy?: string | null) => void; dialog: ReactNode } {
   const [rejectedId, setRejectedId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const goRef = useRef<() => void>(() => undefined);
+  const replacedByRef = useRef<string | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -31,7 +32,9 @@ export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?:
     if (open) boxRef.current?.querySelector<HTMLElement>("button")?.focus();
   }, [open]);
 
-  function afterSave(go: () => void, delayMs = 700) {
+  /** `replacedBy` = requestId of the corrected op (C01 «Reemplazada por» link). */
+  function afterSave(go: () => void, delayMs = 700, replacedBy: string | null = null) {
+    replacedByRef.current = replacedBy;
     if (!rejectedId) {
       setTimeout(go, delayMs);
       return;
@@ -48,7 +51,7 @@ export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?:
         const businessId = getPwaAuthSession().businessId;
         const op = businessId ? await getOutboxStore().get(businessId, rejectedId) : null;
         if (businessId && op && op.status === "failed") {
-          await discardOutboxOperation(businessId, rejectedId);
+          await discardOutboxOperation(businessId, rejectedId, { replacedBy: replacedByRef.current });
           await syncStore.refresh();
         }
       }

@@ -3,6 +3,20 @@ import type { DebtStatement } from "@/domain/debt/statement";
 import { asIsoEpoch, mapCustomer, mapSale, mapPayment } from "../http/mappers";
 import { getPwaApi } from "./api";
 
+function localDayKey(epoch: number): string {
+  const d = new Date(epoch);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** C01 — «De otro día»: received on one day, applied to the caja of another. */
+export function otherDayOf(p: { occurredAt?: number; occurredOn: string }): {
+  otherDay?: { occurredOn: string; appliedOn: string };
+} {
+  if (p.occurredAt == null) return {};
+  const day = localDayKey(p.occurredAt);
+  return day !== p.occurredOn ? { otherDay: { occurredOn: day, appliedOn: p.occurredOn } } : {};
+}
+
 export async function loadHttpStatement(
   customerId: string,
 ): Promise<DebtStatement | null> {
@@ -87,6 +101,7 @@ export async function loadHttpStatement(
           amount: p.amount,
           method: p.method,
           ...(p.note ? { note: p.note } : {}),
+          ...otherDayOf(p),
           runningBalance: 0,
         },
       }),

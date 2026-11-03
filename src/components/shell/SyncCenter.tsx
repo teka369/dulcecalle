@@ -38,11 +38,11 @@ export function SyncCenter() {
     <div
       role="dialog"
       aria-modal="false"
-      aria-label="Datos y sincronización"
+      aria-label="Pendientes"
       className="fixed inset-x-0 bottom-0 z-[60] mx-auto max-h-[80dvh] w-full max-w-lg overflow-y-auto rounded-t-[var(--r-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-lg)]"
     >
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-base font-semibold">Datos y sincronización</h2>
+        <h2 className="text-base font-semibold">Pendientes</h2>
         <button
           type="button"
           onClick={closeCenter}
