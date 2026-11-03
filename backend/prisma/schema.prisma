@@ -573,3 +573,28 @@ model PortalLoginThrottle {
 
   @@map("portal_login_throttles")
 }
+
+/// C01.1 / C01-INV-04 — server copy of client-side rejections and discards
+/// of money operations, so the trace survives the device. One row per
+/// (business, operation, kind); replays are idempotent.
+model ClientOpEvent {
+  id              String    @id @db.Uuid
+  businessId      String    @map("business_id") @db.Uuid
+  operationId     String    @map("operation_id") @db.Uuid
+  requestId       String?   @map("request_id") @db.Uuid
+  entity          String
+  operation       String
+  kind            String
+  amount          BigInt?
+  customerId      String?   @map("customer_id") @db.Uuid
+  rejectionCode   String?   @map("rejection_code")
+  lastError       String?   @map("last_error")
+  replacedBy      String?   @map("replaced_by") @db.Uuid
+  deviceCreatedAt DateTime? @map("device_created_at") @db.Timestamptz(3)
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([businessId, operationId, kind])
+  @@index([businessId, createdAt])
+  @@map("client_op_events")
+}
