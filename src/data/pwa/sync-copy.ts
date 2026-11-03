@@ -6,6 +6,11 @@ export const DISCARD_NOTICE =
 
 export const NOT_A_BACKUP = "Esto no es una copia de seguridad.";
 
+/** C01.2 / C011-INV-02 — «1 respaldo pendiente» / «N respaldos pendientes». */
+export function backupsPendingText(n: number): string {
+  return n === 1 ? "1 respaldo pendiente" : `${n} respaldos pendientes`;
+}
+
 export function syncPillLabel(
   online: boolean,
   counts: SyncCounts,
@@ -29,6 +34,9 @@ export function syncPillLabel(
   }
   if (counts.total > 0) {
     return savedHere(counts.total);
+  }
+  if ((counts.backups ?? 0) > 0) {
+    return `○ ${backupsPendingText(counts.backups ?? 0)}`;
   }
   return "✓ En el servidor";
 }
@@ -76,7 +84,7 @@ export function queueIsClear(input: {
   flushing: { completed: number; total: number } | null;
   authRequired: boolean;
 }): boolean {
-  return !input.authRequired && !input.flushing && input.counts.total === 0;
+  return !input.authRequired && !input.flushing && input.counts.total === 0 && (input.counts.backups ?? 0) === 0;
 }
 
 export type SyncPlaceCopy = {

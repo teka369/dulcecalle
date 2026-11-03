@@ -17,6 +17,8 @@ export type SyncCounts = {
   failed: number;
   permanent: number;
   total: number;
+  /** C01.2 / C011-INV-02 — server traces (clientEvent) not yet on the server. */
+  backups?: number;
 };
 
 export type RecentSyncItem = {
@@ -100,11 +102,13 @@ async function refreshCounts(): Promise<boolean> {
     const db = getLocalDb();
     // C01.1 — server-trace events (clientEvent) are plumbing, not user operations.
     const visible = (rows: OutboxItem[]) => rows.filter((row) => row.entity !== "clientEvent");
-    const [pending, active, failed] = (await Promise.all([
+    const all = await Promise.all([
       db.outbox.where("[businessId+status]").equals([id, "pending"]).toArray(),
       db.outbox.where("[businessId+status]").equals([id, "in_flight"]).toArray(),
       db.outbox.where("[businessId+status]").equals([id, "failed"]).toArray(),
-    ])).map(visible);
+    ]);
+    const backups = all.flat().filter((row) => row.entity === "clientEvent").length;
+    const [pending, active, failed] = all.map(visible);
     if (businessId() !== id) return false;
     const permanent = failed.filter((row) => row.nextAttemptAt == null).length;
     const lastDoneAt = readLastCompletedSync(id);
@@ -115,6 +119,7 @@ async function refreshCounts(): Promise<boolean> {
         failed: failed.length,
         permanent,
         total: pending.length + active.length + failed.length,
+        backups,
       },
       lastDoneAt,
       itemsVersion: state.itemsVersion + 1,

@@ -97,7 +97,7 @@ export function SyncCenter() {
         </a>
       )}
 
-      {online && counts.total > 0 && !flushing && !authRequired && (
+      {online && (counts.total > 0 || (counts.backups ?? 0) > 0) && !flushing && !authRequired && (
         <button
           type="button"
           onClick={() => void syncNow()}

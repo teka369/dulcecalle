@@ -16,7 +16,7 @@ import { SkeletonRows } from "@/components/ui/Skeleton";
 export default function SincronizacionPage() {
   const { online, counts, flushing, lastDoneAt, authRequired, syncNow } = useSync();
   const { items, loading } = useSyncItems();
-  const canSync = online && counts.total > 0 && !flushing && !authRequired;
+  const canSync = online && (counts.total > 0 || (counts.backups ?? 0) > 0) && !flushing && !authRequired;
 
   return (
     <div className="flex flex-col">
