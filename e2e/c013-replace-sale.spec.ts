@@ -79,10 +79,12 @@ test("Registrar de nuevo shows the discard dialog and sale-replaces after Descar
   await context.setOffline(false);
 
   await page.goto("/ventas");
-  await expect(page.getByTestId("sale-rejected-block")).toBeVisible({ timeout: 60_000 });
-  await page.getByTestId("sale-rejected-block").getByRole("link", { name: "Ver" }).click();
-  await expect(page.getByTestId("sale-rejected-block")).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("link", { name: "Registrar de nuevo" }).click();
+  const badge = page.getByTestId("sale-rejected-badge").first();
+  await expect(badge).toHaveText("! Rechazada", { timeout: 20_000 });
+  await page.locator('a[href^="/ventas/"]', { has: page.getByTestId("sale-rejected-badge") }).first().click();
+  const block = page.getByTestId("sale-rejected-block");
+  await expect(block).toBeVisible({ timeout: 15_000 });
+  await block.getByRole("link", { name: "Registrar de nuevo" }).click();
   await expect(page).toHaveURL(/rechazada=/);
   await expect(page.getByTestId("rejected-sale-banner")).toBeVisible();
 
