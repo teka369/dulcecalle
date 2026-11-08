@@ -24,9 +24,9 @@ async function ready(page: import("@playwright/test").Page) {
 }
 
 async function paidSale(page: import("@playwright/test").Page) {
-  await page.getByRole("link", { name: "Nueva venta" }).click();
-  await page.getByRole("button", { name: PROD.name }).click();
-  await page.getByRole("link", { name: "Cobrar" }).click();
+  await page.goto("/ventas/nueva").catch(() => undefined);
+  await page.getByRole("button", { name: `Agregar ${PROD.name}` }).click();
+  await page.getByRole("button", { name: "Cobrar" }).click();
   await page.getByRole("button", { name: "Registrar" }).click();
 }
 
@@ -74,7 +74,7 @@ test("Registrar de nuevo shows the discard dialog and sale-replaces after Descar
   fake.offline = true;
   await context.setOffline(true);
   await paidSale(page);
-  await expect.poll(() => new URL(page.url()).pathname, { timeout: 15_000 }).toMatch(/\/ventas/);
+  await expect(page.getByText(/1 guardada aquí/).first()).toBeVisible({ timeout: 15_000 });
   fake.offline = false;
   await context.setOffline(false);
 
@@ -87,8 +87,8 @@ test("Registrar de nuevo shows the discard dialog and sale-replaces after Descar
   await expect(page.getByTestId("rejected-sale-banner")).toBeVisible();
 
   acceptSales = true;
-  await page.getByRole("button", { name: PROD.name }).click();
-  await page.getByRole("link", { name: "Cobrar" }).click();
+  await page.getByRole("button", { name: `Agregar ${PROD.name}` }).click();
+  await page.getByRole("button", { name: "Cobrar" }).click();
   await expect(page).toHaveURL(/rechazada=/);
   await page.getByRole("button", { name: "Registrar" }).click();
 
