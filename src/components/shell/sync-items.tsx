@@ -17,7 +17,7 @@ import {
   type EnrichedTrayItem,
 } from "@/data/pwa/sync-tray";
 import { syncStore } from "@/store/syncStore";
-import { DISCARD_NOTICE, formatDateTime, syncOperationNotes } from "@/data/pwa/sync-copy";
+import { DISCARD_ATTEMPTED_WARNING, DISCARD_NOTICE, formatDateTime, syncOperationNotes } from "@/data/pwa/sync-copy";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
@@ -280,7 +280,7 @@ export function SyncOperationRow({ item, flushing }: { item: EnrichedTrayItem; f
           {item.attempts > 0 ? (
             // C01.1 / C01-INV-03 — it was already sent at least once: it may exist on the server.
             <p className="mt-1 text-xs font-semibold text-danger" data-testid="discard-attempted-warning">
-              Ya se intentó enviar. Puede que haya llegado al servidor: revisa antes de registrarla de nuevo.
+              {DISCARD_ATTEMPTED_WARNING}
             </p>
           ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2">

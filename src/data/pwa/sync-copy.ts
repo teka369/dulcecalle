@@ -4,6 +4,10 @@ import type { SyncCounts } from "@/store/syncStore";
 export const DISCARD_NOTICE =
   "Descartar elimina este envío pendiente de este dispositivo. No deshace nada que ya esté guardado en el servidor. El registro puede seguir apareciendo en este teléfono hasta que los datos locales se actualicen o se eliminen mediante el flujo correspondiente.";
 
+/** C01 / INV-03 — the POST may already have landed on the server. */
+export const DISCARD_ATTEMPTED_WARNING =
+  "Ya se intentó enviar. Puede que haya llegado al servidor: revisa antes de registrarla de nuevo.";
+
 export const NOT_A_BACKUP = "Esto no es una copia de seguridad.";
 
 /** C01.2 / C011-INV-02 — «1 respaldo pendiente» / «N respaldos pendientes». */

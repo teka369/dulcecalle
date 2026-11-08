@@ -4,10 +4,21 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { getPwaAuthSession } from "@/data/http/session";
 import { getOutboxStore } from "@/data/local/outbox";
+import { DISCARD_ATTEMPTED_WARNING } from "@/data/pwa/sync-copy";
 import { discardOutboxOperation } from "@/data/pwa/sync-tray";
 import { syncStore } from "@/store/syncStore";
 
 const ID = /^[0-9a-zA-Z-]{1,64}$/;
+
+async function readAttempts(operationId: string): Promise<number> {
+  try {
+    const businessId = getPwaAuthSession().businessId;
+    const op = businessId ? await getOutboxStore().get(businessId, operationId) : undefined;
+    return op?.attempts ?? 0;
+  } catch {
+    return 0;
+  }
+}
 
 /**
  * loop/v1 conflict UI: «Corregir» opens a form with `?rechazada=<operationId>`.
@@ -20,6 +31,7 @@ export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?:
   const [rejectedId, setRejectedId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [attempts, setAttempts] = useState(0);
   const goRef = useRef<() => void>(() => undefined);
   const replacedByRef = useRef<string | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -40,7 +52,12 @@ export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?:
       return;
     }
     goRef.current = go;
-    setOpen(true);
+    // C01.4 / C013-INV-01 — read attempts before opening so the INV-03 warning
+    // does not flash in or appear late.
+    void (async () => {
+      setAttempts(await readAttempts(rejectedId));
+      setOpen(true);
+    })();
   }
 
   async function close(discard: boolean) {
@@ -62,6 +79,7 @@ export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?:
       setBusy(false);
       setOpen(false);
       setRejectedId(null);
+      setAttempts(0);
       goRef.current();
     }
   }
@@ -86,6 +104,11 @@ export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?:
         <p id="rejected-discard-desc" className="mt-1 text-xs leading-relaxed text-ink-muted">
           Ya guardaste la versión corregida. Si la descartas, la rechazada no se vuelve a enviar. Si cancelas, queda en Sincronización.
         </p>
+        {attempts > 0 ? (
+          <p className="mt-1 text-xs font-semibold text-danger" data-testid="discard-attempted-warning">
+            {DISCARD_ATTEMPTED_WARNING}
+          </p>
+        ) : null}
         <div className="mt-3 grid grid-cols-2 gap-2">
           <Button type="button" variant="secondary" disabled={busy} onClick={() => void close(false)} className="w-full">
             Cancelar
