@@ -16,7 +16,7 @@ const ID = /^[0-9a-zA-Z-]{1,64}$/;
  * still failed), Cancelar keeps it; both then `go()`. Without the param,
  * `go()` runs after `delayMs` as before.
  */
-export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?: number, replacedBy?: string | null) => void; dialog: ReactNode } {
+export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?: number, replacedBy?: string | null) => void; dialog: ReactNode; pending: boolean } {
   const [rejectedId, setRejectedId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -98,5 +98,7 @@ export function useRejectedCorrection(): { afterSave: (go: () => void, delayMs?:
     </div>
   ) : null;
 
-  return { afterSave, dialog };
+  // C01.3 — pending covers both the open dialog and the ?rechazada= flow, so
+  // cobrar's empty-cart redirect cannot unmount the dialog after clear().
+  return { afterSave, dialog, pending: open || Boolean(rejectedId) };
 }

@@ -83,8 +83,12 @@ export default function CobrarPage() {
 
   useEffect(() => {
     if (!hydrated) return;
+    // C01.3 — stay on this page while «¿Descartar la operación rechazada?» is
+    // pending. clear() after Registrar empties the cart; without this guard
+    // the redirect unmounted the dialog (Tester C01-QA-02).
+    if (rejected.pending) return;
     if (items.length === 0) navigateOfflineAware(router, "/ventas/nueva", { replace: true });
-  }, [hydrated, items.length, router]);
+  }, [hydrated, items.length, router, rejected.pending]);
 
   const lines = useMemo(() => {
     const out: Array<{
@@ -141,17 +145,18 @@ export default function CobrarPage() {
         buildSaleRequest(state, lines, note),
         requestIdRef.current,
       );
+      // C01.3 — open the discard dialog before clear() so a store emit after
+      // this await cannot navigate away with pending still false.
+      rejected.afterSave(
+        () => navigateOfflineAware(router, "/"),
+        700,
+        result.mode === "online" ? result.sale.id : result.saleId,
+      );
       clear();
       setToast(
         result.mode === "offline"
           ? "Venta guardada en este dispositivo · se sincronizará automáticamente."
           : "Venta registrada",
-      );
-      // C01.1 — «Registrar de nuevo»: the rejected original becomes «Reemplazada por» this sale.
-      rejected.afterSave(
-        () => navigateOfflineAware(router, "/"),
-        700,
-        result.mode === "online" ? result.sale.id : result.saleId,
       );
     } catch (e) {
       setError(errorText(e, "Error al registrar venta"));
