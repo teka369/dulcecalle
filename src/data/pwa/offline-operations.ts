@@ -16,6 +16,26 @@ import type { RemoteExpense, RemoteStockMove, RemoteToday } from "@/data/http/ma
 import type { DayCashSummary } from "@/store/cashStore";
 import { addCop, subCop } from "@/domain/money";
 
+
+/** C01.3 — POST /v1/audit/client-events body: DTO fields only. */
+export function clientEventRecordBody(payload: unknown): RemoteClientEventInput {
+  const raw = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+  const body: RemoteClientEventInput = {
+    operationId: String(raw.operationId ?? ""),
+    entity: String(raw.entity ?? ""),
+    operation: String(raw.operation ?? ""),
+    kind: raw.kind as RemoteClientEventInput["kind"],
+  };
+  if (typeof raw.requestId === "string") body.requestId = raw.requestId;
+  if (typeof raw.amount === "number") body.amount = raw.amount;
+  if (typeof raw.customerId === "string") body.customerId = raw.customerId;
+  if (typeof raw.rejectionCode === "string") body.rejectionCode = raw.rejectionCode;
+  if (typeof raw.lastError === "string") body.lastError = raw.lastError;
+  if (typeof raw.replacedBy === "string") body.replacedBy = raw.replacedBy;
+  if (typeof raw.deviceCreatedAt === "string") body.deviceCreatedAt = raw.deviceCreatedAt;
+  return body;
+}
+
 function businessId(): string {
   const id = getPwaAuthSession().businessId;
   if (!id) throw new Error("Selecciona un negocio.");
@@ -938,8 +958,11 @@ export async function syncPendingOperations(business: string) {
       }
       if (item.entity === "clientEvent" && item.operation === "record") {
         // C01.1 / C01-INV-04 — idempotent on the server per (operationId, kind).
+        // C01.3 — never send client-only metadata (optimisticApplied). The
+        // backend DTO forbids unknown fields, so a retry after cleanup would
+        // otherwise 400 VALIDATION («property optimisticApplied should not exist»).
         const remote = await getPwaApi().audit.record(
-          item.payload as RemoteClientEventInput,
+          clientEventRecordBody(item.payload),
           item.requestId,
         );
         return { remoteId: remote.id };

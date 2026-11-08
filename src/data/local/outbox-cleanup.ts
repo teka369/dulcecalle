@@ -292,7 +292,9 @@ export async function cleanupOutboxLocalEffect(
     await db.cashSessions.delete(row.operationId);
   }
 
-  if (mode === "reject" && applied) {
+  // C01.3 — stamp only money/stock ops. clientEvent payloads are POSTed as-is
+  // to a whitelist DTO; optimisticApplied there becomes 400 VALIDATION on retry.
+  if (mode === "reject" && applied && row.entity !== "clientEvent") {
     const current = await db.outbox.get(row.operationId);
     if (current && current.businessId === businessId && current.payload && typeof current.payload !== "string") {
       await db.outbox.put({
