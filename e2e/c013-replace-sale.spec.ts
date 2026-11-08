@@ -41,20 +41,39 @@ test("Registrar de nuevo shows the discard dialog and sale-replaces after Descar
     if (req.method() === "POST" && /\/sales$/.test(url.pathname)) {
       if (fake.offline) return route.fallback();
       if (!acceptSales) return closedDay(route);
-      const body = (req.postDataJSON() ?? {}) as Record<string, unknown>;
+      const body = (req.postDataJSON() ?? {}) as {
+        customerId?: string | null;
+        paymentKind?: string;
+        method?: string;
+        saleTotal?: number;
+        amountReceived?: number;
+        credit?: number;
+        note?: string | null;
+        lines?: Array<{ productId: string; productName?: string; qty: number; unitPrice?: number }>;
+      };
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
+      const lines = (body.lines ?? []).map((l, i) => ({
+        id: `00000000-0000-4000-8000-0000000007${String(10 + i)}`,
+        productId: l.productId,
+        productName: l.productName ?? PROD.name,
+        qty: l.qty,
+        unitPrice: l.unitPrice ?? PROD.price,
+        unitCost: 400,
+        lineTotal: l.qty * (l.unitPrice ?? PROD.price),
+      }));
+      const total = lines.reduce((a, l) => a + l.lineTotal, 0) || 1500;
       const sale = {
         id: REPLACE_ID,
         customerId: body.customerId ?? null,
         paymentKind: body.paymentKind ?? "paid",
         method: body.method ?? "Efectivo",
-        saleTotal: body.saleTotal ?? 1500,
-        amountReceived: body.amountReceived ?? 1500,
-        credit: 0,
+        saleTotal: body.saleTotal ?? total,
+        amountReceived: body.amountReceived ?? total,
+        credit: body.credit ?? 0,
         note: body.note ?? null,
         occurredOn: today,
         createdAt: new Date().toISOString(),
-        lines: body.lines ?? [],
+        lines,
       };
       created.push(sale);
       fake.server.extraSales.push(sale);
@@ -97,6 +116,7 @@ test("Registrar de nuevo shows the discard dialog and sale-replaces after Descar
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toContainText("¿Descartar la operación rechazada?", { timeout: 15_000 });
   await dialog.getByRole("button", { name: "Descartar" }).click();
+  await expect(dialog).toBeHidden({ timeout: 15_000 });
 
   await page.goto(`/ventas/${REPLACE_ID}`);
   await expect(page.getByTestId("sale-replaces")).toContainText("Reemplaza a", { timeout: 15_000 });
