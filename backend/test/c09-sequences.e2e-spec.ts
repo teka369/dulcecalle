@@ -153,6 +153,48 @@ describe("C09-PR1 business sequences", () => {
     ]);
   });
 
+  it("merge C07.1: reverse/void/correct dryRun never touch business_sequences; the real calls take the next consecutive DC-R- / DC-P-", async () => {
+    const a = await newBiz();
+    const ana = await customer(a, "Ana");
+    const beto = await customer(a, "Beto");
+    const sale = await post(a, "/v1/sales", { lines: [{ productId: a.productId, qty: 5, unitPrice: 1000 }], paymentKind: "credit", customerId: ana, amountReceived: 0 });
+    expect(sale.body.number).toBe("DC-000001");
+    const p1 = await post(a, `/v1/customers/${ana}/payments`, { amount: 1000, method: "Efectivo" });
+    const p2 = await post(a, `/v1/customers/${ana}/payments`, { amount: 500, method: "Nequi" });
+    expect([p1.body.number, p2.body.number]).toEqual(["DC-P-000001", "DC-P-000002"]);
+    const snap = async () =>
+      (await prisma.businessSequence.findMany({ where: { businessId: a.biz }, orderBy: { kind: "asc" } })).map((r) => [
+        r.kind,
+        Number(r.next),
+        r.updatedAt.toISOString(),
+      ]);
+    const before = await snap();
+    const correctBody = () => ({
+      reasonCode: "cliente_equivocado",
+      replacement: { customerId: beto, amount: 1000, method: "Efectivo", requestId: randomUUID() },
+    });
+    const dReverse = await post(a, `/v1/customers/${ana}/payments/${p2.body.id}/reverse?dryRun=true`, { reasonCode: "duplicado" });
+    const dVoid = await post(a, `/v1/sales/${sale.body.id}/void?dryRun=true`, { reasonCode: "error_digitacion" });
+    const dCorrect = await post(a, `/v1/customers/${ana}/payments/${p1.body.id}/correct?dryRun=true`, correctBody());
+    expect([dReverse.status, dVoid.status, dCorrect.status]).toEqual([200, 200, 200]);
+    expect([dReverse.body.dryRun, dVoid.body.dryRun, dCorrect.body.dryRun]).toEqual([true, true, true]);
+    expect(dCorrect.body.replacementPreview).toBeTruthy(); // C07.1 preview still there
+    expect(await snap()).toEqual(before); // no increment, no gap
+    expect(await prisma.reversal.count({ where: { businessId: a.biz } })).toBe(0);
+    expect(await prisma.customerPayment.count({ where: { businessId: a.biz } })).toBe(2);
+
+    const rv = await post(a, `/v1/customers/${ana}/payments/${p2.body.id}/reverse`, { reasonCode: "duplicado" });
+    expect([rv.status, rv.body.number]).toEqual([201, "DC-R-000001"]);
+    const c = await post(a, `/v1/customers/${ana}/payments/${p1.body.id}/correct`, correctBody());
+    expect(c.status).toBe(201);
+    expect([c.body.number, c.body.replacementPayment.number]).toEqual(["DC-R-000002", "DC-P-000003"]);
+    expect((await snap()).map(([k, n]) => [k, n])).toEqual([
+      ["sale", 2],
+      ["payment", 4],
+      ["reversal", 3],
+    ]);
+  });
+
   it("wipe keeps the sequences: numbers are never reused after a business data reset", async () => {
     const a = await newBiz();
     expect((await post(a, "/v1/sales", saleBody(a))).body.number).toBe("DC-000001");
