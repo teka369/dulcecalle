@@ -37,6 +37,11 @@ describe("portal balance", () => {
     expect(purchaseLabel(10, "partial")).toBe("Venta parcial");
     expect(purchaseLabel(10, "credit")).toBe("A crédito");
   });
+  it("C04 T22: Saldada / Pendiente $X from the server openBalance", () => {
+    expect(purchaseLabel(1000, "credit", 0)).toBe("Saldada");
+    expect(purchaseLabel(2000, "credit", 1000)).toMatch(/^Pendiente \$\s?1\.000$/);
+    expect(purchaseLabel(0, "paid", 0)).toBe("Compra");
+  });
 });
 
 describe("portal isolation", () => {

@@ -501,7 +501,24 @@ export class SalesService {
       include: { lines: true },
     });
     if (!s) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
-    return saleJson(s);
+    // C04 W6 — what is still owed on this sale and what was applied to it.
+    const rows = await this.prisma.debtAllocation.findMany({
+      where: { businessId: ctx.businessId, saleId: s.id, targetType: "sale" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    const applied = rows.reduce((a, r) => a + r.amount, 0n);
+    const open = s.credit - applied;
+    return {
+      ...saleJson(s),
+      openBalance: copToJson(open < 0n ? 0n : open),
+      allocations: rows.map((r) => ({
+        sourceType: r.sourceType,
+        sourceId: r.sourceId,
+        amount: copToJson(r.amount),
+        mode: r.mode,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    };
   }
 
   async listReturns(ctx: BusinessContext, saleId: string) {

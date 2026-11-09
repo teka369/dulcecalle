@@ -2,6 +2,7 @@
 import type { CustomerLedger } from "@/data/http/customer-api";
 import type { CustomerStatementRow } from "@/data/pwa/customer-portal";
 import { ApiError } from "@/data/errors";
+import { formatCop } from "@/domain/money";
 
 export const PORTAL_OFFLINE_MESSAGE = "Sin conexión.";
 export const PORTAL_LOAD_FAILED_MESSAGE = "No se pudo cargar";
@@ -50,14 +51,54 @@ export function statementSign(row: Pick<CustomerStatementRow, "kind">) {
   return { sign: "+" as const, word: "Sube tu deuda", tone: "danger" as const };
 }
 
-export function purchaseLabel(credit: number, paymentKind: string): string {
+/**
+ * C04 W5 / T22 — with the server `openBalance` a fiado purchase reads
+ * «Pendiente $X» or «Saldada». Pre-C04 servers (no openBalance) keep the
+ * old labels.
+ */
+export function purchaseLabel(credit: number, paymentKind: string, openBalance?: number | null): string {
+  if (credit > 0 && typeof openBalance === "number") {
+    return openBalance > 0 ? `Pendiente ${formatCop(openBalance)}` : "Saldada";
+  }
   if (credit > 0) return paymentKind === "partial" ? "Venta parcial" : "A crédito";
   return "Compra";
 }
 
-export function purchaseTone(credit: number, paymentKind: string): "ok" | "warning" | "info" {
+export function purchaseTone(
+  credit: number,
+  paymentKind: string,
+  openBalance?: number | null,
+): "ok" | "warning" | "info" {
   if (credit <= 0) return "ok";
+  if (typeof openBalance === "number") return openBalance > 0 ? "warning" : "ok";
   return paymentKind === "partial" ? "warning" : "info";
+}
+
+/** C04 W5 — «Se aplicó a: …» for a portal abono. */
+export function paymentAppliedText(
+  payment: { allocations?: Array<{ targetType: string; targetId: string | null; amount: number }> },
+  ledger: { sales: Array<{ id: string; occurredOn: string }>; initials: Array<{ id: string; occurredOn: string }> },
+): string | null {
+  const rows = (payment.allocations ?? []).filter((a) => a.amount > 0);
+  if (rows.length === 0) return null;
+  const day = (k: string) => {
+    const [y, m, d] = k.slice(0, 10).split("-").map(Number);
+    return y && m && d
+      ? new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", timeZone: "UTC" })
+          .format(new Date(Date.UTC(y, m - 1, d)))
+          .replace(".", "")
+      : k;
+  };
+  const parts = rows.map((a) => {
+    if (a.targetType === "credit") return `Saldo a favor ${formatCop(a.amount)}`;
+    if (a.targetType === "initial_debt") {
+      const d = ledger.initials.find((x) => x.id === a.targetId);
+      return `Deuda anterior${d ? ` ${day(d.occurredOn)}` : ""} ${formatCop(a.amount)}`;
+    }
+    const s = ledger.sales.find((x) => x.id === a.targetId);
+    return `Compra${s ? ` ${day(s.occurredOn)}` : ""} ${formatCop(a.amount)}`;
+  });
+  return `Se aplicó a: ${parts.join(" · ")}`;
 }
 
 export function epoch(value: string | number): number {
