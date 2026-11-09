@@ -628,6 +628,68 @@ describe("C07 reversals (DC-05)", () => {
     await invariants(b);
   });
 
+  it("C07.1 / C07-QA-01: correct?dryRun previews the replacement abono — caja nets out+in, replacement debt; writes nothing; matches the real call", async () => {
+    const b = await newBiz(true, 11500);
+    const ana = await customer(b, "Ana");
+    const beto = await customer(b, "Beto");
+    await fiada(b, ana, 4000);
+    await fiada(b, beto, 4000);
+    const p = await pay(b, ana, { amount: 2000 });
+    expect((await today(b)).expectedEfectivo).toBe(13500);
+    const key = randomUUID();
+    const body = { reasonCode: "cliente_equivocado", replacement: { customerId: beto, amount: 2000, method: "Efectivo", requestId: randomUUID() } };
+    const snap0 = await snapshot(b);
+    const d = await post(b, `/v1/customers/${ana}/payments/${p.id}/correct?dryRun=true`, body, key);
+    expect(d.status).toBe(200);
+    expect(d.body).toMatchObject({ dryRun: true, blockers: [], warnings: [] });
+    expect(d.body.effects).toMatchObject({ debtBefore: 2000, debtAfter: 4000, cashOut: 2000 });
+    expect(d.body.after.cash.expectedEfectivo).toBe(11500); // the reverso alone
+    expect(d.body.replacementPreview).toEqual({
+      customerId: beto,
+      amount: 2000,
+      method: "Efectivo",
+      cashMove: { direction: "in", kind: "debt_collect", method: "Efectivo", amount: 2000, sessionId: d.body.after.cash.sessionId },
+      debtBefore: 4000,
+      debtAfter: 2000,
+      creditBefore: 0,
+      creditAfter: 0,
+      expectedEfectivoAfter: 13500,
+      expectedNequiAfter: 0,
+    });
+    expect(await snapshot(b)).toEqual(snap0); // I-R12: nothing written
+    const real = await post(b, `/v1/customers/${ana}/payments/${p.id}/correct`, body, key);
+    expect(real.status).toBe(201);
+    expect(real.body.effects).toEqual(d.body.effects); // I-R12
+    const t = await today(b);
+    expect([t.expectedEfectivo, t.expectedNequi]).toEqual([13500, 0]);
+    const lb = await ledger(b, beto);
+    expect([lb.customer.debt, lb.customer.creditBalance]).toEqual([2000, 0]);
+
+    // Same customer, new amount (monto_equivocado) and Nequi: debt starts from the post-reverso state; overpay → saldo a favor.
+    const p2 = await pay(b, ana, { amount: 1000 });
+    const body2 = { reasonCode: "monto_equivocado", replacement: { customerId: ana, amount: 5000, method: "Nequi", requestId: randomUUID() } };
+    const d2 = await post(b, `/v1/customers/${ana}/payments/${p2.id}/correct?dryRun=true`, body2);
+    expect(d2.status).toBe(200);
+    expect(d2.body.effects).toMatchObject({ debtBefore: 3000, debtAfter: 4000 });
+    expect(d2.body.replacementPreview).toMatchObject({
+      customerId: ana,
+      method: "Nequi",
+      debtBefore: 4000,
+      debtAfter: 0,
+      creditBefore: 0,
+      creditAfter: 1000,
+      expectedEfectivoAfter: 13500,
+      expectedNequiAfter: 5000,
+    });
+    const r2 = await post(b, `/v1/customers/${ana}/payments/${p2.id}/correct`, body2);
+    expect(r2.status).toBe(201);
+    const la = await ledger(b, ana);
+    expect([la.customer.debt, la.customer.creditBalance]).toEqual([0, 1000]);
+    const t2 = await today(b);
+    expect([t2.expectedEfectivo, t2.expectedNequi]).toEqual([13500, 5000]);
+    await invariants(b);
+  });
+
   it("concurrency: two parallel reverses of the same abono with different keys → exactly one 201, one 409", async () => {
     const b = await newBiz(true, 0);
     const c = await customer(b);

@@ -103,12 +103,24 @@ export type ReversalResult = {
     creditBefore: number | null;
     creditAfter: number | null;
     cashOut: number;
-    target?: { occurredOn?: string };
+    target?: { customerId?: string | null; occurredOn?: string };
   };
   after?: { cash?: { expectedEfectivo?: number | null } };
   warnings: string[];
   blockers?: string[];
   replacementPayment?: Record<string, unknown>;
+  /** C07.1 — only on `correct?dryRun=true` (mirrors `ReplacementPreview` in domain/reversal). */
+  replacementPreview?: {
+    customerId: string;
+    amount: number;
+    method: string;
+    debtBefore?: number | null;
+    debtAfter?: number | null;
+    creditBefore?: number | null;
+    creditAfter?: number | null;
+    expectedEfectivoAfter?: number | null;
+    expectedNequiAfter?: number | null;
+  };
 };
 
 export type PaymentInput = {
