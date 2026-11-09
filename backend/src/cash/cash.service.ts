@@ -10,7 +10,7 @@ import { dateKey, occurredOnDate } from "../shared/clock";
 import { linkForNewMove } from "./session-link";
 import { formatNumber, nextNumber } from "../shared/sequences";
 import { copString, isoInZone } from "../shared/canonical";
-import { emitReceipt, receiptRefs } from "../receipts/receipt-emit";
+import { emitAllocationReceipt, emitReceipt, receiptRefs } from "../receipts/receipt-emit";
 import { sessionExpected } from "./carry-rules";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
@@ -673,7 +673,7 @@ export class CashService {
       : null;
     const business = await tx.business.findUniqueOrThrow({ where: { id: ctx.businessId }, select: { id: true, name: true } });
     const paymentNumber = formatNumber("payment", number)!;
-    await emitReceipt(tx, {
+    const paymentRef = await emitReceipt(tx, {
       businessId: ctx.businessId,
       customerId,
       kind: "payment",
@@ -699,6 +699,17 @@ export class CashService {
         creditGenerated: copString(plan.toCredit),
         replacesPaymentNumber: replaced ? formatNumber("payment", replaced.number) : null,
       },
+    });
+    // C09-PR3 — «a qué se aplicó», annex DC-P-…/D1 linked to the payment (T6).
+    await emitAllocationReceipt(tx, {
+      businessId: ctx.businessId,
+      customerId,
+      groupId: id,
+      parent: paymentRef,
+      createdAt: now,
+      timeZone: ctx.timezone,
+      occurredOn: dateKey(occurredOn),
+      adjusted: plan.adjusted,
     });
     return payment;
   }

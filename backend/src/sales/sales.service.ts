@@ -24,7 +24,7 @@ import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../
 import type { CreateReturnDto, CreateSaleDto } from "./sales.dto";
 import { formatNumber, nextNumber } from "../shared/sequences";
 import { copString, isoInZone } from "../shared/canonical";
-import { emitReceipt, receiptRefs } from "../receipts/receipt-emit";
+import { emitAllocationReceipt, emitReceipt, receiptRefs } from "../receipts/receipt-emit";
 
 function saleJson(s: {
   id: string;
@@ -450,7 +450,7 @@ export class SalesService {
           : null;
         const business = await tx.business.findUniqueOrThrow({ where: { id: ctx.businessId }, select: { id: true, name: true } });
         const saleNumber = formatNumber("sale", number)!;
-        await emitReceipt(tx, {
+        const saleRef = await emitReceipt(tx, {
           businessId: ctx.businessId,
           customerId: customerBefore?.id ?? null,
           kind: "sale",
@@ -483,6 +483,18 @@ export class SalesService {
             creditAfter: after ? copString(after.creditBalance) : null,
           },
         });
+        // C09-PR3 — saldo a favor applied (credit_apply): annex DC-…/D1.
+        if (creditToApply > 0n && customerBefore) {
+          await emitAllocationReceipt(tx, {
+            businessId: ctx.businessId,
+            customerId: customerBefore.id,
+            groupId: saleId,
+            parent: saleRef,
+            createdAt: now,
+            timeZone: ctx.timezone,
+            occurredOn: dateKey(occurredOn),
+          });
+        }
 
         return tx.sale.findUniqueOrThrow({
           where: { id: saleId },
@@ -894,7 +906,7 @@ export class SalesService {
           ? await tx.customer.findUniqueOrThrow({ where: { id: customerBefore.id }, select: { debt: true, creditBalance: true } })
           : null;
         const business = await tx.business.findUniqueOrThrow({ where: { id: ctx.businessId }, select: { id: true, name: true } });
-        await emitReceipt(tx, {
+        const returnRef = await emitReceipt(tx, {
           businessId: ctx.businessId,
           customerId: customerBefore?.id ?? null,
           kind: "return",
@@ -929,6 +941,18 @@ export class SalesService {
             creditAfter: after ? copString(after.creditBalance) : null,
           },
         });
+        // C09-PR3 — return imputed FIFO / to saldo a favor (decision 6): annex DC-D-…/D1.
+        if (customerBefore) {
+          await emitAllocationReceipt(tx, {
+            businessId: ctx.businessId,
+            customerId: customerBefore.id,
+            groupId: returnId,
+            parent: returnRef,
+            createdAt: now,
+            timeZone: ctx.timezone,
+            occurredOn: dateKey(occurredOn),
+          });
+        }
 
         return tx.saleReturn.findUniqueOrThrow({
           where: { id: returnId },

@@ -40,7 +40,9 @@ export class ReceiptsService {
         })
       ).map((r) => r.prevReceiptId!),
     );
-    const reversible = rows.filter((r) => REVERSAL_TARGET[r.sourceType]);
+    // An allocation annex shares its source id with the abono/sale it
+    // distributes, so it reads «anulado» when that source is reversed.
+    const reversible = rows.filter((r) => REVERSAL_TARGET[r.sourceType] || r.sourceType === "allocation");
     const reversed = new Set(
       reversible.length === 0
         ? []
@@ -48,17 +50,21 @@ export class ReceiptsService {
             await this.prisma.reversal.findMany({
               where: {
                 businessId,
-                OR: reversible.map((r) => ({ targetType: REVERSAL_TARGET[r.sourceType]!, targetId: r.sourceId })),
+                OR: reversible.map((r) =>
+                  r.sourceType === "allocation"
+                    ? { targetId: r.sourceId, targetType: { in: ["sale", "customer_payment"] as ReversalTarget[] } }
+                    : { targetType: REVERSAL_TARGET[r.sourceType]!, targetId: r.sourceId },
+                ),
               },
               select: { targetType: true, targetId: true },
             })
-          ).map((x) => `${x.targetType}:${x.targetId}`),
+          ).flatMap((x) => [`${x.targetType}:${x.targetId}`, `allocation:${x.targetId}`]),
     );
     const out = new Map<string, ReceiptStatus>();
     for (const r of rows) {
       const st: ReceiptStatus = replaced.has(r.id)
         ? "reemplazado"
-        : reversed.has(`${REVERSAL_TARGET[r.sourceType]}:${r.sourceId}`)
+        : reversed.has(r.sourceType === "allocation" ? `allocation:${r.sourceId}` : `${REVERSAL_TARGET[r.sourceType]}:${r.sourceId}`)
           ? "anulado"
           : "vigente";
       out.set(r.id, st);
@@ -114,8 +120,16 @@ export class ReceiptsService {
     const r = await this.prisma.receipt.findFirst({ where: { id, businessId: ctx.businessId } });
     if (!r) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
     const st = await this.statuses(ctx.businessId, [r]);
+    // C09-PR3 — receipts of the same operation (payment ↔ its allocation
+    // annex, reversal ↔ its annex), derived from the shared source id.
+    const related = await this.prisma.receipt.findMany({
+      where: { businessId: ctx.businessId, sourceId: r.sourceId, id: { not: r.id } },
+      orderBy: [{ number: "asc" }],
+      select: { id: true, kind: true, number: true },
+    });
     return {
       ...this.summary(r, st.get(r.id)!),
+      related,
       prevReceiptId: r.prevReceiptId,
       snapshot: r.snapshot,
       contentHash: r.contentHash,

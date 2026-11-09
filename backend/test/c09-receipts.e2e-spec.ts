@@ -177,7 +177,8 @@ describe("C09-PR2 receipts", () => {
     expect(r2.body.receipts).toEqual(r1.body.receipts);
     const counts = await prisma.receipt.groupBy({ by: ["kind", "sourceId"], where: { businessId: b.biz }, _count: { _all: true } });
     expect(counts.every((c) => c._count._all === 1)).toBe(true);
-    expect(counts.map((c) => c.kind).sort()).toEqual(["payment", "return", "sale"]);
+    // PR3 adds the allocation annexes of the payment and of the return.
+    expect(counts.map((c) => c.kind).sort()).toEqual(["allocation", "allocation", "payment", "return", "sale"]);
   });
 
   it("I-C3: payment and return receipts carry the real before/after; after of one = before of the next for the same customer", async () => {
@@ -226,7 +227,8 @@ describe("C09-PR2 receipts", () => {
     const pr2 = await receipt(b, p2.body.receipts[0].id);
     expect(pr2.snapshot).toMatchObject({ debtBefore: "0", debtAfter: "0", creditBefore: "1000", creditAfter: "1500", creditGenerated: "500" });
     const all = await prisma.receipt.findMany({ where: { businessId: b.biz, customerId: ana.id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
-    const snaps = all.map((r) => r.snapshot as Record<string, string | null>);
+    // Allocation annexes (PR3) carry open balances per obligation, not the customer chain.
+    const snaps = all.filter((r) => r.kind !== "allocation").map((r) => r.snapshot as Record<string, string | null>);
     for (let i = 1; i < snaps.length; i++) {
       expect([snaps[i]!.debtBefore, snaps[i]!.creditBefore ?? snaps[i - 1]!.creditAfter]).toEqual([snaps[i - 1]!.debtAfter, snaps[i - 1]!.creditAfter ?? snaps[i]!.creditBefore]);
     }
