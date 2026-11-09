@@ -19,6 +19,8 @@ export async function getStatementWithOfflineFallback(
   try {
     const statement = await loadHttpStatement(customerId);
     if (!statement) return null;
+    const businessId = getPwaAuthSession().businessId;
+    if (businessId) await appendUnconfirmedAbonos(businessId, customerId, statement);
     return { statement, source: "server" };
   } catch (e) {
     if (!(e instanceof NetworkError)) throw e;
@@ -28,6 +30,50 @@ export async function getStatementWithOfflineFallback(
     if (!statement) throw e;
     return { statement, source: "cache" };
   }
+}
+
+/**
+ * C01 / DC-01 — abonos saved on this device that the server has not
+ * confirmed (pending or rejected) stay visible in the server statement with
+ * their state. They do not move the server running balance.
+ */
+async function appendUnconfirmedAbonos(
+  businessId: string,
+  customerId: string,
+  statement: DebtStatement,
+): Promise<void> {
+  const db = getLocalDb();
+  const states = await unconfirmedPaymentStates(businessId);
+  if (states.size === 0) return;
+  const payments = await db.customerPayments
+    .where("[businessId+customerId]")
+    .equals([businessId, customerId])
+    .toArray();
+  const last = statement.entries.at(-1)?.runningBalance ?? 0;
+  for (const p of payments) {
+    const state = states.get(p.requestId);
+    if (!state) continue;
+    statement.entries.push({
+      kind: "abono",
+      id: `pay-${p.id}`,
+      createdAt: p.createdAt,
+      amount: p.amount,
+      method: p.method,
+      ...(p.note ? { note: p.note } : {}),
+      runningBalance: last,
+      syncState: state,
+    });
+  }
+}
+
+async function unconfirmedPaymentStates(businessId: string): Promise<Map<string, "pending" | "rejected">> {
+  const ops = await getLocalDb().outbox.where("businessId").equals(businessId).toArray();
+  const out = new Map<string, "pending" | "rejected">();
+  for (const op of ops) {
+    if (op.entity !== "customerPayment" || op.status === "synced" || isSuppressedLocalEffect(op)) continue;
+    out.set(op.requestId, op.status === "failed" && op.nextAttemptAt == null ? "rejected" : "pending");
+  }
+  return out;
 }
 
 async function buildLocalStatement(
@@ -104,8 +150,10 @@ async function buildLocalStatement(
     .where("[businessId+customerId]")
     .equals([businessId, customerId])
     .toArray();
+  const unconfirmed = await unconfirmedPaymentStates(businessId);
   for (const p of payments) {
     if (suppressed.has(p.requestId)) continue;
+    const syncState = unconfirmed.get(p.requestId);
     events.push({
       at: p.createdAt,
       delta: -p.amount,
@@ -116,6 +164,7 @@ async function buildLocalStatement(
         amount: p.amount,
         method: p.method,
         ...(p.note ? { note: p.note } : {}),
+        ...(syncState ? { syncState } : {}),
         runningBalance: 0,
       },
     });

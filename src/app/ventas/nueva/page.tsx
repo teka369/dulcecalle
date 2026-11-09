@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCop, mulCop, addCop } from "@/domain/money";
 import { AMOUNT_TOO_LARGE_MESSAGE, MAX_COP_AMOUNT } from "@/domain/money/limits";
 import { parseSaleUnitPrice } from "@/domain/sale/validate";
@@ -18,6 +18,7 @@ import { HeroSearch } from "@/components/ui/HeroSearch";
 import { Sheet } from "@/components/ui/Sheet";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
+import { RejectedSaleBanner, withRejectedParam } from "@/components/sale/RejectedSaleBanner";
 
 export default function NuevaVentaPage() {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function NuevaVentaPage() {
       .catch(() => setProducts([]));
   }, []);
 
+  const productName = useCallback((id: string) => products.find((p) => p.id === id)?.name ?? null, [products]);
   const categories = useMemo(() => {
     return Array.from(new Set(products.map((p) => p.category))).sort();
   }, [products]);
@@ -131,6 +133,7 @@ export default function NuevaVentaPage() {
       </HeroBlock>
 
       <Sheet>
+        <RejectedSaleBanner productName={productName} />
         {sellable.length === 0 ? (
           <StateBlock
             kind="empty"
@@ -182,7 +185,7 @@ export default function NuevaVentaPage() {
           disabled: !canCobrar,
           onClick: () => {
             if (!canCobrar) return;
-            navigateOfflineAware(router, "/ventas/cobrar");
+            navigateOfflineAware(router, withRejectedParam("/ventas/cobrar"));
           },
         }}
       />

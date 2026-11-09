@@ -15,6 +15,7 @@ import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { kindLabel, moveSign, shortDay } from "@/components/cash/cash";
 import { formatCop } from "@/domain/money";
+import { unresolvedMarkText } from "@/components/cash/unresolved-mark";
 import { getPwaApi } from "@/data/pwa/api";
 import { carryCashWithOfflineFallback } from "@/data/pwa/offline-operations";
 import { carryCountedEfectivo, normalizeSessionDetail } from "@/components/cash/gestionar-offline";
@@ -33,6 +34,8 @@ type Detail = {
   regularized: boolean;
   closeMode: string | null;
   note: string | null;
+  unresolvedCount?: number | null;
+  unresolvedAmount?: number | null;
   moves: Array<{ id: string; kind: string; method: string; amount: number; direction: string; occurredOn: string }>;
   stampedMoves: Array<{ id: string; kind: string; method: string; amount: number; direction: string; occurredOn: string }>;
 };
@@ -174,6 +177,11 @@ export default function GestionarCajaDetailPage() {
           />
         ) : null}
         {detail.closeMode === "assumed" && detail.note ? <RowGroupNote>{detail.note}</RowGroupNote> : null}
+        {unresolvedMarkText(detail.unresolvedCount, detail.unresolvedAmount) ? (
+          <p data-testid="caja-unresolved-mark" className="text-sm font-medium text-danger">
+            {unresolvedMarkText(detail.unresolvedCount, detail.unresolvedAmount)}
+          </p>
+        ) : null}
 
         {!detail.regularized ? (
           <section className="flex flex-col gap-3">

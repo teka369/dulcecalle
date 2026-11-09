@@ -555,7 +555,7 @@ describe("M7.1 offline debt reconciliation", () => {
     expect(api.customers.initialDebt.mock.calls.filter((call) => call[2] === requestId).length).toBe(3);
   });
 
-  it("T8 permanent 4xx stops retrying and drops the projection", async () => {
+  it("T8 permanent 4xx stops retrying and keeps the projection until resolved", async () => {
     const customerId = await seedCustomer({ debt: 100_000 });
     const requestId = newEntityId();
     api.customers.initialDebt.mockRejectedValueOnce(new NetworkError("offline"));
@@ -570,26 +570,27 @@ describe("M7.1 offline debt reconciliation", () => {
     expect(op?.nextAttemptAt).toBeNull();
     expect(op?.lastError).toBe("Deuda rechazada");
     expect(op?.lastError).not.toContain("NetworkError");
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(100_000);
-    expect(await pendingDebtAdjustment(BIZ, customerId)).toBe(0);
+    // C01 / DC-01: the rejected intent keeps its projection until resolved.
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(120_000);
+    expect(await pendingDebtAdjustment(BIZ, customerId)).toBe(20_000);
 
     const statement = await getStatementWithOfflineFallback(customerId);
     expect(statement?.source).toBe("cache");
-    expect(statement?.statement.total).toBe(100_000);
-    expect(statement?.statement.entries.some((entry) => entry.kind === "inicial")).toBe(false);
+    expect(statement?.statement.total).toBe(120_000);
+    expect(statement?.statement.entries.some((entry) => entry.kind === "inicial")).toBe(true);
 
     const calls = api.customers.initialDebt.mock.calls.length;
     const again = await syncPendingInitialDebts(BIZ);
     expect(again.processed).toBe(0);
     expect(api.customers.initialDebt.mock.calls.length).toBe(calls);
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(100_000);
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(120_000);
     expect(await getLocalDb().initialDebts.count()).toBe(1);
 
     const rejected = await getOutboxStore().getByRequestId(BIZ, requestId);
     if (!rejected) throw new Error("missing rejected debt");
     await getOutboxStore().requeue(BIZ, rejected.operationId);
     await syncPendingInitialDebts(BIZ);
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(100_000);
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(120_000);
     const retried = await getOutboxStore().getByRequestId(BIZ, requestId);
     expect(retried?.status).toBe("failed");
     expect(retried?.nextAttemptAt).toBeNull();

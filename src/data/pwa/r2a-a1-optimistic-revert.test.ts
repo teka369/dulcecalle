@@ -132,8 +132,9 @@ describe("R2-A A1: optimistic Dexie rows are cleaned on permanent rejection and 
     await syncPendingSales(BIZ);
     await syncPendingPayments(BIZ);
 
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(50_000);
-    expect((await getLocalDb().products.get(prodId))?.stock).toBe(10);
+    // C01 / DC-01: rejections keep every local effect until Descartar.
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(61_000);
+    expect((await getLocalDb().products.get(prodId))?.stock).toBe(7);
 
     // 3. User clicks Descartar on all 3 rejected operations
     await discardOutboxOperation(BIZ, debt.debtId);
@@ -154,7 +155,7 @@ describe("R2-A A1: optimistic Dexie rows are cleaned on permanent rejection and 
     expect(await listLocalSales(BIZ)).toEqual([]);
   });
 
-  it("permanent 409 rejection + discard of aporte, gasto, surtir, shrink, and preparation reverts Caja/Gastos/Stock once", async () => {
+  it("permanent 409 rejection keeps aporte, gasto, surtir, shrink and preparation; discard reverts Caja/Gastos/Stock once", async () => {
     // Queue offline aporte (+4.000), gasto (-1.500), surtir (+5 units @ 600 = 3.000), shrink (-2 units), preparation (+4 units @ 500 = 2.000)
     api.cash.aporte.mockRejectedValueOnce(new NetworkError("offline"));
     const aporte = await recordAporteOffline({ amount: 4_000, method: "Efectivo" }, newEntityId());
@@ -209,21 +210,23 @@ describe("R2-A A1: optimistic Dexie rows are cleaned on permanent rejection and 
 
     await syncPendingPreparations(BIZ);
 
-    // After permanent rejection, local Caja, Gastos, and Stock must be reverted to baseline:
+    // C01 / DC-01: a permanent rejection keeps every local effect visible:
     const cashAfterReject = await getLocalCashSnapshot();
-    expect(cashAfterReject.summary.expected.efectivo).toBe(0);
-    expect(cashAfterReject.summary.moves).toHaveLength(0);
-    expect(cashAfterReject.expenses).toHaveLength(0);
-    expect((await getLocalDb().products.get(prodId))?.stock).toBe(10);
-    expect((await getLocalDb().products.get(prodId))?.avgCost).toBe(500);
-    expect((await getLocalDb().products.get(insumoId))?.avgCost).toBe(10_000);
-    expect(await getLocalDb().preparations.count()).toBe(0);
+    expect(cashAfterReject.summary.expected.efectivo).toBe(2_500);
+    expect(cashAfterReject.expenses).toHaveLength(1);
+    expect((await getLocalDb().products.get(prodId))?.stock).toBe(14);
+    expect(await getLocalDb().preparations.count()).toBe(1);
 
-    // Discarding the rejected ops must not double-revert stock or cost:
+    // Descartar is the explicit action that reverts Caja, Gastos and Stock once:
     await discardOutboxOperation(BIZ, aporte.id);
     await discardOutboxOperation(BIZ, gasto.id);
     await discardOutboxOperation(BIZ, prep.id);
 
+    const cashAfterDiscard = await getLocalCashSnapshot();
+    expect(cashAfterDiscard.summary.expected.efectivo).toBe(0);
+    expect(cashAfterDiscard.summary.moves).toHaveLength(0);
+    expect(cashAfterDiscard.expenses).toHaveLength(0);
+    expect(await getLocalDb().preparations.count()).toBe(0);
     expect((await getLocalDb().products.get(prodId))?.stock).toBe(10);
     expect((await getLocalDb().products.get(prodId))?.avgCost).toBe(500);
     expect((await getLocalDb().products.get(insumoId))?.avgCost).toBe(10_000);
@@ -253,13 +256,16 @@ describe("R2-A A1: optimistic Dexie rows are cleaned on permanent rejection and 
     await syncPendingPreparations(BIZ);
     await syncPendingOperations(BIZ);
 
-    // Must restore prodId to stock=10 AND original avgCost=500 (not the intermediate post-preparation 433):
-    const pAfterFifo = await getLocalDb().products.get(prodId);
-    expect(pAfterFifo?.stock).toBe(10);
-    expect(pAfterFifo?.avgCost).toBe(500);
+    // C01: rejection keeps both effects (10 + 2 + 4):
+    expect((await getLocalDb().products.get(prodId))?.stock).toBe(16);
 
     await discardOutboxOperation(BIZ, prep.id);
     await discardOutboxOperation(BIZ, surtir.id);
+
+    // Discard in FIFO order restores stock=10 AND original avgCost=500 (not the intermediate post-preparation 433):
+    const pAfterFifo = await getLocalDb().products.get(prodId);
+    expect(pAfterFifo?.stock).toBe(10);
+    expect(pAfterFifo?.avgCost).toBe(500);
 
     // 2. Concurrent GET /v1/products overwrites db.products with server baseline BEFORE outbox rejection:
     api.inventory.surtir.mockRejectedValueOnce(new NetworkError("offline"));
@@ -285,8 +291,9 @@ describe("R2-A A1: optimistic Dexie rows are cleaned on permanent rejection and 
       cachedAt: serverFetchedAt,
     });
 
-    // Now syncPendingOperations rejects surtir2 with 409:
+    // Now syncPendingOperations rejects surtir2 with 409 and the owner discards it:
     await syncPendingOperations(BIZ);
+    await discardOutboxOperation(BIZ, surtir2.id);
 
     // Must NOT subtract 5 from the already-clean server baseline (stays stock=10, avgCost=500):
     const pAfterConcurrentGet = await getLocalDb().products.get(prodId);

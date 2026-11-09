@@ -2,6 +2,7 @@
 
 import {
   NOT_A_BACKUP,
+  backupsPendingText,
   lastCompletedSyncLine,
   queueIsClear,
   syncPlaceCopy,
@@ -40,6 +41,11 @@ export function SyncStatusSummary({
           <p className={`mt-1 leading-snug ${counts.permanent > 0 ? "text-danger" : "text-ink"}`}>{copy.attention}</p>
         </li>
       </ul>
+      {(counts.backups ?? 0) > 0 && (
+        <p data-testid="backups-pending" className="text-xs text-warning">
+          {backupsPendingText(counts.backups ?? 0)}: la traza de lo rechazado o descartado todavía no está en el servidor.
+        </p>
+      )}
       <p className="text-xs text-ink-muted">{lastCompletedSyncLine(lastDoneAt, clear)}</p>
       <p className="text-xs text-ink-muted">{NOT_A_BACKUP}</p>
     </div>

@@ -20,6 +20,11 @@ import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { formatCop } from "@/domain/money";
 import { getCachedCustomer } from "@/data/pwa/catalog";
 import { ApiError } from "@/data/errors";
+import { RejectedOpsCard } from "@/components/customers/RejectedOpsCard";
+import { useAfterSync } from "@/components/shell/use-after-sync";
+import { listUnresolvedFinancialOps, type UnresolvedFinancialOp } from "@/data/pwa/unresolved-financial";
+import { pendingDebtAdjustment } from "@/data/pwa/pending-debt";
+import { getPwaAuthSession } from "@/data/http/session";
 
 export default function ClienteFichaPage() {
   const id = useEntityId();
@@ -37,6 +42,8 @@ export default function ClienteFichaPage() {
   const [ready, setReady] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [unresolved, setUnresolved] = useState<UnresolvedFinancialOp[]>([]);
+  const [serverDebt, setServerDebt] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -65,9 +72,20 @@ export default function ClienteFichaPage() {
       const result = await customerStore.getStatement(c.id);
       setStatement(result?.statement ?? null);
       setFromCache(result?.source === "cache");
+      const businessId = getPwaAuthSession().businessId;
+      if (businessId) {
+        try {
+          setUnresolved(await listUnresolvedFinancialOps(businessId, { customerId: c.id }));
+          setServerDebt(c.debt - (await pendingDebtAdjustment(businessId, c.id)));
+        } catch {
+          setUnresolved([]);
+          setServerDebt(null);
+        }
+      }
     }
     setReady(true);
   }, [id]);
+  useAfterSync(load);
 
   useEffect(() => {
     void load();
@@ -196,6 +214,7 @@ export default function ClienteFichaPage() {
           ]}
         />
 
+        <RejectedOpsCard ops={unresolved} serverDebt={serverDebt} localDebt={customer.debt} />
         {statement ? (
           <DebtStatementView statement={statement} />
         ) : (

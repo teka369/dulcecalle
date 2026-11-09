@@ -18,6 +18,7 @@ import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { ActionToast } from "@/components/ui/ActionToast";
 import { usePrefill } from "@/components/ui/use-prefill";
+import { unresolvedMarkText } from "@/components/cash/unresolved-mark";
 import { useRejectedCorrection } from "@/components/ui/use-rejected-correction";
 import { CASH_OFFLINE_NOCACHE, cashOfflineView, cashPageGate, kindLabel, moveSign, shortDay } from "@/components/cash/cash";
 import { useSync } from "@/store/syncStore";
@@ -237,6 +238,11 @@ export default function CajaPage() {
       <Sheet>
         {notices}
         {closed ? <RowGroupNote>{CASH_COPY.elDiaEstaCerrado}</RowGroupNote> : null}
+        {closed && unresolvedMarkText(summary.session?.unresolvedCount, summary.session?.unresolvedAmount) ? (
+          <p role="status" data-testid="caja-unresolved-mark" className="rounded-[var(--r-lg)] border border-warning bg-warning-soft p-3 text-sm">
+            {unresolvedMarkText(summary.session?.unresolvedCount, summary.session?.unresolvedAmount)}
+          </p>
+        ) : null}
         <SegmentedMetrics label="Entradas y salidas" items={metrics} />
         {open ? (
           <QuickTiles

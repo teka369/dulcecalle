@@ -1,5 +1,7 @@
 "use client";
 
+import { Badge } from "@/components/ui/Badge";
+import { unresolvedMarkText } from "@/components/cash/unresolved-mark";
 import { errorText } from "@/domain/ux/user-message";
 import { Button } from "@/components/ui/Button";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -32,6 +34,8 @@ type Row = {
   requiresCarry: boolean;
   regularized: boolean;
   closedAt: string | null;
+  unresolvedCount?: number | null;
+  unresolvedAmount?: number | null;
 };
 
 /** Server default page size for GET /cash/sessions. */
@@ -262,7 +266,16 @@ export default function GestionarCajasPage() {
                 ) : (
                   <RowGroup label="Cerradas">
                     {closed.map((row) => (
-                      <UiRow key={row.id} title={`Caja del ${shortDay(row.localDate)}`} meta="Cerrada" />
+                      <UiRow
+                        key={row.id}
+                        title={`Caja del ${shortDay(row.localDate)}`}
+                        meta={unresolvedMarkText(row.unresolvedCount, row.unresolvedAmount) ?? "Cerrada"}
+                        trailing={
+                          unresolvedMarkText(row.unresolvedCount, row.unresolvedAmount) ? (
+                            <Badge tone="warning" data-testid="caja-unresolved-mark">Sin resolver</Badge>
+                          ) : undefined
+                        }
+                      />
                     ))}
                   </RowGroup>
                 )

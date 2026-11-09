@@ -13,6 +13,7 @@ import { createReturnWithOfflineFallback, syncPendingReturns } from "./offline-r
 import { createSaleWithOfflineFallback, syncPendingSales } from "./offline-sales";
 import { getStatementWithOfflineFallback } from "./offline-statement";
 import { pendingDebtAdjustment } from "./pending-debt";
+import { discardOutboxOperation } from "./sync-tray";
 
 const BIZ = "11111111-1111-4111-8111-111111111111";
 const BIZ_B = "99999999-9999-4999-8999-999999999999";
@@ -233,7 +234,7 @@ describe("offline chaos and financial consistency", () => {
     expect(await pendingDebtAdjustment(BIZ, customerId)).toBe(0);
   });
 
-  it("C4 a permanent rejection stays gone after refresh", async () => {
+  it("C4 a permanent rejection stays visible after refresh until it is discarded", async () => {
     const customerId = newEntityId();
     await seedCustomer(customerId, BIZ, 100_000);
     api.customers.initialDebt.mockRejectedValueOnce(new NetworkError("offline"));
@@ -244,10 +245,23 @@ describe("offline chaos and financial consistency", () => {
     const listed = await cache.listCustomers(BIZ, async () => [{
       id: customerId, code: "DC-0001", name: "Ana", phone: null, debt: 100_000, archivedAt: null, createdAt: 1,
     }]);
-    expect(listed.data[0]?.debt).toBe(100_000);
+    // C01 / DC-01: a rejection keeps the local intent and its effect.
+    expect(listed.data[0]?.debt).toBe(120_000);
     const statement = await getStatementWithOfflineFallback(customerId);
-    expect(statement?.statement.total).toBe(100_000);
-    expect(statement?.statement.entries.some((entry) => entry.kind === "inicial")).toBe(false);
+    expect(statement?.statement.entries.some((entry) => entry.kind === "inicial")).toBe(true);
+    // C01.2 / C011-INV-01 — the rejection also queues a clientEvent trace row;
+    // pick the initial-debt op itself (clientEvent rows cannot be discarded).
+    const op = (await getLocalDb().outbox.where("businessId").equals(BIZ).toArray()).find(
+      (row) => row.entity !== "clientEvent",
+    );
+    expect(op?.entity).toBe("initialDebt");
+    if (op) await discardOutboxOperation(BIZ, op.operationId);
+    const after = await cache.listCustomers(BIZ, async () => [{
+      id: customerId, code: "DC-0001", name: "Ana", phone: null, debt: 100_000, archivedAt: null, createdAt: 1,
+    }]);
+    expect(after.data[0]?.debt).toBe(100_000);
+    const gone = await getStatementWithOfflineFallback(customerId);
+    expect(gone?.statement.entries.some((entry) => entry.kind === "inicial")).toBe(false);
   });
 
   it("C5 a pending return stays visible once and confirms once", async () => {
@@ -302,7 +316,7 @@ describe("offline chaos and financial consistency", () => {
     expect(confirmed?.statement.total).toBe(30_000);
   });
 
-  it("C6 rolls a rejected return back once, including a manual retry", async () => {
+  it("C6 keeps a rejected return applied once, including a manual retry", async () => {
     const customerId = newEntityId();
     const productId = newEntityId();
     const saleId = newEntityId();
@@ -326,7 +340,8 @@ describe("offline chaos and financial consistency", () => {
     expect((await getLocalDb().customers.get(customerId))?.debt).toBe(0);
     api.sales.createReturn.mockRejectedValue(new ApiError("RETURN_EXCEEDS", "no", 409));
     await syncPendingReturns(BIZ);
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(20_000);
+    // C01: the rejected return keeps its local effect until resolved.
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(0);
     expect((await getLocalDb().products.get(productId))?.stock).toBe(8);
     expect(await getLocalDb().cashMoves.count()).toBe(0);
     const op = await getOutboxStore().get(BIZ, queued.operationId);
@@ -334,7 +349,7 @@ describe("offline chaos and financial consistency", () => {
     expect(op?.nextAttemptAt).toBeNull();
     await getOutboxStore().requeue(BIZ, queued.operationId);
     await syncPendingReturns(BIZ);
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(20_000);
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(0);
     expect((await getLocalDb().products.get(productId))?.stock).toBe(8);
     expect((await getOutboxStore().get(BIZ, queued.operationId))?.requestId).toBe(requestId);
   });
@@ -366,7 +381,7 @@ describe("offline chaos and financial consistency", () => {
     expect((await getLocalDb().customers.get(customerId))?.debt).toBe(120_000);
   });
 
-  it("C8 a 403 rolls the debt and the sale back once and does not look synced", async () => {
+  it("C8 a 403 keeps the debt and the sale applied once and does not look synced", async () => {
     const customerId = newEntityId();
     const productId = newEntityId();
     await seedCustomer(customerId, BIZ, 100_000);
@@ -379,10 +394,10 @@ describe("offline chaos and financial consistency", () => {
     await syncPendingInitialDebts(BIZ);
     expect((await getOutboxStore().get(BIZ, debt.debtId))?.status).toBe("failed");
     expect((await getOutboxStore().get(BIZ, debt.debtId))?.nextAttemptAt).toBeNull();
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(100_000);
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(120_000);
     await getOutboxStore().requeue(BIZ, debt.debtId);
     await syncPendingInitialDebts(BIZ);
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(100_000);
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(120_000);
 
     api.sales.create.mockRejectedValueOnce(new NetworkError("offline"));
     const sale = await createSaleWithOfflineFallback(
@@ -396,11 +411,11 @@ describe("offline chaos and financial consistency", () => {
     );
     if (sale.mode !== "offline") throw new Error("expected offline sale");
     expect((await getLocalDb().products.get(productId))?.stock).toBe(9);
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(150_000);
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(170_000);
     api.sales.create.mockRejectedValue(new ApiError("FORBIDDEN", "no", 403));
     await syncPendingSales(BIZ);
-    expect((await getLocalDb().products.get(productId))?.stock).toBe(10);
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(100_000);
+    expect((await getLocalDb().products.get(productId))?.stock).toBe(9);
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(170_000);
     expect((await getOutboxStore().get(BIZ, sale.saleId))?.status).toBe("failed");
     const sent = api.sales.create.mock.calls.at(-1)?.[0] as { optimisticApplied?: unknown };
     expect(sent.optimisticApplied).toBeUndefined();
@@ -408,7 +423,7 @@ describe("offline chaos and financial consistency", () => {
     api.sales.create.mockResolvedValue({ id: newEntityId() });
     await syncPendingSales(BIZ);
     expect((await getLocalDb().products.get(productId))?.stock).toBe(9);
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(150_000);
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(170_000);
     expect((await getOutboxStore().get(BIZ, sale.saleId))?.status).toBe("synced");
   });
 
@@ -437,7 +452,7 @@ describe("offline chaos and financial consistency", () => {
     expect((await getLocalDb().customers.get(customerB))?.debt).toBe(80_000);
   });
 
-  it("a rejected payment restores debt and cash once, then a retry applies it once", async () => {
+  it("a rejected payment keeps debt and cash once, then a retry confirms it once", async () => {
     const customerId = newEntityId();
     await seedCustomer(customerId, BIZ, 100_000);
     const requestId = newEntityId();
@@ -451,8 +466,9 @@ describe("offline chaos and financial consistency", () => {
     expect(await getLocalDb().cashMoves.count()).toBe(1);
     api.customers.pay.mockRejectedValueOnce(new ApiError("FORBIDDEN", "no", 403));
     await syncPendingPayments(BIZ);
-    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(100_000);
-    expect(await getLocalDb().cashMoves.count()).toBe(0);
+    // C01 / DC-01: the rejected abono keeps its debt and cash effect.
+    expect((await getLocalDb().customers.get(customerId))?.debt).toBe(80_000);
+    expect(await getLocalDb().cashMoves.count()).toBe(1);
     await getOutboxStore().requeue(BIZ, payment.paymentId);
     api.customers.pay.mockResolvedValue({ id: newEntityId() });
     await syncPendingPayments(BIZ);
@@ -460,7 +476,7 @@ describe("offline chaos and financial consistency", () => {
     expect(await getLocalDb().cashMoves.count()).toBe(1);
     expect(api.customers.pay).toHaveBeenLastCalledWith(
       customerId,
-      { amount: 20_000, method: "Efectivo" },
+      expect.objectContaining({ amount: 20_000, method: "Efectivo", occurredAt: expect.any(String) }),
       requestId,
     );
   });

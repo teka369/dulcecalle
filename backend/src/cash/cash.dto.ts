@@ -18,6 +18,19 @@ export class CloseSessionDto {
   @Max(MAX_COP_AMOUNT, { message: MAX_COP_MESSAGE })
   countedEfectivo!: number;
 
+  /** C01 — «Cerrar igual»: rejected money operations unresolved on the device. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  unresolvedCount?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(MAX_COP_AMOUNT * 100, { message: MAX_COP_MESSAGE })
+  unresolvedAmount?: number;
+
   @IsOptional()
   @IsUUID()
   requestId?: string;

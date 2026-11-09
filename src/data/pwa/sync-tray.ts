@@ -52,6 +52,7 @@ export const ORPHAN_BLOCKED_REASON = "Esperando a una operación que se descart�
 
 const OPERATION_NAMES: Record<string, string> = {
   "cashSession:open": "Apertura de caja",
+  "clientEvent:record": "Respaldo en el servidor",
   "cashSession:close": "Cierre de caja",
   "cashMove:create": "Movimiento de caja",
   "expense:create": "Gasto",
@@ -232,6 +233,8 @@ export type Correction = {
   href: string | null;
   /** What «Corregir» does / what to do by hand (Spanish, user-facing). */
   note: string;
+  /** C01.1 — button text; defaults to «Corregir» («Registrar de nuevo» for sales). */
+  label?: string;
 };
 
 const AFTER_FIX = "Cuando la guardes corregida, descarta esta.";
@@ -274,7 +277,11 @@ export function correctionFor(item: Pick<TrayItem, "entity" | "operation" | "pay
     return { href: `/inventario/${id(p.productId)}/${page}${q({ cantidad: qty })}`, note: `Abre la salida del producto con la cantidad. ${AFTER_FIX}` };
   }
   if (key === "sale:create") {
-    return { href: "/ventas/nueva", note: `Vuelve a registrar la venta con los productos de arriba (el carrito no se puede rellenar solo). ${AFTER_FIX}` };
+    return {
+      href: "/ventas/nueva",
+      label: "Registrar de nuevo",
+      note: "Vuelve a registrar la venta con los productos de arriba (el carrito no se puede rellenar solo). Al guardarla, esta queda como «Reemplazada».",
+    };
   }
   if (key === "cashSession:open") {
     // Only the opening base is stored with the op (no date/notes to restore).
@@ -339,7 +346,9 @@ export async function listTrayOperations(
         .toArray()),
     );
   }
+  // C01.1 — server-trace events sync silently; their state shows in Historial.
   return rows
+    .filter((row) => row.entity !== "clientEvent")
     .sort((a, b) => a.localCreatedAt - b.localCreatedAt)
     .map(toTrayItem);
 }
@@ -369,6 +378,7 @@ export async function retryOutboxOperation(
 export async function discardOutboxOperation(
   businessId: string,
   operationId: string,
+  opts: { replacedBy?: string | null } = {},
 ): Promise<void> {
   const outbox = getOutboxStore();
   const parent = await outbox.get(businessId, operationId);
@@ -380,6 +390,7 @@ export async function discardOutboxOperation(
       local
         ? orphanLocalNote(parentLabel)
         : `Esperando a ${parentLabel}, que se descartó. Reintenta para enviarlo sin eso, o descártalo.`,
+    ...(opts.replacedBy ? { replacedBy: opts.replacedBy } : {}),
   });
 }
 

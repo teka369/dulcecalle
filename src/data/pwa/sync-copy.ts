@@ -4,7 +4,16 @@ import type { SyncCounts } from "@/store/syncStore";
 export const DISCARD_NOTICE =
   "Descartar elimina este envío pendiente de este dispositivo. No deshace nada que ya esté guardado en el servidor. El registro puede seguir apareciendo en este teléfono hasta que los datos locales se actualicen o se eliminen mediante el flujo correspondiente.";
 
+/** C01 / INV-03 — the POST may already have landed on the server. */
+export const DISCARD_ATTEMPTED_WARNING =
+  "Ya se intentó enviar. Puede que haya llegado al servidor: revisa antes de registrarla de nuevo.";
+
 export const NOT_A_BACKUP = "Esto no es una copia de seguridad.";
+
+/** C01.2 / C011-INV-02 — «1 respaldo pendiente» / «N respaldos pendientes». */
+export function backupsPendingText(n: number): string {
+  return n === 1 ? "1 respaldo pendiente" : `${n} respaldos pendientes`;
+}
 
 export function syncPillLabel(
   online: boolean,
@@ -29,6 +38,9 @@ export function syncPillLabel(
   }
   if (counts.total > 0) {
     return savedHere(counts.total);
+  }
+  if ((counts.backups ?? 0) > 0) {
+    return `○ ${backupsPendingText(counts.backups ?? 0)}`;
   }
   return "✓ En el servidor";
 }
@@ -76,7 +88,7 @@ export function queueIsClear(input: {
   flushing: { completed: number; total: number } | null;
   authRequired: boolean;
 }): boolean {
-  return !input.authRequired && !input.flushing && input.counts.total === 0;
+  return !input.authRequired && !input.flushing && input.counts.total === 0 && (input.counts.backups ?? 0) === 0;
 }
 
 export type SyncPlaceCopy = {

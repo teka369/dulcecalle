@@ -7,7 +7,7 @@ import { getLocalStore } from "../local/store";
 import { getOutboxStore, getOutboxSyncEngine } from "../local/outbox";
 import { newEntityId } from "../local/ids";
 import { customerToLocal } from "../local/read-cache";
-import { pendingDebtAdjustment, isPermanentDebtRejection, isActiveDebtIntent } from "./pending-debt";
+import { pendingDebtAdjustment, isActiveDebtIntent } from "./pending-debt";
 import { addCop, mulCop, subCop } from "@/domain/money";
 import { splitReturnSettlement } from "@/domain/sale/returns";
 import type {
@@ -490,35 +490,6 @@ export async function createReturnWithOfflineFallback(
   }
 }
 
-async function revertOptimisticReturnDebt(businessId: string, item: OutboxItem): Promise<void> {
-  const raw = item.payload;
-  if (!raw || typeof raw !== "object") return;
-  if ((raw as { optimisticApplied?: unknown }).optimisticApplied === false) return;
-  const reduced = (raw as { projectedDebtReduced?: unknown }).projectedDebtReduced;
-  const saleRef = (raw as { saleRef?: unknown }).saleRef;
-  const db = getLocalDb();
-  if (typeof reduced === "number" && reduced > 0 && typeof saleRef === "string") {
-    const sale = await db.sales.get(saleRef);
-    if (sale && sale.businessId === businessId && sale.customerId) {
-      const customer = await db.customers.get(sale.customerId);
-      if (customer && customer.businessId === businessId) {
-        await db.customers.put({
-          ...customer,
-          debt: addCop(customer.debt, reduced),
-          updatedAt: Date.now(),
-        });
-      }
-    }
-  }
-  const current = await db.outbox.get(item.operationId);
-  if (current?.payload && typeof current.payload === "object") {
-    await db.outbox.put({
-      ...current,
-      payload: { ...current.payload, optimisticApplied: false },
-    });
-  }
-}
-
 export async function syncPendingReturns(businessId: string) {
   return getOutboxSyncEngine().flush(
     businessId,
@@ -544,9 +515,8 @@ export async function syncPendingReturns(businessId: string) {
         await reconcileReturnCustomer(businessId, payload.saleRef);
         return { remoteId: remote.id };
       } catch (error) {
-        if (isPermanentDebtRejection(error)) {
-          await revertOptimisticReturnDebt(businessId, item);
-        }
+        // C01 / DC-01 — a permanent rejection keeps the local record and its effect
+        // («Rechazada») until the owner retries, corrects or discards it.
         throw error;
       }
     },

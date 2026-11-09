@@ -1,3 +1,5 @@
+import type { OutboxItem } from "@/data/local/types";
+import { localRef } from "./local-ref";
 import { ApiError, NetworkError } from "../errors";
 import type { CreateSaleInput } from "../http/repository";
 import type { RemoteReturn, RemoteSaleLine } from "../http/mappers";
@@ -10,7 +12,7 @@ import { getLocalDb } from "../local/db";
 import { getOutboxStore, getOutboxSyncEngine, ConnectivityMonitor } from "../local/outbox";
 import { getLocalStore } from "../local/store";
 import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
-import { isPermanentDebtRejection, isSuppressedLocalEffect } from "./pending-debt";
+import { isSuppressedLocalEffect } from "./pending-debt";
 import { newEntityId } from "../local/ids";
 import { addCop, mulCop, subCop } from "@/domain/money";
 import { AMOUNT_TOO_LARGE_MESSAGE, MAX_COP_AMOUNT } from "@/domain/money/limits";
@@ -20,14 +22,32 @@ export type CreateSaleResult =
   | { mode: "online"; sale: RemoteSale }
   | { mode: "offline"; saleId: string };
 
-export type LocalSaleRow = RemoteSale & { pending: boolean };
+export type LocalSaleRow = RemoteSale & {
+  pending: boolean;
+  /** C01.1 — «Pendiente» or «Rechazada» (permanent rejection) for an unsynced local sale. */
+  syncState?: "pending" | "rejected";
+  /** C01.1 — server reason of the rejection. */
+  rejectionReason?: string | null;
+  /** C01.1 — local ref `L-AAMMDD-XXXX` of an unsynced sale (UX-C01 A6). */
+  localRef?: string;
+};
 
 function localSaleToRow(
   sale: LocalSale,
   lines: LocalSaleLine[],
-  pending: boolean,
+  pendingOrOp: boolean | OutboxItem | undefined,
 ): LocalSaleRow {
+  const op = typeof pendingOrOp === "object" ? pendingOrOp : undefined;
+  const pending = typeof pendingOrOp === "boolean" ? pendingOrOp : !!op && op.entity === "sale" && op.status !== "synced";
+  const rejected = !!op && pending && op.status === "failed" && op.nextAttemptAt == null;
   return {
+    ...(pending
+      ? {
+          syncState: rejected ? ("rejected" as const) : ("pending" as const),
+          localRef: localRef(sale.id, op?.localCreatedAt ?? sale.createdAt),
+          ...(rejected ? { rejectionReason: op?.lastError ?? null } : {}),
+        }
+      : {}),
     id: sale.id,
     customerId: sale.customerId,
     paymentKind: sale.paymentKind,
@@ -51,10 +71,6 @@ function localSaleToRow(
   };
 }
 
-async function salePending(businessId: string, saleId: string): Promise<boolean> {
-  const op = await getOutboxStore().get(businessId, saleId);
-  return !!op && op.entity === "sale" && op.status !== "synced";
-}
 
 /**
  * Local-first sales read for offline lists/detail. Reads the same Dexie
@@ -69,7 +85,7 @@ export async function listLocalSales(businessId: string): Promise<LocalSaleRow[]
     const op = await getOutboxStore().get(businessId, sale.id);
     if (op && op.entity === "sale" && isSuppressedLocalEffect(op)) continue;
     const lines = await db.saleLines.where("[businessId+saleId]").equals([businessId, sale.id]).toArray();
-    rows.push(localSaleToRow(sale, lines, !!op && op.entity === "sale" && op.status !== "synced"));
+    rows.push(localSaleToRow(sale, lines, op && op.entity === "sale" ? op : false));
   }
   return rows;
 }
@@ -82,7 +98,8 @@ export async function getLocalSale(
   const sale = await getLocalStoreSafe(businessId, saleId);
   if (!sale) return undefined;
   const lines = await db.saleLines.where("[businessId+saleId]").equals([businessId, sale.id]).toArray();
-  return localSaleToRow(sale, lines, await salePending(businessId, sale.id));
+  const op = await getOutboxStore().get(businessId, sale.id);
+  return localSaleToRow(sale, lines, op && op.entity === "sale" ? op : false);
 }
 
 async function getLocalStoreSafe(businessId: string, saleId: string) {
@@ -442,6 +459,23 @@ export type SaleDetailResult = {
 export async function getSaleDetailWithOfflineFallback(
   saleId: string,
 ): Promise<SaleDetailResult | null> {
+  // C01.1 — a sale still in the outbox (pending or «Rechazada») only exists on
+  // this phone under its local id: read it locally, never ask the server.
+  const owner = getPwaAuthSession().businessId;
+  if (owner) {
+    const op = await getOutboxStore().get(owner, saleId);
+    if (op && op.entity === "sale" && op.status !== "synced") {
+      const local = await loadLocalReturnable(owner, saleId);
+      const row = await getLocalSale(owner, saleId);
+      if (local && row) {
+        return {
+          ...local,
+          sale: { ...local.sale, syncState: row.syncState, rejectionReason: row.rejectionReason, localRef: row.localRef },
+        } as SaleDetailResult;
+      }
+      if (local) return local;
+    }
+  }
   try {
     const found = await getHttpReturnable(saleId);
     if (found) {
@@ -501,44 +535,6 @@ async function setOptimisticApplied(
       ...(applied ? { optimisticAppliedAt: Date.now() } : {}),
     },
   });
-}
-
-/** Put the local stock, cash and credit back when the server rejects the sale. */
-async function revertOptimisticSale(businessId: string, operationId: string): Promise<void> {
-  const db = getLocalDb();
-  const op = await db.outbox.get(operationId);
-  if (!op || op.businessId !== businessId || !effectApplied(op.payload)) return;
-  const sale = await db.sales.get(operationId);
-  if (sale && sale.businessId === businessId && sale.credit > 0 && sale.customerId) {
-    const customer = await db.customers.get(sale.customerId);
-    if (customer && customer.businessId === businessId) {
-      const next = subCop(customer.debt, sale.credit);
-      await db.customers.put({
-        ...customer,
-        debt: next < 0 ? 0 : next,
-        updatedAt: Date.now(),
-      });
-    }
-  }
-  const stockMoves = await db.stockMoves.where("businessId").equals(businessId).toArray();
-  for (const move of stockMoves) {
-    if (move.requestId !== op.requestId || move.reason !== "sale") continue;
-    const product = await db.products.get(move.productId);
-    if (product && product.businessId === businessId) {
-      await db.products.put({
-        ...product,
-        stock: product.stock - move.delta,
-        updatedAt: Date.now(),
-      });
-    }
-    await db.stockMoves.delete(move.id);
-  }
-  const cashMoves = await db.cashMoves.where("businessId").equals(businessId).toArray();
-  for (const move of cashMoves) {
-    if (move.requestId !== op.requestId || move.refType !== "sale") continue;
-    await db.cashMoves.delete(move.id);
-  }
-  await setOptimisticApplied(businessId, operationId, false);
 }
 
 /** A manual retry must re-apply the effect that a rejection rolled back. */
@@ -621,9 +617,8 @@ export async function syncPendingSales(businessId: string) {
       );
       return { remoteId: remote.id };
     } catch (error) {
-      if (isPermanentDebtRejection(error)) {
-        await revertOptimisticSale(businessId, item.operationId);
-      }
+      // C01 / DC-01 — a permanent rejection keeps the local record and its effect
+      // («Rechazada») until the owner retries, corrects or discards it.
       throw error;
     }
   }, (item) => item.entity === "sale" && item.operation === "create");

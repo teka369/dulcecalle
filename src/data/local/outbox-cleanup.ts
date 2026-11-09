@@ -89,7 +89,8 @@ export async function cleanupOutboxLocalEffect(
           const next = subCop(customer.debt, sale.credit);
           await db.customers.put({
             ...customer,
-            debt: next < 0 ? 0 : next,
+            // C01 / DC-15 — exact delta, no clamp: a later revert must land on the true prior debt.
+            debt: next,
             updatedAt: now,
           });
         }
@@ -158,7 +159,8 @@ export async function cleanupOutboxLocalEffect(
           const next = subCop(customer.debt, amount);
           await db.customers.put({
             ...customer,
-            debt: next < 0 ? 0 : next,
+            // C01 / DC-15 — exact delta, no clamp: a later revert must land on the true prior debt.
+            debt: next,
             updatedAt: now,
           });
         }
@@ -290,7 +292,9 @@ export async function cleanupOutboxLocalEffect(
     await db.cashSessions.delete(row.operationId);
   }
 
-  if (mode === "reject" && applied) {
+  // C01.3 — stamp only money/stock ops. clientEvent payloads are POSTed as-is
+  // to a whitelist DTO; optimisticApplied there becomes 400 VALIDATION on retry.
+  if (mode === "reject" && applied && row.entity !== "clientEvent") {
     const current = await db.outbox.get(row.operationId);
     if (current && current.businessId === businessId && current.payload && typeof current.payload !== "string") {
       await db.outbox.put({

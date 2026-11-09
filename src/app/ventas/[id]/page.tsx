@@ -13,6 +13,7 @@ import { StateBlock } from "@/components/ui/StateBlock";
 import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { PendingBadge } from "@/components/ui/StatusBadge";
+import { SaleSyncBlock } from "@/components/sale/SaleSyncBlock";
 import { dayHeading, saleCustomerLabel, saleDayKey, saleMethodLabel, saleTime } from "@/components/sale/sales-list";
 import { useCallback, useEffect, useState } from "react";
 import { formatCop } from "@/domain/money";
@@ -143,7 +144,7 @@ export default function VentaDetallePage() {
             <span>{saleCustomerLabel(null, customerName)}</span>
           )}
         </p>
-        {pending && (
+        {pending && sale.syncState !== "rejected" && (
           <p className="mt-3">
             <PendingBadge label="Pendiente de sincronización" />
           </p>
@@ -151,6 +152,7 @@ export default function VentaDetallePage() {
       </HeroBlock>
 
       <Sheet>
+        <SaleSyncBlock sale={sale} />
         {/* saleTotal ≠ amountReceived ≠ credit — each in its own cell */}
         <SegmentedMetrics
           label="Cobro de la venta"

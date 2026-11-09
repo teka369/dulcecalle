@@ -43,6 +43,10 @@ export type DebtEntry =
       method: string;
       note?: string;
       runningBalance: number;
+      /** C01 — not confirmed by the server yet («Pendiente») or rejected («Rechazada»). */
+      syncState?: "pending" | "rejected";
+      /** C01 — received on `occurredOn` but applied to the caja of `appliedOn` («De otro día»). */
+      otherDay?: { occurredOn: string; appliedOn: string };
     }
   | {
       kind: "devolucion";

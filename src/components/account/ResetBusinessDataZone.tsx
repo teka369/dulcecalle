@@ -8,6 +8,8 @@ import { HttpRepository } from "@/data/http/repository";
 import { getPwaAuthSession } from "@/data/http/session";
 import { clearLocalBusinessData } from "@/data/pwa/business-reset";
 import { Button } from "@/components/ui/Button";
+import { useSync } from "@/store/syncStore";
+import { backupsPendingText } from "@/data/pwa/sync-copy";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 
@@ -41,6 +43,7 @@ function entityList(): string[] {
 }
 
 export function ResetBusinessDataZone() {
+  const backups = useSync().counts.backups ?? 0;
   const [step, setStep] = useState<Step>("idle");
   const [phrase, setPhrase] = useState("");
   const [busy, setBusy] = useState(false);
@@ -136,6 +139,11 @@ export function ResetBusinessDataZone() {
                 <li key={line}>{line}</li>
               ))}
             </ul>
+            {backups > 0 && (
+              <p data-testid="reset-backups-warning" className="mt-3 text-sm font-medium text-warning">
+                Hay {backupsPendingText(backups)} en este teléfono: la traza de lo rechazado o descartado todavía no está en el servidor y se perderá.
+              </p>
+            )}
             <p className="mt-3 text-sm font-medium">
               La cuenta del usuario NO será eliminada.
             </p>

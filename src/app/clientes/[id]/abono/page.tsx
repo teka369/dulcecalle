@@ -125,7 +125,7 @@ export default function RegistrarAbonoPage() {
       );
       rejected.afterSave(() => {
         navigateOfflineAware(router, `/clientes/${customer.id}`);
-      }, 700);
+      }, 700, requestIdRef.current);
     } catch (e) {
       setError(errorText(e, "Error al registrar abono"));
       setBusy(false);

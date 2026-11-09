@@ -587,6 +587,21 @@ export class CatalogService {
         orderBy: { createdAt: "asc" },
       }),
     ]);
+    // C01.1 — «De otro día»: the caja day each abono entered (session local_date).
+    const moves = payments.length
+      ? await this.prisma.cashMove.findMany({
+          where: { businessId: ctx.businessId, refType: "payment", refId: { in: payments.map((p) => p.id) } },
+          select: { refId: true, sessionId: true, pendingForSessionId: true },
+        })
+      : [];
+    const sessionIds = [...new Set(moves.map((m) => m.sessionId ?? m.pendingForSessionId).filter((v): v is string => !!v))];
+    const sessions = sessionIds.length
+      ? await this.prisma.cashSession.findMany({ where: { id: { in: sessionIds } }, select: { id: true, localDate: true } })
+      : [];
+    const dayBySession = new Map(sessions.map((s) => [s.id, dateKey(s.localDate)]));
+    const cajaDayByPayment = new Map(
+      moves.map((m) => [m.refId, dayBySession.get(m.sessionId ?? m.pendingForSessionId ?? "") ?? null]),
+    );
 
     return {
       customer: customerJson(c),
@@ -644,6 +659,9 @@ export class CatalogService {
         method: p.method,
         note: p.note,
         occurredOn: dateKey(p.occurredOn),
+        occurredAt: p.occurredAt ?? p.createdAt,
+        cajaDay: cajaDayByPayment.get(p.id) ?? null,
+        needsReview: p.needsReview,
         createdAt: p.createdAt,
       })),
     };
@@ -696,6 +714,10 @@ export class CatalogService {
 
     try {
       const row = await this.prisma.$transaction(async (tx) => {
+        // C01 / DC-16 — serialized with every other debt write of the
+        // business. Still allowed on a closed day (no cash involved), now
+        // consistent with abonos, which are also accepted after the close.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
         const customer = await tx.customer.findFirst({
           where: { id: customerId, businessId: ctx.businessId },
         });

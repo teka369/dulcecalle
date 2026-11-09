@@ -197,14 +197,19 @@ export const cashStore = {
       fail(e);
     }
   },
-  async closeCaja(countedRaw: string): Promise<void> {
+  async closeCaja(countedRaw: string, opts: { closeAnyway?: boolean } = {}): Promise<void> {
     const err = validateCounted(countedRaw);
     if (err) throw new Error(err);
     const summary = await this.refresh();
     if (!summary.session) throw new Error(CASH_ERRORS.noOpenSession);
     if (summary.closed) throw new Error(CASH_ERRORS.sessionAlreadyClosed);
     try {
-      const result = await closeCashWithOfflineFallback(summary.session.id, parseCopAmount(countedRaw)!, crypto.randomUUID());
+      const result = await closeCashWithOfflineFallback(
+        summary.session.id,
+        parseCopAmount(countedRaw)!,
+        crypto.randomUUID(),
+        ...(opts.closeAnyway ? [{ closeAnyway: true }] as const : []),
+      );
       setState({ lastToast: result.mode === "offline" ? "Caja cerrada sin conexión" : CASH_COPY.toastCajaCerrada });
       await this.refresh();
     } catch (e) {

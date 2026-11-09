@@ -1,7 +1,9 @@
 import { ApiError, NetworkError } from "../errors";
 import { getLocalDb, type DulceCalleLocalDB } from "./db";
 import { cleanupOutboxLocalEffect } from "./outbox-cleanup";
+import { isFinancialOp, summarizeOutboxMoney } from "./outbox-money";
 import { assertUuid } from "./ids";
+import { deriveRequestId } from "@/domain/requestId";
 import type { OutboxItem, OutboxStatus } from "./types";
 
 export type EnqueueOutboxInput = {
@@ -146,6 +148,7 @@ export class OutboxStore {
       remoteId,
       lastError: null,
       nextAttemptAt: null,
+      rejection: null,
     });
   }
 
@@ -154,11 +157,57 @@ export class OutboxStore {
     operationId: string,
     lastError: string,
     nextAttemptAt?: number | null,
+    rejectionCode?: string | null,
   ): Promise<OutboxItem> {
-    return this.patchStatus(businessId, operationId, {
+    const permanent = (nextAttemptAt ?? null) == null;
+    const row = await this.patchStatus(businessId, operationId, {
       status: "failed",
       lastError,
       nextAttemptAt: nextAttemptAt ?? null,
+      rejection: permanent ? { code: rejectionCode ?? null, at: Date.now() } : null,
+    });
+    // C01.1 / C01-INV-04 — the server keeps a trace of every permanent
+    // rejection of a money op (best effort; queued like any other op).
+    if (permanent && isFinancialOp(row)) {
+      await this.enqueueClientEvent(row, "rejected", {}).catch(() => undefined);
+    }
+    return row;
+  }
+
+  /**
+   * C01.1 / C01-INV-04 — queue a server-side trace for a money op. One per
+   * (operation, kind): the deterministic requestId makes a second enqueue a no-op.
+   */
+  async enqueueClientEvent(
+    op: OutboxItem,
+    kind: "rejected" | "discarded" | "replaced",
+    extra: { amount?: number | null; customerId?: string | null; replacedBy?: string | null },
+  ): Promise<void> {
+    const summary =
+      extra.amount !== undefined ? { amount: extra.amount, customerId: extra.customerId ?? null } : await summarizeOutboxMoney(this.db, op);
+    const requestId = await deriveRequestId(op.operationId, `client-event:${kind}`);
+    const existing = await this.getByRequestId(op.businessId, requestId);
+    if (existing) return;
+    await this.enqueue({
+      operationId: requestId,
+      businessId: op.businessId,
+      entity: "clientEvent",
+      operation: "record",
+      requestId,
+      payload: {
+        operationId: op.operationId,
+        requestId: op.requestId,
+        entity: op.entity,
+        operation: op.operation,
+        kind,
+        ...(summary.amount != null ? { amount: summary.amount } : {}),
+        ...(summary.customerId ? { customerId: summary.customerId } : {}),
+        ...(op.rejection?.code ? { rejectionCode: op.rejection.code } : {}),
+        ...(op.lastError ? { lastError: op.lastError.slice(0, 500) } : {}),
+        ...(extra.replacedBy ? { replacedBy: extra.replacedBy } : {}),
+        deviceCreatedAt: new Date(op.localCreatedAt).toISOString(),
+      },
+      dependsOn: [],
     });
   }
 
@@ -179,7 +228,7 @@ export class OutboxStore {
     if (row.status !== "failed") {
       throw new Error(`only failed operations can be retried (status: ${row.status})`);
     }
-    const next: OutboxItem = { ...row, status: "pending", nextAttemptAt: null };
+    const next: OutboxItem = { ...row, status: "pending", nextAttemptAt: null, rejection: null };
     await this.db.outbox.put(next);
     return next;
   }
@@ -197,6 +246,8 @@ export class OutboxStore {
       /** Local ids the discarded operation stood for (its operationId, local entity ids…). */
       parentLocalIds?: string[];
       parentLabel?: string;
+      /** C01 — the correction that replaces this operation (state «replaced»). */
+      replacedBy?: string | null;
     } = {},
   ): Promise<void> {
     assertUuid(businessId, "businessId");
@@ -208,6 +259,37 @@ export class OutboxStore {
     }
     if (preRow.status !== "pending" && preRow.status !== "failed") {
       throw new Error(`only pending/failed operations can be discarded (status: ${preRow.status})`);
+    }
+    if (preRow.entity === "clientEvent") {
+      throw new Error("Este respaldo no se puede descartar: guarda la traza en el servidor.");
+    }
+    // C01 / DC-14 — keep an audit trail of money operations before any
+    // local effect is undone (Descartar never leaves them without a trace).
+    if (isFinancialOp(preRow)) {
+      const summary = await summarizeOutboxMoney(this.db, preRow);
+      await this.db.discardedOps.put({
+        id: preRow.operationId,
+        operationId: preRow.operationId,
+        businessId,
+        entity: preRow.entity,
+        operation: preRow.operation,
+        requestId: preRow.requestId,
+        payload: preRow.payload,
+        amount: summary.amount,
+        customerId: summary.customerId,
+        lastError: preRow.lastError,
+        rejectionCode: preRow.rejection?.code ?? null,
+        state: options.replacedBy ? "replaced" : "discarded",
+        replacedBy: options.replacedBy ?? null,
+        localCreatedAt: preRow.localCreatedAt,
+        discardedAt: Date.now(),
+      });
+      // C01.1 / C01-INV-04 — the discard is also traced on the server.
+      await this.enqueueClientEvent(preRow, options.replacedBy ? "replaced" : "discarded", {
+        amount: summary.amount,
+        customerId: summary.customerId,
+        replacedBy: options.replacedBy ?? null,
+      });
     }
     await cleanupOutboxLocalEffect(this.db, businessId, preRow, "discard");
     await this.db.transaction("rw", this.db.outbox, async () => {
@@ -281,6 +363,7 @@ export class OutboxStore {
       lastError: string | null;
       nextAttemptAt?: number | null;
       attemptsDelta?: number;
+      rejection?: OutboxItem["rejection"];
     },
   ): Promise<OutboxItem> {
     assertUuid(businessId, "businessId");
@@ -309,6 +392,7 @@ export class OutboxStore {
       nextAttemptAt:
         patch.nextAttemptAt === undefined ? row.nextAttemptAt : patch.nextAttemptAt,
       attempts: row.attempts + (patch.attemptsDelta ?? 0),
+      ...(patch.rejection !== undefined ? { rejection: patch.rejection } : {}),
     };
     await this.db.outbox.put(next);
     return next;
@@ -534,13 +618,23 @@ export class OutboxSyncEngine {
             });
             break;
           }
-          const retryable = isRetryableError(error);
+          // C01.2 / C011-INV-02 — a server trace (clientEvent) must not die on a
+          // transient 4xx (403 role/session, 409, 429…): keep retrying with
+          // backoff. Only a validation 400 stays a visible permanent failure.
+          const retryable =
+            isRetryableError(error) ||
+            (current.entity === "clientEvent" &&
+              error instanceof ApiError &&
+              error.status >= 400 &&
+              error.status < 500 &&
+              error.code !== "VALIDATION");
           const message = error instanceof Error ? error.message : "Error de sincronización.";
           await this.outbox.markFailed(
             businessId,
             current.operationId,
             message,
             retryable ? retryAt(flying.attempts, this.clock()) : null,
+            error instanceof ApiError ? error.code : null,
           );
           failed += 1;
           emitSyncEvent({

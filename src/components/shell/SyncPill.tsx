@@ -43,7 +43,7 @@ export function SyncPill() {
         <button
           type="button"
           onClick={openCenter}
-          aria-label={`Datos y sincronización: ${label}. Abrir detalle.`}
+          aria-label={`Pendientes: ${label}. Abrir detalle.`}
           className={`pointer-events-auto flex min-h-11 max-w-[min(22rem,calc(100%_-_7rem))] items-center gap-2 rounded-[var(--r-pill)] border px-3 py-2 text-xs font-semibold shadow-[var(--shadow-md)] ${tone}`}
         >
           <span className="truncate">{label}</span>

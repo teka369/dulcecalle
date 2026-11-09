@@ -434,7 +434,7 @@ export class HttpRepository {
 
     pay: async (
       customerId: string,
-      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string },
+      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string; occurredAt?: string },
       requestId: string,
     ): Promise<RemotePayment> => {
       const row = await this.http.request<Record<string, unknown>>(
@@ -753,11 +753,18 @@ export class HttpRepository {
       sessionId: string,
       countedEfectivo: number,
       requestId: string = crypto.randomUUID(),
+      unresolved?: { count: number; amount: number },
     ): Promise<RemoteSession> => {
+      // C01 — «Cerrar igual»: the close carries a traceable mark of the
+      // rejected money operations still unresolved on this device.
+      const mark =
+        unresolved && unresolved.count > 0
+          ? { unresolvedCount: unresolved.count, unresolvedAmount: unresolved.amount }
+          : {};
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         `/cash/sessions/${sessionId}/close`,
-        { body: { countedEfectivo }, idempotencyKey: requestId },
+        { body: { countedEfectivo, ...mark }, idempotencyKey: requestId },
       );
       return mapSession(row);
     },
@@ -852,6 +859,17 @@ export class HttpRepository {
     },
   };
 
+  /** C01.1 / C01-INV-04 — server trace of client rejections and discards. */
+  readonly audit = {
+    record: async (event: RemoteClientEventInput, requestId: string): Promise<RemoteClientEvent> =>
+      this.http.request<RemoteClientEvent>("POST", "/audit/client-events", {
+        body: event,
+        idempotencyKey: requestId,
+      }),
+    list: async (): Promise<RemoteClientEvent[]> =>
+      this.http.request<RemoteClientEvent[]>("GET", "/audit/client-events"),
+  };
+
   readonly stats = {
     get: async (period: "hoy" | "semana" | "mes"): Promise<RemoteStats> => {
       return this.http.request<RemoteStats>(
@@ -877,3 +895,29 @@ export class HttpRepository {
 export function createHttpRepository(baseUrl: string): HttpRepository {
   return new HttpRepository(baseUrl);
 }
+
+export type RemoteClientEventInput = {
+  operationId: string;
+  requestId?: string;
+  entity: string;
+  operation: string;
+  kind: "rejected" | "discarded" | "replaced";
+  amount?: number;
+  customerId?: string;
+  rejectionCode?: string;
+  lastError?: string;
+  replacedBy?: string;
+  deviceCreatedAt?: string;
+};
+
+export type RemoteClientEvent = Omit<RemoteClientEventInput, "amount" | "customerId" | "rejectionCode" | "lastError" | "replacedBy" | "requestId" | "deviceCreatedAt"> & {
+  id: string;
+  requestId: string | null;
+  amount: number | null;
+  customerId: string | null;
+  rejectionCode: string | null;
+  lastError: string | null;
+  replacedBy: string | null;
+  deviceCreatedAt: string | null;
+  createdAt: string;
+};

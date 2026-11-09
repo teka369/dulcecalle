@@ -28,10 +28,14 @@ function sessionJson(s: {
   expectedEfectivo: bigint | null;
   expectedNequi: bigint | null;
   difference: bigint | null;
+  unresolvedCount?: number | null;
+  unresolvedAmount?: bigint | null;
 }) {
   return {
     id: s.id,
     localDate: dateKey(s.localDate),
+    unresolvedCount: s.unresolvedCount ?? null,
+    unresolvedAmount: s.unresolvedAmount == null ? null : copToJson(s.unresolvedAmount),
     openedAt: s.openedAt,
     closedAt: s.closedAt,
     openingFloat: copToJson(s.openingFloat),
@@ -86,6 +90,46 @@ function expenseJson(e: {
     note: e.note,
     occurredOn: dateKey(e.occurredOn),
     createdAt: e.createdAt,
+  };
+}
+
+/** Max clock skew accepted for a device timestamp in the future. */
+const OCCURRED_AT_FUTURE_SKEW_MS = 5 * 60 * 1000;
+
+/** C01/C03 — device occurrence time; never in the future, defaults to now. */
+export function parseOccurredAt(raw: string | undefined, now: Date): Date {
+  if (raw == null) return now;
+  const at = new Date(raw);
+  if (Number.isNaN(at.getTime())) {
+    throw new AppError(ERROR_CODES.VALIDATION, "La fecha de la operación no es válida.");
+  }
+  if (at.getTime() > now.getTime() + OCCURRED_AT_FUTURE_SKEW_MS) {
+    throw new AppError(ERROR_CODES.VALIDATION, "La fecha de la operación está en el futuro.");
+  }
+  return at;
+}
+
+function paymentJson(p: {
+  id: string;
+  customerId: string;
+  amount: bigint;
+  method: string;
+  note: string | null;
+  occurredOn: Date;
+  occurredAt?: Date | null;
+  needsReview?: boolean;
+  createdAt: Date;
+}) {
+  return {
+    id: p.id,
+    customerId: p.customerId,
+    amount: copToJson(p.amount),
+    method: p.method,
+    note: p.note,
+    occurredOn: dateKey(p.occurredOn),
+    occurredAt: p.occurredAt ?? p.createdAt,
+    needsReview: p.needsReview ?? false,
+    createdAt: p.createdAt,
   };
 }
 
@@ -187,7 +231,13 @@ export class CashService {
     });
   }
 
-  async close(ctx: BusinessContext, sessionId: string, countedEfectivo: number, requestId: string = randomUUID()) {
+  async close(
+    ctx: BusinessContext,
+    sessionId: string,
+    countedEfectivo: number,
+    requestId: string = randomUUID(),
+    mark: { unresolvedCount?: number; unresolvedAmount?: number } = {},
+  ) {
     const existingByRequest = await this.prisma.cashSession.findUnique({
       where: { businessId_closeRequestId: { businessId: ctx.businessId, closeRequestId: requestId } },
     });
@@ -235,6 +285,12 @@ export class CashService {
           expectedNequi: expected.nequi,
           difference,
           closeRequestId: requestId,
+          ...(mark.unresolvedCount && mark.unresolvedCount > 0
+            ? {
+                unresolvedCount: mark.unresolvedCount,
+                unresolvedAmount: asCop(mark.unresolvedAmount ?? 0),
+              }
+            : {}),
         },
       });
       return sessionJson(updated);
@@ -345,15 +401,7 @@ export class CashService {
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
     });
     if (existing) {
-      return {
-        id: existing.id,
-        customerId: existing.customerId,
-        amount: copToJson(existing.amount),
-        method: existing.method,
-        note: existing.note,
-        occurredOn: dateKey(existing.occurredOn),
-        createdAt: existing.createdAt,
-      };
+      return paymentJson(existing);
     }
 
     const amount = asCop(dto.amount);
@@ -366,15 +414,23 @@ export class CashService {
 
     const now = new Date();
     const occurredOn = occurredOnDate(ctx.timezone, now);
-    await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
+    const occurredAt = parseOccurredAt(dto.occurredAt, now);
 
     try {
       const pay = await this.prisma.$transaction(async (tx) => {
-        await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C01 / DC-01 — decision 1: an abono is money already received. It is
+        // never rejected for a closed day: it goes to the open operating day,
+        // or stays «recibido sin aplicar / requiere revisión» (unassigned).
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
         const customer = await tx.customer.findFirst({
           where: { id: customerId, businessId: ctx.businessId },
         });
         if (!customer) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+        const opens = await tx.cashSession.findMany({
+          where: { businessId: ctx.businessId, closedAt: null },
+        });
+        const link = linkForNewMove(opens, occurredOn);
+        const needsReview = link.sessionId == null && link.pendingForSessionId == null;
         const id = randomUUID();
         const payment = await tx.customerPayment.create({
           data: {
@@ -386,6 +442,8 @@ export class CashService {
             note: dto.note ?? null,
             requestId,
             occurredOn,
+            occurredAt,
+            needsReview,
             createdAt: now,
           },
         });
@@ -403,11 +461,7 @@ export class CashService {
             MESSAGES.abonoExceeds,
           );
         }
-        const opens = await tx.cashSession.findMany({
-          where: { businessId: ctx.businessId, closedAt: null },
-        });
-        const link = linkForNewMove(opens, occurredOn);
-                await tx.cashMove.create({
+        await tx.cashMove.create({
           data: {
             id: randomUUID(),
             businessId: ctx.businessId,
@@ -417,6 +471,7 @@ export class CashService {
             kind: "debt_collect",
             sessionId: link.sessionId,
             pendingForSessionId: link.pendingForSessionId,
+            needsReview,
             refType: "payment",
             refId: id,
             requestId,
@@ -426,15 +481,7 @@ export class CashService {
         });
         return payment;
       });
-      return {
-        id: pay.id,
-        customerId: pay.customerId,
-        amount: copToJson(pay.amount),
-        method: pay.method,
-        note: pay.note,
-        occurredOn: dateKey(pay.occurredOn),
-        createdAt: pay.createdAt,
-      };
+      return paymentJson(pay);
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
         const again = await this.prisma.customerPayment.findUnique({
@@ -443,15 +490,7 @@ export class CashService {
           },
         });
         if (again) {
-          return {
-            id: again.id,
-            customerId: again.customerId,
-            amount: copToJson(again.amount),
-            method: again.method,
-            note: again.note,
-            occurredOn: dateKey(again.occurredOn),
-            createdAt: again.createdAt,
-          };
+          return paymentJson(again);
         }
       }
       throw e;

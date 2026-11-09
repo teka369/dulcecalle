@@ -42,13 +42,14 @@ describe("M6.9 outbox recovery", () => {
     let sent = 0;
     const result = await new OutboxSyncEngine(getOutboxStore(), () => 10_000).flush(
       BIZ,
-      async () => {
-        sent += 1;
+      async (item) => {
+        // C01.1 — only the server-trace event of the rejection is sent.
+        if (item.entity !== "clientEvent") sent += 1;
         return { remoteId: newEntityId() };
       },
     );
     expect(sent).toBe(0);
-    expect(result.processed).toBe(0);
+    expect(result.processed).toBe(1);
     expect((await getOutboxStore().get(BIZ, operationId))?.status).toBe("failed");
   });
 
@@ -73,11 +74,12 @@ describe("M6.9 outbox recovery", () => {
     const result = await new OutboxSyncEngine(getOutboxStore(), () => 10_000).flush(
       BIZ,
       async (item) => {
-        seen.push(item.requestId);
+        if (item.entity !== "clientEvent") seen.push(item.requestId);
         return { remoteId: newEntityId() };
       },
     );
-    expect(result.synced).toBe(1);
+    // C01.1 — plus the server-trace event of the earlier rejection.
+    expect(result.synced).toBe(2);
     expect(seen).toEqual([requestId]);
     expect((await getOutboxStore().get(BIZ, operationId))?.status).toBe("synced");
   });
@@ -92,8 +94,8 @@ describe("M6.9 outbox recovery", () => {
     const { operationId } = await seedFailedPermanent();
     await getOutboxStore().discard(BIZ, operationId);
     let sent = 0;
-    await new OutboxSyncEngine(getOutboxStore(), () => 10_000).flush(BIZ, async () => {
-      sent += 1;
+    await new OutboxSyncEngine(getOutboxStore(), () => 10_000).flush(BIZ, async (item) => {
+      if (item.entity !== "clientEvent") sent += 1;
       return { remoteId: newEntityId() };
     });
     expect(sent).toBe(0);

@@ -54,7 +54,9 @@ test("rejected offline aporte: badge, item with reason, Corregir prefilled, Desc
   await row.getByRole("button", { name: "Descartar" }).click();
   await expect(page.getByRole("alertdialog")).toContainText("¿Descartar este envío?");
   await page.getByRole("alertdialog").getByRole("button", { name: "Descartar" }).click();
-  await expect(page.locator("li", { hasText: "Movimiento de caja" })).toHaveCount(0);
+  // C01 / DC-14 — gone from the pending list, kept in the history as «Descartada».
+  await expect(page.getByTestId("sync-operations").locator("li", { hasText: "Movimiento de caja" })).toHaveCount(0);
+  await expect(page.getByTestId("discarded-history")).toContainText("Descartada");
   expect(rejects, "a permanent rejection is not retried on its own").toBe(1);
 });
 
@@ -124,7 +126,7 @@ test("Corregir → save asks to discard the rejected op: Cancelar keeps it, Desc
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 15_000 }).toBe("/mas/caja");
   await expect.poll(() => accepted, { timeout: 30_000 }).toBe(2);
   await page.goto("/sincronizacion");
-  await expect(page.locator("li", { hasText: REJECT })).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.getByTestId("sync-operations").locator("li", { hasText: REJECT })).toHaveCount(0, { timeout: 20_000 });
   expect(rejects, "the rejected op was never re-sent").toBe(1);
 });
 
@@ -178,6 +180,6 @@ test("rejected offline caja open: Corregir prefills the original base; save + De
   await expect(dialog).toHaveCount(0);
   await expect.poll(() => accepted, { timeout: 30_000 }).toBe(1);
   await page.goto("/sincronizacion");
-  await expect(page.locator("li", { hasText: REJECT })).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.getByTestId("sync-operations").locator("li", { hasText: REJECT })).toHaveCount(0, { timeout: 20_000 });
   expect(rejects).toBe(1);
 });

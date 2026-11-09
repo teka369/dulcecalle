@@ -19,7 +19,10 @@ type TxLock = SessionReader & {
   ) => Promise<unknown>;
 };
 
-/** Closed-day lock. Exempt: product birth, initial debts (not called here). */
+/**
+ * Closed-day lock. Exempt: product birth, initial debts and (C01, decision 1)
+ * customer abonos, which are accepted and routed to the open day or to review.
+ */
 export async function assertDayEditable(
   db: SessionReader,
   businessId: string,

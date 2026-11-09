@@ -6,8 +6,8 @@ import { getLocalStore } from "../local/store";
 import { getOutboxStore, getOutboxSyncEngine } from "../local/outbox";
 import { newEntityId } from "../local/ids";
 import { customerToLocal } from "../local/read-cache";
-import { pendingDebtAdjustment, isPermanentDebtRejection } from "./pending-debt";
-import { addCop, subCop } from "@/domain/money";
+import { pendingDebtAdjustment } from "./pending-debt";
+import { addCop } from "@/domain/money";
 import type { RemoteInitialDebt } from "../http/mappers";
 
 export type CreateInitialDebtInput = {
@@ -155,35 +155,6 @@ export async function createInitialDebtWithOfflineFallback(
   }
 }
 
-async function revertOptimisticInitialDebt(
-  businessId: string,
-  operationId: string,
-  customerId: string,
-  amount: number,
-): Promise<void> {
-  const db = getLocalDb();
-  const op = await db.outbox.get(operationId);
-  const payload = op?.payload;
-  if (payload && typeof payload === "object" && (payload as { optimisticApplied?: unknown }).optimisticApplied === false) {
-    return;
-  }
-  const customer = await getLocalStore().customers.get(businessId, customerId);
-  if (customer && amount > 0) {
-    const next = subCop(customer.debt, amount);
-    await getLocalStore().customers.put({
-      ...customer,
-      debt: next < 0 ? 0 : next,
-      updatedAt: Date.now(),
-    });
-  }
-  if (op && payload && typeof payload === "object") {
-    await db.outbox.put({
-      ...op,
-      payload: { ...payload, optimisticApplied: false },
-    });
-  }
-}
-
 async function reconcileInitialDebt(
   businessId: string,
   operationId: string,
@@ -242,14 +213,8 @@ export async function syncPendingInitialDebts(businessId: string) {
         await reconcileInitialDebt(businessId, item.operationId, remote);
         return { remoteId: remote.id };
       } catch (error) {
-        if (isPermanentDebtRejection(error)) {
-          await revertOptimisticInitialDebt(
-            businessId,
-            item.operationId,
-            customerId,
-            payload.amount,
-          );
-        }
+        // C01 / DC-01 — a permanent rejection keeps the local record and its effect
+        // («Rechazada») until the owner retries, corrects or discards it.
         throw error;
       }
     },

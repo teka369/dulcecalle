@@ -1,3 +1,4 @@
+import { AuditModule } from "./audit/audit.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
@@ -46,6 +47,7 @@ import { shouldSkipThrottle } from "./http-setup";
     CashModule,
     StatsModule,
     CustomerAccessModule,
+    AuditModule,
   ],
   controllers: [HealthController],
   providers: [

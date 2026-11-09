@@ -5,11 +5,12 @@ import type { OutboxItem } from "../local/types";
 
 /**
  * Debt still only on this device. Synced rows are already in the server
- * balance. A permanent failure (failed, no retry) is not a valid balance.
+ * balance. C01 / DC-01: a permanent rejection («Rechazada») keeps its local
+ * effect until the owner retries, corrects or discards it, so it still
+ * counts here; only discarded rows (gone from the outbox) do not.
  */
 export function isActiveDebtIntent(op: OutboxItem): boolean {
-  if (op.status === "pending" || op.status === "in_flight") return true;
-  return op.status === "failed" && op.nextAttemptAt != null;
+  return op.status === "pending" || op.status === "in_flight" || op.status === "failed";
 }
 
 export function isPermanentDebtRejection(error: unknown): boolean {
@@ -24,12 +25,11 @@ export function isPermanentDebtRejection(error: unknown): boolean {
 }
 
 /**
- * Hide a local financial row when the server rejected it, or when the
- * optimistic effect was rolled back and has not been re-applied yet.
- * 401 is not this case: the intent stays pending and the effect stays.
+ * Hide a local financial row only when its optimistic effect is not applied
+ * (legacy rows reverted before C01, until Reintentar re-applies them).
+ * A rejection alone never hides it (C01 / DC-01).
  */
 export function isSuppressedLocalEffect(op: OutboxItem): boolean {
-  if (op.status === "failed" && op.nextAttemptAt == null) return true;
   const raw = op.payload;
   return (
     !!raw &&

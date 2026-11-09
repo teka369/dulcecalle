@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsEnum,
+  IsISO8601,
   IsInt,
   IsOptional,
   IsString,
@@ -80,6 +81,11 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsUUID()
   requestId?: string;
+
+  /** C01/C03 — when the money was received (ISO 8601, device clock). */
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  occurredAt?: string;
 }
 
 export class ReturnLineDto {

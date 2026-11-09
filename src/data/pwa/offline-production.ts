@@ -1,6 +1,4 @@
 import { NetworkError } from "../errors";
-import { cleanupOutboxLocalEffect } from "../local/outbox-cleanup";
-import { isPermanentDebtRejection } from "./pending-debt";
 import { formatCop } from "@/domain/money";
 import type { RemotePreparation } from "../http/mappers";
 import { getPwaApi } from "./api";
@@ -294,10 +292,8 @@ export async function syncPendingPreparations(business: string) {
           item.requestId,
         );
       } catch (error) {
-        if (isPermanentDebtRejection(error)) {
-          const current = await getLocalDb().outbox.get(item.operationId);
-          await cleanupOutboxLocalEffect(getLocalDb(), business, current ?? item, "reject");
-        }
+        // C01 / DC-01 — a permanent rejection keeps the local record and its effect
+        // («Rechazada») until the owner retries, corrects or discards it.
         throw error;
       }
       // Pending-only mirror: the server row is now the source of truth.
