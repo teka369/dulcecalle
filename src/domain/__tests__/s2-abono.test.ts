@@ -74,17 +74,17 @@ describe("S2 abono rules + persistence", () => {
     expect(customer!.debt).toBeGreaterThanOrEqual(0);
   });
 
-  it("rejects overpay", async () => {
+  // C04 R4 (intentional change): overpay is accepted; the excess is saldo a favor.
+  it("overpay leaves debt at 0 and the excess as saldo a favor (C04 R4)", async () => {
     const { customerId } = await seedCustomerWithDebt(5_000);
-    await expect(
-      customerRepository.recordPayment({
-        customerId,
-        amount: 5_001,
-        method: "Efectivo",
-      }),
-    ).rejects.toThrow(ABONO_ERRORS.exceedsDebt);
+    await customerRepository.recordPayment({
+      customerId,
+      amount: 5_001,
+      method: "Efectivo",
+    });
     const customer = await customerRepository.getById(customerId);
-    expect(customer?.debt).toBe(5_000);
+    expect(customer?.debt).toBe(0);
+    expect(customer?.creditBalance).toBe(1);
   });
 
   it("rejects amount <= 0", async () => {

@@ -290,6 +290,8 @@ describe("offline returns", () => {
       remoteSaleId,
       { lines: [{ saleLineId: line!.id, qty: 2 }] },
       ret?.requestId,
+      // C04 decision 15 — return syncs are offline replays.
+      { offlineReplay: true },
     );
     const createAt = api.sales.create.mock.invocationCallOrder.at(-1) ?? 0;
     const returnAt = api.sales.createReturn.mock.invocationCallOrder[0] ?? 0;

@@ -23,7 +23,8 @@ import {
 } from "@/data/pwa/offline-catalog";
 import { getStatementWithOfflineFallback } from "@/data/pwa/offline-statement";
 import { createInitialDebtWithOfflineFallback } from "@/data/pwa/offline-initial-debt";
-import type { RemoteCustomer } from "@/data/http/mappers";
+import type { RemoteCustomer, RemotePayment } from "@/data/http/mappers";
+import type { PaymentTarget } from "@/data/http/repository";
 import type { DebtStatement } from "@/domain/debt/statement";
 
 type CustomerState = {
@@ -172,7 +173,11 @@ export const customerStore = {
     amountRaw: string;
     method: PayMethod | null;
     requestId?: string;
-  }): Promise<{ id: string; mode: "online" | "offline" }> {
+    /** C04 — omitted = oldest first. */
+    target?: PaymentTarget;
+    overflow?: "fifo" | "credit";
+    dependsOnOperationId?: string;
+  }): Promise<{ id: string; mode: "online" | "offline"; payment?: RemotePayment }> {
     const customer = await this.getCustomer(input.customerId);
     if (!customer) throw new Error("customer not found");
 
@@ -190,6 +195,9 @@ export const customerStore = {
           customerId: input.customerId,
           amount,
           method: input.method as PayMethod,
+          ...(input.target ? { target: input.target } : {}),
+          ...(input.overflow ? { overflow: input.overflow } : {}),
+          ...(input.dependsOnOperationId ? { dependsOnOperationId: input.dependsOnOperationId } : {}),
         },
         input.requestId ?? crypto.randomUUID(),
       );
@@ -203,6 +211,7 @@ export const customerStore = {
       return {
         id: result.mode === "offline" ? result.paymentId : result.payment.id,
         mode: result.mode,
+        ...(result.mode === "online" ? { payment: result.payment } : {}),
       };
     } catch (e) {
       fail(e);
@@ -263,12 +272,7 @@ export function useCustomers() {
     [],
   );
   const recordAbono = useCallback(
-    (input: {
-      customerId: string;
-      amountRaw: string;
-      method: PayMethod | null;
-      requestId?: string;
-    }) => customerStore.recordAbono(input),
+    (input: Parameters<typeof customerStore.recordAbono>[0]) => customerStore.recordAbono(input),
     [],
   );
   const recordInitialDebt = useCallback(

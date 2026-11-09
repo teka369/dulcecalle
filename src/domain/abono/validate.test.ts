@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ABONO_ERRORS,
   abonoRemainingHelper,
+  abonoExcess,
   validateAbono,
 } from "./validate";
 
@@ -21,10 +22,14 @@ describe("validateAbono (exact S2 copy)", () => {
     ).toBe(ABONO_ERRORS.notPositive);
   });
 
-  it("rejects overpay", () => {
+  // C04 R4 (intentional change): overpay is valid; the excess is saldo a favor.
+  it("accepts overpay (C04 R4)", () => {
     expect(
       validateAbono({ amountRaw: "3001", debt: 3000, method: "Efectivo" }),
-    ).toBe(ABONO_ERRORS.exceedsDebt);
+    ).toBeNull();
+    expect(
+      validateAbono({ amountRaw: "2000", debt: 0, method: "Nequi" }),
+    ).toBeNull();
   });
 
   it("rejects missing method", () => {
@@ -47,5 +52,10 @@ describe("abonoRemainingHelper", () => {
   it("shows Queda debiendo / Queda en $ 0", () => {
     expect(abonoRemainingHelper(3000, 1000)).toMatch(/^Queda debiendo \$/);
     expect(abonoRemainingHelper(3000, 3000)).toBe("Queda en $ 0");
+  });
+  it("shows the saldo a favor that an overpay leaves (C04 T21)", () => {
+    expect(abonoRemainingHelper(3000, 5000)).toMatch(/^Sobran \$\s?2\.000: quedan como saldo a favor\.$/);
+    expect(abonoExcess(3000, 5000)).toBe(2000);
+    expect(abonoExcess(3000, 1000)).toBe(0);
   });
 });

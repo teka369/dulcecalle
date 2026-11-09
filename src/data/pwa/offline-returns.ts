@@ -20,9 +20,13 @@ import type { SaleDetailResult } from "./offline-sales";
 
 export type ReturnLineInput = { saleLineId: string; qty: number };
 
+/** C04 — what to do with value left after the customer's debts. */
+export type ReturnRemainder = "refund" | "credit";
+
 type ReturnPayload = {
   saleRef: string;
   lines: ReturnLineInput[];
+  remainder?: ReturnRemainder;
 };
 
 function todayLocal(): string {
@@ -54,7 +58,12 @@ function readPayload(op: OutboxItem): ReturnPayload | null {
     if (typeof saleLineId !== "string" || typeof qty !== "number") continue;
     parsed.push({ saleLineId, qty });
   }
-  return { saleRef, lines: parsed };
+  const remainder = (raw as { remainder?: unknown }).remainder;
+  return {
+    saleRef,
+    lines: parsed,
+    ...(remainder === "refund" || remainder === "credit" ? { remainder } : {}),
+  };
 }
 
 /** Server sale id. Never the local id when the outbox already has remoteId. */
@@ -387,6 +396,7 @@ async function enqueueReturn(
   saleRef: string,
   lines: ReturnLineInput[],
   requestId: string,
+  remainder?: ReturnRemainder,
 ): Promise<string> {
   const local = await loadLocalReturnable(businessId, saleRef);
   if (!local) throw new Error("Esta venta no está disponible sin conexión.");
@@ -431,11 +441,23 @@ async function enqueueReturn(
   const customer = local.sale.customerId
     ? await db.customers.get(local.sale.customerId)
     : undefined;
+  // C04 decision 6 — the value lowers the customer's debt (own sale first,
+  // then FIFO), so the local estimate is min(value, cached debt); the rest is
+  // a refund or saldo a favor. The server recomputes on sync.
+  void alreadyDebtReduced;
+  const hasCustomer = !!local.sale.customerId;
+  const cachedDebt = customer && customer.businessId === businessId ? customer.debt : 0;
   const split = splitReturnSettlement({
     returnValue,
     saleCredit: local.sale.credit,
-    alreadyDebtReduced,
-    customerDebt: customer && customer.businessId === businessId ? customer.debt : 0,
+    alreadyDebtReduced: 0,
+    customerDebt: cachedDebt,
+    saleId: local.sale.id,
+    hasCustomer,
+    obligations: hasCustomer
+      ? [{ kind: "sale", id: local.sale.id, occurredOn: local.sale.occurredOn, createdAt: 0, original: cachedDebt, open: cachedDebt }]
+      : [],
+    remainder: hasCustomer ? remainder ?? "credit" : "refund",
   });
 
   const operationId = newEntityId();
@@ -459,6 +481,8 @@ async function enqueueReturn(
         lines,
         projectedDebtReduced: split.debtReduced,
         projectedRefundAmount: split.refundAmount,
+        // C04 T33 — always explicit for a customer sale (default credit, J2).
+        ...(hasCustomer ? { remainder: remainder ?? "credit", projectedToCredit: split.toCredit } : {}),
       },
       dependsOn,
       localCreatedAt: Date.now(),
@@ -471,13 +495,18 @@ export async function createReturnWithOfflineFallback(
   saleRef: string,
   lines: ReturnLineInput[],
   requestId: string,
+  remainder?: ReturnRemainder,
 ): Promise<{ mode: "online"; returnId: string } | { mode: "offline"; operationId: string }> {
   const businessId = getPwaAuthSession().businessId;
   if (!businessId) throw new Error("Selecciona el negocio antes de devolver.");
   const remoteSaleId = await resolveRemoteSaleId(businessId, saleRef);
   try {
     if (!remoteSaleId) throw new NetworkError("La venta todavía no está en el servidor.");
-    const remote = await getPwaApi().sales.createReturn(remoteSaleId, { lines }, requestId);
+    const remote = await getPwaApi().sales.createReturn(
+      remoteSaleId,
+      { lines, ...(remainder ? { remainder } : {}) },
+      requestId,
+    );
     await applyReturnStockOnce(businessId, requestId, remote.lines);
     const db = getLocalDb();
     await db.transaction("rw", [db.saleReturns, db.saleReturnLines], async () => {
@@ -486,7 +515,7 @@ export async function createReturnWithOfflineFallback(
     return { mode: "online", returnId: remote.id };
   } catch (error) {
     if (!(error instanceof NetworkError)) throw error;
-    const operationId = await enqueueReturn(businessId, saleRef, lines, requestId);
+    const operationId = await enqueueReturn(businessId, saleRef, lines, requestId, remainder);
     return { mode: "offline", operationId };
   }
 }
@@ -505,8 +534,10 @@ export async function syncPendingReturns(businessId: string) {
       try {
         const remote = await getPwaApi().sales.createReturn(
           remoteSaleId,
-          { lines: payload.lines },
+          { lines: payload.lines, ...(payload.remainder ? { remainder: payload.remainder } : {}) },
           item.requestId,
+          // C04 decision 15 — a replay without a choice becomes saldo a favor + review.
+          { offlineReplay: true },
         );
         await applyReturnStockOnce(businessId, item.requestId, remote.lines);
         const db = getLocalDb();

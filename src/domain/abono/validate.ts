@@ -5,6 +5,11 @@ import { AMOUNT_TOO_LARGE_MESSAGE, exceedsMaxCop } from "@/domain/money/limits";
 export const ABONO_ERRORS = {
   empty: "Escribe cuánto abona.",
   notPositive: "El abono tiene que ser mayor a 0.",
+  /**
+   * Pre-C04 copy, kept only to map an old server's 409 ABONO_EXCEEDS_DEBT.
+   * Since C04 (R4) an abono above the debt is valid: the excess becomes
+   * saldo a favor.
+   */
   exceedsDebt: "El abono no puede ser mayor al saldo.",
   noMethod: "Elige Efectivo o Nequi.",
 } as const;
@@ -34,7 +39,7 @@ export function validateAbono(input: AbonoInput): string | null {
     return ABONO_ERRORS.empty;
   }
   if (amount <= 0) return ABONO_ERRORS.notPositive;
-  if (amount > input.debt) return ABONO_ERRORS.exceedsDebt;
+  // C04 R4 — amount > debt is allowed: the excess is saldo a favor.
   if (input.method !== "Efectivo" && input.method !== "Nequi") {
     return ABONO_ERRORS.noMethod;
   }
@@ -43,16 +48,25 @@ export function validateAbono(input: AbonoInput): string | null {
 
 /** Remaining debt helper copy after a proposed abono amount. */
 export function abonoRemainingHelper(debt: number, amount: number): string | null {
-  if (!Number.isInteger(amount) || amount <= 0 || amount > debt) return null;
+  if (!Number.isInteger(amount) || amount <= 0) return null;
+  if (amount > debt) return `Sobran ${formatPesos(amount - Math.max(0, debt))}: quedan como saldo a favor.`;
   if (amount === debt) return "Queda en $ 0";
-  const remaining = debt - amount;
-  const formatted = new Intl.NumberFormat("es-CO", {
+  return `Queda debiendo ${formatPesos(debt - amount)}`;
+}
+
+function formatPesos(n: number): string {
+  return new Intl.NumberFormat("es-CO", {
     style: "currency",
     currency: "COP",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(remaining);
-  return `Queda debiendo ${formatted}`;
+  }).format(n);
+}
+
+/** C04 R4 — the part of an abono that will become saldo a favor (estimate). */
+export function abonoExcess(debt: number, amount: number): number {
+  if (!Number.isInteger(amount) || amount <= 0) return 0;
+  return Math.max(0, amount - Math.max(0, debt));
 }
 
 export function parseAbonoAmount(amountRaw: string): number {

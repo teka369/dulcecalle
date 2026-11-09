@@ -24,6 +24,8 @@ import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
 import { ActionBar, ACTION_BAR_SPACE, ABOVE_ACTION_BAR } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
+import { useOnline } from "@/components/shell/use-online";
+import { saldoAFavorView } from "@/components/sale/saldo-a-favor";
 import {
   buildSaleRequest,
   canRegister,
@@ -69,6 +71,9 @@ export default function CobrarPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // C04 W7 — «Usar saldo a favor»: one tap, online only (J3 / T34).
+  const [useSaldo, setUseSaldo] = useState(false);
+  const online = useOnline();
   // C02 / NEW-02 — the requestId is bound to the sale payload.
   const requestIdRef = useRef<PayloadBoundId>(null);
   const rejected = useRejectedCorrection();
@@ -124,6 +129,16 @@ export default function CobrarPage() {
   const itemCount = lines.reduce((s, l) => s + l.qty, 0);
   const valid = canRegister(state, total, lines.length);
   const fiado = fiadoFor(state, total);
+  const selectedCustomer = customers.find((c) => c.id === customerId) ?? null;
+  const saldo = saldoAFavorView({
+    creditBalance: paymentKind === "paid" ? 0 : selectedCustomer?.creditBalance ?? 0,
+    owedOnSale: fiado,
+    online,
+    using: useSaldo,
+  });
+  useEffect(() => {
+    if (!saldo.offerable && useSaldo) setUseSaldo(false);
+  }, [saldo.offerable, useSaldo]);
 
   function dispatch(action: CheckoutAction) {
     const next = checkoutReducer(state, action);
@@ -142,7 +157,8 @@ export default function CobrarPage() {
     setBusy(true);
     setError(null);
     try {
-      const request = buildSaleRequest(state, lines, note);
+      const built = buildSaleRequest(state, lines, note);
+      const request = saldo.applied > 0 ? { ...built, applyCredit: true as const } : built;
       requestIdRef.current = payloadBoundRequestId(requestIdRef.current, JSON.stringify(request));
       const result = await createSaleWithOfflineFallback(request, requestIdRef.current.id);
       // C01.3 — open the discard dialog before clear() so a store emit after
@@ -230,6 +246,27 @@ export default function CobrarPage() {
             hint={fiado > 0 ? `Queda debiendo ${formatCop(fiado)}` : undefined}
           />
         )}
+
+        {saldo.visible && selectedCustomer ? (
+          <section className="flex flex-col gap-1 rounded-[var(--r-md)] bg-ok-soft p-3 text-sm text-ink">
+            <div className="flex items-center justify-between gap-2">
+              <span>{`${selectedCustomer.name.split(" ")[0]} tiene ${formatCop(saldo.creditBalance)} a favor`}</span>
+              {saldo.offerable ? (
+                <button
+                  type="button"
+                  onClick={() => setUseSaldo((v) => !v)}
+                  className="inline-flex min-h-11 items-center rounded-[var(--r-pill)] border border-border bg-surface px-3 text-sm font-semibold"
+                >
+                  {useSaldo ? "Quitar" : `Usar ${formatCop(saldo.usable)}`}
+                </button>
+              ) : null}
+            </div>
+            {!online ? <span className="text-xs text-ink-muted">Se usa con conexión.</span> : null}
+            {saldo.applied > 0 ? (
+              <span>{`Saldo a favor −${formatCop(saldo.applied)} · Queda ${formatCop(saldo.remaining)}`}</span>
+            ) : null}
+          </section>
+        ) : null}
 
         <div>
           <label className="text-xs font-semibold uppercase tracking-wide text-ink-muted" htmlFor="nota">

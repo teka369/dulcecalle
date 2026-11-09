@@ -339,6 +339,10 @@ async function createLocalSale(
   );
 }
 
+/** C04 J3 — copy when «Usar saldo a favor» meets a dropped connection. */
+export const SALDO_NEEDS_CONNECTION =
+  "Sin conexión. El saldo a favor se usa con conexión: quita «Usar saldo a favor» para guardar la venta.";
+
 export async function createSaleWithOfflineFallback(
   input: CreateSaleInput,
   requestId: string,
@@ -357,9 +361,13 @@ export async function createSaleWithOfflineFallback(
     return { mode: "online", sale };
   } catch (error) {
     if (!(error instanceof NetworkError)) throw error;
+    // C04 J3 / T34 — saldo a favor is used only online; never queued.
+    if (stamped.applyCredit) throw new Error(SALDO_NEEDS_CONNECTION);
     const businessId = getPwaAuthSession().businessId;
     if (!businessId) throw new Error("Selecciona el negocio antes de vender.");
-    const saleId = await createLocalSale(stamped, businessId, requestId);
+    const { applyCredit: _drop, ...queued } = stamped;
+    void _drop;
+    const saleId = await createLocalSale(queued, businessId, requestId);
     return { mode: "offline", saleId };
   }
 }

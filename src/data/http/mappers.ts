@@ -154,6 +154,8 @@ export type RemoteCustomer = {
   name: string;
   phone: string | null;
   debt: number;
+  /** C04 — saldo a favor (overpayments, returns to credit). 0 on old servers. */
+  creditBalance?: number;
   archivedAt: string | null;
   createdAt: number;
 };
@@ -165,6 +167,7 @@ export function mapCustomer(raw: Record<string, unknown>): RemoteCustomer {
     name: String(raw.name ?? ""),
     phone: raw.phone == null ? null : String(raw.phone),
     debt: asCopJson(raw.debt, "debt"),
+    creditBalance: raw.creditBalance == null ? 0 : asCopJson(raw.creditBalance, "creditBalance"),
     archivedAt: raw.archivedAt == null ? null : String(raw.archivedAt),
     createdAt: asIsoEpoch(raw.createdAt),
   };
@@ -178,6 +181,15 @@ export type RemoteSaleLine = {
   unitPrice: number;
   unitCost: number;
   lineTotal: number;
+};
+
+export type RemoteSaleApplied = {
+  sourceType: string;
+  sourceId: string;
+  amount: number;
+  /** fifo | explicit | credit_apply (saldo a favor). */
+  mode?: string;
+  createdAt: number;
 };
 
 export type RemoteSale = {
@@ -195,6 +207,12 @@ export type RemoteSale = {
   occurredAt?: number;
   /** C03 — when the server accepted the sale. */
   syncedAt?: number;
+  /** C04 — what is still owed on this sale (ledger / detail). */
+  openBalance?: number;
+  /** C04 — part paid with saldo a favor. */
+  creditApplied?: number;
+  /** C04 W6 — money applied to this sale (abonos, returns, saldo a favor). */
+  appliedFrom?: RemoteSaleApplied[];
   lines: RemoteSaleLine[];
 };
 
@@ -215,6 +233,22 @@ export function mapSale(raw: Record<string, unknown>): RemoteSale {
     ...(raw.syncedAt != null || raw.receivedAt != null
       ? { syncedAt: asIsoEpoch(raw.syncedAt ?? raw.receivedAt) }
       : {}),
+    ...(raw.openBalance != null ? { openBalance: asCopJson(raw.openBalance, "openBalance") } : {}),
+    ...(raw.creditApplied != null ? { creditApplied: asCopJson(raw.creditApplied, "creditApplied") } : {}),
+    ...(Array.isArray(raw.allocations)
+      ? {
+          appliedFrom: raw.allocations
+            .map((a) => a as Record<string, unknown>)
+            .filter((a) => typeof a.sourceType === "string")
+            .map((a) => ({
+              sourceType: String(a.sourceType),
+              sourceId: String(a.sourceId ?? ""),
+              amount: asCopJson(a.amount, "allocation.amount"),
+              ...(a.mode != null ? { mode: String(a.mode) } : {}),
+              createdAt: asIsoEpoch(a.createdAt),
+            })),
+        }
+      : {}),
     lines: linesRaw.map((line) => {
       const l = line as Record<string, unknown>;
       return {
@@ -228,6 +262,35 @@ export function mapSale(raw: Record<string, unknown>): RemoteSale {
       };
     }),
   };
+}
+
+/** C04 — one imputation line as returned by payments / returns / credit apply. */
+export type RemoteAllocation = {
+  targetType: "sale" | "initial_debt" | "credit";
+  saleId: string | null;
+  initialDebtId: string | null;
+  amount: number;
+  openBefore?: number;
+  openAfter?: number;
+  mode?: string;
+};
+
+export function mapAllocation(raw: Record<string, unknown>): RemoteAllocation {
+  const t = String(raw.targetType);
+  return {
+    targetType: t === "sale" || t === "initial_debt" ? t : "credit",
+    saleId: raw.saleId == null ? null : String(raw.saleId),
+    initialDebtId: raw.initialDebtId == null ? null : String(raw.initialDebtId),
+    amount: asCopJson(raw.amount, "allocation.amount"),
+    ...(raw.openBefore != null ? { openBefore: asCopJson(raw.openBefore, "openBefore") } : {}),
+    ...(raw.openAfter != null ? { openAfter: asCopJson(raw.openAfter, "openAfter") } : {}),
+    ...(raw.mode != null ? { mode: String(raw.mode) } : {}),
+  };
+}
+
+function mapAllocations(raw: unknown): RemoteAllocation[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.map((r) => mapAllocation(r as Record<string, unknown>));
 }
 
 export type RemotePayment = {
@@ -246,6 +309,15 @@ export type RemotePayment = {
   needsReview?: boolean;
   /** C01.1 — local_date of the caja the abono entered (ledger only). */
   cajaDay?: string | null;
+  /** C04 — where the server applied the money (replaces any local estimate). */
+  allocations?: RemoteAllocation[];
+  debtBefore?: number;
+  debtAfter?: number;
+  creditBalanceAfter?: number;
+  /** C04 — the requested target could not be honored (W4). */
+  adjusted?: boolean;
+  adjustedReviewedAt?: string | null;
+  requestedTarget?: Record<string, unknown> | null;
 };
 
 export function mapPayment(raw: Record<string, unknown>): RemotePayment {
@@ -263,6 +335,19 @@ export function mapPayment(raw: Record<string, unknown>): RemotePayment {
       : {}),
     ...(raw.needsReview === true ? { needsReview: true } : {}),
     ...(typeof raw.cajaDay === "string" ? { cajaDay: asDateKey(raw.cajaDay) } : {}),
+    ...(Array.isArray(raw.allocations) ? { allocations: mapAllocations(raw.allocations) } : {}),
+    ...(raw.debtBefore != null ? { debtBefore: asCopJson(raw.debtBefore, "debtBefore") } : {}),
+    ...(raw.debtAfter != null ? { debtAfter: asCopJson(raw.debtAfter, "debtAfter") } : {}),
+    ...(raw.creditBalanceAfter != null
+      ? { creditBalanceAfter: asCopJson(raw.creditBalanceAfter, "creditBalanceAfter") }
+      : {}),
+    ...(raw.adjusted === true ? { adjusted: true } : {}),
+    ...(raw.adjustedReviewedAt !== undefined
+      ? { adjustedReviewedAt: raw.adjustedReviewedAt == null ? null : String(raw.adjustedReviewedAt) }
+      : {}),
+    ...(raw.requestedTarget && typeof raw.requestedTarget === "object"
+      ? { requestedTarget: raw.requestedTarget as Record<string, unknown> }
+      : {}),
   };
 }
 
@@ -470,6 +555,11 @@ export type RemoteReturn = {
   note: string | null;
   occurredOn: string;
   createdAt: number;
+  /** C04 — remainder kept as saldo a favor. */
+  toCredit?: number;
+  remainderMode?: "refund" | "credit" | null;
+  needsReview?: boolean;
+  allocations?: RemoteAllocation[];
   lines: RemoteReturnLine[];
 };
 
@@ -484,6 +574,10 @@ export function mapReturn(raw: Record<string, unknown>): RemoteReturn {
     note: raw.note == null ? null : String(raw.note),
     occurredOn: asDateKey(raw.occurredOn),
     createdAt: asIsoEpoch(raw.createdAt),
+    ...(raw.toCredit != null ? { toCredit: asCopJson(raw.toCredit, "toCredit") } : {}),
+    ...(raw.remainderMode === "refund" || raw.remainderMode === "credit" ? { remainderMode: raw.remainderMode } : {}),
+    ...(raw.needsReview === true ? { needsReview: true } : {}),
+    ...(Array.isArray(raw.allocations) ? { allocations: mapAllocations(raw.allocations) } : {}),
     lines: linesRaw.map((line) => {
       const l = line as Record<string, unknown>;
       return {
@@ -505,6 +599,8 @@ export type RemoteInitialDebt = {
   note: string | null;
   occurredOn: string;
   createdAt: number;
+  /** C04 — still owed on this initial debt (ledger only). */
+  openBalance?: number;
 };
 
 export function mapInitialDebt(raw: Record<string, unknown>): RemoteInitialDebt {
@@ -515,6 +611,7 @@ export function mapInitialDebt(raw: Record<string, unknown>): RemoteInitialDebt 
     note: raw.note == null ? null : String(raw.note),
     occurredOn: asDateKey(raw.occurredOn),
     createdAt: asIsoEpoch(raw.createdAt),
+    ...(raw.openBalance != null ? { openBalance: asCopJson(raw.openBalance, "openBalance") } : {}),
   };
 }
 

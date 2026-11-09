@@ -101,7 +101,9 @@ export function abonoView(debt: number, amountRaw: string, method: PayMethod) {
     remaining: amount != null && error === null ? debt - amount : null,
     remainingText:
       amount != null && Number.isFinite(amount) && abonoRemainingHelper(debt, amount) != null
-        ? `Queda debiendo ${formatCop(debt - amount)}`
+        ? amount > debt
+          ? `Sobran ${formatCop(amount - Math.max(0, debt))}: quedan como saldo a favor.`
+          : `Queda debiendo ${formatCop(debt - amount)}`
         : null,
     fullChip: debt > 0 ? String(debt) : null,
     method,

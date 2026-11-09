@@ -275,14 +275,15 @@ export class CustomerRepository {
 
         const customer = await db.customers.get(input.customerId);
         if (!customer) throw new Error("customer not found");
-        if (amount > customer.debt) {
-          throw new Error(ABONO_ERRORS.exceedsDebt);
-        }
-        const newDebt = subCop(customer.debt, amount);
+        // C04 R4 — an overpayment is accepted; the excess is saldo a favor.
+        const toDebt = Math.min(amount, Math.max(0, customer.debt));
+        const toCredit = amount - toDebt;
+        const newDebt = subCop(customer.debt, toDebt);
         if (newDebt < 0) throw new Error("debt must be ≥ 0");
 
         await db.customers.update(customer.id!, {
           debt: newDebt,
+          ...(toCredit > 0 ? { creditBalance: (customer.creditBalance ?? 0) + toCredit } : {}),
           updatedAt: Date.now(),
         });
 

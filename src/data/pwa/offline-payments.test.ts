@@ -11,15 +11,14 @@ describe("offline customer payments", () => {
     expect(() => validateOfflinePayment(input, 50_000)).not.toThrow();
   });
 
-  it("rejects a payment greater than the cached debt", () => {
+  // C04 R4 / T21 (intentional change): offline overpay is allowed.
+  it("accepts a payment greater than the cached debt (excess → saldo a favor)", () => {
     const input: CreatePaymentInput = {
       customerId: "customer",
       amount: 60_000,
       method: "Nequi",
     };
-    expect(() => validateOfflinePayment(input, 50_000)).toThrow(
-      "El abono no puede ser mayor al saldo.",
-    );
+    expect(() => validateOfflinePayment(input, 50_000)).not.toThrow();
   });
 
   it("rejects non-positive payments", () => {
