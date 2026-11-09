@@ -164,6 +164,7 @@ model Business {
   reversals          Reversal[]
   sequences          BusinessSequence[]
   receipts           Receipt[]
+  receiptAcks        ReceiptAcknowledgement[]
 
   @@map("businesses")
 }
@@ -816,10 +817,47 @@ model Receipt {
   business Business @relation(fields: [businessId], references: [id])
   prev     Receipt?  @relation("ReceiptVersions", fields: [prevReceiptId], references: [id])
   next     Receipt[] @relation("ReceiptVersions")
+  acks     ReceiptAcknowledgement[]
 
   @@unique([businessId, kind, sourceId])
   @@unique([businessId, number])
   @@index([businessId, customerId, createdAt])
   @@index([businessId, createdAt])
   @@map("receipts")
+}
+
+/// C09 §3.3 — the customer's confirmation of a receipt (decision 4: optional).
+enum ReceiptAckKind {
+  acknowledged
+  reported_issue
+}
+
+enum ReceiptAckChannel {
+  portal
+  link
+}
+
+/// C09 §3.3 — INSERT-ONLY (DB trigger `receipt_acknowledgements_insert_only`).
+/// Extra evidence only: never changes debt, saldo a favor, caja or stock (I-C5).
+/// No FK to customer on purpose (survives the business wipe like receipts);
+/// claimId links the C08 claim once C08-PR3 exists.
+model ReceiptAcknowledgement {
+  id          String            @id @db.Uuid
+  businessId  String            @map("business_id") @db.Uuid
+  customerId  String            @map("customer_id") @db.Uuid
+  receiptId   String            @map("receipt_id") @db.Uuid
+  receiptHash String            @map("receipt_hash")
+  kind        ReceiptAckKind
+  claimId     String?           @map("claim_id") @db.Uuid
+  channel     ReceiptAckChannel
+  note        String?
+  at          DateTime          @default(now()) @db.Timestamptz(3)
+  ipHash      String?           @map("ip_hash")
+
+  business Business @relation(fields: [businessId], references: [id])
+  receipt  Receipt  @relation(fields: [receiptId], references: [id])
+
+  @@index([businessId, receiptId, at])
+  @@index([businessId, customerId, at])
+  @@map("receipt_acknowledgements")
 }
