@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
+import { parseOccurredAt } from "../shared/occurred-at";
 import { addCop, asCop, copToJson, subCop } from "../shared/money";
 import { dateKey, occurredOnDate } from "../shared/clock";
 import { linkForNewMove } from "./session-link";
@@ -94,22 +95,6 @@ function expenseJson(e: {
   };
 }
 
-/** Max clock skew accepted for a device timestamp in the future. */
-const OCCURRED_AT_FUTURE_SKEW_MS = 5 * 60 * 1000;
-
-/** C01/C03 — device occurrence time; never in the future, defaults to now. */
-export function parseOccurredAt(raw: string | undefined, now: Date): Date {
-  if (raw == null) return now;
-  const at = new Date(raw);
-  if (Number.isNaN(at.getTime())) {
-    throw new AppError(ERROR_CODES.VALIDATION, "La fecha de la operación no es válida.");
-  }
-  if (at.getTime() > now.getTime() + OCCURRED_AT_FUTURE_SKEW_MS) {
-    throw new AppError(ERROR_CODES.VALIDATION, "La fecha de la operación está en el futuro.");
-  }
-  return at;
-}
-
 function paymentJson(p: {
   id: string;
   customerId: string;
@@ -118,6 +103,7 @@ function paymentJson(p: {
   note: string | null;
   occurredOn: Date;
   occurredAt?: Date | null;
+  syncedAt?: Date | null;
   needsReview?: boolean;
   createdAt: Date;
 }) {
@@ -129,6 +115,7 @@ function paymentJson(p: {
     note: p.note,
     occurredOn: dateKey(p.occurredOn),
     occurredAt: p.occurredAt ?? p.createdAt,
+    syncedAt: p.syncedAt ?? p.createdAt,
     needsReview: p.needsReview ?? false,
     createdAt: p.createdAt,
   };
@@ -441,6 +428,7 @@ export class CashService {
     const now = new Date();
     const occurredOn = occurredOnDate(ctx.timezone, now);
     const occurredAt = parseOccurredAt(dto.occurredAt, now);
+    const syncedAt = now;
 
     try {
       const pay = await this.prisma.$transaction(async (tx) => {
@@ -469,6 +457,7 @@ export class CashService {
             requestId,
             occurredOn,
             occurredAt,
+            syncedAt,
             needsReview,
             payloadHash: hash,
             createdAt: now,

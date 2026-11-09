@@ -58,6 +58,7 @@ function localSaleToRow(
     note: sale.note,
     occurredOn: sale.occurredOn,
     createdAt: sale.createdAt,
+    ...(sale.occurredAt != null ? { occurredAt: sale.occurredAt } : {}),
     lines: lines.map((l) => ({
       id: l.id,
       productId: l.productId,
@@ -230,6 +231,7 @@ async function createLocalSale(
         occurredOn,
         createdAt: now,
         updatedAt: now,
+        occurredAt: now,
       };
       await db.sales.put(sale);
 
@@ -320,6 +322,8 @@ async function createLocalSale(
             qty: row.qty,
             unitPrice: row.unitPrice,
           })),
+          // C03 — the server keeps when the sale really happened.
+          occurredAt: new Date(now).toISOString(),
         },
         dependsOn: [],
         localCreatedAt: now,
@@ -511,6 +515,7 @@ function saleRequestBody(payload: unknown): CreateSaleInput {
     ...(raw.customerId ? { customerId: raw.customerId } : {}),
     ...(raw.method ? { method: raw.method } : {}),
     ...(raw.note ? { note: raw.note } : {}),
+    ...(raw.occurredAt ? { occurredAt: raw.occurredAt } : {}),
   };
 }
 

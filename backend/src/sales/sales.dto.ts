@@ -63,6 +63,11 @@ export class CreateSaleDto {
   @IsOptional()
   @IsUUID()
   requestId?: string;
+
+  /** C03 — when the sale happened (ISO 8601, device clock). */
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  occurredAt?: string;
 }
 
 export class CreatePaymentDto {

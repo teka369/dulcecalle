@@ -25,6 +25,8 @@ export type RequestOptions = {
   skipRefresh?: boolean;
   /** GET only: override the read deadline (e.g. offline prep downloads use 30s). */
   timeoutMs?: number;
+  /** C03 / Decision 16: marks a past occurredAt from an offline replay. */
+  offlineReplay?: boolean;
 };
 
 /** GET reads give up after this long and surface as NetworkError (writes are never timed out). */
@@ -103,6 +105,9 @@ export class HttpClient {
     }
     if (opts.idempotencyKey) {
       headers["Idempotency-Key"] = opts.idempotencyKey;
+    }
+    if (opts.offlineReplay) {
+      headers["X-Offline-Replay"] = "true";
     }
 
     const body =
