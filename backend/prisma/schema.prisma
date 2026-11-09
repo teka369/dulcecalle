@@ -44,6 +44,8 @@ enum StockMoveReason {
   devolucion
   adjust
   preparacion
+  /// C07 — stock back from a voided sale (refType "reversal").
+  anulacion
 }
 
 enum CashDirection {
@@ -61,6 +63,8 @@ enum CashMoveKind {
   devolucion
   /// C04 R5b — owner pays saldo a favor back in money.
   reembolso_saldo
+  /// C07 — compensating move of a reversal (refType "reversal").
+  reverso
 }
 
 /// C04 — what reduced (or released) an obligation. `reversal` is reserved for C07.
@@ -69,6 +73,25 @@ enum AllocationSource {
   sale_return
   reversal
   credit_refund
+}
+
+/// C07 — what a reversal compensates. expense / initial_debt / cash_move are phase 2.
+enum ReversalTarget {
+  sale
+  customer_payment
+  expense
+  initial_debt
+  cash_move
+}
+
+/// C07 / decision 10 — closed list of reasons. `otro` needs reasonText (decision 14).
+enum ReversalReason {
+  error_digitacion
+  cliente_equivocado
+  monto_equivocado
+  duplicado
+  devolucion
+  otro
 }
 
 /// C04 — `credit` = saldo a favor.
@@ -129,6 +152,7 @@ model Business {
   importIdMap        ImportIdMap[]
   productImages      ProductImage[]
   preparations       Preparation[]
+  reversals          Reversal[]
 
   @@map("businesses")
 }
@@ -557,6 +581,9 @@ model DebtAllocation {
   groupId       String           @map("group_id") @db.Uuid
   createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   createdBy     String?          @map("created_by") @db.Uuid
+  /// C07 — only on reversal rows: the source whose money this row moves (I-A1 per source).
+  originSourceType AllocationSource? @map("origin_source_type")
+  originSourceId   String?           @map("origin_source_id") @db.Uuid
 
   business    Business     @relation(fields: [businessId], references: [id])
   customer    Customer     @relation(fields: [customerId], references: [id])
@@ -567,6 +594,41 @@ model DebtAllocation {
   @@index([businessId, saleId])
   @@index([businessId, sourceType, sourceId])
   @@map("debt_allocations")
+}
+
+/// C07 — one compensating reversal (anulación) of a sale or a payment.
+/// Never updated or deleted (only the business wipe deletes it).
+/// The target is «anulado» iff a row exists (derived state, no mutable column).
+model Reversal {
+  id            String         @id @db.Uuid
+  businessId    String         @map("business_id") @db.Uuid
+  /// DC-R-000001, per business (decision 13).
+  number        String
+  targetType    ReversalTarget @map("target_type")
+  targetId      String         @map("target_id") @db.Uuid
+  reasonCode    ReversalReason @map("reason_code")
+  reasonText    String?        @map("reason_text")
+  oldConfirmed  Boolean        @default(false) @map("old_confirmed")
+  requestedBy   String         @map("requested_by") @db.Uuid
+  /// Operating day of the reversal (today), never the original's day.
+  occurredOn    DateTime       @map("occurred_on") @db.Date
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  requestId     String         @map("request_id") @db.Uuid
+  payloadHash   String         @map("payload_hash")
+  /// Snapshot before: debt, saldo a favor, open balances, stock, caja.
+  before        Json
+  /// Snapshot after + the effects (cash/stock moves, allocations).
+  after         Json
+  /// «Corregir abono»: id of the replacement payment (decision 21).
+  replacementId String?        @map("replacement_id") @db.Uuid
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@unique([businessId, targetType, targetId])
+  @@unique([businessId, requestId])
+  @@unique([businessId, number])
+  @@index([businessId, occurredOn])
+  @@map("reversals")
 }
 
 model ImportIdMap {

@@ -87,6 +87,7 @@ function fakePrisma(seedImages: Row[] = [{ businessId: BIZ, productId: "p1", pub
   const tx = {
     customer: table("customer"),
     debtAllocation: table("debtAllocation"),
+    reversal: table("reversal"),
     saleReturnLine: table("saleReturnLine"),
     saleReturn: table("saleReturn"),
     saleLine: table("saleLine"),
@@ -188,6 +189,15 @@ describe("BusinessDataService.resetData", () => {
     for (const later of ["sale", "customerPayment", "initialDebt", "customer"]) {
       expect(at("debtAllocation")).toBeLessThan(at(later));
     }
+  });
+
+  it("C07: wipes reversals (business wipe is the only delete of that table)", async () => {
+    const prisma = fakePrisma();
+    const result = await service(prisma, okMedia()).resetData(ctx());
+    expect(result.deleted).toHaveProperty("reversals");
+    const calls = prisma.__state.calls;
+    expect(calls.indexOf("reversal.deleteMany")).toBeGreaterThanOrEqual(0);
+    expect(calls.indexOf("reversal.deleteMany")).toBeLessThan(calls.indexOf("customer.deleteMany"));
   });
 
   it("succeeds on a business without images", async () => {
