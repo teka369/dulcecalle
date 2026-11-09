@@ -602,6 +602,13 @@ export class SalesService {
           include: { lines: true },
         });
         if (!sale) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+        // C07 G8 — a voided sale is final: no return after its reversal
+        // (same business lock as the void, so the check cannot race).
+        const voided = await tx.reversal.findUnique({
+          where: { businessId_targetType_targetId: { businessId: ctx.businessId, targetType: "sale", targetId: sale.id } },
+          select: { id: true },
+        });
+        if (voided) throw new AppError(ERROR_CODES.ALREADY_REVERSED, MESSAGES.alreadyReversed);
 
         const lineById = new Map(sale.lines.map((l) => [l.id, l]));
         const prior = await tx.saleReturn.findMany({

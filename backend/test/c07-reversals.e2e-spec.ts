@@ -399,6 +399,10 @@ describe("C07 reversals (DC-05)", () => {
     const v9 = await voidSale(b, s9.id);
     expect(v9.status).toBe(201);
     expect(await stock(b)).toBe(st9 + 3);
+    // G8: a voided sale accepts no more returns (stock/cash would count twice)
+    const late = await post(b, `/v1/sales/${s9.id}/returns`, { lines: [{ saleLineId: s9.lines[0]!.id, qty: 1 }] });
+    expect([late.status, late.body.error?.code]).toEqual([409, "ALREADY_REVERSED"]);
+    expect(await stock(b)).toBe(st9 + 3);
 
     // T35: fully returned → nothing to void
     const s35 = await cashSale(b, 1000, "Nequi");
