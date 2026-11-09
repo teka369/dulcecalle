@@ -228,13 +228,23 @@ describe("C09-PR2 receipts", () => {
     expect(byKind.body.map((x: { number: string }) => x.number)).toEqual(["DC-P-000002", "DC-P-000001"]);
   });
 
-  it("corregir: the replacement abono gets its own payment receipt (C07 integration)", async () => {
+  it("corregir: dryRun emits nothing; the real replacement abono gets its own payment receipt (C07/C07.1 integration)", async () => {
     const b = await newBiz();
     const ana = await customer(b, "Ana");
     const beto = await customer(b, "Beto");
     await fiada(b, ana.id, 4000);
     await fiada(b, beto.id, 4000);
     const p = await post(b, `/v1/customers/${ana.id}/payments`, { amount: 2000, method: "Efectivo" });
+    // C07.1 merged: correct/reverse dryRun (replacementPreview) emit no receipt and leave statuses alone.
+    const countBefore = await prisma.receipt.count({ where: { businessId: b.biz } });
+    const dc = await post(b, `/v1/customers/${ana.id}/payments/${p.body.id}/correct?dryRun=true`, {
+      reasonCode: "cliente_equivocado",
+      replacement: { customerId: beto.id, amount: 2000, method: "Efectivo", requestId: randomUUID() },
+    });
+    const dr = await post(b, `/v1/customers/${ana.id}/payments/${p.body.id}/reverse?dryRun=true`, { reasonCode: "duplicado" });
+    expect([dc.status, dr.status, Boolean(dc.body.replacementPreview)]).toEqual([200, 200, true]);
+    expect(await prisma.receipt.count({ where: { businessId: b.biz } })).toBe(countBefore);
+    expect((await receipt(b, p.body.receipts[0].id)).status).toBe("vigente");
     const c = await post(b, `/v1/customers/${ana.id}/payments/${p.body.id}/correct`, {
       reasonCode: "cliente_equivocado",
       replacement: { customerId: beto.id, amount: 2000, method: "Efectivo", requestId: randomUUID() },
