@@ -216,6 +216,8 @@ export function mapReversalRef(raw: unknown): RemoteReversalRef | null {
 
 export type RemoteSale = {
   id: string;
+  /** C09 — per-business number (DC-000125), once the server accepted the sale. */
+  number?: string;
   customerId: string | null;
   paymentKind: string;
   method: string | null;
@@ -244,6 +246,7 @@ export function mapSale(raw: Record<string, unknown>): RemoteSale {
   const linesRaw = Array.isArray(raw.lines) ? raw.lines : [];
   return {
     id: asUuid(raw.id, "sale.id"),
+    ...(typeof raw.number === "string" && raw.number ? { number: raw.number } : {}),
     customerId: raw.customerId == null ? null : asUuid(raw.customerId, "sale.customerId"),
     paymentKind: String(raw.paymentKind),
     method: raw.method == null ? null : String(raw.method),
@@ -320,6 +323,8 @@ function mapAllocations(raw: unknown): RemoteAllocation[] | undefined {
 
 export type RemotePayment = {
   id: string;
+  /** C09 — per-business number (DC-P-000045). */
+  number?: string;
   customerId: string;
   amount: number;
   method: string;
@@ -353,6 +358,7 @@ export type RemotePayment = {
 export function mapPayment(raw: Record<string, unknown>): RemotePayment {
   return {
     id: asUuid(raw.id, "payment.id"),
+    ...(typeof raw.number === "string" && raw.number ? { number: raw.number } : {}),
     customerId: asUuid(raw.customerId, "payment.customerId"),
     amount: asCopJson(raw.amount, "amount"),
     method: String(raw.method),

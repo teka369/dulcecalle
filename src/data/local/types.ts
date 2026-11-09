@@ -248,6 +248,8 @@ export type LocalSale = {
   updatedAt: number;
   /** C03 — device time the sale was registered (epoch ms). */
   occurredAt?: number;
+  /** C09 — server number (DC-000125) once synced; not indexed (no Dexie bump). */
+  number?: string;
 };
 
 export type LocalSaleLine = {

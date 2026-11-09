@@ -173,6 +173,7 @@ export async function persistServerSale(
     createdAt: sale.createdAt,
     updatedAt: now,
     ...(sale.occurredAt != null ? { occurredAt: sale.occurredAt } : {}),
+    ...(sale.number ? { number: sale.number } : {}),
   };
 
   await db.transaction(
