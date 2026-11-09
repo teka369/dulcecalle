@@ -239,6 +239,16 @@ Every created sale (with or without customer), abono and devolución gets exactl
 - **PR3 — `reversal`** (`DC-R-…`, `sourceType: "reversal"`): `original {type, id, number, receiptId}`, `reasonCode` (label only, never `reasonText`), `debtBefore/After`, `creditBefore/After` (null without customer: internal), `cashOut {method, amount} | null`, `stock [{productName, qty}]`, `replacementPaymentNumber` («corregir»). The original receipt is never edited; it reads `anulado`. `dryRun` emits nothing.
 - `POST /v1/sales/:id/void`, `POST …/payments/:paymentId/reverse|correct` (and replays) and `GET /v1/reversals/:id` carry `receipts` (reversal first, then its annex); POST responses of payments/sales/returns list the parent first, then its annex. `GET /v1/receipts/:id` adds `related: [{id, kind, number}]` (the other receipts of the same operation).
 
+### 6d. Portal receipts and confirmations (C09-PR4, SPEC-C09 §3.3/§5/§7)
+
+Customer token only (the existing code + PIN portal login; business and customer come from the token, `X-Business-Id` is ignored). Another customer's, an internal (no customer) or another business's receipt → `404`. No token / owner token / bad token → `401`.
+
+- `GET /v1/customer/me/receipts` → own receipts, newest first: `{ id, kind, number, status, ackState, verifyCode, hashPrefix, issuedAt }`. `issuedAt` is the exact issue time in Bogota (`…T10:15:42.123-05:00`).
+- `GET /v1/customer/me/receipts/:id` → the same plus `snapshot`, `contentHash`, `related` (own receipts of the same operation) and `acks: [{ kind, receiptHash, note, at }]`.
+- `POST /v1/customer/me/receipts/:id/ack` `{ kind: "acknowledged" | "reported_issue", receiptHash, note? }` → `201 { id, receiptId, kind, receiptHash, channel: "portal", note, claimId, at }`. `receiptHash` must equal the receipt's `contentHash`, else `409 RECEIPT_HASH_MISMATCH` (the customer saw another version). `acknowledged` («Reconozco esto») is idempotent per receipt + hash: a repeat returns `200` with the same row. `reported_issue` («Hay un error») needs `note` (5–280 after trim); `claimId` stays `null` until C08-PR3 creates the claim. Throttle 20/min. **Evidence only:** never changes debt, saldo a favor, caja or stock (I-C5). Rows are insert-only.
+- `ackState` (derived, latest confirmation wins): `pending | acknowledged | reported`. Owner `GET /v1/receipts` items and `GET /v1/receipts/:id` carry it; the owner detail adds `acks: [{ id, kind, receiptHash, note, channel, claimId, at }]`.
+- Ledger (§7): owner `GET /v1/customers/:id/ledger` and portal `GET /v1/customer/me/ledger` add `receiptId` and `ackState` to every sale, abono and devolución, and `number` (portal: sales and abonos; both: returns, `DC-D-…` from the receipt). Movements before PR2 have `receiptId: null`.
+
 ## 7. Initial debt
 
 `POST /v1/customers/:id/initial-debts` `{ amount, note?, requestId }`  
