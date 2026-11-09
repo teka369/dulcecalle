@@ -23,6 +23,8 @@ import { reversalsByTarget, type ReversalRef } from "../shared/reversal-lookup";
 import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import type { CreateReturnDto, CreateSaleDto } from "./sales.dto";
 import { formatNumber, nextNumber } from "../shared/sequences";
+import { copString, isoInZone } from "../shared/canonical";
+import { emitReceipt, receiptRefs } from "../receipts/receipt-emit";
 
 function saleJson(s: {
   id: string;
@@ -228,6 +230,8 @@ export class SalesService {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
 
         let creditBalance = 0n;
+        // C09 §2 — balances before this sale, read inside the lock (I-C3).
+        let customerBefore: { id: string; code: string; name: string; debt: bigint; creditBalance: bigint } | null = null;
         if (dto.customerId) {
           const customer = await tx.customer.findFirst({
             where: { id: dto.customerId, businessId: ctx.businessId },
@@ -236,6 +240,7 @@ export class SalesService {
             throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
           }
           creditBalance = customer.creditBalance;
+          customerBefore = customer;
         }
         // C04 R5 — saldo a favor only with the explicit flag and a customer.
         const useCredit = dto.applyCredit === true && !!dto.customerId && creditBalance > 0n;
@@ -438,6 +443,47 @@ export class SalesService {
           });
         }
 
+        // C09-PR2 — sale receipt in this transaction (I-C1). Also for a sale
+        // without customer: internal receipt, never in a portal (decision 19).
+        const after = customerBefore
+          ? await tx.customer.findUniqueOrThrow({ where: { id: customerBefore.id }, select: { debt: true, creditBalance: true } })
+          : null;
+        const business = await tx.business.findUniqueOrThrow({ where: { id: ctx.businessId }, select: { id: true, name: true } });
+        const saleNumber = formatNumber("sale", number)!;
+        await emitReceipt(tx, {
+          businessId: ctx.businessId,
+          customerId: customerBefore?.id ?? null,
+          kind: "sale",
+          sourceType: "sale",
+          sourceId: saleId,
+          number: saleNumber,
+          createdAt: now,
+          snapshot: {
+            kind: "sale",
+            number: saleNumber,
+            business: { id: business.id, name: business.name },
+            createdAt: isoInZone(now, ctx.timezone),
+            occurredOn: dateKey(occurredOn),
+            customer: customerBefore ? { id: customerBefore.id, code: customerBefore.code, name: customerBefore.name } : null,
+            internal: !customerBefore,
+            paymentKind: storedKind,
+            lines: prepared.map((l) => ({
+              productName: l.productName,
+              qty: l.qty,
+              unitPrice: copString(l.unitPrice),
+              lineTotal: copString(l.lineTotal),
+            })),
+            total: copString(saleTotal),
+            received: amountReceived > 0n && method ? { method, amount: copString(amountReceived) } : null,
+            credit: copString(credit),
+            creditApplied: copString(creditToApply),
+            debtBefore: customerBefore ? copString(customerBefore.debt) : null,
+            debtAfter: after ? copString(after.debt) : null,
+            creditBefore: customerBefore ? copString(customerBefore.creditBalance) : null,
+            creditAfter: after ? copString(after.creditBalance) : null,
+          },
+        });
+
         return tx.sale.findUniqueOrThrow({
           where: { id: saleId },
           include: { lines: true },
@@ -486,6 +532,7 @@ export class SalesService {
         amount: copToJson(r.amount),
       })),
       creditAvailable: customer ? copToJson(customer.creditBalance) : null,
+      receipts: await receiptRefs(this.prisma, businessId, row.id),
     };
   }
 
@@ -576,6 +623,7 @@ export class SalesService {
         initialDebtId: x.initialDebtId,
         amount: copToJson(x.amount),
       })),
+      receipts: await receiptRefs(this.prisma, businessId, r.id),
     };
   }
 
@@ -671,12 +719,14 @@ export class SalesService {
         }
 
         let customerDebt = 0n;
+        let customerBefore: { id: string; code: string; name: string; debt: bigint; creditBalance: bigint } | null = null;
         if (sale.customerId) {
           const customer = await tx.customer.findFirst({
             where: { id: sale.customerId, businessId: ctx.businessId },
           });
           if (!customer) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
           customerDebt = customer.debt;
+          customerBefore = customer;
         }
 
         // C04 / decision 6 (R6, §4.1): own sale first, then FIFO; the rest is
@@ -837,6 +887,48 @@ export class SalesService {
             credit: toCredit,
           });
         }
+
+        // C09-PR2 — return receipt DC-D- (decision 26) in this transaction (I-C1).
+        const returnNumber = formatNumber("return", await nextNumber(tx, ctx.businessId, "return"))!;
+        const after = customerBefore
+          ? await tx.customer.findUniqueOrThrow({ where: { id: customerBefore.id }, select: { debt: true, creditBalance: true } })
+          : null;
+        const business = await tx.business.findUniqueOrThrow({ where: { id: ctx.businessId }, select: { id: true, name: true } });
+        await emitReceipt(tx, {
+          businessId: ctx.businessId,
+          customerId: customerBefore?.id ?? null,
+          kind: "return",
+          sourceType: "sale_return",
+          sourceId: returnId,
+          number: returnNumber,
+          createdAt: now,
+          snapshot: {
+            kind: "return",
+            number: returnNumber,
+            business: { id: business.id, name: business.name },
+            createdAt: isoInZone(now, ctx.timezone),
+            occurredOn: dateKey(occurredOn),
+            customer: customerBefore ? { id: customerBefore.id, code: customerBefore.code, name: customerBefore.name } : null,
+            internal: !customerBefore,
+            saleId,
+            saleNumber: formatNumber("sale", sale.number),
+            lines: prepared.map((l) => ({
+              productName: lineById.get(l.saleLineId)?.productName ?? "",
+              qty: l.qty,
+              unitPrice: copString(l.unitPrice),
+              value: copString(mulCop(l.unitPrice, l.qty)),
+            })),
+            value: copString(returnValue),
+            debtReduced: copString(debtReduced),
+            refundAmount: copString(refundAmount),
+            refundMethod: method,
+            toCredit: copString(toCredit),
+            debtBefore: customerBefore ? copString(customerBefore.debt) : null,
+            debtAfter: after ? copString(after.debt) : null,
+            creditBefore: customerBefore ? copString(customerBefore.creditBalance) : null,
+            creditAfter: after ? copString(after.creditBalance) : null,
+          },
+        });
 
         return tx.saleReturn.findUniqueOrThrow({
           where: { id: returnId },

@@ -9,6 +9,8 @@ import { addCop, asCop, copToJson, subCop } from "../shared/money";
 import { dateKey, occurredOnDate } from "../shared/clock";
 import { linkForNewMove } from "./session-link";
 import { formatNumber, nextNumber } from "../shared/sequences";
+import { copString, isoInZone } from "../shared/canonical";
+import { emitReceipt, receiptRefs } from "../receipts/receipt-emit";
 import { sessionExpected } from "./carry-rules";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
@@ -664,12 +666,46 @@ export class CashService {
         createdAt: now,
       },
     });
+    // C09-PR2 — payment receipt DC-P- in this transaction (I-C1). Its own
+    // balances before/after (I-C3). Allocation receipts are PR3.
+    const replaced = args.replacesPaymentId
+      ? await tx.customerPayment.findUnique({ where: { id: args.replacesPaymentId }, select: { number: true } })
+      : null;
+    const business = await tx.business.findUniqueOrThrow({ where: { id: ctx.businessId }, select: { id: true, name: true } });
+    const paymentNumber = formatNumber("payment", number)!;
+    await emitReceipt(tx, {
+      businessId: ctx.businessId,
+      customerId,
+      kind: "payment",
+      sourceType: "customer_payment",
+      sourceId: id,
+      number: paymentNumber,
+      createdAt: now,
+      snapshot: {
+        kind: "payment",
+        number: paymentNumber,
+        business: { id: business.id, name: business.name },
+        createdAt: isoInZone(now, ctx.timezone),
+        occurredOn: dateKey(occurredOn),
+        customer: { id: customer.id, code: customer.code, name: customer.name },
+        internal: false,
+        amount: copString(amount),
+        method: dto.method,
+        evidenceRef: null,
+        debtBefore: copString(customer.debt),
+        debtAfter: copString(debtAfter),
+        creditBefore: copString(customer.creditBalance),
+        creditAfter: copString(creditAfter),
+        creditGenerated: copString(plan.toCredit),
+        replacesPaymentNumber: replaced ? formatNumber("payment", replaced.number) : null,
+      },
+    });
     return payment;
   }
 
   /** Payment JSON + C04 allocation snapshot (stored at creation time). */
   async paymentWithAllocations(row: PaymentRow) {
-    const base = paymentJson(row);
+    const base = { ...paymentJson(row), receipts: await receiptRefs(this.prisma, row.businessId, row.id) };
     const stored = row.allocationResult as StoredAllocationResult | null;
     if (stored && typeof stored === "object" && Array.isArray(stored.allocations)) {
       return {
