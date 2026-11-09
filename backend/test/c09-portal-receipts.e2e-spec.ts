@@ -232,4 +232,57 @@ describe("C09-PR4 portal receipts and acknowledgements", () => {
     expect(portal.sales[0].returns[0]).toMatchObject({ number: "DC-D-000001", receiptId: ret.body.receipts[0].id, ackState: "pending" });
     expect(portal.payments[0]).toMatchObject({ number: "DC-P-000001", receiptId: anaPay.receipts[0]!.id, ackState: "pending" });
   });
+
+  it("P-C09-14 (Juan: a dispute stays in reconciliation): report → acknowledge = still reported; acknowledge → report = reported; acknowledge only = acknowledged; none = pending — same state everywhere", async () => {
+    const sale = async () =>
+      (await post(a, "/v1/sales", { lines: [{ productId: productA, qty: 1, unitPrice: 1000 }], paymentKind: "credit", customerId: ana.id, amountReceived: 0 })).body as {
+        id: string;
+        receipts: Array<{ id: string }>;
+      };
+    const [s1, s2, s3, s4] = [await sale(), await sale(), await sale(), await sale()];
+    const hashOf = async (id: string) => (await me(anaToken, `/v1/customer/me/receipts/${id}`)).body.contentHash as string;
+    const note = "El precio no era ese";
+    // s1: report, then acknowledge — the acknowledge is still recorded as a row.
+    const r1 = s1.receipts[0]!.id;
+    const h1 = await hashOf(r1);
+    expect((await ack(anaToken, r1, { kind: "reported_issue", receiptHash: h1, note })).status).toBe(201);
+    const late = await ack(anaToken, r1, { kind: "acknowledged", receiptHash: h1 });
+    expect(late.status).toBe(201);
+    expect((await ack(anaToken, r1, { kind: "acknowledged", receiptHash: h1 })).status).toBe(200); // idempotent
+    expect(await prisma.receiptAcknowledgement.count({ where: { receiptId: r1 } })).toBe(2);
+    // s2: acknowledge, then report.
+    const r2 = s2.receipts[0]!.id;
+    const h2 = await hashOf(r2);
+    expect((await ack(anaToken, r2, { kind: "acknowledged", receiptHash: h2 })).status).toBe(201);
+    expect((await ack(anaToken, r2, { kind: "reported_issue", receiptHash: h2, note })).status).toBe(201);
+    // s3: acknowledge only (201 then 200).
+    const r3 = s3.receipts[0]!.id;
+    const h3 = await hashOf(r3);
+    expect((await ack(anaToken, r3, { kind: "acknowledged", receiptHash: h3 })).status).toBe(201);
+    expect((await ack(anaToken, r3, { kind: "acknowledged", receiptHash: h3 })).status).toBe(200);
+    const r4 = s4.receipts[0]!.id;
+    const want: Record<string, string> = { [r1]: "reported", [r2]: "reported", [r3]: "acknowledged", [r4]: "pending" };
+    const bySale: Record<string, string> = { [s1.id]: "reported", [s2.id]: "reported", [s3.id]: "acknowledged", [s4.id]: "pending" };
+    // Portal list + detail.
+    const plist = (await me(anaToken, "/v1/customer/me/receipts")).body as Array<{ id: string; ackState: string }>;
+    for (const [id, st] of Object.entries(want)) {
+      expect([id, plist.find((x) => x.id === id)!.ackState]).toEqual([id, st]);
+      expect([id, (await me(anaToken, `/v1/customer/me/receipts/${id}`)).body.ackState]).toEqual([id, st]);
+    }
+    // Owner list + detail.
+    const olist = (await api().get(`/v1/receipts?customerId=${ana.id}&kind=sale`).set(admin(a))).body as Array<{ id: string; ackState: string }>;
+    for (const [id, st] of Object.entries(want)) {
+      expect([id, olist.find((x) => x.id === id)!.ackState]).toEqual([id, st]);
+      expect([id, (await api().get(`/v1/receipts/${id}`).set(admin(a))).body.ackState]).toEqual([id, st]);
+    }
+    // Ledgers (owner + portal).
+    const owner = (await api().get(`/v1/customers/${ana.id}/ledger`).set(admin(a))).body;
+    const portal = (await me(anaToken, "/v1/customer/me/ledger")).body;
+    for (const [saleId, st] of Object.entries(bySale)) {
+      expect([saleId, owner.sales.find((x: { id: string }) => x.id === saleId).ackState]).toEqual([saleId, st]);
+      expect([saleId, portal.sales.find((x: { id: string }) => x.id === saleId).ackState]).toEqual([saleId, st]);
+    }
+    // Both rows of s1 stay in the history, in order.
+    expect((await me(anaToken, `/v1/customer/me/receipts/${r1}`)).body.acks.map((x: { kind: string }) => x.kind)).toEqual(["reported_issue", "acknowledged"]);
+  });
 });
