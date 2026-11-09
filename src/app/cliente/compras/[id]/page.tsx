@@ -58,9 +58,9 @@ export default function CustomerPurchaseDetailPage() {
       hero={
         <div className="mt-4">
           <HeroAmount
-            label={purchaseLabel(sale.credit, sale.paymentKind, sale.openBalance)}
+            label={purchaseLabel(sale.credit, sale.paymentKind, sale.openBalance, sale.reversal)}
             value={formatCop(sale.saleTotal)}
-            tone={(sale.openBalance ?? sale.credit) > 0 ? "danger" : "ok"}
+            tone={!sale.reversal && (sale.openBalance ?? sale.credit) > 0 ? "danger" : "ok"}
           />
         </div>
       }

@@ -3,6 +3,7 @@ import type { CustomerLedger } from "@/data/http/customer-api";
 import type { CustomerStatementRow } from "@/data/pwa/customer-portal";
 import { ApiError } from "@/data/errors";
 import { formatCop } from "@/domain/money";
+import { reversalBadge } from "@/domain/reversal";
 
 export const PORTAL_OFFLINE_MESSAGE = "Sin conexión.";
 export const PORTAL_LOAD_FAILED_MESSAGE = "No se pudo cargar";
@@ -56,7 +57,14 @@ export function statementSign(row: Pick<CustomerStatementRow, "kind">) {
  * «Pendiente $X» or «Saldada». Pre-C04 servers (no openBalance) keep the
  * old labels.
  */
-export function purchaseLabel(credit: number, paymentKind: string, openBalance?: number | null): string {
+export function purchaseLabel(
+  credit: number,
+  paymentKind: string,
+  openBalance?: number | null,
+  reversal?: { number: string; reasonCode: string } | null,
+): string {
+  // C07 W7 — a voided purchase reads «Anulada · motivo» (label only, J5).
+  if (reversal) return reversalBadge("sale", reversal);
   if (credit > 0 && typeof openBalance === "number") {
     return openBalance > 0 ? `Pendiente ${formatCop(openBalance)}` : "Saldada";
   }
@@ -68,7 +76,9 @@ export function purchaseTone(
   credit: number,
   paymentKind: string,
   openBalance?: number | null,
+  reversal?: unknown,
 ): "ok" | "warning" | "info" {
+  if (reversal) return "info";
   if (credit <= 0) return "ok";
   if (typeof openBalance === "number") return openBalance > 0 ? "warning" : "ok";
   return paymentKind === "partial" ? "warning" : "info";
@@ -124,4 +134,9 @@ export function activePortalTab(pathname: string): string | null {
   if (pathname === "/cliente") return "/cliente";
   const hit = PORTAL_TABS.find((t) => t.href !== "/cliente" && (pathname === t.href || pathname.startsWith(`${t.href}/`)));
   return hit?.href ?? null;
+}
+
+/** C07 W7 — «Anulado · motivo» for a portal abono (never who or the free text). */
+export function portalPaymentReversal(p: { reversal?: { number: string; reasonCode: string } | null }): string | null {
+  return p.reversal ? reversalBadge("payment", p.reversal) : null;
 }

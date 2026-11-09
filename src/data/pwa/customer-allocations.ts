@@ -12,9 +12,11 @@ import { getPwaApi } from "./api";
 import { getPwaAuthSession } from "../http/session";
 import { getLocalDb } from "../local/db";
 import { fifoOrder, type Obligation } from "@/domain/allocation";
-import { mapCustomer, mapPayment, type RemoteAllocation } from "../http/mappers";
+import { mapCustomer, mapPayment, mapReversalRef, type RemoteAllocation, type RemoteReversalRef } from "../http/mappers";
 
 export type OpenObligation = Obligation & {
+  /** C07 — the sale was voided («Anulada»). */
+  reversed?: boolean;
   /** «Compra 2 nov» / «Deuda anterior 2 oct». */
   label: string;
   /** Sale still only on this device: target it by its requestId. */
@@ -32,6 +34,19 @@ export type AdjustedPayment = {
   reviewedAt: string | null;
 };
 
+/** C07 — an abono as the server ledger shows it (W3, W4). */
+export type LedgerPayment = {
+  id: string;
+  amount: number;
+  method: string;
+  occurredOn: string;
+  createdAt: number;
+  note: string | null;
+  reversal: RemoteReversalRef | null;
+  replacesPaymentId: string | null;
+  replacedByPaymentId: string | null;
+};
+
 export type CustomerMoneyState = {
   source: "server" | "estimate";
   debt: number;
@@ -41,6 +56,8 @@ export type CustomerMoneyState = {
   adjusted: AdjustedPayment[];
   /** null when unknown (offline / old server). */
   isOwner: boolean | null;
+  /** C07 — server abonos, newest first (empty offline). */
+  payments?: LedgerPayment[];
 };
 
 const DAY = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -55,7 +72,7 @@ function num(v: unknown): number {
   return typeof v === "number" ? v : Number(v ?? 0);
 }
 
-async function ownerRole(): Promise<boolean | null> {
+export async function ownerRole(): Promise<boolean | null> {
   try {
     const businessId = getPwaAuthSession().businessId;
     const me = await getPwaApi().auth.me();
@@ -106,8 +123,22 @@ async function loadFromServer(customerId: string): Promise<CustomerMoneyState> {
       original: credit,
       open: raw.openBalance == null ? credit : num(raw.openBalance),
       label: `Compra ${dayLabel(occurredOn)}`,
+      ...(raw.reversal ? { reversed: true } : {}),
     });
   }
+  const payments: LedgerPayment[] = ledger.payments
+    .map((raw) => ({
+      id: String(raw.id),
+      amount: num(raw.amount),
+      method: String(raw.method ?? ""),
+      occurredOn: String(raw.occurredOn ?? "").slice(0, 10),
+      createdAt: Date.parse(String(raw.createdAt)) || 0,
+      note: raw.note == null ? null : String(raw.note),
+      reversal: mapReversalRef(raw.reversal),
+      replacesPaymentId: typeof raw.replacesPaymentId === "string" ? raw.replacesPaymentId : null,
+      replacedByPaymentId: typeof raw.replacedByPaymentId === "string" ? raw.replacedByPaymentId : null,
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt);
   const adjusted: AdjustedPayment[] = [];
   for (const raw of ledger.payments) {
     if (raw.adjusted !== true) continue;
@@ -129,6 +160,7 @@ async function loadFromServer(customerId: string): Promise<CustomerMoneyState> {
     obligations: fifoOrder(obligations),
     adjusted,
     isOwner,
+    payments,
   };
 }
 

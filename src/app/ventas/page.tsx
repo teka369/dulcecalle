@@ -205,6 +205,9 @@ export default function VentasPage() {
                           {meta ? <span>{meta}</span> : null}
                           <span className="flex flex-wrap gap-1.5">
                             <Badge tone={kindTone(s.paymentKind)}>{kindLabel[s.paymentKind] ?? s.paymentKind}</Badge>
+                            {s.reversal ? (
+                              <span className="inline-flex items-center rounded-[var(--r-pill)] bg-surface-2 px-2 py-0.5 text-xs font-semibold text-ink-muted">Anulada</span>
+                            ) : null}
                             {s.syncState === "rejected" ? (
                               <Badge tone="danger" data-testid="sale-rejected-badge">! Rechazada</Badge>
                             ) : s.pending ? (
@@ -215,7 +218,12 @@ export default function VentasPage() {
                         </span>
                       }
                       trailing={
-                        <span className="text-base font-semibold tabular-nums text-ink">{formatCop(s.saleTotal)}</span>
+                        <span
+                          className={`text-base font-semibold tabular-nums ${s.reversal ? "text-ink-muted line-through" : "text-ink"}`}
+                          aria-label={s.reversal ? `${formatCop(s.saleTotal)}, anulada` : undefined}
+                        >
+                          {formatCop(s.saleTotal)}
+                        </span>
                       }
                     />
                   );

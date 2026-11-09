@@ -27,6 +27,8 @@ export function kindLabel(kind: string): string {
       return "Compra";
     case "devolucion":
       return "Devolución";
+    case "reverso":
+      return "Reverso";
     default:
       return kind ? kind.charAt(0).toUpperCase() + kind.slice(1).replace(/_/g, " ") : kind;
   }
