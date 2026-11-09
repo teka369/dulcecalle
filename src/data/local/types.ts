@@ -244,6 +244,8 @@ export type LocalSale = {
   occurredOn: string;
   createdAt: number;
   updatedAt: number;
+  /** C03 — device time the sale was registered (epoch ms). */
+  occurredAt?: number;
 };
 
 export type LocalSaleLine = {

@@ -65,6 +65,8 @@ export type CreateSaleInput = {
   amountReceived: number;
   method?: "Efectivo" | "Nequi";
   note?: string;
+  /** C03 — device time of an offline sale (ISO 8601). */
+  occurredAt?: string;
 };
 
 /**
@@ -440,7 +442,11 @@ export class HttpRepository {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         `/customers/${customerId}/payments`,
-        { body: input, idempotencyKey: requestId },
+        {
+          body: input,
+          idempotencyKey: requestId,
+          offlineReplay: Boolean(input.occurredAt),
+        },
       );
       return mapPayment(row);
     },
@@ -668,7 +674,11 @@ export class HttpRepository {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         "/sales",
-        { body: input, idempotencyKey: requestId },
+        {
+          body: input,
+          idempotencyKey: requestId,
+          offlineReplay: Boolean(input.occurredAt),
+        },
       );
       return mapSale(row);
     },
