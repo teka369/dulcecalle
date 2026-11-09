@@ -449,11 +449,11 @@ export class ReversalsService {
     const rows = args.forUpdate
       ? ((await tx.$queryRaw`
           SELECT id, closed_at FROM cash_sessions
-          WHERE business_id = ${ctx.businessId}::uuid AND local_date = ${today} FOR UPDATE
+          WHERE business_id = ${ctx.businessId}::uuid AND local_date = ${dateKey(today)}::date FOR UPDATE
         `) as Array<{ id: string; closed_at: Date | null }>)
       : ((await tx.$queryRaw`
           SELECT id, closed_at FROM cash_sessions
-          WHERE business_id = ${ctx.businessId}::uuid AND local_date = ${today}
+          WHERE business_id = ${ctx.businessId}::uuid AND local_date = ${dateKey(today)}::date
         `) as Array<{ id: string; closed_at: Date | null }>);
     const todayRow = rows[0] ?? null;
     if (todayRow?.closed_at) blockers.push("CLOSED_DAY");

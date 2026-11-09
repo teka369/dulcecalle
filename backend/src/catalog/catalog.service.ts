@@ -645,9 +645,14 @@ export class CatalogService {
     const reversalJson = (r: ReversalRef | undefined) =>
       r ? { id: r.id, number: r.number, reasonCode: r.reasonCode, reasonText: r.reasonText, createdAt: r.createdAt } : null;
     // Decision 21 — «Reemplaza a / Reemplazada por» (replacedBy is derived).
-    const replacedBy = new Map(
-      payments.filter((p) => p.replacesPaymentId).map((p) => [p.replacesPaymentId as string, p.id]),
-    );
+    // The replacement may belong to ANOTHER customer (cliente equivocado).
+    const replacements = payments.length
+      ? await this.prisma.customerPayment.findMany({
+          where: { businessId: ctx.businessId, replacesPaymentId: { in: payments.map((p) => p.id) } },
+          select: { id: true, replacesPaymentId: true },
+        })
+      : [];
+    const replacedBy = new Map(replacements.map((p) => [p.replacesPaymentId as string, p.id]));
     const cajaDayByPayment = new Map(
       moves.map((m) => [m.refId, dayBySession.get(m.sessionId ?? m.pendingForSessionId ?? "") ?? null]),
     );
