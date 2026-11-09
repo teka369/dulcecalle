@@ -163,6 +163,7 @@ model Business {
   preparations       Preparation[]
   reversals          Reversal[]
   sequences          BusinessSequence[]
+  receipts           Receipt[]
 
   @@map("businesses")
 }
@@ -783,4 +784,42 @@ model BusinessSequence {
 
   @@id([businessId, kind])
   @@map("business_sequences")
+}
+
+/// C09 §2 — receipt kinds (separate receipts; allocation/reversal from PR3, adjustment reserved).
+enum ReceiptKind {
+  sale
+  payment
+  allocation
+  reversal
+  adjustment
+  return
+}
+
+/// C09 §3.2 — verifiable receipt. INSERT-ONLY (DB trigger `receipts_insert_only`,
+/// the business wipe included). `contentHash` = sha256 of the canonical snapshot.
+/// No FK to customer/source on purpose: the receipt outlives a wipe of its source.
+model Receipt {
+  id            String      @id @db.Uuid
+  businessId    String      @map("business_id") @db.Uuid
+  customerId    String?     @map("customer_id") @db.Uuid
+  kind          ReceiptKind
+  sourceType    String      @map("source_type")
+  sourceId      String      @map("source_id") @db.Uuid
+  number        String
+  verifyCode    String      @unique @map("verify_code") @db.VarChar(10)
+  snapshot      Json
+  contentHash   String      @map("content_hash")
+  prevReceiptId String?     @map("prev_receipt_id") @db.Uuid
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  business Business @relation(fields: [businessId], references: [id])
+  prev     Receipt?  @relation("ReceiptVersions", fields: [prevReceiptId], references: [id])
+  next     Receipt[] @relation("ReceiptVersions")
+
+  @@unique([businessId, kind, sourceId])
+  @@unique([businessId, number])
+  @@index([businessId, customerId, createdAt])
+  @@index([businessId, createdAt])
+  @@map("receipts")
 }
