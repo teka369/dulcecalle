@@ -39,7 +39,7 @@ test("rejected offline aporte: badge, item with reason, Corregir prefilled, Desc
   // Badge/notice in the shell, then the item in the sync center.
   await expect(page.getByText(/1 necesita atención/).first()).toBeVisible({ timeout: 20_000 });
   await page.goto("/sincronizacion");
-  const row = page.locator("li", { hasText: "Movimiento de caja" });
+  const row = page.getByTestId("sync-operations").locator("li", { hasText: "Movimiento de caja" });
   await expect(row).toContainText("Aporte");
   await expect(row).toContainText(/4\.700/);
   await expect(row).toContainText(REJECT);
@@ -99,7 +99,7 @@ test("Corregir → save asks to discard the rejected op: Cancelar keeps it, Desc
   await context.setOffline(false);
   await expect.poll(() => rejects, { timeout: 60_000 }).toBe(1);
 
-  const rejected = page.locator("li", { hasText: REJECT });
+  const rejected = page.getByTestId("sync-operations").locator("li", { hasText: REJECT });
   const correctAndSave = async (amount: string) => {
     await page.goto("/sincronizacion");
     await expect(rejected).toHaveCount(1, { timeout: 20_000 });
@@ -165,7 +165,7 @@ test("rejected offline caja open: Corregir prefills the original base; save + De
   await expect.poll(() => rejects, { timeout: 60_000 }).toBe(1);
 
   await page.goto("/sincronizacion");
-  const rejected = page.locator("li", { hasText: REJECT });
+  const rejected = page.getByTestId("sync-operations").locator("li", { hasText: REJECT });
   await expect(rejected).toHaveCount(1, { timeout: 20_000 });
   await expect(rejected).toContainText("Apertura de caja");
   await rejected.getByRole("link", { name: "Corregir" }).click({ timeout: 10_000 });
