@@ -1,5 +1,4 @@
 import type { ProductKind } from "../../domain/types";
-import type { ReplacementPreview } from "../../domain/reversal";
 /**
  * HTTP repository adapter. Transport only — no financial formulas.
  * Server remains the authority for stock, debt, totals, cost, caja.
@@ -110,8 +109,18 @@ export type ReversalResult = {
   warnings: string[];
   blockers?: string[];
   replacementPayment?: Record<string, unknown>;
-  /** C07.1 — only on `correct?dryRun=true`. */
-  replacementPreview?: ReplacementPreview;
+  /** C07.1 — only on `correct?dryRun=true` (mirrors `ReplacementPreview` in domain/reversal). */
+  replacementPreview?: {
+    customerId: string;
+    amount: number;
+    method: string;
+    debtBefore?: number | null;
+    debtAfter?: number | null;
+    creditBefore?: number | null;
+    creditAfter?: number | null;
+    expectedEfectivoAfter?: number | null;
+    expectedNequiAfter?: number | null;
+  };
 };
 
 export type PaymentInput = {
