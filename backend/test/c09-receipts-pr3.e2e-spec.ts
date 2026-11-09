@@ -1,6 +1,5 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import * as bcrypt from "bcrypt";
 import { execSync } from "child_process";
 import { createHash, randomUUID } from "crypto";
 import * as path from "path";
