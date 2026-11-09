@@ -43,10 +43,13 @@ export function DiscardedHistory({ refreshKey }: { refreshKey?: unknown }) {
         .filter((row) => row.entity === "clientEvent" && row.status !== "synced")
         .toArray()
         .catch(() => [] as OutboxItem[]);
+      // C012-INV-03 — any kind of trace (rejected too); a failed one wins.
       const byOp = new Map<string, OutboxItem>();
       for (const row of outbox) {
-        const target = (row.payload as { operationId?: string; kind?: string } | null) ?? {};
-        if (target.operationId && target.kind !== "rejected") byOp.set(target.operationId, row);
+        const target = (row.payload as { operationId?: string } | null) ?? {};
+        if (!target.operationId) continue;
+        const prev = byOp.get(target.operationId);
+        if (!prev || (prev.status !== "failed" && row.status === "failed")) byOp.set(target.operationId, row);
       }
       if (alive) {
         setRows(mergeHistory(local, server));
@@ -64,7 +67,9 @@ export function DiscardedHistory({ refreshKey }: { refreshKey?: unknown }) {
     setTick((t) => t + 1);
   }
 
-  if (rows.length === 0) return null;
+  const shown = new Set(rows.map((r) => r.operationId));
+  const orphanFailed = [...traces.entries()].filter(([opId, t]) => !shown.has(opId) && t.status === "failed");
+  if (rows.length === 0 && orphanFailed.length === 0) return null;
   return (
     <section className="flex flex-col gap-2" data-testid="discarded-history">
       <SectionHead title="Historial" />
@@ -106,6 +111,36 @@ export function DiscardedHistory({ refreshKey }: { refreshKey?: unknown }) {
           </li>
         ))}
       </ul>
+      {orphanFailed.length > 0 && (
+        <ul className="flex flex-col gap-2" data-testid="failed-backups">
+          {orphanFailed.map(([opId, t]) => {
+            const p = (t.payload as { entity?: string; operation?: string; amount?: number | null; kind?: string } | null) ?? {};
+            return (
+              <li key={t.operationId} data-testid="failed-backup-row" className="rounded-[var(--r-lg)] border border-border bg-surface p-3 text-sm">
+                <p className="font-semibold">
+                  {p.kind === "rejected" ? "Rechazo sin respaldar" : "Respaldo sin enviar"}
+                  {p.entity && p.operation ? ` · ${describeOutboxOperation(p.entity, p.operation)}` : ""}
+                </p>
+                <p className="mt-1 text-xs text-ink-muted">
+                  {localRef(opId, t.localCreatedAt)}
+                  {p.amount != null ? ` · ${formatCop(p.amount)}` : ""}
+                </p>
+                <p className="mt-1 text-xs text-danger" data-testid="history-backup-failed">
+                  No se pudo respaldar{t.lastError ? `: ${t.lastError}` : "."}
+                </p>
+                <button
+                  type="button"
+                  data-testid="retry-backup"
+                  onClick={() => void retryBackup(t)}
+                  className="mt-2 flex min-h-11 w-full items-center justify-center rounded-[var(--r-md)] border border-border bg-surface text-sm font-semibold"
+                >
+                  Reintentar respaldo
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

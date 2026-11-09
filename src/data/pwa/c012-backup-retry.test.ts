@@ -28,6 +28,7 @@ const api = {
 vi.mock("./api", () => ({ getPwaApi: () => api, getPrepPwaApi: () => api }));
 
 
+import { recordExpenseWithOfflineFallback } from "./offline-operations";
 import { syncStore } from "@/store/syncStore";
 import { backupsPendingText, syncPillLabel } from "./sync-copy";
 
@@ -98,5 +99,29 @@ describe("C01.2 — a server trace survives a transient 4xx (C011-INV-02)", () =
     expect(backupsPendingText(1)).toBe("1 respaldo pendiente");
     expect(backupsPendingText(2)).toBe("2 respaldos pendientes");
     expect(syncPillLabel(true, { pending: 0, active: 0, failed: 0, permanent: 0, total: 0, backups: 2 }, null)).toBe("○ 2 respaldos pendientes");
+  });
+  it("C012-INV-01: a failing trace does not hold back a later expense in the same run", async () => {
+    const { trace } = await rejectedWithTrace();
+    await getLocalDb().outbox.update(trace.operationId, { localCreatedAt: 1 });
+    api.cash.recordExpense.mockRejectedValueOnce(new NetworkError("offline"));
+    await recordExpenseWithOfflineFallback({ amount: 1000, category: "Bolsas", method: "Efectivo" }, newEntityId());
+    api.audit.record.mockRejectedValue(new ApiError("CONFLICT", "x", 409));
+    api.cash.recordExpense.mockResolvedValue({ id: newEntityId() });
+    await syncPendingOperations(BIZ);
+    expect(api.cash.recordExpense).toHaveBeenCalledTimes(2);
+  });
+
+  it("C012-INV-01: a trace that keeps failing becomes a visible permanent failure after the cap", async () => {
+    const { trace } = await rejectedWithTrace();
+    api.audit.record.mockRejectedValue(new ApiError("CONFLICT", "No.", 409));
+    for (let i = 0; i < 12; i += 1) {
+      const cur = await getOutboxStore().get(BIZ, trace.operationId);
+      if (cur?.nextAttemptAt != null) await getLocalDb().outbox.update(trace.operationId, { nextAttemptAt: Date.now() - 1 });
+      await syncPendingOperations(BIZ);
+    }
+    const row = await getOutboxStore().get(BIZ, trace.operationId);
+    expect(row?.status).toBe("failed");
+    expect(row?.nextAttemptAt).toBeNull();
+    expect(api.audit.record.mock.calls.length).toBeLessThanOrEqual(10);
   });
 });

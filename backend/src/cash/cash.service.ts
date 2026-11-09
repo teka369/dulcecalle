@@ -1,3 +1,4 @@
+import { assertSamePayload, payloadHash } from "../shared/payload-hash";
 import { Injectable } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
@@ -397,11 +398,36 @@ export class CashService {
     dto: CreatePaymentDto,
     requestId: string,
   ) {
+    // C02 / DC-13 — the key is bound to (customer, amount, method, note).
+    const hash = payloadHash({
+      customerId,
+      amount: String(dto.amount),
+      method: dto.method,
+      note: dto.note ?? null,
+    });
     const existing = await this.prisma.customerPayment.findUnique({
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
     });
+    const replay = async (row: NonNullable<typeof existing>) => {
+      if (row.payloadHash != null) {
+        assertSamePayload(row.payloadHash, hash);
+      } else {
+        const reconstructed = payloadHash({
+          customerId: row.customerId,
+          amount: String(row.amount),
+          method: row.method,
+          note: row.note ?? null,
+        });
+        assertSamePayload(reconstructed, hash);
+        await this.prisma.customerPayment.update({
+          where: { id: row.id },
+          data: { payloadHash: hash },
+        });
+      }
+      return paymentJson(row);
+    };
     if (existing) {
-      return paymentJson(existing);
+      return replay(existing);
     }
 
     const amount = asCop(dto.amount);
@@ -444,6 +470,7 @@ export class CashService {
             occurredOn,
             occurredAt,
             needsReview,
+            payloadHash: hash,
             createdAt: now,
           },
         });
@@ -490,7 +517,7 @@ export class CashService {
           },
         });
         if (again) {
-          return paymentJson(again);
+          return replay(again);
         }
       }
       throw e;

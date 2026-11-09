@@ -52,3 +52,18 @@ export async function deriveRequestId(parent: string, purpose: string): Promise<
   const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
+
+/**
+ * C02 / NEW-01 / NEW-02 — an idempotency key bound to a payload fingerprint.
+ * Unchanged retry (same fingerprint) keeps the id; a changed payload mints a
+ * new one, so the server never answers a different abono/sale with the old one.
+ */
+export type PayloadBoundId = { id: string; fingerprint: string } | null;
+
+export function payloadBoundRequestId(
+  current: PayloadBoundId,
+  fingerprint: string,
+): { id: string; fingerprint: string } {
+  if (current && current.fingerprint === fingerprint) return current;
+  return { id: newStableUuid(), fingerprint };
+}

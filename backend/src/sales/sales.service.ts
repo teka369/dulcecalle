@@ -1,3 +1,4 @@
+import { assertSamePayload, IDEMPOTENCY_MISMATCH_MESSAGE, payloadHash } from "../shared/payload-hash";
 import { Injectable } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
@@ -95,16 +96,82 @@ function returnJson(r: {
   };
 }
 
+function saleStoredPayloadMatches(
+  stored: {
+    paymentKind: string;
+    customerId: string | null;
+    amountReceived: bigint;
+    method: string | null;
+    note: string | null;
+    lines?: Array<{ productId: string; qty: number; unitPrice: bigint }>;
+  },
+  dto: CreateSaleDto,
+): boolean {
+  // Cannot verify a legacy row without its lines — never replay as 201.
+  if (!stored.lines) return false;
+  const incoming = dto.lines ?? [];
+  if (incoming.length !== stored.lines.length) return false;
+  const unused = stored.lines.slice();
+  for (const line of incoming) {
+    const idx = unused.findIndex((s) => {
+      if (s.productId !== line.productId || s.qty !== line.qty) return false;
+      // create() hashes `unitPrice ?? null`; omitted price means the catalog
+      // value that was stored on the line.
+      if (line.unitPrice == null) return true;
+      return s.unitPrice === asCop(line.unitPrice);
+    });
+    if (idx < 0) return false;
+    unused.splice(idx, 1);
+  }
+  return (
+    unused.length === 0 &&
+    stored.paymentKind === dto.paymentKind &&
+    (stored.customerId ?? null) === (dto.customerId ?? null) &&
+    stored.amountReceived === asCop(dto.amountReceived) &&
+    (stored.method ?? null) === (dto.method ?? null) &&
+    (stored.note ?? null) === (dto.note ?? null)
+  );
+}
+
 @Injectable()
 export class SalesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(ctx: BusinessContext, dto: CreateSaleDto, requestId: string) {
+    // C02 / DC-13 — the key is bound to the sale payload (lines in order).
+    const hash = payloadHash({
+      lines: (dto.lines ?? []).map((l) => [l.productId, l.qty, l.unitPrice ?? null]),
+      paymentKind: dto.paymentKind,
+      customerId: dto.customerId ?? null,
+      amountReceived: String(dto.amountReceived),
+      method: dto.method ?? null,
+      note: dto.note ?? null,
+    });
     const existing = await this.prisma.sale.findUnique({
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
       include: { lines: true },
     });
-    if (existing) return saleJson(existing);
+    const replaySale = async (row: NonNullable<typeof existing>) => {
+      if (row.payloadHash != null) {
+        assertSamePayload(row.payloadHash, hash);
+      } else {
+        if (!saleStoredPayloadMatches(row, dto)) {
+          throw new AppError(
+            ERROR_CODES.IDEMPOTENCY_MISMATCH,
+            IDEMPOTENCY_MISMATCH_MESSAGE,
+          );
+        }
+        await this.prisma.sale.update({
+          where: { id: row.id },
+          data: { payloadHash: hash },
+        });
+      }
+      return saleJson(row);
+    };
+
+    if (existing) {
+      return replaySale(existing);
+    }
 
     if (!dto.lines?.length) {
       throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.emptySale);
@@ -217,6 +284,7 @@ export class SalesService {
             amountReceived,
             credit,
             requestId,
+            payloadHash: hash,
             note: dto.note,
             occurredOn,
             createdAt: now,
@@ -315,7 +383,9 @@ export class SalesService {
           },
           include: { lines: true },
         });
-        if (again) return saleJson(again);
+        if (again) {
+          return replaySale(again);
+        }
       }
       throw e;
     }
