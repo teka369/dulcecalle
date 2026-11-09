@@ -1,9 +1,12 @@
 import { Injectable } from "@nestjs/common";
+import { randomUUID } from "crypto";
 import type { Prisma, ReversalTarget } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import type { BusinessContext } from "../identity/auth.types";
 import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import { isoInZone } from "../shared/canonical";
+import type { CustomerAuth } from "../identity/auth.types";
+import { ackStates, type AckState } from "./receipt-acks";
 
 export const RECEIPT_KINDS = ["sale", "payment", "allocation", "reversal", "adjustment", "return"] as const;
 export type ReceiptStatus = "vigente" | "reemplazado" | "anulado";
@@ -72,7 +75,7 @@ export class ReceiptsService {
     return out;
   }
 
-  private summary(r: Row, status: ReceiptStatus) {
+  private summary(r: Row, status: ReceiptStatus, ackState: AckState = "pending") {
     return {
       id: r.id,
       kind: r.kind,
@@ -83,6 +86,7 @@ export class ReceiptsService {
       verifyCode: r.verifyCode,
       hashPrefix: r.contentHash.slice(0, 8),
       status,
+      ackState,
       createdAt: r.createdAt.toISOString(),
     };
   }
@@ -113,7 +117,8 @@ export class ReceiptsService {
       take: q.limit ?? 100,
     });
     const st = await this.statuses(ctx.businessId, rows);
-    return rows.map((r) => this.summary(r, st.get(r.id)!));
+    const acks = await ackStates(this.prisma, ctx.businessId, rows.map((r) => r.id));
+    return rows.map((r) => this.summary(r, st.get(r.id)!, acks.get(r.id)));
   }
 
   async get(ctx: BusinessContext, id: string) {
@@ -127,12 +132,134 @@ export class ReceiptsService {
       orderBy: [{ number: "asc" }],
       select: { id: true, kind: true, number: true },
     });
+    const acks = await this.prisma.receiptAcknowledgement.findMany({
+      where: { businessId: ctx.businessId, receiptId: r.id },
+      orderBy: [{ at: "asc" }, { id: "asc" }],
+    });
+    const ackState = (await ackStates(this.prisma, ctx.businessId, [r.id])).get(r.id);
     return {
-      ...this.summary(r, st.get(r.id)!),
+      ...this.summary(r, st.get(r.id)!, ackState),
       related,
+      // C09-PR4 — the customer's confirmations (owner: recibido/confirmado/reportado).
+      acks: acks.map((a) => ({ id: a.id, kind: a.kind, receiptHash: a.receiptHash, note: a.note, channel: a.channel, claimId: a.claimId, at: a.at })),
       prevReceiptId: r.prevReceiptId,
       snapshot: r.snapshot,
       contentHash: r.contentHash,
     };
+  }
+
+  // ---- C09-PR4 — portal (customer token: business + customer from the token) ----
+
+  /** The customer's own receipts only; internal receipts (no customer) never match (T5/T11). */
+  private portalWhere(auth: CustomerAuth) {
+    return { businessId: auth.businessId, customerId: auth.customerId };
+  }
+
+  private portalSummary(r: Row, status: ReceiptStatus, ackState: AckState) {
+    return {
+      id: r.id,
+      kind: r.kind,
+      number: r.number,
+      status,
+      ackState,
+      verifyCode: r.verifyCode,
+      hashPrefix: r.contentHash.slice(0, 8),
+      // T27 — exact date and time, portal zone (decision J-B1: Bogota).
+      issuedAt: isoInZone(r.createdAt, "America/Bogota"),
+    };
+  }
+
+  async portalList(auth: CustomerAuth) {
+    const rows = await this.prisma.receipt.findMany({
+      where: this.portalWhere(auth),
+      orderBy: [{ createdAt: "desc" }, { number: "desc" }],
+      take: 200,
+    });
+    const st = await this.statuses(auth.businessId, rows);
+    const acks = await ackStates(this.prisma, auth.businessId, rows.map((r) => r.id));
+    return rows.map((r) => this.portalSummary(r, st.get(r.id)!, acks.get(r.id)!));
+  }
+
+  private async portalFind(auth: CustomerAuth, id: string) {
+    const r = await this.prisma.receipt.findFirst({ where: { id, ...this.portalWhere(auth) } });
+    if (!r) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+    return r;
+  }
+
+  async portalGet(auth: CustomerAuth, id: string) {
+    const r = await this.portalFind(auth, id);
+    const st = await this.statuses(auth.businessId, [r]);
+    const related = await this.prisma.receipt.findMany({
+      where: { ...this.portalWhere(auth), sourceId: r.sourceId, id: { not: r.id } },
+      orderBy: [{ number: "asc" }],
+      select: { id: true, kind: true, number: true },
+    });
+    const acks = await this.prisma.receiptAcknowledgement.findMany({
+      where: { businessId: auth.businessId, customerId: auth.customerId, receiptId: r.id },
+      orderBy: [{ at: "asc" }, { id: "asc" }],
+    });
+    const ackState = (await ackStates(this.prisma, auth.businessId, [r.id])).get(r.id)!;
+    return {
+      ...this.portalSummary(r, st.get(r.id)!, ackState),
+      snapshot: r.snapshot,
+      contentHash: r.contentHash,
+      related,
+      acks: acks.map((a) => ({ kind: a.kind, receiptHash: a.receiptHash, note: a.note, at: a.at })),
+    };
+  }
+
+  /**
+   * §3.3 / §5 — «Reconozco esto» / «Hay un error». Evidence only (I-C5):
+   * one insert, no balance, caja or stock write. The hash must be the one
+   * of the receipt (T15). «Reconozco esto» is idempotent per receipt and
+   * hash. «Hay un error» needs a note; the C08 claim (claimId) is linked
+   * once C08-PR3 exists.
+   */
+  async portalAck(
+    auth: CustomerAuth,
+    id: string,
+    dto: { kind: "acknowledged" | "reported_issue"; receiptHash: string; note?: string },
+  ): Promise<{ created: boolean; body: Record<string, unknown> }> {
+    const r = await this.portalFind(auth, id);
+    if (dto.receiptHash !== r.contentHash) {
+      throw new AppError(ERROR_CODES.RECEIPT_HASH_MISMATCH, "Este comprobante cambió. Vuelve a abrirlo antes de confirmar.");
+    }
+    const note = dto.note?.trim() ? dto.note.trim() : null;
+    if (dto.kind === "reported_issue" && (note == null || note.length < 5)) {
+      throw new AppError(ERROR_CODES.VALIDATION, "Cuéntanos qué está mal (mínimo 5 caracteres).");
+    }
+    const json = (a: Prisma.ReceiptAcknowledgementGetPayload<object>) => ({
+      id: a.id,
+      receiptId: a.receiptId,
+      kind: a.kind,
+      receiptHash: a.receiptHash,
+      channel: a.channel,
+      note: a.note,
+      claimId: a.claimId,
+      at: a.at,
+    });
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${r.id}))`;
+      if (dto.kind === "acknowledged") {
+        const existing = await tx.receiptAcknowledgement.findFirst({
+          where: { businessId: auth.businessId, customerId: auth.customerId, receiptId: r.id, kind: "acknowledged", receiptHash: r.contentHash },
+          orderBy: [{ at: "asc" }, { id: "asc" }],
+        });
+        if (existing) return { created: false, body: json(existing) };
+      }
+      const created = await tx.receiptAcknowledgement.create({
+        data: {
+          id: randomUUID(),
+          businessId: auth.businessId,
+          customerId: auth.customerId,
+          receiptId: r.id,
+          receiptHash: r.contentHash,
+          kind: dto.kind,
+          channel: "portal",
+          note,
+        },
+      });
+      return { created: true, body: json(created) };
+    });
   }
 }
