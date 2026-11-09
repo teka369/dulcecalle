@@ -86,6 +86,21 @@ export type ReversalEffects = {
   creditBefore?: number | null;
   creditAfter?: number | null;
   cashOut?: number;
+  target?: { customerId?: string | null; occurredOn?: string };
+};
+
+/** C07.1 — «Corregir pago» dry-run: the replacement abono (C04) after the reverso. */
+export type ReplacementPreview = {
+  customerId: string;
+  amount: number;
+  method: string;
+  debtBefore?: number | null;
+  debtAfter?: number | null;
+  creditBefore?: number | null;
+  creditAfter?: number | null;
+  /** Expected caja after the reverso AND the new abono. */
+  expectedEfectivoAfter?: number | null;
+  expectedNequiAfter?: number | null;
 };
 
 export type ReversalPreview = {
@@ -93,27 +108,49 @@ export type ReversalPreview = {
   warnings: string[];
   blockers?: string[];
   after?: { cash?: { expectedEfectivo?: number | null } };
+  replacementPreview?: ReplacementPreview;
 };
 
-/** W2 «Qué pasa al anular» — lines built from the dry-run response (J4). */
-export function previewLines(p: ReversalPreview, firstName: string | null): string[] {
+/**
+ * W2 «Qué pasa al anular» — lines built from the dry-run response (J4).
+ * With a «Corregir pago» dry-run (`replacementPreview`) the new abono is part
+ * of the preview: money in, its customer's debt and the netted caja (C07.1).
+ */
+export function previewLines(p: ReversalPreview, firstName: string | null, replacementName?: string | null): string[] {
   const out: string[] = [];
   const e = p.effects ?? {};
+  const r = p.replacementPreview;
+  const same = !!r && !!e.target?.customerId && r.customerId === e.target.customerId;
   const units = (e.stockMoves ?? []).reduce((s, m) => s + Math.max(0, m.delta), 0);
   if (units > 0) out.push(`Vuelven al inventario: ${units} ${units === 1 ? "producto" : "productos"}`);
   const cash = e.cashMoves ?? [];
-  if (cash.length === 0) out.push("No mueve la caja");
+  if (cash.length === 0 && !r) out.push("No mueve la caja");
   for (const m of cash) {
     out.push(m.method === "Nequi" ? `Sale de Nequi: ${formatCop(m.amount)} (no cambia el efectivo)` : `Sale de la caja: ${formatCop(m.amount)} ${m.method}`);
   }
-  if (e.debtBefore != null && e.debtAfter != null) {
-    out.push(`Deuda${firstName ? ` de ${firstName}` : ""}: ${formatCop(e.debtBefore)} → ${formatCop(e.debtAfter)}`);
+  if (r) {
+    out.push(r.method === "Nequi" ? `Entra a Nequi: ${formatCop(r.amount)} (no cambia el efectivo)` : `Entra a la caja: ${formatCop(r.amount)} ${r.method}`);
   }
-  if (e.creditBefore != null && e.creditAfter != null && e.creditBefore !== e.creditAfter) {
-    out.push(`Saldo a favor: ${formatCop(e.creditBefore)} → ${formatCop(e.creditAfter)}`);
+  const debtAfter = same && r?.debtAfter != null ? r.debtAfter : e.debtAfter;
+  const creditAfter = same && r?.creditAfter != null ? r.creditAfter : e.creditAfter;
+  if (e.debtBefore != null && debtAfter != null) {
+    out.push(`Deuda${firstName ? ` de ${firstName}` : ""}: ${formatCop(e.debtBefore)} → ${formatCop(debtAfter)}`);
   }
-  const exp = p.after?.cash?.expectedEfectivo;
-  if (typeof exp === "number" && cash.some((m) => m.method === "Efectivo")) {
+  if (e.creditBefore != null && creditAfter != null && e.creditBefore !== creditAfter) {
+    out.push(`Saldo a favor${same && firstName ? ` de ${firstName}` : ""}: ${formatCop(e.creditBefore)} → ${formatCop(creditAfter)}`);
+  }
+  if (r && !same) {
+    const who = replacementName ? ` de ${replacementName}` : "";
+    if (r.debtBefore != null && r.debtAfter != null) {
+      out.push(`Deuda${who}: ${formatCop(r.debtBefore)} → ${formatCop(r.debtAfter)}`);
+    }
+    if (r.creditBefore != null && r.creditAfter != null && r.creditBefore !== r.creditAfter) {
+      out.push(`Saldo a favor${who}: ${formatCop(r.creditBefore)} → ${formatCop(r.creditAfter)}`);
+    }
+  }
+  const exp = r && r.expectedEfectivoAfter !== undefined ? r.expectedEfectivoAfter : p.after?.cash?.expectedEfectivo;
+  const touchesEfectivo = cash.some((m) => m.method === "Efectivo") || r?.method === "Efectivo";
+  if (typeof exp === "number" && touchesEfectivo) {
     out.push(`La caja esperada queda en ${formatMaybeNegative(exp)}`);
   }
   return out;
@@ -139,7 +176,8 @@ export function blockerText(code: string): string {
 
 export function warningText(code: string, p?: ReversalPreview): string {
   if (code === "EXPECTED_CASH_NEGATIVE") {
-    const exp = p?.after?.cash?.expectedEfectivo;
+    const r = p?.replacementPreview;
+    const exp = r && r.expectedEfectivoAfter !== undefined ? r.expectedEfectivoAfter : p?.after?.cash?.expectedEfectivo;
     return typeof exp === "number"
       ? `La caja esperada quedará en ${formatMaybeNegative(exp)}. Revisa el efectivo.`
       : "La caja esperada quedará en negativo. Revisa el efectivo.";

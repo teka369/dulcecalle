@@ -39,6 +39,8 @@ export type ReversalSheetProps = {
   extra?: React.ReactNode;
   extraError?: string | null;
   extraSignature?: string;
+  /** «Corregir pago»: first name of the replacement abono's customer (C07.1). */
+  replacementName?: string | null;
   preview: (body: ReversalBody) => Promise<ReversalResult>;
   submit: (body: ReversalBody, requestId: string) => Promise<ReversalResult>;
   onDone: (r: ReversalResult) => void;
@@ -57,8 +59,16 @@ export function ReversalSheet(props: ReversalSheetProps) {
   const [confirmOld, setConfirmOld] = useState(false);
   const keyRef = useRef<{ sig: string; key: string } | null>(null);
   const firstRadio = useRef<HTMLInputElement | null>(null);
-  // Callers pass inline closures: run the dry-run once, on open.
+  const lastSigRef = useRef({ started: false });
+  // Callers pass inline closures: run the dry-run on open, and again when the
+  // extra form (Corregir pago) changes what the real call would do (C07.1).
   const previewRef = useRef(props.preview);
+  useEffect(() => {
+    // Declared before the preview effect: it runs first, so the dry-run uses the latest closure.
+    previewRef.current = props.preview;
+  });
+  const extraSig = props.extraSignature ?? "";
+  const extraBlocked = !!props.extraError;
 
   useEffect(() => {
     firstRadio.current?.focus();
@@ -66,19 +76,33 @@ export function ReversalSheet(props: ReversalSheetProps) {
 
   useEffect(() => {
     let alive = true;
-    // The effects do not depend on the reason: preview once with a valid one.
-    previewRef.current({ reasonCode: "error_digitacion" })
-      .then((r) => alive && setPreview(r))
-      .catch((e: unknown) => {
-        if (!alive) return;
-        const c = e instanceof ApiError ? e.code : undefined;
-        setPreviewError(reversalErrorText(c, props.kind));
-      });
+    setPreviewError(null);
+    if (extraBlocked) {
+      setPreview(null);
+      return () => {
+        alive = false;
+      };
+    }
+    const run = () =>
+      // The effects do not depend on the reason: preview with a valid one.
+      previewRef.current({ reasonCode: "error_digitacion" })
+        .then((r) => alive && setPreview(r))
+        .catch((e: unknown) => {
+          if (!alive) return;
+          const c = e instanceof ApiError ? e.code : undefined;
+          setPreviewError(reversalErrorText(c, props.kind));
+        });
+    // First open: right away; later edits of the extra form: debounced.
+    const first = !lastSigRef.current.started;
+    lastSigRef.current.started = true;
+    const t = first ? null : setTimeout(run, 300);
+    if (first) void run();
     return () => {
       alive = false;
+      if (t) clearTimeout(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [extraSig, extraBlocked]);
 
   const blockers = (preview?.blockers ?? []).filter((b) => b !== "CONFIRM_OLD_REQUIRED");
   const old = daysOld(props.occurredOn, props.today) > 30;
@@ -175,14 +199,23 @@ export function ReversalSheet(props: ReversalSheetProps) {
             {preview ? (
               <ul className="mt-1 flex flex-col gap-0.5 text-sm text-ink">
                 {previewLines(
-                  { effects: preview.effects, warnings: preview.warnings ?? [], blockers: preview.blockers ?? [], after: preview.after },
+                  {
+                    effects: preview.effects,
+                    warnings: preview.warnings ?? [],
+                    blockers: preview.blockers ?? [],
+                    after: preview.after,
+                    replacementPreview: preview.replacementPreview,
+                  },
                   props.firstName,
+                  props.replacementName,
                 ).map((l) => (
                   <li key={l}>{l}</li>
                 ))}
               </ul>
             ) : previewError ? (
               <p className="mt-1 text-sm text-danger">{previewError}</p>
+            ) : extraBlocked ? (
+              <p className="mt-1 text-sm text-ink-muted">Completa el pago de reemplazo para ver qué pasa.</p>
             ) : (
               <p className="mt-1 text-sm text-ink-muted">Calculando…</p>
             )}
@@ -196,7 +229,7 @@ export function ReversalSheet(props: ReversalSheetProps) {
               </Link>
             </p>
           ))}
-          {(preview?.warnings ?? []).map((w) => (
+          {visibleWarnings(preview).map((w) => (
             <p key={w} className="rounded-[var(--r-lg)] bg-warning-soft px-3 py-2.5 text-sm text-warning">
               {warningText(w, preview ?? undefined)}
             </p>
@@ -242,4 +275,11 @@ export function ReversalSheet(props: ReversalSheetProps) {
       </div>
     </div>
   );
+}
+
+/** C07.1 — with a replacement the caja nets out + in: drop the negative-caja warning if it no longer applies. */
+function visibleWarnings(p: ReversalResult | null): string[] {
+  const all = p?.warnings ?? [];
+  const net = p?.replacementPreview?.expectedEfectivoAfter;
+  return typeof net === "number" && net >= 0 ? all.filter((w) => w !== "EXPECTED_CASH_NEGATIVE") : all;
 }

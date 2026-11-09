@@ -4,10 +4,10 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AppError, ERROR_CODES, MESSAGES, type ErrorCode } from "../shared/errors";
 import { assertSamePayload, IDEMPOTENCY_MISMATCH_MESSAGE, payloadHash } from "../shared/payload-hash";
-import { copToJson, mulCop } from "../shared/money";
+import { asCop, copToJson, mulCop } from "../shared/money";
 import { dateKey, occurredOnDate } from "../shared/clock";
 import { resolveIdempotencyKey } from "../shared/idempotency";
-import { loadObligations, moveCustomerBalances } from "../shared/debt-allocations";
+import { loadObligations, moveCustomerBalances, planOrThrow, resolveTarget } from "../shared/debt-allocations";
 import type { Obligation } from "../shared/allocation";
 import {
   planPaymentReversal,
@@ -93,6 +93,19 @@ type Prepared = {
   todaySessionId: string | null;
   today: Date;
   oldConfirmed: boolean;
+  /** C07.1 — «corregir» dryRun only: what the replacement abono adds (caja in, its customer's debt). */
+  replacementEffects?: ReplacementEffects;
+};
+
+type ReplacementEffects = {
+  cashMove: { direction: "in"; kind: "debt_collect"; method: Method; amount: number; sessionId: string | null };
+  debtBefore: number;
+  debtAfter: number;
+  creditBefore: number;
+  creditAfter: number;
+  /** Today's expected caja after the reverso AND the replacement (null without an open caja). */
+  expectedEfectivoAfter: number | null;
+  expectedNequiAfter: number | null;
 };
 
 function fail(code: ErrorCode, message: string): never {
@@ -199,6 +212,9 @@ export class ReversalsService {
         const p = await this.preparePayment(tx, ctx, customerId, paymentId, dto, forUpdate);
         const other = await tx.customer.findFirst({ where: { id: r.customerId, businessId: ctx.businessId }, select: { id: true } });
         if (!other) fail(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+        if (dryRun) {
+          p.replacementEffects = await this.previewReplacement(tx, ctx, p, r, replacementHash.target, replacementHash.overflow);
+        }
         return p;
       },
     );
@@ -244,6 +260,7 @@ export class ReversalsService {
                 customerId: op.replacement.dto.customerId,
                 amount: op.replacement.dto.amount,
                 method: op.replacement.dto.method,
+                ...(p.replacementEffects ?? {}),
               },
             }
           : {}),
@@ -484,6 +501,51 @@ export class ReversalsService {
       select: { id: true },
     });
     if (prior) fail(ERROR_CODES.ALREADY_REVERSED, MESSAGES.alreadyReversed);
+  }
+
+  /**
+   * C07.1 (C07-QA-01) — «corregir» dryRun: the replacement abono as C04 would
+   * apply it right after the reverso (same customer → from the post-reverso
+   * obligations and balances). Read only; mirrors `createPaymentInTx`.
+   */
+  private async previewReplacement(
+    tx: Tx,
+    ctx: BusinessContext,
+    p: Prepared,
+    r: CorrectPaymentDto["replacement"],
+    target: ReturnType<CashService["paymentHash"]>["target"],
+    overflow: "fifo" | "credit",
+  ): Promise<ReplacementEffects> {
+    const amount = asCop(r.amount);
+    const same = r.customerId === p.customerId;
+    const c = await tx.customer.findFirstOrThrow({ where: { id: r.customerId, businessId: ctx.businessId } });
+    let obligations = await loadObligations(tx, ctx.businessId, r.customerId);
+    let debt = c.debt;
+    let credit = c.creditBalance;
+    if (same) {
+      obligations = obligations.map((o) => {
+        const delta = p.lines
+          .filter((l) => l.targetType === o.kind && l.id === o.id)
+          .reduce((a, l) => a + l.amount, 0n);
+        return delta === 0n ? o : { ...o, open: o.open - delta };
+      });
+      debt += p.debtDelta;
+      credit += p.creditDelta;
+    }
+    const resolved = await resolveTarget(tx, ctx.businessId, r.customerId, target, obligations);
+    const plan = planOrThrow({ amount, obligations: resolved.obligations, target: resolved.input, overflow, cap: debt });
+    const method: Method = r.method === "Nequi" ? "Nequi" : "Efectivo";
+    const cash = p.after.cash;
+    return {
+      cashMove: { direction: "in", kind: "debt_collect", method, amount: n(amount), sessionId: p.todaySessionId },
+      debtBefore: n(debt),
+      debtAfter: n(debt - plan.toObligations),
+      creditBefore: n(credit),
+      creditAfter: n(credit + plan.toCredit),
+      expectedEfectivoAfter:
+        cash.expectedEfectivo == null ? null : cash.expectedEfectivo + (method === "Efectivo" ? n(amount) : 0),
+      expectedNequiAfter: cash.expectedNequi == null ? null : cash.expectedNequi + (method === "Nequi" ? n(amount) : 0),
+    };
   }
 
   private async customerState(tx: Tx, businessId: string, customerId: string) {
