@@ -12,6 +12,7 @@ import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { ABONO_METHODS } from "@/components/customers/clientes";
 import { ReversalSheet } from "@/components/reversal/ReversalSheet";
+import { correctPaymentPreview } from "@/components/reversal/correct-preview";
 import { getPwaApi } from "@/data/pwa/api";
 import { listCachedCustomers } from "@/data/pwa/catalog";
 import { dayLabel, type CustomerMoneyState, type LedgerPayment } from "@/data/pwa/customer-allocations";
@@ -195,7 +196,8 @@ function CorrectPaymentSheet(props: {
           ) : null}
         </div>
       }
-      preview={(body) => getPwaApi().reversals.reversePayment(props.customerId, props.payment.id, body, { dryRun: true })}
+      replacementName={targetName.split(" ")[0] || targetName}
+      preview={(body) => correctPaymentPreview(getPwaApi().reversals, props.customerId, props.payment.id, body, replacement)}
       submit={(body, requestId) =>
         getPwaApi().reversals.correctPayment(props.customerId, props.payment.id, { ...body, replacement }, { requestId })
       }
