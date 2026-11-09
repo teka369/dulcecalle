@@ -152,6 +152,8 @@ export class BusinessDataService {
         where: { businessId: ctx.businessId },
         select: { id: true },
       });
+      // C04 — allocations reference sales, initial debts and customers: first.
+      await wipe(tx, "debtAllocations", (where) => tx.debtAllocation.deleteMany({ where }));
       await wipe(tx, "saleReturnLines", (where) => tx.saleReturnLine.deleteMany({ where }));
       await wipe(tx, "saleReturns", (where) => tx.saleReturn.deleteMany({ where }));
       await wipe(tx, "saleLines", (where) => tx.saleLine.deleteMany({ where }));
