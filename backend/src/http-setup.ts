@@ -18,7 +18,7 @@ export function trustProxyHops(env: Env = process.env): number {
 }
 
 /** Production PWA. */
-const PROD_ORIGIN = "https://dulcecalle.vercel.app";
+export const PROD_ORIGIN = "https://dulcecalle.vercel.app";
 /** Our team's Vercel previews only (deployment + git-branch URLs). */
 const TEAM_PREVIEW = /^https:\/\/dulcecalle-[a-z0-9-]+-teka369s-projects\.vercel\.app$/i;
 const LOCALHOST = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;

@@ -8,6 +8,7 @@ import { isoInZone } from "../shared/canonical";
 import type { CustomerAuth } from "../identity/auth.types";
 import { ackStates, type AckState } from "./receipt-acks";
 import { imputationCompensations } from "./receipt-compensation";
+import { ReceiptLinksService } from "./receipt-links.service";
 
 export const RECEIPT_KINDS = ["sale", "payment", "allocation", "reversal", "adjustment", "return"] as const;
 export type ReceiptStatus = "vigente" | "reemplazado" | "anulado";
@@ -38,7 +39,10 @@ function isImputation(r: Row): boolean {
 
 @Injectable()
 export class ReceiptsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly links: ReceiptLinksService,
+  ) {}
 
   /** C09 §3.2 — status is derived, the receipt row never changes. */
   private async statuses(businessId: string, rows: Row[]): Promise<Map<string, ReceiptStatus>> {
@@ -185,6 +189,8 @@ export class ReceiptsService {
       // C09-PR4 — the customer's confirmations (owner: recibido/confirmado/reportado).
       acks: acks.map((a) => ({ id: a.id, kind: a.kind, receiptHash: a.receiptHash, note: a.note, channel: a.channel, claimId: a.claimId, at: a.at })),
       prevReceiptId: r.prevReceiptId,
+      // C09-PR5 (W6) — share links: state only, never the token.
+      links: await this.links.forReceipt(ctx.businessId, r.id),
       snapshot: r.snapshot,
       contentHash: r.contentHash,
     };

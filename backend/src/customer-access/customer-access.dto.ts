@@ -32,3 +32,15 @@ export class CustomerLogoutDto {
   @MinLength(1)
   refreshToken?: string;
 }
+
+/** C09-PR5 — the link fixes business and customer; no code/businessId here. */
+export class CustomerLinkLoginDto {
+  @IsString()
+  @MaxLength(128)
+  token!: string;
+
+  /** Shape checked in the service so a bad PIN gets the same generic 401. */
+  @IsString()
+  @MaxLength(32)
+  pin!: string;
+}

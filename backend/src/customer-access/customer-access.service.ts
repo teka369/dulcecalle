@@ -18,6 +18,7 @@ import {
   softCapAlert,
   softDelayMs,
 } from "./portal-throttle";
+import { ReceiptLinksService } from "../receipts/receipt-links.service";
 
 const IDENTIFY_FAIL = "No pudimos identificarte.";
 const PIN_RE = /^\d{6}$/;
@@ -54,6 +55,8 @@ export class CustomerAccessService {
     private readonly catalog: CatalogService,
     private readonly sessions: AuthSessionService,
     private readonly throttle: PortalLoginThrottle,
+    /** C09-PR5 link-login. Optional only so older unit specs can build the service without it. */
+    private readonly links?: ReceiptLinksService,
   ) {}
 
   private readonly logger = new Logger("CustomerAccess");
@@ -174,6 +177,45 @@ export class CustomerAccessService {
       accessToken: issued.accessToken,
       refreshToken: issued.refreshToken,
     };
+  }
+
+  /**
+   * C09-PR5 — POST /v1/customer-access/link-login {token, pin} (SPEC-C09 §5, §7).
+   * The link only fixes the business and the customer; the PIN check IS the
+   * portal login (same ipcode/ip throttle counter and limit, same soft cap,
+   * exactly one bcrypt compare, same generic 401). Unknown or malformed
+   * tokens get that same 401 (no oracle). A used / expired / revoked link is
+   * 410 with the W3 copy. The link is spent only by a successful login,
+   * atomically; a login that loses the race has its session revoked.
+   */
+  async linkLogin(tokenRaw: string, pinRaw: string, clientIp?: string) {
+    if (!this.links) throw new Error("ReceiptLinksService not wired");
+    const token = (tokenRaw ?? "").trim();
+    const link = await this.links.findByToken(token);
+    const customer = link?.receipt.customerId
+      ? await this.prisma.customer.findFirst({
+          where: { id: link.receipt.customerId, businessId: link.businessId },
+          select: { code: true },
+        })
+      : null;
+    if (!link || !customer) {
+      const ip = clientIp?.replace(/^::ffff:/i, "") || "unknown";
+      if (!isPrivateOrUnknownIp(ip) && (await this.throttle.take(`ip:${ip}`, IP_POLICY)) === "cooled") {
+        await bcrypt.compare(String(pinRaw ?? "") || "000000", await dummyHash());
+        throw new AppError(ERROR_CODES.RATE_LIMIT, "Demasiados intentos. Espera un momento.");
+      }
+      await bcrypt.compare(String(pinRaw ?? "") || "000000", await dummyHash());
+      throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
+    }
+    this.links.assertUsable(link);
+    const session = await this.login(customer.code, String(pinRaw ?? ""), link.businessId, clientIp);
+    if (!(await this.links.claim(link.id))) {
+      await this.sessions.revokeOwned(session.refreshToken, { kind: "customer", subjectId: session.customer.id }, "customer_refresh");
+      const now = await this.prisma.receiptLink.findUniqueOrThrow({ where: { id: link.id } });
+      this.links.assertUsable(now);
+      throw new AppError(ERROR_CODES.LINK_USED, "Este enlace ya se usó. Entra con tu PIN en Mis compras.");
+    }
+    return { ...session, receiptId: link.receiptId };
   }
 
   async refresh(refreshToken: string) {
