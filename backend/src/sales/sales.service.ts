@@ -22,6 +22,7 @@ import type { BusinessContext } from "../identity/auth.types";
 import { reversalsByTarget, type ReversalRef } from "../shared/reversal-lookup";
 import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import type { CreateReturnDto, CreateSaleDto } from "./sales.dto";
+import { formatNumber, nextNumber } from "../shared/sequences";
 
 function saleJson(s: {
   id: string;
@@ -36,6 +37,8 @@ function saleJson(s: {
   occurredAt?: Date | null;
   syncedAt?: Date | null;
   createdAt: Date;
+  /** C09 — per-business sequence (DC-000001). */
+  number?: number | null;
   lines?: Array<{
     id: string;
     productId: string;
@@ -48,6 +51,7 @@ function saleJson(s: {
 }) {
   return {
     id: s.id,
+    number: formatNumber("sale", s.number ?? null),
     customerId: s.customerId,
     paymentKind: s.paymentKind,
     method: s.method,
@@ -316,9 +320,12 @@ export class SalesService {
         }
 
         const saleId = randomUUID();
+        // C09 §3.1 — DC-000001 per business, in this transaction (I-C6).
+        const number = await nextNumber(tx, ctx.businessId, "sale");
         await tx.sale.create({
           data: {
             id: saleId,
+            number,
             businessId: ctx.businessId,
             customerId: dto.customerId ?? null,
             paymentKind: storedKind,

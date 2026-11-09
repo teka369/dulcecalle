@@ -59,6 +59,8 @@ function localSaleToRow(
     occurredOn: sale.occurredOn,
     createdAt: sale.createdAt,
     ...(sale.occurredAt != null ? { occurredAt: sale.occurredAt } : {}),
+    // C09 T3 — the server number replaces the local ref once synced.
+    ...(!pending && sale.number ? { number: sale.number } : {}),
     lines: lines.map((l) => ({
       id: l.id,
       productId: l.productId,
@@ -628,6 +630,10 @@ export async function syncPendingSales(businessId: string) {
         saleRequestBody(current?.payload ?? item.payload),
         item.requestId,
       );
+      // C09 T3 — keep the server number on the local row (it replaces L-…).
+      if (remote && typeof remote.number === "string" && remote.number) {
+        await getLocalDb().sales.update(item.operationId, { number: remote.number });
+      }
       return { remoteId: remote.id };
     } catch (error) {
       // C01 / DC-01 — a permanent rejection keeps the local record and its effect

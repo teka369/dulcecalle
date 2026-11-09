@@ -22,6 +22,7 @@ import { listSalesForScreen, type LocalSaleRow } from "@/data/pwa/offline-sales"
 import { LIST_STALE_TEXT } from "@/data/pwa/list-status";
 import { ventasErrorMessage, ventasHero } from "@/components/sale/sales-list";
 import { summarizeSales } from "@/components/sale/checkout";
+import { saleReference } from "@/domain/sale-number";
 import { bogotaKey, dayHeading, groupByDay, saleCustomerLabel, saleDateLabel, saleMethodLabel, ventasSheetState } from "@/components/sale/sales-list";
 
 const kindLabel: Record<string, string> = {
@@ -213,7 +214,7 @@ export default function VentasPage() {
                             ) : s.pending ? (
                               <PendingBadge />
                             ) : null}
-                            {s.localRef ? <span className="text-xs text-ink-muted">Ref. local {s.localRef}</span> : null}
+                            {saleReference(s) ? <span className="text-xs text-ink-muted">{saleReference(s)}</span> : null}
                           </span>
                         </span>
                       }

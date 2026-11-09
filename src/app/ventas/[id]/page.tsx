@@ -30,6 +30,7 @@ import { useOnline } from "@/components/shell/use-online";
 import { useIsOwner } from "@/components/reversal/use-is-owner";
 import { ReversalSheet } from "@/components/reversal/ReversalSheet";
 import { getPwaApi } from "@/data/pwa/api";
+import { saleReference } from "@/domain/sale-number";
 import { localDateKey } from "@/domain/cash/day";
 import {
   OFFLINE_REVERSAL_TEXT,
@@ -142,6 +143,8 @@ export default function VentaDetallePage() {
   const day = saleDayKey(sale);
   const time = saleTime(sale.createdAt);
   const when = [day ? dayHeading(day, "") : null, time].filter(Boolean).join(", ");
+  // C09 T3 — server number (DC-000125); a pending sale keeps its «Ref. local» line below.
+  const number = !sale.pending ? saleReference(sale) : null;
   const dot = sale.paymentKind === "paid" ? "bg-ok" : sale.paymentKind === "partial" ? "bg-warning" : "bg-info";
 
   return (
@@ -150,7 +153,7 @@ export default function VentaDetallePage() {
         size="medium"
         back={{ href: "/ventas", label: "Volver a Ventas", entity: true }}
         title="Venta"
-        subtitle={when || undefined}
+        subtitle={[number, when].filter(Boolean).join(" · ") || undefined}
         action={canReturn ? <HeroPill href={`/ventas/${sale.id}/devolver`} label="Devolver" /> : undefined}
         offline={fromCache ? { text: "Sin conexión · mostrando venta guardada en este dispositivo." } : null}
       >
