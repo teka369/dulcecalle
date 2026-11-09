@@ -212,4 +212,12 @@ describe("C04 splitReturnSettlement (decision 6)", () => {
     const walk = splitReturnSettlement({ returnValue: 900, saleCredit: 0, alreadyDebtReduced: 0, customerDebt: 0, obligations: [], hasCustomer: false });
     expect(walk).toMatchObject({ refundAmount: 900, toCredit: 0, remainderRequired: false });
   });
+  it("C07: creditBySource follows the origin of reversal rows (mirror of the server)", () => {
+    const rows = [
+      { id: "a", sourceType: "payment", sourceId: "P", targetType: "credit", amount: 500, createdAt: 1 },
+      { id: "b", sourceType: "reversal", sourceId: "R", originSourceType: "payment", originSourceId: "Q", targetType: "credit", amount: 3000, createdAt: 2 },
+      { id: "c", sourceType: "reversal", sourceId: "R2", originSourceType: "payment", originSourceId: "P", targetType: "credit", amount: -500, createdAt: 3 },
+    ];
+    expect(creditBySource(rows)).toEqual([{ sourceType: "payment", sourceId: "Q", available: 3000 }]);
+  });
 });
