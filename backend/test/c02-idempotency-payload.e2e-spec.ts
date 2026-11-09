@@ -141,4 +141,96 @@ describe("C02 idempotency key bound to the payload (DC-13)", () => {
     expect(e2.status).toBe(201);
     expect(e2.body.id).toBe(e1.body.id);
   });
+
+  describe("C02.1 legacy NULL payloadHash", () => {
+    it("rejects a sale replay when payloadHash is NULL and qty differs", async () => {
+      const key = randomUUID();
+      const body = {
+        lines: [{ productId, qty: 2 }],
+        paymentKind: "paid",
+        amountReceived: 2000,
+        method: "Efectivo",
+      };
+      const created = await post("/v1/sales", body, key);
+      expect(created.status).toBe(201);
+      await prisma.sale.update({
+        where: { id: created.body.id },
+        data: { payloadHash: null },
+      });
+
+      const mismatch = await post(
+        "/v1/sales",
+        { ...body, lines: [{ productId, qty: 3 }] },
+        key,
+      );
+      expect(mismatch.status).toBe(422);
+      expect(mismatch.body.error.code).toBe("IDEMPOTENCY_MISMATCH");
+      expect(mismatch.body.id).toBeUndefined();
+      const row = await prisma.sale.findUnique({ where: { id: created.body.id } });
+      expect(row?.payloadHash).toBeNull();
+    });
+
+    it("rejects a payment replay when payloadHash is NULL and note differs", async () => {
+      const key = randomUUID();
+      const body = { amount: 1500, method: "Efectivo", note: "primera" };
+      const created = await post(`/v1/customers/${ana}/payments`, body, key);
+      expect(created.status).toBe(201);
+      await prisma.customerPayment.update({
+        where: { id: created.body.id },
+        data: { payloadHash: null },
+      });
+
+      const mismatch = await post(
+        `/v1/customers/${ana}/payments`,
+        { ...body, note: "otra" },
+        key,
+      );
+      expect(mismatch.status).toBe(422);
+      expect(mismatch.body.error.code).toBe("IDEMPOTENCY_MISMATCH");
+      expect(mismatch.body.id).toBeUndefined();
+      const row = await prisma.customerPayment.findUnique({
+        where: { id: created.body.id },
+      });
+      expect(row?.payloadHash).toBeNull();
+    });
+
+    it("backfills payloadHash on an identical replay when it was NULL", async () => {
+      const saleKey = randomUUID();
+      const saleBody = {
+        lines: [{ productId, qty: 2 }],
+        paymentKind: "paid",
+        amountReceived: 2000,
+        method: "Efectivo",
+      };
+      const sale = await post("/v1/sales", saleBody, saleKey);
+      expect(sale.status).toBe(201);
+      await prisma.sale.update({
+        where: { id: sale.body.id },
+        data: { payloadHash: null },
+      });
+      const saleAgain = await post("/v1/sales", saleBody, saleKey);
+      expect(saleAgain.status).toBe(201);
+      expect(saleAgain.body.id).toBe(sale.body.id);
+      const saleRow = await prisma.sale.findUnique({ where: { id: sale.body.id } });
+      expect(saleRow?.payloadHash).toEqual(expect.any(String));
+      expect(saleRow?.payloadHash).toHaveLength(64);
+
+      const payKey = randomUUID();
+      const payBody = { amount: 1500, method: "Efectivo", note: "primera" };
+      const pay = await post(`/v1/customers/${ana}/payments`, payBody, payKey);
+      expect(pay.status).toBe(201);
+      await prisma.customerPayment.update({
+        where: { id: pay.body.id },
+        data: { payloadHash: null },
+      });
+      const payAgain = await post(`/v1/customers/${ana}/payments`, payBody, payKey);
+      expect(payAgain.status).toBe(201);
+      expect(payAgain.body.id).toBe(pay.body.id);
+      const payRow = await prisma.customerPayment.findUnique({
+        where: { id: pay.body.id },
+      });
+      expect(payRow?.payloadHash).toEqual(expect.any(String));
+      expect(payRow?.payloadHash).toHaveLength(64);
+    });
+  });
 });
