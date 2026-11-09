@@ -103,6 +103,7 @@ describe("publicCustomerLedger shape (AC5)", () => {
     expect(pub.payments[0]).toEqual({
       id: "pay1", amount: 1, method: "Nequi", note: "Abono del jueves", occurredOn: "2026-10-13", createdAt: now,
       allocations: [{ targetType: "sale", targetId: "s1", amount: 1 }],
+      reversal: null, // C07 §6: derived «Anulado» (null = stands)
     });
     expect(pub.sales[0]!.openBalance).toBe(0);
     expect(pub.sales[0]!.allocations).toEqual([{ sourceType: "payment", sourceId: "pay1", amount: 1, createdAt: now }]);
@@ -110,5 +111,25 @@ describe("publicCustomerLedger shape (AC5)", () => {
       ["id", "lineTotal", "productId", "productName", "qty", "unitPrice"],
     );
     expect(Object.keys(pub.sales[0]!.returns[0]!.lines[0]!).sort()).toEqual(["id", "qty", "unitPrice"]);
+  });
+
+  it("C07 J5: a voided sale/abono shows number + reason label only (no reasonText, no requestedBy)", () => {
+    const now = new Date("2026-11-09T15:00:00Z");
+    const rev = { id: "rev1", number: "DC-R-000001", reasonCode: "cliente_equivocado", reasonText: "Era para Marta", requestedBy: "u-owner", createdAt: now };
+    const raw = {
+      customer: { id: CUS, code: "DC-0001", name: "Rosa", debt: 0, createdAt: now },
+      initials: [],
+      sales: [{
+        id: "s1", paymentKind: "credit", method: null, saleTotal: 2, amountReceived: 0, credit: 2, note: null,
+        occurredOn: "2026-11-09", createdAt: now, openBalance: 0, allocations: [], lines: [], returns: [], reversal: rev,
+      }],
+      payments: [{ id: "p1", amount: 1, method: "Efectivo", note: null, occurredOn: "2026-11-09", createdAt: now, allocations: [], reversal: rev }],
+    };
+    const pub = publicCustomerLedger(raw as never);
+    expect(pub.sales[0]!.reversal).toEqual({ number: "DC-R-000001", reasonCode: "cliente_equivocado", createdAt: now });
+    expect(pub.payments[0]!.reversal).toEqual({ number: "DC-R-000001", reasonCode: "cliente_equivocado", createdAt: now });
+    const blob = JSON.stringify(pub);
+    expect(blob).not.toContain("Era para Marta");
+    expect(blob).not.toContain("u-owner");
   });
 });

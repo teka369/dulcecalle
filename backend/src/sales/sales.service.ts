@@ -19,6 +19,7 @@ import {
   planOrThrow,
 } from "../shared/debt-allocations";
 import type { BusinessContext } from "../identity/auth.types";
+import { reversalsByTarget, type ReversalRef } from "../shared/reversal-lookup";
 import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import type { CreateReturnDto, CreateSaleDto } from "./sales.dto";
 
@@ -68,6 +69,11 @@ function saleJson(s: {
       lineTotal: copToJson(l.lineTotal),
     })),
   };
+}
+
+/** C07 §3.3 — derived «Anulada» state (null when the sale stands). */
+function saleReversalJson(r: ReversalRef | undefined) {
+  return r ? { id: r.id, number: r.number, reasonCode: r.reasonCode, reasonText: r.reasonText, createdAt: r.createdAt } : null;
 }
 
 function returnJson(r: {
@@ -492,7 +498,8 @@ export class SalesService {
       orderBy: NEWEST_FIRST,
       take: pageProbe(page.limit),
     });
-    return paged(rows, page.limit, saleJson);
+    const reversals = await reversalsByTarget(this.prisma, ctx.businessId, "sale", rows.map((r) => r.id));
+    return paged(rows, page.limit, (r) => ({ ...saleJson(r), reversal: saleReversalJson(reversals.get(r.id)) }));
   }
 
   async get(ctx: BusinessContext, id: string) {
@@ -508,8 +515,10 @@ export class SalesService {
     });
     const applied = rows.reduce((a, r) => a + r.amount, 0n);
     const open = s.credit - applied;
+    const reversal = (await reversalsByTarget(this.prisma, ctx.businessId, "sale", [s.id])).get(s.id);
     return {
       ...saleJson(s),
+      reversal: saleReversalJson(reversal),
       openBalance: copToJson(open < 0n ? 0n : open),
       allocations: rows.map((r) => ({
         sourceType: r.sourceType,

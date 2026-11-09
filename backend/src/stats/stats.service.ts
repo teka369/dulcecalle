@@ -23,6 +23,7 @@ export class StatsService {
       products,
       customers,
       returns,
+      reversals,
     ] = await Promise.all([
       this.prisma.sale.findMany({
         where: {
@@ -61,6 +62,14 @@ export class StatsService {
           occurredOn: { gte: from, lte: to },
         },
         include: { lines: true },
+      }),
+      // C07 / decision 10 — a reversal counts on ITS day; the original day's
+      // figures never change (closed days are immutable, T24).
+      this.prisma.reversal.findMany({
+        where: {
+          businessId: ctx.businessId,
+          occurredOn: { gte: from, lte: to },
+        },
       }),
     ]);
 
@@ -106,6 +115,27 @@ export class StatsService {
       }
     }
 
+    // C07 T17 — «Anulado»: what was voided in the period leaves Ventas,
+    // Recibido and Ganancia here, never on the original day.
+    let anulado = 0n;
+    let anuladoCount = 0;
+    let recibidoAnulado = 0n;
+    for (const r of reversals) {
+      const eff = ((r.after ?? {}) as { effects?: { voidedValue?: number; voidedMargin?: number; cashOut?: number } }).effects ?? {};
+      const cashOut = BigInt(eff.cashOut ?? 0);
+      recibidoAnulado = addCop(recibidoAnulado, cashOut);
+      if (r.targetType === "sale") {
+        anulado = addCop(anulado, BigInt(eff.voidedValue ?? 0));
+        anuladoCount += 1;
+        ganancia = subCop(ganancia, BigInt(eff.voidedMargin ?? 0));
+      }
+    }
+    for (const m of moves) {
+      if (m.kind !== "reverso" || m.direction !== "out") continue;
+      if (m.method === "Efectivo") recibidoEfectivo = subCop(recibidoEfectivo, m.amount);
+      else if (m.method === "Nequi") recibidoNequi = subCop(recibidoNequi, m.amount);
+    }
+
     let gaste = 0n;
     for (const e of expenses) gaste = addCop(gaste, e.amount);
 
@@ -124,17 +154,21 @@ export class StatsService {
       payments.length === 0 &&
       expenses.length === 0 &&
       moves.length === 0 &&
-      returns.length === 0;
+      returns.length === 0 &&
+      reversals.length === 0;
 
     return {
       period,
       from: dateKey(from),
       to: dateKey(to),
-      ventas: copToJson(ventas),
+      ventas: copToJson(subCop(ventas, anulado)),
       ventasCount: sales.length,
+      anulado: copToJson(anulado),
+      anuladoCount,
+      reversosCount: reversals.length,
       devoluciones: copToJson(devoluciones),
       devolucionesCount: returns.length,
-      recibido: copToJson(addCop(recibidoSales, recibidoAbonos)),
+      recibido: copToJson(subCop(addCop(recibidoSales, recibidoAbonos), recibidoAnulado)),
       recibidoEfectivo: copToJson(recibidoEfectivo),
       recibidoNequi: copToJson(recibidoNequi),
       porCobrar: copToJson(porCobrar),
