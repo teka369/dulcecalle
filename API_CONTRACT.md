@@ -227,6 +227,15 @@ Stats: a reversal counts on **its** day (`anulado`, `anuladoCount`, `reversosCou
 
 ---
 
+## 6c. Receipts (C09-PR2, SPEC-C09 §3.2/§7)
+
+Every created sale (with or without customer), abono and devolución gets exactly one receipt, written in the same transaction (I-C1). `POST /v1/sales`, `POST /v1/customers/:id/payments`, `POST /v1/sales/:id/returns` (and their replays, which return the identical refs) plus `replacementPayment` of «corregir» carry `receipts: [{ id, kind, number, verifyCode }]`. Numbers: sale `DC-`, payment `DC-P-`, return `DC-D-` (sequence per business). `verifyCode`: 10 chars of `23456789ABCDEFGHJKMNPQRSTVWXYZ`, globally unique.
+
+- `GET /v1/receipts?customerId&kind&from&to&limit` (owner + staff) → array, newest first: `{ id, kind, number, customerId, sourceType (sale|customer_payment|sale_return), sourceId, verifyCode, hashPrefix, status, createdAt }`. `from`/`to` are `YYYY-MM-DD` in the business zone; `limit` 1–500 (default 100).
+- `GET /v1/receipts/:id` (owner + staff) → the same plus `prevReceiptId`, `snapshot`, `contentHash`. Other business → `404`.
+- `snapshot` is canonical (keys sorted, COP as integer strings, `createdAt` ISO with the business offset, e.g. `-05:00`); `contentHash = sha256(canonical(snapshot))` hex, `hashPrefix` = first 8. A sale without customer has `internal: true`, `customer: null` and null balances; it never reaches a portal.
+- `status` is derived: `reemplazado` (a newer version points at it), `anulado` (its sale/abono has a reversal), else `vigente`. Rows are insert-only (DB trigger, wipe included). Allocation and reversal receipts arrive in PR3.
+
 ## 7. Initial debt
 
 `POST /v1/customers/:id/initial-debts` `{ amount, note?, requestId }`  
