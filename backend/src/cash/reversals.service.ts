@@ -20,6 +20,8 @@ import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../
 import type { BusinessContext } from "../identity/auth.types";
 import { CashService } from "./cash.service";
 import { formatNumber, nextNumber } from "../shared/sequences";
+import { copString, isoInZone } from "../shared/canonical";
+import { collectAllocation, emitAllocationReceipt, emitReceipt, receiptRefs } from "../receipts/receipt-emit";
 import type { CorrectPaymentDto, ReverseDto } from "./reversals.dto";
 
 type Tx = Prisma.TransactionClient;
@@ -353,6 +355,9 @@ export class ReversalsService {
             },
           });
           await this.applyEffects(tx, ctx, reversalId, number, p, now);
+          // C09-PR3 — the reversal's distribution is read before the
+          // replacement abono can touch the same customer's obligations.
+          const allocationLines = p.customerId ? await collectAllocation(tx, ctx.businessId, p.customerId, reversalId) : [];
           if (op.replacement && replacementId) {
             await this.cash.createPaymentInTx(tx, ctx, op.replacement.dto.customerId, {
               id: replacementId,
@@ -366,6 +371,15 @@ export class ReversalsService {
               replacesPaymentId: p.targetId,
             });
           }
+          await this.emitReversalReceipts(tx, ctx, {
+            reversalId,
+            number,
+            p,
+            reasonCode: reason.reasonCode,
+            replacementId,
+            allocationLines,
+            now,
+          });
           return reversalId;
         },
         { timeout: 20000 },
@@ -385,6 +399,92 @@ export class ReversalsService {
     }
     const row = await this.prisma.reversal.findUniqueOrThrow({ where: { id } });
     return this.respond(ctx.businessId, row);
+  }
+
+  /**
+   * C09-PR3 — `reversal` receipt (SPEC §2: original, motivo, efectos, antes y
+   * después) + its allocation annex DC-R-…/D1. The reason goes as the
+   * enumerated label only (no free text, WIRES J5). It does not set
+   * prevReceiptId on the original: the original reads «anulado» by
+   * derivation and is never edited (T9).
+   */
+  private async emitReversalReceipts(
+    tx: Tx,
+    ctx: BusinessContext,
+    args: {
+      reversalId: string;
+      number: string;
+      p: Prepared;
+      reasonCode: string;
+      replacementId: string | null;
+      allocationLines: Awaited<ReturnType<typeof collectAllocation>>;
+      now: Date;
+    },
+  ) {
+    const { p, now } = args;
+    const original =
+      p.targetType === "sale"
+        ? formatNumber("sale", (await tx.sale.findUniqueOrThrow({ where: { id: p.targetId }, select: { number: true } })).number)
+        : formatNumber(
+            "payment",
+            (await tx.customerPayment.findUniqueOrThrow({ where: { id: p.targetId }, select: { number: true } })).number,
+          );
+    const originalReceipt = await tx.receipt.findFirst({
+      where: { businessId: ctx.businessId, sourceId: p.targetId, kind: p.targetType === "sale" ? "sale" : "payment" },
+      select: { id: true },
+    });
+    const replacement = args.replacementId
+      ? await tx.customerPayment.findUnique({ where: { id: args.replacementId }, select: { number: true } })
+      : null;
+    const customer = p.customerId
+      ? await tx.customer.findFirstOrThrow({ where: { id: p.customerId, businessId: ctx.businessId }, select: { id: true, code: true, name: true } })
+      : null;
+    const business = await tx.business.findUniqueOrThrow({ where: { id: ctx.businessId }, select: { id: true, name: true } });
+    const names = new Map(
+      (await tx.product.findMany({ where: { businessId: ctx.businessId, id: { in: p.stock.map((x) => x.productId) } }, select: { id: true, name: true } })).map(
+        (x) => [x.id, x.name],
+      ),
+    );
+    const money = (n: number | null | undefined) => (n == null ? null : copString(BigInt(n)));
+    const ref = await emitReceipt(tx, {
+      businessId: ctx.businessId,
+      customerId: p.customerId,
+      kind: "reversal",
+      sourceType: "reversal",
+      sourceId: args.reversalId,
+      number: args.number,
+      createdAt: now,
+      snapshot: {
+        kind: "reversal",
+        number: args.number,
+        business: { id: business.id, name: business.name },
+        createdAt: isoInZone(now, ctx.timezone),
+        occurredOn: dateKey(p.today),
+        customer: customer ? { id: customer.id, code: customer.code, name: customer.name } : null,
+        internal: !customer,
+        original: { type: p.targetType, id: p.targetId, number: original, receiptId: originalReceipt?.id ?? null },
+        reasonCode: args.reasonCode,
+        debtBefore: customer ? money(p.before.debt) : null,
+        debtAfter: customer ? money(p.after.debt) : null,
+        creditBefore: customer ? money(p.before.creditBalance) : null,
+        creditAfter: customer ? money(p.after.creditBalance) : null,
+        cashOut: p.cash ? { method: p.cash.method, amount: copString(p.cash.amount) } : null,
+        stock: p.stock.map((x) => ({ productName: names.get(x.productId) ?? "", qty: x.qty })),
+        replacementPaymentNumber: replacement ? formatNumber("payment", replacement.number) : null,
+      },
+    });
+    if (p.customerId) {
+      await emitAllocationReceipt(tx, {
+        businessId: ctx.businessId,
+        customerId: p.customerId,
+        groupId: args.reversalId,
+        parent: ref,
+        createdAt: now,
+        timeZone: ctx.timezone,
+        occurredOn: dateKey(p.today),
+        lines: args.allocationLines,
+      });
+    }
   }
 
   private async applyEffects(tx: Tx, ctx: BusinessContext, reversalId: string, number: string, p: Prepared, now: Date) {
@@ -838,6 +938,7 @@ export class ReversalsService {
       after: afterSnap,
       effects,
       warnings: warnings ?? [],
+      receipts: await receiptRefs(this.prisma, businessId, row.id),
       ...(replacementPayment ? { replacementPayment: await this.cash.paymentWithAllocations(replacementPayment) } : {}),
     };
   }
