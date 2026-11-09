@@ -11,6 +11,13 @@ import { linkForNewMove } from "../cash/session-link";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import { assertPaymentMath, resolveUnitPrice } from "../shared/sale-math";
 import { splitReturnSettlement } from "../shared/returns";
+import {
+  applyCreditToObligations,
+  insertAllocations,
+  loadObligations,
+  moveCustomerBalances,
+  planOrThrow,
+} from "../shared/debt-allocations";
 import type { BusinessContext } from "../identity/auth.types";
 import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import type { CreateReturnDto, CreateSaleDto } from "./sales.dto";
@@ -151,6 +158,8 @@ export class SalesService {
       amountReceived: String(dto.amountReceived),
       method: dto.method ?? null,
       note: dto.note ?? null,
+      // C04 R5 — only when confirmed, so older rows/clients keep their hash.
+      ...(dto.applyCredit === true ? { applyCredit: true } : {}),
     });
     const existing = await this.prisma.sale.findUnique({
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
@@ -171,7 +180,7 @@ export class SalesService {
           data: { payloadHash: hash },
         });
       }
-      return saleJson(row);
+      return this.saleCreditJson(ctx.businessId, row);
     };
 
     if (existing) {
@@ -208,6 +217,7 @@ export class SalesService {
       const created = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
 
+        let creditBalance = 0n;
         if (dto.customerId) {
           const customer = await tx.customer.findFirst({
             where: { id: dto.customerId, businessId: ctx.businessId },
@@ -215,7 +225,10 @@ export class SalesService {
           if (!customer) {
             throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
           }
+          creditBalance = customer.creditBalance;
         }
+        // C04 R5 — saldo a favor only with the explicit flag and a customer.
+        const useCredit = dto.applyCredit === true && !!dto.customerId && creditBalance > 0n;
 
         const products = await tx.product.findMany({
           where: {
@@ -273,11 +286,28 @@ export class SalesService {
           });
         }
 
-        const { credit } = assertPaymentMath(
-          dto.paymentKind,
-          saleTotal,
-          amountReceived,
-        );
+        // C04 T27 — a «paid» sale may be covered partly by saldo a favor:
+        // the uncovered part is recorded as this sale's credit and settled at
+        // once by a credit_apply pair (no cash for it).
+        // DB CHECKs keep «paid ⇒ credit = 0» and «received + credit = total»,
+        // so it is stored as partial (or credit when nothing was received).
+        let credit: bigint;
+        let creditToApply = 0n;
+        let storedKind: "paid" | "partial" | "credit" = dto.paymentKind;
+        if (dto.paymentKind === "paid" && useCredit && amountReceived < saleTotal) {
+          const shortfall = saleTotal - amountReceived;
+          if (amountReceived < 0n || shortfall > creditBalance) {
+            throw new AppError(ERROR_CODES.CREDIT_INSUFFICIENT, MESSAGES.creditInsufficient);
+          }
+          credit = shortfall;
+          creditToApply = shortfall;
+          storedKind = amountReceived > 0n ? "partial" : "credit";
+        } else {
+          credit = assertPaymentMath(dto.paymentKind, saleTotal, amountReceived).credit;
+          if (useCredit && credit > 0n) {
+            creditToApply = credit < creditBalance ? credit : creditBalance;
+          }
+        }
 
         const saleId = randomUUID();
         await tx.sale.create({
@@ -285,7 +315,7 @@ export class SalesService {
             id: saleId,
             businessId: ctx.businessId,
             customerId: dto.customerId ?? null,
-            paymentKind: dto.paymentKind,
+            paymentKind: storedKind,
             method,
             saleTotal,
             amountReceived,
@@ -377,13 +407,31 @@ export class SalesService {
           });
         }
 
+        if (creditToApply > 0n && dto.customerId) {
+          const obligations = await loadObligations(tx, ctx.businessId, dto.customerId);
+          const plan = planOrThrow({
+            amount: creditToApply,
+            obligations,
+            target: { mode: "sale", saleId },
+            overflow: "credit",
+          });
+          await applyCreditToObligations(tx, {
+            businessId: ctx.businessId,
+            customerId: dto.customerId,
+            plan,
+            groupId: saleId,
+            createdBy: ctx.userId,
+            now,
+          });
+        }
+
         return tx.sale.findUniqueOrThrow({
           where: { id: saleId },
           include: { lines: true },
         });
       });
 
-      return saleJson(created);
+      return this.saleCreditJson(ctx.businessId, created);
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
         const again = await this.prisma.sale.findUnique({
@@ -398,6 +446,34 @@ export class SalesService {
       }
       throw e;
     }
+  }
+
+  /**
+   * C04 R5 — create/replay response: the sale + saldo a favor used in it
+   * (from the stored credit_apply rows, never recalculated) and, when none
+   * was used, what the customer has available (T28).
+   */
+  private async saleCreditJson(businessId: string, row: Parameters<typeof saleJson>[0]) {
+    const base = saleJson(row);
+    const rows = await this.prisma.debtAllocation.findMany({
+      where: { businessId, groupId: row.id, mode: "credit_apply", targetType: "sale" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    const applied = rows.reduce((a, r) => a + r.amount, 0n);
+    const customer = row.customerId
+      ? await this.prisma.customer.findFirst({ where: { id: row.customerId, businessId }, select: { creditBalance: true } })
+      : null;
+    return {
+      ...base,
+      creditApplied: copToJson(applied),
+      allocations: rows.map((r) => ({
+        targetType: r.targetType,
+        saleId: r.saleId,
+        initialDebtId: r.initialDebtId,
+        amount: copToJson(r.amount),
+      })),
+      creditAvailable: customer ? copToJson(customer.creditBalance) : null,
+    };
   }
 
   async list(ctx: BusinessContext, from?: string, to?: string, page: PageQuery = {}) {
@@ -441,17 +517,47 @@ export class SalesService {
     return rows.map(returnJson);
   }
 
+  /** C04 — return JSON + its allocations (stored rows, never recalculated). */
+  private async returnWithAllocations(
+    businessId: string,
+    r: Parameters<typeof returnJson>[0] & { needsReview?: boolean; remainderMode?: string | null },
+  ) {
+    const rows = await this.prisma.debtAllocation.findMany({
+      where: { businessId, sourceType: "sale_return", sourceId: r.id, mode: { not: "credit_apply" } },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    // Same order as written: obligations (own sale first, then FIFO), credit last.
+    const saleIdOf = (r as { saleId?: string }).saleId;
+    const rank = (x: (typeof rows)[number]) =>
+      x.targetType === "credit" ? 2 : x.saleId != null && x.saleId === saleIdOf ? 0 : 1;
+    rows.sort((a, b) => rank(a) - rank(b));
+    const toCredit = rows.filter((x) => x.targetType === "credit").reduce((a, x) => a + x.amount, 0n);
+    return {
+      ...returnJson(r),
+      toCredit: copToJson(toCredit),
+      remainderMode: r.remainderMode ?? null,
+      needsReview: r.needsReview ?? false,
+      allocations: rows.map((x) => ({
+        targetType: x.targetType,
+        saleId: x.saleId,
+        initialDebtId: x.initialDebtId,
+        amount: copToJson(x.amount),
+      })),
+    };
+  }
+
   async createReturn(
     ctx: BusinessContext,
     saleId: string,
     dto: CreateReturnDto,
     requestId: string,
+    offlineReplay = false,
   ) {
     const existing = await this.prisma.saleReturn.findUnique({
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
       include: { lines: true },
     });
-    if (existing) return returnJson(existing);
+    if (existing) return this.returnWithAllocations(ctx.businessId, existing);
 
     if (!dto.lines?.length) {
       throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.returnEmpty);
@@ -533,12 +639,33 @@ export class SalesService {
           customerDebt = customer.debt;
         }
 
-        const { debtReduced, refundAmount } = splitReturnSettlement({
+        // C04 / decision 6 (R6, §4.1): own sale first, then FIFO; the rest is
+        // refund or saldo a favor as chosen. Offline replay without a choice
+        // (decision 15) → saldo a favor + needs_review, never cash on its own.
+        const obligations = sale.customerId
+          ? await loadObligations(tx, ctx.businessId, sale.customerId)
+          : [];
+        const offlineDefault = offlineReplay && !dto.remainder && !!sale.customerId;
+        const settlement = splitReturnSettlement({
           returnValue,
           saleCredit: sale.credit,
           alreadyDebtReduced,
           customerDebt,
+          saleId,
+          obligations,
+          hasCustomer: !!sale.customerId,
+          remainder: dto.remainder ?? (offlineDefault ? "credit" : null),
         });
+        if (settlement.remainderRequired) {
+          throw new AppError(
+            ERROR_CODES.REMAINDER_CHOICE_REQUIRED,
+            MESSAGES.remainderChoiceRequired,
+          );
+        }
+        const { debtReduced, refundAmount, toCredit } = settlement;
+        const remainderMode =
+          settlement.rest > 0n ? (toCredit > 0n ? "credit" : "refund") : null;
+        const needsReview = offlineDefault && toCredit > 0n;
 
         let method: "Efectivo" | "Nequi" | null = null;
         if (refundAmount > 0n) {
@@ -561,8 +688,44 @@ export class SalesService {
             note: dto.note,
             occurredOn,
             createdAt: now,
+            needsReview,
+            remainderMode,
           },
         });
+        if (sale.customerId) {
+          await insertAllocations(tx, [
+            ...settlement.lines.map((l) => ({
+              businessId: ctx.businessId,
+              customerId: sale.customerId!,
+              sourceType: "sale_return" as const,
+              sourceId: returnId,
+              targetType: l.kind,
+              saleId: l.kind === "sale" ? l.id : null,
+              initialDebtId: l.kind === "initial_debt" ? l.id : null,
+              amount: l.amount,
+              mode: l.kind === "sale" && l.id === saleId ? ("explicit" as const) : ("fifo" as const),
+              groupId: returnId,
+              createdAt: now,
+              createdBy: ctx.userId,
+            })),
+            ...(toCredit > 0n
+              ? [
+                  {
+                    businessId: ctx.businessId,
+                    customerId: sale.customerId,
+                    sourceType: "sale_return" as const,
+                    sourceId: returnId,
+                    targetType: "credit" as const,
+                    amount: toCredit,
+                    mode: "explicit" as const,
+                    groupId: returnId,
+                    createdAt: now,
+                    createdBy: ctx.userId,
+                  },
+                ]
+              : []),
+          ]);
+        }
 
         for (const row of prepared) {
           await tx.saleReturnLine.create({
@@ -625,21 +788,14 @@ export class SalesService {
           });
         }
 
-        if (debtReduced > 0n) {
+        if (debtReduced > 0n || toCredit > 0n) {
           if (!sale.customerId) {
             throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
           }
-          const decremented = await tx.$executeRaw`
-            UPDATE customers
-            SET debt = debt - ${debtReduced},
-                updated_at = NOW()
-            WHERE id = ${sale.customerId}::uuid
-              AND business_id = ${ctx.businessId}::uuid
-              AND debt >= ${debtReduced}
-          `;
-          if (Number(decremented) !== 1) {
-            throw new AppError(ERROR_CODES.VALIDATION, "debt must be ≥ 0");
-          }
+          await moveCustomerBalances(tx, ctx.businessId, sale.customerId, {
+            debt: -debtReduced,
+            credit: toCredit,
+          });
         }
 
         return tx.saleReturn.findUniqueOrThrow({
@@ -648,7 +804,7 @@ export class SalesService {
         });
       });
 
-      return returnJson(created);
+      return this.returnWithAllocations(ctx.businessId, created);
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
         const again = await this.prisma.saleReturn.findUnique({
@@ -657,7 +813,7 @@ export class SalesService {
           },
           include: { lines: true },
         });
-        if (again) return returnJson(again);
+        if (again) return this.returnWithAllocations(ctx.businessId, again);
       }
       throw e;
     }

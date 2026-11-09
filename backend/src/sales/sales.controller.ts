@@ -5,6 +5,7 @@ import { CreateReturnDto, CreateSaleDto } from "./sales.dto";
 import { CurrentBusiness } from "../tenancy/business.decorator";
 import type { BusinessContext } from "../identity/auth.types";
 import { resolveIdempotencyKey } from "../shared/idempotency";
+import { isOfflineReplay } from "../shared/occurred-at";
 import { UuidParam, optionalDateQuery } from "../shared/http/params";
 
 @Controller("sales")
@@ -34,12 +35,14 @@ export class SalesController {
     @Param("id", UuidParam) id: string,
     @Body() dto: CreateReturnDto,
     @Headers("idempotency-key") key?: string,
+    @Headers("x-offline-replay") replay?: string,
   ) {
     return this.sales.createReturn(
       ctx,
       id,
       dto,
       resolveIdempotencyKey(key, dto.requestId),
+      isOfflineReplay(replay),
     );
   }
 

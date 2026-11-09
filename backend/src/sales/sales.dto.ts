@@ -3,8 +3,11 @@ import {
   ArrayMinSize,
   IsArray,
   IsEnum,
+  IsBoolean,
   IsISO8601,
+  IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -68,6 +71,15 @@ export class CreateSaleDto {
   @IsOptional()
   @IsISO8601({ strict: true })
   occurredAt?: string;
+
+  /**
+   * C04 R5 — explicit one-tap confirmation to use the customer's saldo a
+   * favor in this same sale. Never applied without it. The offline outbox
+   * never sends it (J3 / T34).
+   */
+  @IsOptional()
+  @IsBoolean()
+  applyCredit?: boolean;
 }
 
 export class CreatePaymentDto {
@@ -91,6 +103,20 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsISO8601({ strict: true })
   occurredAt?: string;
+
+  /**
+   * C04 §6.1 — {mode:"fifo"} (default) | {mode:"sale", saleId?, saleRequestId?}
+   * | {mode:"split", targets:[{saleId|initialDebtId, amount}]}. Shape is
+   * checked by parseTarget (400 VALIDATION when malformed).
+   */
+  @IsOptional()
+  @IsObject()
+  target?: Record<string, unknown>;
+
+  /** C04 R2/R3 — what to do with the rest: "fifo" (default) or "credit". */
+  @IsOptional()
+  @IsIn(["fifo", "credit"])
+  overflow?: "fifo" | "credit";
 }
 
 export class ReturnLineDto {
@@ -116,4 +142,9 @@ export class CreateReturnDto {
   @IsOptional()
   @IsUUID()
   requestId?: string;
+
+  /** C04 decision 6 — how to settle the rest (value − debtReduced). */
+  @IsOptional()
+  @IsIn(["refund", "credit"])
+  remainder?: "refund" | "credit";
 }

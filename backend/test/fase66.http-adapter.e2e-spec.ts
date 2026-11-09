@@ -241,22 +241,24 @@ describe("Fase 6.6 HTTP adapter ↔ Nest contract", () => {
     );
     expect(payAgain.id).toBe(pay.id);
 
-    await expect(
-      api.customers.pay(
-        customer.id,
-        { amount: 99999, method: "Efectivo" },
-        randomUUID(),
-      ),
-    ).rejects.toMatchObject({ code: "ABONO_EXCEEDS_DEBT", status: 409 });
+    // C04 R4 (intentional change): overpayment is accepted; the excess is
+    // saldo a favor (it used to be 409 ABONO_EXCEEDS_DEBT).
+    const over = await api.customers.pay(
+      customer.id,
+      { amount: 2000, method: "Nequi" },
+      randomUUID(),
+    );
+    expect(over.amount).toBe(2000);
+    expect((await api.customers.get(customer.id)).debt).toBe(0);
 
     const today = await api.cash.today();
     expect(today.expected.efectivo).toBe(8000);
-    expect(today.expected.nequi).toBe(1500);
+    expect(today.expected.nequi).toBe(3500);
     expect(today.session?.id).toBe(opened.id);
 
     const closed = await api.cash.close(opened.id, 8000);
     expect(closed.expectedEfectivo).toBe(8000);
-    expect(closed.expectedNequi).toBe(1500);
+    expect(closed.expectedNequi).toBe(3500);
     expect(closed.difference).toBe(0);
 
     await expect(api.cash.close(opened.id, 1)).rejects.toMatchObject({

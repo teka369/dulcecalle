@@ -45,9 +45,8 @@ ALTER TABLE "debt_allocations" ADD CONSTRAINT "debt_allocations_initial_debt_id_
 -- Saldo a favor cache (same writers/pattern as debt).
 ALTER TABLE "customers" ADD COLUMN "credit_balance" BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE "customers" ADD CONSTRAINT "customers_credit_balance_nonneg" CHECK ("credit_balance" >= 0);
--- DC-20: debt never below 0. NOT VALID = enforced for every new write without
--- scanning/rejecting legacy rows during deploy (validate later, after review).
-ALTER TABLE "customers" ADD CONSTRAINT "customers_debt_nonneg" CHECK ("debt" >= 0) NOT VALID;
+-- DC-20: CHECK debt >= 0 already exists since 20260917120000_init
+-- ("customers_debt_nonneg"); nothing to add here.
 
 ALTER TABLE "customer_payments" ADD COLUMN "requested_target" JSONB;
 ALTER TABLE "customer_payments" ADD COLUMN "allocation_result" JSONB;
