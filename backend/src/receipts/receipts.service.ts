@@ -8,6 +8,7 @@ import { isoInZone } from "../shared/canonical";
 import type { CustomerAuth } from "../identity/auth.types";
 import { ackStates, type AckState } from "./receipt-acks";
 import { imputationCompensations } from "./receipt-compensation";
+import { VERIFY_ALPHABET } from "./receipt-emit";
 import { ReceiptLinksService } from "./receipt-links.service";
 
 export const RECEIPT_KINDS = ["sale", "payment", "allocation", "reversal", "adjustment", "return"] as const;
@@ -35,6 +36,40 @@ function isImputation(r: Row): boolean {
   if (r.kind !== "allocation" || !r.customerId) return false;
   const snap = r.snapshot as Record<string, unknown> | null;
   return snap != null && typeof snap === "object" && snap.parent === null;
+}
+
+/** SPEC-C09 §4 — every verify answer (found or not) takes at least this long. */
+export const VERIFY_MIN_MS = 250;
+const VERIFY_RE = new RegExp(`^[${VERIFY_ALPHABET}]{10}$`);
+export const VERIFY_NOT_FOUND = "No encontramos ese código. Revisa que esté bien escrito.";
+
+/** Manual entry XXXX-XXXX-XX (W5): case, spaces and dashes are ignored. */
+export function normalizeVerifyCode(raw: string): string | null {
+  const v = (raw ?? "").toUpperCase().replace(/[\s-]/g, "");
+  return VERIFY_RE.test(v) ? v : null;
+}
+
+type Snap = Record<string, unknown>;
+const str = (x: unknown) => (typeof x === "string" ? x : null);
+const abs = (x: unknown) => {
+  const v = str(x);
+  return v === null ? 0n : BigInt(v.replace(/^-/, ""));
+};
+
+/** The receipt's headline amount (§4 `amount`), read from its frozen snapshot. */
+function snapshotAmount(snap: Snap): string | null {
+  switch (snap.kind) {
+    case "sale":
+      return str(snap.total);
+    case "payment":
+      return str(snap.amount);
+    case "return":
+      return str(snap.value);
+    case "allocation":
+      return (abs(snap.toObligations) + abs(snap.toCredit)).toString();
+    default:
+      return null;
+  }
 }
 
 @Injectable()
@@ -193,6 +228,53 @@ export class ReceiptsService {
       links: await this.links.forReceipt(ctx.businessId, r.id),
       snapshot: r.snapshot,
       contentHash: r.contentHash,
+    };
+  }
+
+  // ---- C09-PR5 — public verification (SPEC-C09 §4) ----
+
+  /**
+   * GET /v1/receipts/verify/:code. ONLY {valid, kind, number, amount,
+   * createdAt, businessName, status, hashPrefix}: no customer, lines,
+   * balance, ids or other receipts. Unknown and malformed codes throw the
+   * same 404, and every answer is padded to VERIFY_MIN_MS so timing does
+   * not tell them apart. The per-IP 10/min bucket is on the controller.
+   */
+  async verify(raw: string) {
+    const started = Date.now();
+    try {
+      return await this.verifyNow(raw);
+    } finally {
+      const wait = VERIFY_MIN_MS - (Date.now() - started);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    }
+  }
+
+  private async verifyNow(raw: string) {
+    const code = normalizeVerifyCode(raw);
+    // Same lookup shape either way; a malformed code queries a value that cannot exist.
+    const r = await this.prisma.receipt.findUnique({ where: { verifyCode: code ?? "----------" } });
+    if (!code || !r) throw new AppError(ERROR_CODES.NOT_FOUND, VERIFY_NOT_FOUND);
+    const status = (await this.statuses(r.businessId, [r])).get(r.id)!;
+    const snap = (r.snapshot ?? {}) as Snap;
+    let amount = snapshotAmount(snap);
+    if (snap.kind === "reversal") {
+      // A reversal shows the amount it cancels: the original receipt's headline amount.
+      const origId = str((snap.original as Snap | undefined)?.receiptId);
+      const orig = origId
+        ? await this.prisma.receipt.findFirst({ where: { id: origId, businessId: r.businessId }, select: { snapshot: true } })
+        : null;
+      amount = orig ? snapshotAmount((orig.snapshot ?? {}) as Snap) : null;
+    }
+    return {
+      valid: true as const,
+      kind: r.kind,
+      number: r.number,
+      amount,
+      createdAt: str(snap.createdAt) ?? isoInZone(r.createdAt, "America/Bogota"),
+      businessName: str((snap.business as Snap | undefined)?.name),
+      status,
+      hashPrefix: r.contentHash.slice(0, 8),
     };
   }
 
