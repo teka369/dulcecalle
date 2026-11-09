@@ -115,6 +115,15 @@ enum ReturnRemainderMode {
   credit
 }
 
+/// C09 §3.1 — one counter per business and kind (decisions 5, 13, 26).
+enum SequenceKind {
+  sale
+  payment
+  reversal
+  adjustment
+  return
+}
+
 model User {
   id           String   @id @db.Uuid
   email        String   @unique
@@ -153,6 +162,7 @@ model Business {
   productImages      ProductImage[]
   preparations       Preparation[]
   reversals          Reversal[]
+  sequences          BusinessSequence[]
 
   @@map("businesses")
 }
@@ -285,6 +295,8 @@ model Sale {
   syncedAt        DateTime?    @map("synced_at") @db.Timestamptz(3)
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   legacyDexieId   Int?         @map("legacy_dexie_id")
+  /// C09 — DC-000001 per business (business_sequences kind sale).
+  number          Int?
 
   business Business   @relation(fields: [businessId], references: [id])
   customer Customer?  @relation(fields: [customerId], references: [id])
@@ -294,6 +306,7 @@ model Sale {
 
   @@unique([businessId, requestId])
   @@unique([businessId, legacyDexieId])
+  @@unique([businessId, number])
   @@index([businessId, occurredOn])
   @@index([businessId, customerId])
   @@map("sales")
@@ -530,12 +543,15 @@ model CustomerPayment {
   adjustedReviewedBy String?   @map("adjusted_reviewed_by") @db.Uuid
   /// C07 «corregir» (decision 21). Unused in C04.
   replacesPaymentId  String?   @map("replaces_payment_id") @db.Uuid
+  /// C09 — DC-P-000001 per business (business_sequences kind payment).
+  number             Int?
 
   business Business @relation(fields: [businessId], references: [id])
   customer Customer @relation(fields: [customerId], references: [id])
 
   @@unique([businessId, requestId])
   @@unique([businessId, legacyDexieId])
+  @@unique([businessId, number])
   @@index([businessId, occurredOn])
   @@index([businessId, customerId])
   @@map("customer_payments")
@@ -753,4 +769,18 @@ model ClientOpEvent {
   @@unique([businessId, operationId, kind])
   @@index([businessId, createdAt])
   @@map("client_op_events")
+}
+
+/// C09 §3.1 — `next` is the number the next row of that kind gets. Bumped
+/// inside the creating transaction (a rollback undoes it: no gaps). Never reset.
+model BusinessSequence {
+  businessId String       @map("business_id") @db.Uuid
+  kind       SequenceKind
+  next       BigInt       @default(1)
+  updatedAt  DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@id([businessId, kind])
+  @@map("business_sequences")
 }
