@@ -405,18 +405,29 @@ export class CashService {
       method: dto.method,
       note: dto.note ?? null,
     });
-    const replay = (row: { payloadHash: string | null; customerId: string; amount: bigint; method: string }) => {
-      if (row.payloadHash != null) assertSamePayload(row.payloadHash, hash);
-      else if (row.customerId !== customerId || row.amount !== BigInt(dto.amount) || row.method !== dto.method) {
-        assertSamePayload("legacy-mismatch", hash);
-      }
-    };
     const existing = await this.prisma.customerPayment.findUnique({
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
     });
+    const replay = async (row: NonNullable<typeof existing>) => {
+      if (row.payloadHash != null) {
+        assertSamePayload(row.payloadHash, hash);
+      } else {
+        const reconstructed = payloadHash({
+          customerId: row.customerId,
+          amount: String(row.amount),
+          method: row.method,
+          note: row.note ?? null,
+        });
+        assertSamePayload(reconstructed, hash);
+        await this.prisma.customerPayment.update({
+          where: { id: row.id },
+          data: { payloadHash: hash },
+        });
+      }
+      return paymentJson(row);
+    };
     if (existing) {
-      replay(existing);
-      return paymentJson(existing);
+      return replay(existing);
     }
 
     const amount = asCop(dto.amount);
@@ -506,8 +517,7 @@ export class CashService {
           },
         });
         if (again) {
-          replay(again);
-          return paymentJson(again);
+          return replay(again);
         }
       }
       throw e;
