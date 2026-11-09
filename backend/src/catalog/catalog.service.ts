@@ -623,6 +623,8 @@ export class CatalogService {
         credit: copToJson(s.credit),
         note: s.note,
         occurredOn: dateKey(s.occurredOn),
+        occurredAt: s.occurredAt ?? s.createdAt,
+        syncedAt: s.syncedAt ?? s.createdAt,
         createdAt: s.createdAt,
         lines: s.lines.map((l) => ({
           id: l.id,
@@ -660,6 +662,7 @@ export class CatalogService {
         note: p.note,
         occurredOn: dateKey(p.occurredOn),
         occurredAt: p.occurredAt ?? p.createdAt,
+        syncedAt: p.syncedAt ?? p.createdAt,
         cajaDay: cajaDayByPayment.get(p.id) ?? null,
         needsReview: p.needsReview,
         createdAt: p.createdAt,

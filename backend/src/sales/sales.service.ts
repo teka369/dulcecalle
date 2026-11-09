@@ -6,6 +6,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import { addCop, asCop, copToJson, mulCop } from "../shared/money";
 import { occurredOnDate, dateKey } from "../shared/clock";
+import { parseOccurredAt } from "../shared/occurred-at";
 import { linkForNewMove } from "../cash/session-link";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import { assertPaymentMath, resolveUnitPrice } from "../shared/sale-math";
@@ -24,6 +25,8 @@ function saleJson(s: {
   credit: bigint;
   note: string | null;
   occurredOn: Date;
+  occurredAt?: Date | null;
+  syncedAt?: Date | null;
   createdAt: Date;
   lines?: Array<{
     id: string;
@@ -45,6 +48,8 @@ function saleJson(s: {
     credit: copToJson(s.credit),
     note: s.note,
     occurredOn: dateKey(s.occurredOn),
+    occurredAt: s.occurredAt ?? s.createdAt,
+    syncedAt: s.syncedAt ?? s.createdAt,
     createdAt: s.createdAt,
     lines: s.lines?.map((l) => ({
       id: l.id,
@@ -193,6 +198,8 @@ export class SalesService {
 
     const now = new Date();
     const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredAt = parseOccurredAt(dto.occurredAt, now);
+    const syncedAt = now;
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     const productIds = [...new Set(dto.lines.map((l) => l.productId))].sort();
@@ -287,6 +294,8 @@ export class SalesService {
             payloadHash: hash,
             note: dto.note,
             occurredOn,
+            occurredAt,
+            syncedAt,
             createdAt: now,
           },
         });
