@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { formatNumber } from "../shared/sequences";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
@@ -672,6 +673,7 @@ export class CatalogService {
       })),
       sales: sales.map((s) => ({
         id: s.id,
+        number: formatNumber("sale", s.number),
         customerId: s.customerId,
         paymentKind: s.paymentKind,
         method: s.method,
@@ -725,6 +727,7 @@ export class CatalogService {
       })),
       payments: payments.map((p) => ({
         id: p.id,
+        number: formatNumber("payment", p.number),
         customerId: p.customerId,
         amount: copToJson(p.amount),
         method: p.method,

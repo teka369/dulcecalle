@@ -19,6 +19,7 @@ import {
 import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import type { BusinessContext } from "../identity/auth.types";
 import { CashService } from "./cash.service";
+import { formatNumber, nextNumber } from "../shared/sequences";
 import type { CorrectPaymentDto, ReverseDto } from "./reversals.dto";
 
 type Tx = Prisma.TransactionClient;
@@ -294,8 +295,8 @@ export class ReversalsService {
           const now = new Date();
           const reversalId = randomUUID();
           const replacementId = op.replacement ? randomUUID() : null;
-          const count = await tx.reversal.count({ where: { businessId: ctx.businessId } });
-          const number = `DC-R-${String(count + 1).padStart(6, "0")}`;
+          // C09 §3.1 — DC-R- from the per-business sequence (never reused, even after a wipe).
+          const number = formatNumber("reversal", await nextNumber(tx, ctx.businessId, "reversal"))!;
           // G5 — the reversals row is the first write after the lock: a retry
           // or a second reversal of the same target hits its unique indexes.
           await tx.reversal.create({

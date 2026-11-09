@@ -8,6 +8,7 @@ import { parseOccurredAt } from "../shared/occurred-at";
 import { addCop, asCop, copToJson, subCop } from "../shared/money";
 import { dateKey, occurredOnDate } from "../shared/clock";
 import { linkForNewMove } from "./session-link";
+import { formatNumber, nextNumber } from "../shared/sequences";
 import { sessionExpected } from "./carry-rules";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
@@ -157,9 +158,12 @@ function paymentJson(p: {
   syncedAt?: Date | null;
   needsReview?: boolean;
   createdAt: Date;
+  /** C09 — per-business sequence (DC-P-000001). */
+  number?: number | null;
 }) {
   return {
     id: p.id,
+    number: formatNumber("payment", p.number ?? null),
     customerId: p.customerId,
     amount: copToJson(p.amount),
     method: p.method,
@@ -594,9 +598,12 @@ export class CashService {
     });
     const link = linkForNewMove(opens, occurredOn);
     const needsReview = link.sessionId == null && link.pendingForSessionId == null;
+    // C09 §3.1 — DC-P-000001 per business, in this transaction (I-C6).
+    const number = await nextNumber(tx, ctx.businessId, "payment");
     const payment = await tx.customerPayment.create({
       data: {
         id,
+        number,
         businessId: ctx.businessId,
         customerId,
         amount,
