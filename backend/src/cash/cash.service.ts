@@ -12,6 +12,19 @@ import { sessionExpected } from "./carry-rules";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
 import type { CreatePaymentDto } from "../sales/sales.dto";
+import {
+  insertAllocations,
+  loadObligations,
+  moveCustomerBalances,
+  parseOverflow,
+  parseTarget,
+  planLinesJson,
+  planOrThrow,
+  resolveTarget,
+  targetHashFields,
+  type AllocationJson,
+  type PaymentTarget,
+} from "../shared/debt-allocations";
 import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import type { CashOwnerMoveDto, CreateExpenseDto } from "./cash.dto";
 
@@ -93,6 +106,44 @@ function expenseJson(e: {
     occurredOn: dateKey(e.occurredOn),
     createdAt: e.createdAt,
   };
+}
+
+type StoredAllocationResult = {
+  allocations: AllocationJson[];
+  debtBefore: number;
+  debtAfter: number;
+  creditBalanceAfter: number;
+  adjusted: boolean;
+};
+
+type PaymentRow = {
+  id: string;
+  businessId: string;
+  customerId: string;
+  amount: bigint;
+  method: string;
+  note: string | null;
+  occurredOn: Date;
+  occurredAt: Date | null;
+  syncedAt: Date | null;
+  needsReview: boolean;
+  createdAt: Date;
+  requestedTarget: Prisma.JsonValue | null;
+  allocationResult: Prisma.JsonValue | null;
+  allocationAdjusted: boolean;
+  adjustedReviewedAt: Date | null;
+};
+
+/** Stored requested_target → canonical target + overflow (null for pre-C04 rows). */
+function storedTarget(raw: Prisma.JsonValue | null): { target: PaymentTarget; overflow: "fifo" | "credit" } | null {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const { overflow, ...target } = raw as Record<string, unknown>;
+  try {
+    const t = parseTarget(target);
+    return { target: t, overflow: t.mode === "fifo" ? "fifo" : parseOverflow(overflow) };
+  } catch {
+    return null;
+  }
 }
 
 function paymentJson(p: {
@@ -385,12 +436,17 @@ export class CashService {
     dto: CreatePaymentDto,
     requestId: string,
   ) {
-    // C02 / DC-13 — the key is bound to (customer, amount, method, note).
+    // C04 §6.1 — canonical target/overflow (malformed → 400 before any write).
+    const target = parseTarget(dto.target);
+    const overflow = target.mode === "fifo" ? "fifo" : parseOverflow(dto.overflow);
+    // C02 / DC-13 — the key is bound to (customer, amount, method, note) and,
+    // since C04, to a non-default target/overflow (T14). C03: never occurredAt.
     const hash = payloadHash({
       customerId,
       amount: String(dto.amount),
       method: dto.method,
       note: dto.note ?? null,
+      ...targetHashFields(target, overflow),
     });
     const existing = await this.prisma.customerPayment.findUnique({
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
@@ -399,11 +455,15 @@ export class CashService {
       if (row.payloadHash != null) {
         assertSamePayload(row.payloadHash, hash);
       } else {
+        // C02.1 legacy NULL hash. Rows without requested_target are pre-C04:
+        // rebuild the 4-field hash; newer rows add their stored target.
+        const stored = storedTarget(row.requestedTarget);
         const reconstructed = payloadHash({
           customerId: row.customerId,
           amount: String(row.amount),
           method: row.method,
           note: row.note ?? null,
+          ...(stored ? targetHashFields(stored.target, stored.overflow) : {}),
         });
         assertSamePayload(reconstructed, hash);
         await this.prisma.customerPayment.update({
@@ -411,7 +471,8 @@ export class CashService {
           data: { payloadHash: hash },
         });
       }
-      return paymentJson(row);
+      // §6.4 — identical response: stored allocations, never recalculated.
+      return this.paymentWithAllocations(row);
     };
     if (existing) {
       return replay(existing);
@@ -440,6 +501,27 @@ export class CashService {
           where: { id: customerId, businessId: ctx.businessId },
         });
         if (!customer) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+
+        // C04 — allocation (R1–R4, §6.3). Inside the lock (R8 / T11).
+        const loaded = await loadObligations(tx, ctx.businessId, customerId);
+        const resolved = await resolveTarget(tx, ctx.businessId, customerId, target, loaded);
+        const plan = planOrThrow({
+          amount,
+          obligations: resolved.obligations,
+          target: resolved.input,
+          overflow,
+          cap: customer.debt,
+        });
+        const debtAfter = customer.debt - plan.toObligations;
+        const creditAfter = customer.creditBalance + plan.toCredit;
+        const allocationResult = {
+          allocations: planLinesJson(plan),
+          debtBefore: copToJson(customer.debt),
+          debtAfter: copToJson(debtAfter),
+          creditBalanceAfter: copToJson(creditAfter),
+          adjusted: plan.adjusted,
+        };
+
         const opens = await tx.cashSession.findMany({
           where: { businessId: ctx.businessId, closedAt: null },
         });
@@ -460,23 +542,36 @@ export class CashService {
             syncedAt,
             needsReview,
             payloadHash: hash,
+            requestedTarget: { ...target, overflow } as Prisma.InputJsonValue,
+            allocationResult: allocationResult as Prisma.InputJsonValue,
+            allocationAdjusted: plan.adjusted,
             createdAt: now,
           },
         });
-        const decremented = await tx.$executeRaw`
-          UPDATE customers
-          SET debt = debt - ${amount},
-              updated_at = NOW()
-          WHERE id = ${customerId}::uuid
-            AND business_id = ${ctx.businessId}::uuid
-            AND debt >= ${amount}
-        `;
-        if (Number(decremented) !== 1) {
-          throw new AppError(
-            ERROR_CODES.ABONO_EXCEEDS_DEBT,
-            MESSAGES.abonoExceeds,
-          );
-        }
+        await insertAllocations(
+          tx,
+          plan.lines.map((l) => ({
+            businessId: ctx.businessId,
+            customerId,
+            sourceType: "payment",
+            sourceId: id,
+            targetType: l.targetType,
+            saleId: l.targetType === "sale" ? l.id : null,
+            initialDebtId: l.targetType === "initial_debt" ? l.id : null,
+            amount: l.amount,
+            mode: l.mode,
+            groupId: id,
+            createdAt: now,
+            createdBy: ctx.userId,
+          })),
+        );
+        // R4 — no more 409 ABONO_EXCEEDS_DEBT: the surplus is saldo a favor.
+        await moveCustomerBalances(tx, ctx.businessId, customerId, {
+          debt: -plan.toObligations,
+          credit: plan.toCredit,
+        });
+        // §3.3 — allocation never creates or edits cash moves; the money in is
+        // still exactly one debt_collect for the full amount (I-A6).
         await tx.cashMove.create({
           data: {
             id: randomUUID(),
@@ -497,7 +592,7 @@ export class CashService {
         });
         return payment;
       });
-      return paymentJson(pay);
+      return this.paymentWithAllocations(pay);
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
         const again = await this.prisma.customerPayment.findUnique({
@@ -511,6 +606,46 @@ export class CashService {
       }
       throw e;
     }
+  }
+
+  /** Payment JSON + C04 allocation snapshot (stored at creation time). */
+  async paymentWithAllocations(row: PaymentRow) {
+    const base = paymentJson(row);
+    const stored = row.allocationResult as StoredAllocationResult | null;
+    if (stored && typeof stored === "object" && Array.isArray(stored.allocations)) {
+      return {
+        ...base,
+        requestedTarget: row.requestedTarget ?? null,
+        allocations: stored.allocations,
+        debtBefore: stored.debtBefore,
+        debtAfter: stored.debtAfter,
+        creditBalanceAfter: stored.creditBalanceAfter,
+        adjusted: row.allocationAdjusted,
+        adjustedReviewedAt: row.adjustedReviewedAt ?? null,
+      };
+    }
+    // Pre-C04 row: rows written by the backfill, if any; no snapshot.
+    const rows = await this.prisma.debtAllocation.findMany({
+      where: { businessId: row.businessId, sourceType: "payment", sourceId: row.id },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    return {
+      ...base,
+      requestedTarget: row.requestedTarget ?? null,
+      allocations: rows.map((r) => ({
+        targetType: r.targetType,
+        saleId: r.saleId,
+        initialDebtId: r.initialDebtId,
+        amount: copToJson(r.amount),
+        openBefore: null,
+        openAfter: null,
+      })),
+      debtBefore: null,
+      debtAfter: null,
+      creditBalanceAfter: null,
+      adjusted: row.allocationAdjusted,
+      adjustedReviewedAt: row.adjustedReviewedAt ?? null,
+    };
   }
 
   async ownerAporte(

@@ -128,7 +128,11 @@ export async function cleanupOutboxLocalEffect(
     const payment = await db.customerPayments.get(row.operationId);
     if (applied) {
       const customerId = payment?.customerId ?? (typeof raw.customerId === "string" ? raw.customerId : null);
-      const amount = payment?.amount ?? (typeof raw.amount === "number" ? raw.amount : 0);
+      // C04 R4 — revert only the debt part (an overpay's excess never lowered debt).
+      const amount =
+        typeof raw.projectedToDebt === "number" && Number.isInteger(raw.projectedToDebt)
+          ? raw.projectedToDebt
+          : payment?.amount ?? (typeof raw.amount === "number" ? raw.amount : 0);
       if (customerId && amount > 0) {
         const customer = await db.customers.get(customerId);
         if (customer && customer.businessId === businessId) {

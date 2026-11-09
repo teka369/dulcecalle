@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { __resetDbForTests, getDb } from "@/storage/db";
 import { CASH_ERRORS, localDateKey } from "@/domain/cash";
-import { ABONO_ERRORS } from "@/domain/abono";
 import { INVENTORY_ERRORS, reconcileSurtirCost } from "@/domain/inventory";
 import { loadStats } from "@/repositories/statsRepository";
 import {
@@ -274,7 +273,7 @@ describe("P0 fiados and abonos", () => {
     await __resetDbForTests();
   });
 
-  it("rejects overpay, missing customer, and never goes negative", async () => {
+  it("overpay becomes saldo a favor (C04 R4), rejects missing customer, never goes negative", async () => {
     const productId = await seedProduct({ price: 1000, stock: 10 });
     const customerId = await customerRepository.create({ name: "Rosa" });
     await saleRepository.createSale({
@@ -284,13 +283,15 @@ describe("P0 fiados and abonos", () => {
       amountReceived: 0,
     });
 
-    await expect(
-      customerRepository.recordPayment({
-        customerId,
-        amount: 5_001,
-        method: "Efectivo",
-      }),
-    ).rejects.toThrow(ABONO_ERRORS.exceedsDebt);
+    // C04 R4 (intentional change): no longer rejected; 1 peso goes to credit.
+    await customerRepository.recordPayment({
+      customerId,
+      amount: 5_001,
+      method: "Efectivo",
+    });
+    const paid = await customerRepository.getById(customerId);
+    expect(paid?.debt).toBe(0);
+    expect(paid?.creditBalance).toBe(1);
 
     await expect(
       customerRepository.recordPayment({

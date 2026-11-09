@@ -20,6 +20,9 @@ import {
   mapSupplier,
   mapReturn,
   mapInitialDebt,
+  mapAllocation,
+  asCopJson,
+  type RemoteAllocation,
   type RemoteCustomer,
   type RemotePayment,
   type RemoteProduct,
@@ -67,6 +70,23 @@ export type CreateSaleInput = {
   note?: string;
   /** C03 — device time of an offline sale (ISO 8601). */
   occurredAt?: string;
+  /** C04 — use the customer's saldo a favor. Online only; never queued (T34). */
+  applyCredit?: boolean;
+};
+
+/** C04 — where an abono goes. Omitted = oldest first (FIFO). */
+export type PaymentTarget =
+  | { mode: "fifo" }
+  | { mode: "sale"; saleId?: string; saleRequestId?: string }
+  | { mode: "split"; targets: Array<{ saleId?: string; initialDebtId?: string; amount: number }> };
+
+export type PaymentInput = {
+  amount: number;
+  method: "Efectivo" | "Nequi";
+  note?: string;
+  occurredAt?: string;
+  target?: PaymentTarget;
+  overflow?: "fifo" | "credit";
 };
 
 /**
@@ -436,7 +456,7 @@ export class HttpRepository {
 
     pay: async (
       customerId: string,
-      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string; occurredAt?: string },
+      input: PaymentInput,
       requestId: string,
     ): Promise<RemotePayment> => {
       const row = await this.http.request<Record<string, unknown>>(
@@ -462,6 +482,49 @@ export class HttpRepository {
         { body: input, idempotencyKey: requestId },
       );
       return mapInitialDebt(row);
+    },
+
+    /** C04 — apply saldo a favor to open debts (online only, J3). */
+    applyCredit: async (
+      customerId: string,
+      input: { amount: number; target?: PaymentTarget },
+      requestId: string,
+    ): Promise<{ allocations: RemoteAllocation[]; debtAfter: number; creditBalanceAfter: number }> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        `/customers/${customerId}/credit/apply`,
+        { body: input, idempotencyKey: requestId },
+      );
+      return {
+        allocations: (Array.isArray(row.allocations) ? row.allocations : []).map((a) =>
+          mapAllocation(a as Record<string, unknown>),
+        ),
+        debtAfter: asCopJson(row.debtAfter, "debtAfter"),
+        creditBalanceAfter: asCopJson(row.creditBalanceAfter, "creditBalanceAfter"),
+      };
+    },
+
+    /** C04 R5b — owner gives saldo a favor back as money from today's caja. */
+    refundCredit: async (
+      customerId: string,
+      input: { amount: number; method: "Efectivo" | "Nequi"; note?: string },
+      requestId: string,
+    ): Promise<{ creditBalanceAfter: number }> => {
+      const row = await this.http.request<Record<string, unknown>>(
+        "POST",
+        `/customers/${customerId}/credit/refund`,
+        { body: input, idempotencyKey: requestId },
+      );
+      return { creditBalanceAfter: asCopJson(row.creditBalanceAfter, "creditBalanceAfter") };
+    },
+
+    /** C04 T32 — owner marks an adjusted abono as reviewed. */
+    reviewPayment: async (customerId: string, paymentId: string): Promise<void> => {
+      await this.http.request<Record<string, unknown>>(
+        "POST",
+        `/customers/${customerId}/payments/${paymentId}/review`,
+        { body: {} },
+      );
     },
 
     ledger: async (customerId: string) => {
@@ -693,13 +756,23 @@ export class HttpRepository {
 
     createReturn: async (
       saleId: string,
-      input: { lines: Array<{ saleLineId: string; qty: number }>; note?: string },
+      input: {
+        lines: Array<{ saleLineId: string; qty: number }>;
+        note?: string;
+        /** C04 — what to do with value left after debts (T33: always explicit). */
+        remainder?: "refund" | "credit";
+      },
       requestId: string,
+      opts: { offlineReplay?: boolean } = {},
     ): Promise<RemoteReturn> => {
       const row = await this.http.request<Record<string, unknown>>(
         "POST",
         `/sales/${saleId}/returns`,
-        { body: input, idempotencyKey: requestId },
+        {
+          body: input,
+          idempotencyKey: requestId,
+          ...(opts.offlineReplay ? { offlineReplay: true } : {}),
+        },
       );
       return mapReturn(row);
     },

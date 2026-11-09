@@ -25,7 +25,10 @@ Error envelope:
 | 409 | `CLOSED_DAY` | `dayClosed` |
 | 409 | `SESSION_ALREADY_CLOSED` | re-close |
 | 409 | `INSUFFICIENT_STOCK` | |
-| 409 | `ABONO_EXCEEDS_DEBT` | |
+| 409 | `ABONO_EXCEEDS_DEBT` | **No longer emitted since C04** (R4: an overpayment becomes saldo a favor). Kept so older clients still map it. |
+| 422 | `ALLOCATION_INVALID` | C04: payment `target` sale/debt is unknown, of another customer/business, not open, or a split exceeds the amount / an open balance |
+| 422 | `CREDIT_INSUFFICIENT` | C04: `credit/apply` or `credit/refund` above the customer's saldo a favor |
+| 422 | `REMAINDER_CHOICE_REQUIRED` | C04: an online return leaves value after the customer's debts and the body has no `remainder` |
 | 409 | `RETURN_EXCEEDS` | |
 | 409 | `NEED_COST` | stock>0, cost 0, not gifted |
 | 409 | `STOCK_VIA_MOVES` | patch stock |
@@ -158,7 +161,17 @@ No PATCH/DELETE.
 
 ### Payments
 `POST /v1/customers/:id/payments`  
-Dto: amount, method, requestId. Server: **reject** if amount > current debt (`ABONO_EXCEEDS_DEBT`). Do not clamp. cash_move kind=`debt_collect`.
+Dto: `amount, method, note?, occurredAt?, target?, overflow?` + `Idempotency-Key`. cash_move kind=`debt_collect`.
+
+C04 (SPEC-C04 v3.2): the payment is imputed under the business advisory lock and written to `debt_allocations`.
+- `target` omitted or `{mode:"fifo"}` → oldest first (`occurredOn, createdAt, id`).
+- `{mode:"sale", saleId | saleRequestId}` → that sale first; the rest by `overflow` (`fifo` default, or `credit`). A sale already settled → 201 with `adjusted: true` (money follows `overflow`).
+- `{mode:"split", targets:[{saleId|initialDebtId, amount}]}` → each target ≤ its open balance and Σ ≤ amount, else 422 `ALLOCATION_INVALID`.
+- **Overpay (R4):** amount > debt is accepted (201). Debt goes to 0 and the excess is saldo a favor (`creditBalanceAfter`). The server no longer rejects amount > debt with `ABONO_EXCEEDS_DEBT`.
+- Response adds `allocations[]` (`targetType, saleId, initialDebtId, amount, openBefore, openAfter, mode`), `debtBefore, debtAfter, creditBalanceAfter, adjusted`. A replay (same key) returns the same snapshot.
+- C02 hash: `customerId, amount, method, note` + `{target, overflow}` only when the target is not FIFO (so an omitted target and `{mode:"fifo"}` hash the same as pre-C04 rows). `occurredAt` is not hashed (C03).
+
+C04 also adds: `POST /v1/customers/:id/credit/apply` `{amount, target?}` (no cash move), `POST /v1/customers/:id/credit/refund` `{amount, method, note?}` (owner; needs today's caja open, else 409 `CLOSED_DAY`; cash_move out `reembolso_saldo`), `POST /v1/customers/:id/payments/:paymentId/review` (owner; marks an adjusted abono reviewed), `GET /v1/customers/:id/balance-check` (owner, read-only). Sales accept `applyCredit: true` (online only). `GET /v1/sales/:id` and the ledgers add `openBalance` and allocations; customers add `creditBalance`.
 
 ### Cash sessions
 `POST /v1/cash/sessions` Dto: `{ openingFloat }` → unique day, second call returns existing.  
@@ -188,8 +201,8 @@ No `adjust` endpoint. No client `createdAt` in the past (Dexie tests only).
 ## 6. Returns
 
 `POST /v1/sales/:id/returns`  
-Dto: `{ lines: [{ saleLineId, qty }], requestId, note? }`  
-Server: remaining qty, snapshots from the **sale line** (not current catalog), `splitReturnSettlement` from DOMAIN (fiada of **this** sale first, never below `customer.debt`, remainder is cash refund on the original sale method). stock_move `devolucion` does **not** reweight avg_cost. cash_move if refund>0. Original sale untouched. Hits **today’s** `occurred_on`, not the sale’s day.
+Dto: `{ lines: [{ saleLineId, qty }], requestId, note?, remainder?: "refund" | "credit" }`  
+Server: remaining qty, snapshots from the **sale line** (not current catalog), `splitReturnSettlement` from DOMAIN. C04 (decision 6): the value lowers the customer's debt up to `customer.debt` — **this** sale's open balance first, then the other open debts FIFO; the rest is a cash refund on the original sale method (`remainder: refund`) or saldo a favor (`remainder: credit`). With a customer and a rest > 0, `remainder` is required online (422 `REMAINDER_CHOICE_REQUIRED`); an `X-Offline-Replay` sync without it becomes saldo a favor + `needsReview`. Walk-in sales always refund. Response adds `toCredit`, `remainderMode`, `needsReview`, `allocations[]`. stock_move `devolucion` does **not** reweight avg_cost. cash_move if refund>0. Original sale untouched. Hits **today’s** `occurred_on`, not the sale’s day.
 
 ---
 

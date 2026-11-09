@@ -84,6 +84,7 @@ export function customerToLocal(
     name: row.name,
     phone: row.phone,
     debt: row.debt,
+    ...(row.creditBalance ? { creditBalance: row.creditBalance } : {}),
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: cachedAt,
@@ -97,6 +98,7 @@ export function customerToRemote(row: LocalCustomer): RemoteCustomer {
     name: row.name,
     phone: row.phone,
     debt: row.debt,
+    ...(row.creditBalance ? { creditBalance: row.creditBalance } : {}),
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
   };

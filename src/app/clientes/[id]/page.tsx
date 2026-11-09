@@ -25,6 +25,9 @@ import { useAfterSync } from "@/components/shell/use-after-sync";
 import { listUnresolvedFinancialOps, type UnresolvedFinancialOp } from "@/data/pwa/unresolved-financial";
 import { pendingDebtAdjustment } from "@/data/pwa/pending-debt";
 import { getPwaAuthSession } from "@/data/http/session";
+import { CustomerCreditPanel } from "@/components/customers/CustomerCreditPanel";
+import { loadCustomerMoneyState, type CustomerMoneyState } from "@/data/pwa/customer-allocations";
+import { useOnline } from "@/components/shell/use-online";
 
 export default function ClienteFichaPage() {
   const id = useEntityId();
@@ -44,6 +47,8 @@ export default function ClienteFichaPage() {
   const [loadError, setLoadError] = useState(false);
   const [unresolved, setUnresolved] = useState<UnresolvedFinancialOp[]>([]);
   const [serverDebt, setServerDebt] = useState<number | null>(null);
+  const [money, setMoney] = useState<CustomerMoneyState | null>(null);
+  const online = useOnline();
 
   const load = useCallback(async () => {
     if (!id) {
@@ -69,6 +74,9 @@ export default function ClienteFichaPage() {
       setEditPhone(c.phone ?? "");
     }
     if (c) {
+      void loadCustomerMoneyState(c.id)
+        .then(setMoney)
+        .catch(() => setMoney(null));
       const result = await customerStore.getStatement(c.id);
       setStatement(result?.statement ?? null);
       setFromCache(result?.source === "cache");
@@ -215,6 +223,15 @@ export default function ClienteFichaPage() {
         />
 
         <RejectedOpsCard ops={unresolved} serverDebt={serverDebt} localDebt={customer.debt} />
+        {money ? (
+          <CustomerCreditPanel
+            customerId={customer.id}
+            customerName={customer.name}
+            money={money}
+            online={online}
+            onChanged={() => void load()}
+          />
+        ) : null}
         {statement ? (
           <DebtStatementView statement={statement} />
         ) : (

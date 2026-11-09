@@ -48,7 +48,24 @@ export type CustomerLedgerReturn = {
   note: string | null;
   occurredOn: string;
   createdAt: string | number;
+  /** C04 — part kept as saldo a favor. */
+  toCredit?: number;
   lines: Array<{ id: string; qty: number; unitPrice: number }>;
+};
+
+/** C04 — money applied to a sale / initial debt (never createdBy). */
+export type CustomerAppliedTo = {
+  sourceType: "payment" | "sale_return" | "credit_refund" | "reversal" | string;
+  sourceId: string;
+  amount: number;
+  createdAt: string | number;
+};
+
+/** C04 — where an abono went. */
+export type CustomerAppliedFrom = {
+  targetType: "sale" | "initial_debt" | "credit" | string;
+  targetId: string | null;
+  amount: number;
 };
 
 export type CustomerLedgerSale = {
@@ -61,6 +78,9 @@ export type CustomerLedgerSale = {
   note: string | null;
   occurredOn: string;
   createdAt: string | number;
+  /** C04 — what is still owed on this sale; absent on pre-C04 servers. */
+  openBalance?: number;
+  allocations?: CustomerAppliedTo[];
   lines: CustomerLedgerLine[];
   returns: CustomerLedgerReturn[];
 };
@@ -71,6 +91,9 @@ export type CustomerLedgerPayment = {
   method: string;
   occurredOn: string;
   createdAt: string | number;
+  /** C04 / DC-54 — the abono note is shown to the customer. */
+  note?: string | null;
+  allocations?: CustomerAppliedFrom[];
 };
 
 export type CustomerLedgerInitial = {
@@ -79,6 +102,8 @@ export type CustomerLedgerInitial = {
   note: string | null;
   occurredOn: string;
   createdAt: string | number;
+  openBalance?: number;
+  allocations?: CustomerAppliedTo[];
 };
 
 export type CustomerLedger = {

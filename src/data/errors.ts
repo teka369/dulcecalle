@@ -45,7 +45,14 @@ export const API_ERROR_CODES = {
   CLOSED_DAY: "CLOSED_DAY",
   SESSION_ALREADY_CLOSED: "SESSION_ALREADY_CLOSED",
   INSUFFICIENT_STOCK: "INSUFFICIENT_STOCK",
+  /** Pre-C04 servers only: C04 turns an overpayment into saldo a favor (R4). */
   ABONO_EXCEEDS_DEBT: "ABONO_EXCEEDS_DEBT",
+  /** C04 — target sale/debt is not open, unknown or over its balance. */
+  ALLOCATION_INVALID: "ALLOCATION_INVALID",
+  /** C04 — not enough saldo a favor. */
+  CREDIT_INSUFFICIENT: "CREDIT_INSUFFICIENT",
+  /** C04 — a return with remainder must say refund or credit. */
+  REMAINDER_CHOICE_REQUIRED: "REMAINDER_CHOICE_REQUIRED",
   NEED_COST: "NEED_COST",
   STOCK_VIA_MOVES: "STOCK_VIA_MOVES",
   RATE_LIMIT: "RATE_LIMIT",

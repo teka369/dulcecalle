@@ -61,7 +61,9 @@ describe("abono with Efectivo | Nequi", () => {
   });
   it("rejects other methods, over-debt and empty", () => {
     expect(abonoView(30000, "10000", "Tarjeta" as never).valid).toBe(false);
-    expect(abonoView(30000, "40000", "Efectivo").valid).toBe(false);
+    // C04 R4: overpay is valid and says what becomes saldo a favor.
+    expect(abonoView(30000, "40000", "Efectivo").valid).toBe(true);
+    expect(abonoView(30000, "40000", "Efectivo").remainingText).toMatch(/^Sobran .*10\.000: quedan como saldo a favor\.$/);
     expect(abonoView(30000, "", "Nequi").valid).toBe(false);
   });
   it("Todo chip equals debt; paying all leaves 0", () => {

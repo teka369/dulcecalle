@@ -58,9 +58,9 @@ export default function CustomerPurchaseDetailPage() {
       hero={
         <div className="mt-4">
           <HeroAmount
-            label={purchaseLabel(sale.credit, sale.paymentKind)}
+            label={purchaseLabel(sale.credit, sale.paymentKind, sale.openBalance)}
             value={formatCop(sale.saleTotal)}
-            tone={sale.credit > 0 ? "danger" : "ok"}
+            tone={(sale.openBalance ?? sale.credit) > 0 ? "danger" : "ok"}
           />
         </div>
       }
@@ -73,6 +73,32 @@ export default function CustomerPurchaseDetailPage() {
           { icon: "check", label: "Método", value: sale.method ?? "—" },
         ]}
       />
+      {sale.credit > 0 && typeof sale.openBalance === "number" ? (
+        <section className="flex flex-col gap-2">
+          <SectionHead title="Pagos de esta compra" />
+          <RowGroup label="Pagos de esta compra">
+            <Row
+              title="Abonos aplicados"
+              trailing={<span className="font-semibold tabular-nums">{formatCop(sale.credit - sale.openBalance)}</span>}
+            />
+            <Row title="Te falta" trailing={<span className="font-semibold tabular-nums">{formatCop(sale.openBalance)}</span>} />
+            {(sale.allocations ?? []).filter((a) => a.amount > 0).length === 0 ? (
+              <Row title="Aún no hay abonos a esta compra." />
+            ) : (
+              (sale.allocations ?? [])
+                .filter((a) => a.amount > 0)
+                .map((a) => (
+                  <Row
+                    key={`${a.sourceType}-${a.sourceId}`}
+                    title={a.sourceType === "sale_return" ? "Devolución" : "Abono"}
+                    meta={dmy(typeof a.createdAt === "number" ? new Date(a.createdAt).toISOString().slice(0, 10) : String(a.createdAt).slice(0, 10))}
+                    trailing={<span className="tabular-nums">{formatCop(a.amount)}</span>}
+                  />
+                ))
+            )}
+          </RowGroup>
+        </section>
+      ) : null}
       <section className="flex flex-col gap-2">
         <SectionHead title="Productos" />
         <RowGroup label="Productos">

@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCop, mulCop } from "@/domain/money";
 import { newRequestId } from "@/domain/requestId";
-import { RETURN_ERRORS, RETURN_TOAST } from "@/domain/sale/returns";
+import { RETURN_ERRORS, RETURN_TOAST, splitReturnSettlement } from "@/domain/sale/returns";
+import { loadCustomerMoneyState, type CustomerMoneyState } from "@/data/pwa/customer-allocations";
+import type { ReturnRemainder } from "@/data/pwa/offline-returns";
 import { useEntityId } from "@/components/shell/entity-route";
 import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { createReturnWithOfflineFallback } from "@/data/pwa/offline-returns";
@@ -36,6 +38,9 @@ export default function DevolverVentaPage() {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string | null>(null);
+  // C04 W9 / J2 — the remainder comes preselected as saldo a favor (T33).
+  const [remainder, setRemainder] = useState<ReturnRemainder>("credit");
+  const [money, setMoney] = useState<CustomerMoneyState | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const imageMap = useProductImageMap(getPwaAuthSession().businessId);
 
@@ -57,6 +62,9 @@ export default function DevolverVentaPage() {
           void listCachedCustomers()
             .then((cs) => setCustomerName(cs.find((c) => c.id === cid)?.name ?? null))
             .catch(() => setCustomerName(null));
+          void loadCustomerMoneyState(cid)
+            .then(setMoney)
+            .catch(() => setMoney(null));
         }
       }
     } catch (e: unknown) {
@@ -85,6 +93,23 @@ export default function DevolverVentaPage() {
     () => selected.reduce((s, x) => s + mulCop(x.line.unitPrice, x.qty), 0),
     [selected],
   );
+
+  const hasCustomer = !!data?.sale.customerId;
+  const settlement = useMemo(() => {
+    if (!data || previewValue <= 0) return null;
+    return splitReturnSettlement({
+      returnValue: previewValue,
+      saleCredit: data.sale.credit,
+      alreadyDebtReduced: 0,
+      customerDebt: money?.debt ?? 0,
+      saleId: data.sale.id,
+      hasCustomer: hasCustomer && money != null,
+      obligations: money?.obligations ?? [],
+      remainder: hasCustomer ? remainder : "refund",
+    });
+  }, [data, previewValue, money, hasCustomer, remainder]);
+  const ownReduced = settlement?.lines.find((l) => l.kind === "sale" && l.id === data?.sale.id)?.amount ?? 0;
+  const otherReduced = (settlement?.debtReduced ?? 0) - ownReduced;
 
   const canSubmit = selected.length > 0 && selected.every((x) => x.qty <= x.line.remaining);
 
@@ -117,6 +142,8 @@ export default function DevolverVentaPage() {
         data.sale.id,
         selected.map((x) => ({ saleLineId: x.line.id, qty: x.qty })),
         requestIdRef.current,
+        // C04 T33 — explicit for every customer sale; walk-in is always a refund.
+        hasCustomer ? remainder : undefined,
       );
       setToast(
         result.mode === "offline"
@@ -264,8 +291,41 @@ export default function DevolverVentaPage() {
                   title={`Se devuelve ${formatCop(previewValue)}`}
                   meta="El inventario sube cuando el servidor confirme la devolución."
                 />
+                {hasCustomer && settlement ? (
+                  <>
+                    <Row title="Baja esta compra" trailing={<span className="tabular-nums">{formatCop(ownReduced)}</span>} />
+                    <Row title="Baja otras deudas" trailing={<span className="tabular-nums">{`${formatCop(otherReduced)} (FIFO)`}</span>} />
+                    <Row title="Resto" trailing={<span className="tabular-nums">{formatCop(settlement.rest)}</span>} />
+                  </>
+                ) : null}
               </RowGroup>
             )}
+
+            {hasCustomer && previewValue > 0 ? (
+              <fieldset className="flex flex-col">
+                <legend className="text-xs font-semibold uppercase tracking-wide text-ink-muted">¿Cómo devuelves el resto?</legend>
+                <label className="flex min-h-11 items-center gap-3 text-sm text-ink">
+                  <input
+                    type="radio"
+                    name="resto"
+                    className="h-5 w-5"
+                    checked={remainder === "credit"}
+                    onChange={() => setRemainder("credit")}
+                  />
+                  Como saldo a favor (no mueve caja)
+                </label>
+                <label className="flex min-h-11 items-center gap-3 text-sm text-ink">
+                  <input
+                    type="radio"
+                    name="resto"
+                    className="h-5 w-5"
+                    checked={remainder === "refund"}
+                    onChange={() => setRemainder("refund")}
+                  />
+                  {`En ${data.sale.method ?? "Efectivo"} (método de la venta)`}
+                </label>
+              </fieldset>
+            ) : null}
 
             {error && <StateBlock kind="error" title={error} />}
 

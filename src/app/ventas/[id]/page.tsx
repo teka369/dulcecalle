@@ -163,6 +163,47 @@ export default function VentaDetallePage() {
           ]}
         />
 
+        {sale.credit > 0 && typeof sale.openBalance === "number" ? (
+          <section className="flex flex-col gap-2" aria-labelledby="pagos-compra">
+            <div id="pagos-compra" className="flex items-center justify-between">
+              <SectionHead title="Pagos de esta compra" />
+              <span
+                className={`rounded-[var(--r-pill)] px-2 py-1 text-xs font-semibold ${sale.openBalance > 0 ? "bg-warning-soft" : "bg-ok-soft"}`}
+              >
+                {sale.openBalance > 0 ? `Pendiente ${formatCop(sale.openBalance)}` : "Saldada"}
+              </span>
+            </div>
+            <RowGroup>
+              <Row title="En la venta" trailing={<span className="tabular-nums">{formatCop(sale.amountReceived)}</span>} />
+              <Row
+                title="Abonos"
+                trailing={
+                  <span className="tabular-nums">
+                    {formatCop((sale.appliedFrom ?? []).filter((a) => a.sourceType === "payment" && a.mode !== "credit_apply").reduce((s, a) => s + a.amount, 0))}
+                  </span>
+                }
+              />
+              <Row
+                title="Saldo a favor"
+                trailing={
+                  <span className="tabular-nums">
+                    {formatCop((sale.appliedFrom ?? []).filter((a) => a.mode === "credit_apply").reduce((s, a) => s + a.amount, 0))}
+                  </span>
+                }
+              />
+              <Row title="Pendiente" trailing={<span className="font-semibold tabular-nums">{formatCop(sale.openBalance)}</span>} />
+            </RowGroup>
+            {sale.openBalance > 0 && sale.customerId ? (
+              <OfflineLink
+                href={`/clientes/${sale.customerId}/abono?compra=${sale.id}`}
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-pill)] border border-border bg-surface px-4 text-sm font-semibold text-ink"
+              >
+                Registrar abono a esta compra
+              </OfflineLink>
+            ) : null}
+          </section>
+        ) : null}
+
         {!canReturn && !data.returnPending && (
           <p role="status" className="rounded-[var(--r-lg)] bg-info-soft px-3 py-2.5 text-sm text-info">
             Esta venta ya se devolvió.

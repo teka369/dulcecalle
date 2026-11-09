@@ -59,6 +59,37 @@ enum CashMoveKind {
   aporte
   compra
   devolucion
+  /// C04 R5b — owner pays saldo a favor back in money.
+  reembolso_saldo
+}
+
+/// C04 — what reduced (or released) an obligation. `reversal` is reserved for C07.
+enum AllocationSource {
+  payment
+  sale_return
+  reversal
+  credit_refund
+}
+
+/// C04 — `credit` = saldo a favor.
+enum AllocationTarget {
+  sale
+  initial_debt
+  credit
+}
+
+enum AllocationMode {
+  fifo
+  explicit
+  backfill
+  credit_apply
+  reversal
+}
+
+/// C04 decision 6 — how the rest of a return was settled.
+enum ReturnRemainderMode {
+  refund
+  credit
 }
 
 model User {
@@ -94,6 +125,7 @@ model Business {
   expenses           Expense[]
   customerPayments   CustomerPayment[]
   initialDebts       InitialDebt[]
+  debtAllocations    DebtAllocation[]
   importIdMap        ImportIdMap[]
   productImages      ProductImage[]
   preparations       Preparation[]
@@ -162,11 +194,14 @@ model Customer {
   requestId     String?   @map("request_id") @db.Uuid
   /** bcrypt of the 6-digit portal PIN. Null means the portal cannot log in. */
   pinHash       String?   @map("pin_hash")
+  /// C04 — saldo a favor cache (= Σ allocations with target credit). CHECK ≥ 0.
+  creditBalance BigInt    @default(0) @map("credit_balance")
 
-  business Business           @relation(fields: [businessId], references: [id])
-  sales    Sale[]
-  payments CustomerPayment[]
-  initials InitialDebt[]
+  business    Business           @relation(fields: [businessId], references: [id])
+  sales       Sale[]
+  payments    CustomerPayment[]
+  initials    InitialDebt[]
+  allocations DebtAllocation[]
 
   @@unique([businessId, code])
   @@unique([businessId, requestId])
@@ -231,6 +266,7 @@ model Sale {
   customer Customer?  @relation(fields: [customerId], references: [id])
   lines    SaleLine[]
   returns  SaleReturn[]
+  allocations DebtAllocation[]
 
   @@unique([businessId, requestId])
   @@unique([businessId, legacyDexieId])
@@ -273,6 +309,10 @@ model SaleReturn {
   occurredOn    DateTime   @map("occurred_on") @db.Date
   createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   legacyDexieId Int?       @map("legacy_dexie_id")
+  /// C04 decision 15 — offline return without a remainder choice: rest left as saldo a favor.
+  needsReview   Boolean    @default(false) @map("needs_review")
+  /// C04 decision 6 — how the rest (value − debtReduced) was settled; null when there was no rest.
+  remainderMode ReturnRemainderMode? @map("remainder_mode")
 
   business Business         @relation(fields: [businessId], references: [id])
   sale     Sale             @relation(fields: [saleId], references: [id])
@@ -440,6 +480,8 @@ model CustomerPayment {
   customerId    String    @map("customer_id") @db.Uuid
   amount        BigInt
   method        PayMethod
+  /// OBSOLETE (C04): always null. A payment may be split across several sales;
+  /// use debt_allocations. Kept (not dropped, not reused).
   saleId        String?   @map("sale_id") @db.Uuid
   requestId     String?   @map("request_id") @db.Uuid
   note          String?
@@ -454,6 +496,16 @@ model CustomerPayment {
   payloadHash   String?   @map("payload_hash")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   legacyDexieId Int?      @map("legacy_dexie_id")
+  /// C04 — seller intent ({mode:"fifo"} | {mode:"sale",saleId} | {mode:"split",targets}) + overflow. Audit.
+  requestedTarget    Json?     @map("requested_target")
+  /// C04 §6.4 — allocation response snapshot (openBefore/openAfter, debt before/after) so a replay is identical.
+  allocationResult   Json?     @map("allocation_result")
+  /// C04 §6.3 — the requested sale was already settled; applied elsewhere.
+  allocationAdjusted Boolean   @default(false) @map("allocation_adjusted")
+  adjustedReviewedAt DateTime? @map("adjusted_reviewed_at") @db.Timestamptz(3)
+  adjustedReviewedBy String?   @map("adjusted_reviewed_by") @db.Uuid
+  /// C07 «corregir» (decision 21). Unused in C04.
+  replacesPaymentId  String?   @map("replaces_payment_id") @db.Uuid
 
   business Business @relation(fields: [businessId], references: [id])
   customer Customer @relation(fields: [customerId], references: [id])
@@ -476,13 +528,45 @@ model InitialDebt {
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   legacyDexieId Int?     @map("legacy_dexie_id")
 
-  business Business @relation(fields: [businessId], references: [id])
-  customer Customer @relation(fields: [customerId], references: [id])
+  business    Business         @relation(fields: [businessId], references: [id])
+  customer    Customer         @relation(fields: [customerId], references: [id])
+  allocations DebtAllocation[]
 
   @@unique([businessId, requestId])
   @@unique([businessId, legacyDexieId])
   @@index([businessId, customerId])
   @@map("initial_debts")
+}
+
+/// C04 — one row per piece of a source (payment / return / credit refund)
+/// applied to an obligation (sale / initial debt) or to saldo a favor.
+/// Signed amount: > 0 applies, < 0 releases (credit_apply pair, refund).
+/// Rows are never updated or deleted (only the business wipe deletes them).
+/// CHECKs in SQL: exactly one target by target_type; amount <> 0.
+model DebtAllocation {
+  id            String           @id @db.Uuid
+  businessId    String           @map("business_id") @db.Uuid
+  customerId    String           @map("customer_id") @db.Uuid
+  sourceType    AllocationSource @map("source_type")
+  sourceId      String           @map("source_id") @db.Uuid
+  targetType    AllocationTarget @map("target_type")
+  saleId        String?          @map("sale_id") @db.Uuid
+  initialDebtId String?          @map("initial_debt_id") @db.Uuid
+  amount        BigInt
+  mode          AllocationMode
+  groupId       String           @map("group_id") @db.Uuid
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdBy     String?          @map("created_by") @db.Uuid
+
+  business    Business     @relation(fields: [businessId], references: [id])
+  customer    Customer     @relation(fields: [customerId], references: [id])
+  sale        Sale?        @relation(fields: [saleId], references: [id])
+  initialDebt InitialDebt? @relation(fields: [initialDebtId], references: [id])
+
+  @@index([businessId, customerId])
+  @@index([businessId, saleId])
+  @@index([businessId, sourceType, sourceId])
+  @@map("debt_allocations")
 }
 
 model ImportIdMap {

@@ -81,6 +81,7 @@ function customerJson(c: {
   name: string;
   phone: string | null;
   debt: bigint;
+  creditBalance?: bigint;
   archivedAt: Date | null;
   createdAt: Date;
 }) {
@@ -90,6 +91,8 @@ function customerJson(c: {
     name: c.name,
     phone: c.phone,
     debt: copToJson(c.debt),
+    /** C04 — saldo a favor. */
+    creditBalance: copToJson(c.creditBalance ?? 0n),
     archivedAt: c.archivedAt,
     createdAt: c.createdAt,
   };
@@ -572,7 +575,7 @@ export class CatalogService {
     });
     if (!c) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
 
-    const [initials, sales, payments] = await Promise.all([
+    const [initials, sales, payments, allocationRows] = await Promise.all([
       this.prisma.initialDebt.findMany({
         where: { businessId: ctx.businessId, customerId },
         orderBy: { createdAt: "asc" },
@@ -586,7 +589,39 @@ export class CatalogService {
         where: { businessId: ctx.businessId, customerId },
         orderBy: { createdAt: "asc" },
       }),
+      // C04 — every allocation row of this customer (immutable history).
+      this.prisma.debtAllocation.findMany({
+        where: { businessId: ctx.businessId, customerId },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      }),
     ]);
+    const allocJson = (r: (typeof allocationRows)[number]) => ({
+      id: r.id,
+      sourceType: r.sourceType,
+      sourceId: r.sourceId,
+      targetType: r.targetType,
+      saleId: r.saleId,
+      initialDebtId: r.initialDebtId,
+      amount: copToJson(r.amount),
+      mode: r.mode,
+      groupId: r.groupId,
+      createdAt: r.createdAt,
+      createdBy: r.createdBy,
+    });
+    const toSale = new Map<string, typeof allocationRows>();
+    const toInitial = new Map<string, typeof allocationRows>();
+    const fromSource = new Map<string, typeof allocationRows>();
+    for (const r of allocationRows) {
+      if (r.saleId) toSale.set(r.saleId, [...(toSale.get(r.saleId) ?? []), r]);
+      if (r.initialDebtId) toInitial.set(r.initialDebtId, [...(toInitial.get(r.initialDebtId) ?? []), r]);
+      // The source's own distribution; credit_apply pairs belong to their group.
+      if (r.mode !== "credit_apply") {
+        const k = `${r.sourceType}:${r.sourceId}`;
+        fromSource.set(k, [...(fromSource.get(k) ?? []), r]);
+      }
+    }
+    const applied = (rows: typeof allocationRows | undefined) =>
+      (rows ?? []).reduce((a, r) => a + r.amount, 0n);
     // C01.1 — «De otro día»: the caja day each abono entered (session local_date).
     const moves = payments.length
       ? await this.prisma.cashMove.findMany({
@@ -612,6 +647,9 @@ export class CatalogService {
         note: d.note,
         occurredOn: dateKey(d.occurredOn),
         createdAt: d.createdAt,
+        // C04 — saldo abierto = original − Σ imputaciones.
+        openBalance: copToJson(d.amount - applied(toInitial.get(d.id))),
+        allocations: (toInitial.get(d.id) ?? []).map(allocJson),
       })),
       sales: sales.map((s) => ({
         id: s.id,
@@ -626,6 +664,9 @@ export class CatalogService {
         occurredAt: s.occurredAt ?? s.createdAt,
         syncedAt: s.syncedAt ?? s.createdAt,
         createdAt: s.createdAt,
+        // C04 — «Saldada» when 0, «Pendiente $X» otherwise (T1/T22).
+        openBalance: s.credit > 0n ? copToJson(s.credit - applied(toSale.get(s.id))) : 0,
+        allocations: (toSale.get(s.id) ?? []).map(allocJson),
         lines: s.lines.map((l) => ({
           id: l.id,
           productId: l.productId,
@@ -640,10 +681,18 @@ export class CatalogService {
           saleId: r.saleId,
           refundAmount: copToJson(r.refundAmount),
           debtReduced: copToJson(r.debtReduced),
+          toCredit: copToJson(
+            (fromSource.get(`sale_return:${r.id}`) ?? [])
+              .filter((x) => x.targetType === "credit")
+              .reduce((a, x) => a + x.amount, 0n),
+          ),
+          remainderMode: r.remainderMode,
+          needsReview: r.needsReview,
           method: r.method,
           note: r.note,
           occurredOn: dateKey(r.occurredOn),
           createdAt: r.createdAt,
+          allocations: (fromSource.get(`sale_return:${r.id}`) ?? []).map(allocJson),
           lines: r.lines.map((l) => ({
             id: l.id,
             saleLineId: l.saleLineId,
@@ -666,7 +715,17 @@ export class CatalogService {
         cajaDay: cajaDayByPayment.get(p.id) ?? null,
         needsReview: p.needsReview,
         createdAt: p.createdAt,
+        // C04 — distribution of this abono and §6.3 adjusted notice (W4).
+        allocations: (fromSource.get(`payment:${p.id}`) ?? []).map(allocJson),
+        requestedTarget: p.requestedTarget ?? null,
+        adjusted: p.allocationAdjusted,
+        adjustedReviewedAt: p.adjustedReviewedAt,
+        adjustedReviewedBy: p.adjustedReviewedBy,
       })),
+      /** C04 — saldo a favor movements (credit_apply pairs, refunds) for the statement. */
+      creditMoves: allocationRows
+        .filter((r) => r.targetType === "credit")
+        .map(allocJson),
     };
   }
 

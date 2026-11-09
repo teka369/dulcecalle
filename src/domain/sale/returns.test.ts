@@ -10,7 +10,7 @@ describe("splitReturnSettlement", () => {
         alreadyDebtReduced: 0,
         customerDebt: 20_000,
       }),
-    ).toEqual({ debtReduced: 3_000, refundAmount: 0 });
+    ).toMatchObject({ debtReduced: 3_000, refundAmount: 0 });
   });
 
   it("paid sale → all cash", () => {
@@ -21,7 +21,7 @@ describe("splitReturnSettlement", () => {
         alreadyDebtReduced: 0,
         customerDebt: 0,
       }),
-    ).toEqual({ debtReduced: 0, refundAmount: 4_000 });
+    ).toMatchObject({ debtReduced: 0, refundAmount: 4_000 });
   });
 
   it("partial: debt first, then cash", () => {
@@ -32,7 +32,7 @@ describe("splitReturnSettlement", () => {
         alreadyDebtReduced: 0,
         customerDebt: 6_000,
       }),
-    ).toEqual({ debtReduced: 6_000, refundAmount: 2_000 });
+    ).toMatchObject({ debtReduced: 6_000, refundAmount: 2_000 });
   });
 
   it("fiada already cobrada (debt 0) → cash refund", () => {
@@ -43,6 +43,6 @@ describe("splitReturnSettlement", () => {
         alreadyDebtReduced: 0,
         customerDebt: 0,
       }),
-    ).toEqual({ debtReduced: 0, refundAmount: 3_000 });
+    ).toMatchObject({ debtReduced: 0, refundAmount: 3_000 });
   });
 });

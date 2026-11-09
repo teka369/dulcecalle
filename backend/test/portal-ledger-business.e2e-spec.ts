@@ -253,19 +253,21 @@ describe("portal ledger is scoped by the customer token business", () => {
     expect(me.body.id).toBe(left.id);
   });
 
-  it("AC5: public ledger has no costs, saleLineId, payment note or internal ids", async () => {
+  // C04 / DC-54 (intentional change): the abono note is shown to the customer.
+  it("AC5: public ledger has no costs, saleLineId, createdBy or internal ids; shows the abono note (DC-54)", async () => {
     const token = await login(left.code, a.business.id);
     const res = await api()
       .get("/v1/customer/me/ledger")
       .set("Authorization", `Bearer ${token}`)
       .expect(200);
     const blob = JSON.stringify(res.body);
-    for (const banned of ["unitCost", "avgCost", "saleLineId", "businessId", "customerId", "pinHash", "abono-privado-A"]) {
+    for (const banned of ["unitCost", "avgCost", "saleLineId", "businessId", "customerId", "pinHash", "createdBy", "groupId"]) {
       expect(blob).not.toContain(banned);
     }
     expect(Object.keys(res.body).sort()).toEqual(["customer", "initials", "payments", "sales"]);
-    expect(Object.keys(res.body.customer).sort()).toEqual(["code", "createdAt", "debt", "id", "name"]);
-    expect(Object.keys(res.body.payments[0]).sort()).toEqual(["amount", "createdAt", "id", "method", "occurredOn"]);
+    expect(Object.keys(res.body.customer).sort()).toEqual(["code", "createdAt", "creditBalance", "debt", "id", "name"]);
+    expect(Object.keys(res.body.payments[0]).sort()).toEqual(["allocations", "amount", "createdAt", "id", "method", "note", "occurredOn"]);
+    expect(res.body.payments[0].note).toBe("abono-privado-A");
     expect(Object.keys(res.body.sales[0].lines[0]).sort()).toEqual(
       ["id", "lineTotal", "productId", "productName", "qty", "unitPrice"],
     );

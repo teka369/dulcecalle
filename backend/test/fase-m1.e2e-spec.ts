@@ -409,22 +409,28 @@ describe("Fase M1 domain endpoints", () => {
     expect(refunds[0].amount).toBe(2000);
   });
 
-  it("return partial: leftover is refund on original sale method", async () => {
+  // C04 / decision 6 (R6, intentional change): the return value lowers its
+  // own sale's open balance first (1500) and then the customer's other open
+  // debts by FIFO (1000 of the older initial debt). Before C04 the 1000 was a
+  // cash refund even though the customer still owed money.
+  it("return partial: own sale first, then other debts FIFO (C04 R6)", async () => {
     const ret = await api()
       .post(`/v1/sales/${partialSaleId}/returns`)
       .set(auth(tokenA, bizA))
       .set("Idempotency-Key", randomUUID())
       .send({ lines: [{ saleLineId: partialLineId, qty: 1 }] })
       .expect(201);
-    expect(ret.body.debtReduced).toBe(1500);
-    expect(ret.body.refundAmount).toBe(1000);
-    expect(ret.body.method).toBe("Nequi");
+    expect(ret.body.debtReduced).toBe(2500);
+    expect(ret.body.refundAmount).toBe(0);
+    expect(ret.body.method).toBeNull();
+    expect(ret.body.allocations[0]).toMatchObject({ targetType: "sale", saleId: partialSaleId, amount: 1500 });
+    expect(ret.body.allocations[1]).toMatchObject({ targetType: "initial_debt", amount: 1000 });
 
     const cust = await api()
       .get(`/v1/customers/${customerId}`)
       .set(auth(tokenA, bizA))
       .expect(200);
-    expect(cust.body.debt).toBe(45_200);
+    expect(cust.body.debt).toBe(44_200);
   });
 
   it("surtir reweights avgCost, total wins, cash compra, idempotent", async () => {

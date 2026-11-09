@@ -19,6 +19,9 @@ export const ERROR_CODES = {
   STOCK_VIA_MOVES: "STOCK_VIA_MOVES",
   KIND_LOCKED: "KIND_LOCKED",
   IDEMPOTENCY_MISMATCH: "IDEMPOTENCY_MISMATCH",
+  ALLOCATION_INVALID: "ALLOCATION_INVALID",
+  CREDIT_INSUFFICIENT: "CREDIT_INSUFFICIENT",
+  REMAINDER_CHOICE_REQUIRED: "REMAINDER_CHOICE_REQUIRED",
   RATE_LIMIT: "RATE_LIMIT",
   INTERNAL: "INTERNAL",
 } as const;
@@ -46,6 +49,9 @@ export const HTTP_FOR_CODE: Record<ErrorCode, number> = {
   STOCK_VIA_MOVES: 409,
   KIND_LOCKED: 409,
   IDEMPOTENCY_MISMATCH: 422,
+  ALLOCATION_INVALID: 422,
+  CREDIT_INSUFFICIENT: 422,
+  REMAINDER_CHOICE_REQUIRED: 422,
   RATE_LIMIT: 429,
   INTERNAL: 500,
 };
@@ -71,7 +77,12 @@ export const MESSAGES = {
   assumedRequired: "Ya hay movimientos posteriores. El cierre tiene que ser por paso de saldo.",
   todayAlreadyClosed: "La caja de hoy ya está cerrada. No se reabre.",
   alreadyCarried: "Esa caja ya fue regularizada.",
+  /** Kept for old clients only. C04 R4: the payment endpoint no longer emits it. */
   abonoExceeds: "El abono no puede ser mayor al saldo.",
+  allocationInvalid: "Esa compra no se puede usar para este abono.",
+  creditInsufficient: "No alcanza el saldo a favor.",
+  remainderChoiceRequired: "Elige cómo devuelves el resto: en dinero o como saldo a favor.",
+  refundNeedsOpenCaja: "Abre la caja de hoy para devolver dinero.",
   returnExceeds: "No se puede devolver más de lo vendido.",
   returnEmpty: "Elige qué se devuelve.",
   returnLineNotFound: "Ese producto no está en la venta.",

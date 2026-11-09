@@ -84,7 +84,13 @@ export async function pendingDebtAdjustment(
     }
     if (op.entity === "customerPayment" && op.operation === "pay") {
       if (payloadCustomerId(op) !== customerId) continue;
-      delta = subCop(delta, payloadAmount(op, "amount"));
+      // C04 R4 — only the debt part; an overpay's excess is saldo a favor.
+      const row = payloadRecord(op);
+      const debtPart =
+        typeof row?.projectedToDebt === "number" && Number.isInteger(row.projectedToDebt)
+          ? row.projectedToDebt
+          : payloadAmount(op, "amount");
+      delta = subCop(delta, debtPart);
       continue;
     }
     if (op.entity === "sale" && op.operation === "create") {

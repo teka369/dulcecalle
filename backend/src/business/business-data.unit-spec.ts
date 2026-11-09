@@ -86,6 +86,7 @@ function fakePrisma(seedImages: Row[] = [{ businessId: BIZ, productId: "p1", pub
   });
   const tx = {
     customer: table("customer"),
+    debtAllocation: table("debtAllocation"),
     saleReturnLine: table("saleReturnLine"),
     saleReturn: table("saleReturn"),
     saleLine: table("saleLine"),
@@ -175,6 +176,18 @@ describe("BusinessDataService.resetData", () => {
       "preparation.deleteMany",
       "product.deleteMany",
     ]);
+  });
+
+  it("C04: wipes debt_allocations before sales, payments, initial debts and customers", async () => {
+    const prisma = fakePrisma();
+    const result = await service(prisma, okMedia()).resetData(ctx());
+    expect(result.deleted).toHaveProperty("debtAllocations");
+    const calls = prisma.__state.calls;
+    const at = (name: string) => calls.indexOf(`${name}.deleteMany`);
+    expect(at("debtAllocation")).toBeGreaterThanOrEqual(0);
+    for (const later of ["sale", "customerPayment", "initialDebt", "customer"]) {
+      expect(at("debtAllocation")).toBeLessThan(at(later));
+    }
   });
 
   it("succeeds on a business without images", async () => {

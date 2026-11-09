@@ -335,9 +335,15 @@ describe("Fase 6 backend", () => {
       .set("Authorization", `Bearer ${tokenA}`)
       .set("X-Business-Id", bizA)
       .set("Idempotency-Key", randomUUID())
-      .send({ amount: 99999, method: "Efectivo" })
-      .expect(409)
-      .expect((r) => expect(r.body.error.code).toBe("ABONO_EXCEEDS_DEBT"));
+      // C04 R4 (intentional change): an overpayment is no longer 409
+      // ABONO_EXCEEDS_DEBT. Debt goes to 0 and the excess is saldo a favor.
+      .send({ amount: 2000, method: "Nequi" })
+      .expect(201)
+      .expect((r) => {
+        expect(r.body.debtAfter).toBe(0);
+        expect(r.body.creditBalanceAfter).toBe(500);
+        expect(r.body.allocations.at(-1)).toMatchObject({ targetType: "credit", amount: 500 });
+      });
 
     const today2 = await api()
       .get("/v1/cash/today")
@@ -345,7 +351,7 @@ describe("Fase 6 backend", () => {
       .set("X-Business-Id", bizA)
       .expect(200);
     expect(today2.body.expected.efectivo).toBe(8000);
-    expect(today2.body.expected.nequi).toBe(500);
+    expect(today2.body.expected.nequi).toBe(2500);
 
     const closed = await api()
       .post(`/v1/cash/sessions/${opened.body.id}/close`)
@@ -355,7 +361,7 @@ describe("Fase 6 backend", () => {
       .send({ countedEfectivo: 8000 })
       .expect(201);
     expect(closed.body.expectedEfectivo).toBe(8000);
-    expect(closed.body.expectedNequi).toBe(500);
+    expect(closed.body.expectedNequi).toBe(2500);
     expect(closed.body.difference).toBe(0);
 
     await api()
@@ -621,7 +627,7 @@ describe("Fase 6 backend", () => {
       .expect(400);
   });
 
-  it("staff can sell, cannot archive; concurrent abonos cannot overpay", async () => {
+  it("staff can sell, cannot archive; concurrent abonos never push debt below 0 (C04: excess → saldo a favor)", async () => {
     const prisma = app.get(PrismaService);
     const staffEmail = "staff-a@test.co";
     const staffId = randomUUID();
@@ -704,13 +710,16 @@ describe("Fase 6 backend", () => {
     const statuses = results.map((r) =>
       r.status === "fulfilled" ? r.value.status : 0,
     );
-    expect(statuses.sort()).toEqual([201, 409]);
+    // C04 R4 / T11 (intentional change): both are accepted; the second one
+    // finds debt 0 under the advisory lock and becomes saldo a favor.
+    expect(statuses.sort()).toEqual([201, 201]);
     const left = await api()
       .get(`/v1/customers/${cust.body.id}`)
       .set("Authorization", `Bearer ${tokenB}`)
       .set("X-Business-Id", bizB)
       .expect(200);
     expect(left.body.debt).toBe(0);
+    expect(left.body.creditBalance).toBe(1000);
   });
 
   it("second open after close returns the existing session", async () => {

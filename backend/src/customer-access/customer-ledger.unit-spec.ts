@@ -30,6 +30,8 @@ function ledgerWithLine() {
         note: null,
         occurredOn: "2026-09-22",
         createdAt: new Date(),
+        openBalance: 12000,
+        allocations: [],
         lines: [line],
         returns: [],
       },

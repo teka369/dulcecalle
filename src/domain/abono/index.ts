@@ -3,6 +3,7 @@ export {
   CUSTOMER_ERRORS,
   validateAbono,
   abonoRemainingHelper,
+  abonoExcess,
   parseAbonoAmount,
   type AbonoInput,
 } from "./validate";

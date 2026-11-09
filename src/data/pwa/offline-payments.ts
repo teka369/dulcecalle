@@ -7,13 +7,51 @@ import { ConnectivityMonitor, getOutboxSyncEngine } from "../local/outbox";
 import { PENDING_CUSTOMER_MESSAGE } from "./offline-catalog";
 import { newEntityId } from "../local/ids";
 import { subCop } from "@/domain/money";
+import type { PaymentTarget } from "../http/repository";
 
 export type CreatePaymentInput = {
   customerId: string;
   amount: number;
   method: "Efectivo" | "Nequi";
   note?: string;
+  /** C04 — omitted = oldest first. */
+  target?: PaymentTarget;
+  overflow?: "fifo" | "credit";
+  /**
+   * C04 — outbox op of a still-local sale this abono targets
+   * (`target.saleRequestId`). The abono waits for it (dependsOn).
+   */
+  dependsOnOperationId?: string;
 };
+
+/**
+ * C04 R4 — local estimate: how much of an abono lowers the cached debt and
+ * how much becomes saldo a favor. The server decides on sync (T20).
+ */
+export function projectPaymentSplit(amount: number, debt: number): { toDebt: number; toCredit: number } {
+  const toDebt = Math.min(amount, Math.max(0, debt));
+  return { toDebt, toCredit: amount - toDebt };
+}
+
+/** Debt part of a queued abono (payloads from before C04 have no split). */
+export function paymentDebtPart(payload: unknown): number {
+  if (!payload || typeof payload !== "object") return 0;
+  const p = payload as { amount?: unknown; projectedToDebt?: unknown };
+  if (typeof p.projectedToDebt === "number" && Number.isInteger(p.projectedToDebt)) return p.projectedToDebt;
+  return typeof p.amount === "number" && Number.isInteger(p.amount) ? p.amount : 0;
+}
+
+/** Fields of a queued abono that go to the server (never local projections). */
+export function paymentWireBody(payload: CreatePaymentInput & { occurredAt?: string }) {
+  return {
+    amount: payload.amount,
+    method: payload.method,
+    ...(payload.note ? { note: payload.note } : {}),
+    ...(payload.occurredAt ? { occurredAt: payload.occurredAt } : {}),
+    ...(payload.target && payload.target.mode !== "fifo" ? { target: payload.target } : {}),
+    ...(payload.overflow && payload.overflow !== "fifo" ? { overflow: payload.overflow } : {}),
+  };
+}
 
 export type CreatePaymentResult =
   | { mode: "online"; payment: RemotePayment }
@@ -23,9 +61,9 @@ export function validateOfflinePayment(input: CreatePaymentInput, debt: number):
   if (!Number.isInteger(input.amount) || input.amount <= 0) {
     throw new Error("El abono tiene que ser mayor a 0.");
   }
-  if (input.amount > debt) {
-    throw new Error("El abono no puede ser mayor al saldo.");
-  }
+  // C04 R4 / T21 — amount > debt is allowed offline; the excess is shown as
+  // the saldo a favor that will remain (estimate).
+  void debt;
   if (input.method !== "Efectivo" && input.method !== "Nequi") {
     throw new Error("Elige Efectivo o Nequi.");
   }
@@ -69,6 +107,7 @@ async function createLocalPayment(
         if (op && op.status !== "synced") throw new Error(PENDING_CUSTOMER_MESSAGE);
       }
       validateOfflinePayment(input, customer.debt);
+      const split = projectPaymentSplit(input.amount, customer.debt);
 
       const paymentId = newEntityId();
       await db.customerPayments.put({
@@ -87,7 +126,7 @@ async function createLocalPayment(
 
       await db.customers.put({
         ...customer,
-        debt: subCop(customer.debt, input.amount),
+        debt: subCop(customer.debt, split.toDebt),
         updatedAt: now,
       });
 
@@ -118,10 +157,16 @@ async function createLocalPayment(
           amount: input.amount,
           method: input.method,
           ...(input.note ? { note: input.note } : {}),
+          ...(input.target && input.target.mode !== "fifo" ? { target: input.target } : {}),
+          ...(input.overflow && input.overflow !== "fifo" ? { overflow: input.overflow } : {}),
           // C01/C03 — the server keeps when the money was really received.
           occurredAt: new Date(now).toISOString(),
+          // C04 — local estimate only (never sent): debt part vs saldo a favor.
+          projectedToDebt: split.toDebt,
+          projectedToCredit: split.toCredit,
         },
-        dependsOn: [],
+        // C04 — an abono to a still-local sale waits for that sale to sync.
+        dependsOn: input.dependsOnOperationId ? [input.dependsOnOperationId] : [],
         localCreatedAt: now,
         status: "pending",
         remoteId: null,
@@ -144,11 +189,7 @@ export async function createPaymentWithOfflineFallback(
       mode: "online",
       payment: await getPwaApi().customers.pay(
         input.customerId,
-        {
-          amount: input.amount,
-          method: input.method,
-          ...(input.note ? { note: input.note } : {}),
-        },
+        paymentWireBody(input),
         requestId,
       ),
     };
@@ -184,7 +225,7 @@ async function ensurePaymentOptimistic(businessId: string, operationId: string):
   if (!payment || payment.businessId !== businessId) return;
   const customer = await db.customers.get(payment.customerId);
   if (customer && customer.businessId === businessId) {
-    const next = subCop(customer.debt, payment.amount);
+    const next = subCop(customer.debt, paymentDebtPart(op.payload));
     await db.customers.put({
       ...customer,
       // C01 / DC-15 — exact delta, no clamp: a later revert must land on the true prior debt.
@@ -225,12 +266,7 @@ export async function syncPendingPayments(businessId: string) {
           remoteId: (
             await getPwaApi().customers.pay(
               payload.customerId,
-              {
-                amount: payload.amount,
-                method: payload.method,
-                ...(payload.note ? { note: payload.note } : {}),
-                ...(payload.occurredAt ? { occurredAt: payload.occurredAt } : {}),
-              },
+              paymentWireBody(payload),
               item.requestId,
             )
           ).id,

@@ -838,9 +838,13 @@ describe("M7.1 offline debt reconciliation", () => {
     expect((await getLocalDb().products.get(productId))?.stock).toBe(4);
     expect((await getLocalDb().customers.get(customerId))?.debt).toBe(0);
     const op = await getOutboxStore().getByRequestId(BIZ, requestId);
+    // C04 J2 / T33 (intentional change): with a customer the remainder is
+    // explicit and defaults to saldo a favor, so nothing is refunded in cash.
     expect(op?.payload).toMatchObject({
       projectedDebtReduced: 5_000,
-      projectedRefundAmount: 3_000,
+      projectedRefundAmount: 0,
+      remainder: "credit",
+      projectedToCredit: 3_000,
     });
 
     const statement = await getStatementWithOfflineFallback(customerId);

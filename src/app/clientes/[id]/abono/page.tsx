@@ -30,6 +30,10 @@ import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
 import { ActionToast } from "@/components/ui/ActionToast";
+import { loadCustomerMoneyState, type CustomerMoneyState } from "@/data/pwa/customer-allocations";
+import { AbonoAllocationPicker } from "@/components/customers/AbonoAllocationPicker";
+import { buildAbonoPreview, wireTarget, type AbonoChoice } from "@/components/customers/abono-target";
+import type { Overflow } from "@/domain/allocation";
 
 export default function RegistrarAbonoPage() {
   const offlineBand = useOfflineBand();
@@ -46,6 +50,10 @@ export default function RegistrarAbonoPage() {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingSync, setPendingSync] = useState(false);
+  // C04 W1 — where the abono goes; FIFO by default (5 taps, unchanged).
+  const [money, setMoney] = useState<CustomerMoneyState | null>(null);
+  const [choice, setChoice] = useState<AbonoChoice>({ mode: "fifo" });
+  const [overflow, setOverflow] = useState<Overflow>("fifo");
   // C02 / NEW-01 — the requestId is bound to the payload (see payloadBoundRequestId).
   const boundIdRef = useRef<PayloadBoundId>(null);
   const requestIdRef = useRef<string | null>(null);
@@ -63,6 +71,16 @@ export default function RegistrarAbonoPage() {
         void getPendingCustomerIds().then((ids) =>
           setPendingSync(ids.includes(c.id)),
         );
+        void loadCustomerMoneyState(c.id)
+          .then((m) => {
+            setMoney(m);
+            // W6 «Registrar abono a esta compra» → «Una compra» preselected.
+            const pre = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("compra");
+            if (pre && m.obligations.some((o) => o.kind === "sale" && o.id === pre && o.open > 0)) {
+              setChoice({ mode: "sale", obligationId: pre });
+            }
+          })
+          .catch(() => setMoney(null));
       }
     } catch (e: unknown) {
       setLoadError(errorText(e, ""));
@@ -86,8 +104,24 @@ export default function RegistrarAbonoPage() {
     return abonoView(customer.debt, amountRaw, method).remainingText;
   }, [customer, amount, amountRaw, method]);
 
+  const preview = useMemo(() => {
+    if (!customer || !money) return null;
+    return buildAbonoPreview({
+      amount,
+      debt: customer.debt,
+      obligations: money.obligations,
+      choice,
+      overflow,
+    });
+  }, [customer, money, amount, choice, overflow]);
+
+  const choiceIncomplete =
+    (choice.mode === "sale" && !choice.obligationId) ||
+    (preview != null && (preview.error != null || Object.keys(preview.fieldErrors).length > 0));
+
   const canSubmit = useMemo(() => {
     if (!customer) return false;
+    if (choiceIncomplete) return false;
     return (
       validateAbono({
         amountRaw,
@@ -95,7 +129,7 @@ export default function RegistrarAbonoPage() {
         method,
       }) === null
     );
-  }, [customer, amountRaw, method]);
+  }, [customer, amountRaw, method, choiceIncomplete]);
 
   async function confirm() {
     if (amountInputInvalid()) return; // a rejected amount is on screen: never send
@@ -110,11 +144,22 @@ export default function RegistrarAbonoPage() {
       setError(err);
       return;
     }
+    if (choiceIncomplete) {
+      setError(preview?.error ?? "Elige a qué compra se aplica.");
+      return;
+    }
     setBusy(true);
     try {
+      const wire = money ? wireTarget(choice, money.obligations, overflow) : {};
       boundIdRef.current = payloadBoundRequestId(
         boundIdRef.current,
-        JSON.stringify({ customerId: customer.id, amount: amountRaw.replace(/\D/g, ""), method }),
+        // C02 — the target is part of the payload: another target = another key.
+        JSON.stringify({
+          customerId: customer.id,
+          amount: amountRaw.replace(/\D/g, ""),
+          method,
+          ...(wire.target ? { target: wire.target, overflow: wire.overflow ?? "fifo" } : {}),
+        }),
       );
       requestIdRef.current = boundIdRef.current.id;
       const result = await customerStore.recordAbono({
@@ -122,11 +167,17 @@ export default function RegistrarAbonoPage() {
         amountRaw,
         method,
         requestId: requestIdRef.current,
+        ...wire,
       });
+      const p = result.payment;
       setToast(
         result.mode === "offline"
           ? "Abono guardado sin conexión"
-          : "Abono registrado",
+          : p?.adjusted
+            ? "Abono registrado · se aplicó distinto"
+            : p?.debtBefore != null && p.debtAfter != null
+              ? `Abono registrado · Deuda ${formatCop(p.debtBefore)} → ${formatCop(p.debtAfter)}`
+              : "Abono registrado",
       );
       rejected.afterSave(() => {
         navigateOfflineAware(router, `/clientes/${customer.id}`);
@@ -202,7 +253,20 @@ export default function RegistrarAbonoPage() {
           <ChoiceSegmented label="¿Cómo recibes?" options={ABONO_METHODS} value={method} onChange={setMethod} />
         </div>
 
-        {helper ? (
+        {money && preview ? (
+          <AbonoAllocationPicker
+            customerName={customer.name}
+            debt={customer.debt}
+            obligations={money.obligations}
+            estimated={money.source === "estimate"}
+            choice={choice}
+            onChoice={setChoice}
+            overflow={overflow}
+            onOverflow={setOverflow}
+            preview={preview}
+            amount={amount}
+          />
+        ) : helper ? (
           <RowGroup label="Resultado">
             <Row title={helper} />
           </RowGroup>

@@ -55,7 +55,7 @@ export default function CustomerPurchasesPage() {
                   />
                 }
                 title={dmy(s.occurredOn)}
-                meta={<Badge tone={purchaseTone(s.credit, s.paymentKind)}>{purchaseLabel(s.credit, s.paymentKind)}</Badge>}
+                meta={<Badge tone={purchaseTone(s.credit, s.paymentKind, s.openBalance)}>{purchaseLabel(s.credit, s.paymentKind, s.openBalance)}</Badge>}
                 trailing={<span className="text-[15px] font-semibold tabular-nums">{formatCop(s.saleTotal)}</span>}
               />
             );

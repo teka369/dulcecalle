@@ -290,6 +290,18 @@ type AdminLedger = Awaited<
   ReturnType<CatalogService["customerLedger"]>
 >;
 
+type AdminAllocation = AdminLedger["sales"][number]["allocations"][number];
+
+/** Portal: what reduced this purchase / initial debt. Never `createdBy`. */
+function publicAppliedTo(a: AdminAllocation) {
+  return { sourceType: a.sourceType, sourceId: a.sourceId, amount: a.amount, createdAt: a.createdAt };
+}
+
+/** Portal: where this abono went (`targetId` = public sale / initial debt id; null = saldo a favor). */
+function publicAppliedFrom(a: AdminAllocation) {
+  return { targetType: a.targetType, targetId: a.saleId ?? a.initialDebtId ?? null, amount: a.amount };
+}
+
 export function publicCustomerLedger(raw: AdminLedger) {
   return {
     customer: {
@@ -297,6 +309,7 @@ export function publicCustomerLedger(raw: AdminLedger) {
       code: raw.customer.code,
       name: raw.customer.name,
       debt: raw.customer.debt,
+      creditBalance: raw.customer.creditBalance,
       createdAt: raw.customer.createdAt,
     },
     initials: raw.initials.map((d) => ({
@@ -305,6 +318,8 @@ export function publicCustomerLedger(raw: AdminLedger) {
       note: d.note,
       occurredOn: d.occurredOn,
       createdAt: d.createdAt,
+      openBalance: d.openBalance,
+      allocations: d.allocations.map(publicAppliedTo),
     })),
     sales: raw.sales.map((s) => ({
       id: s.id,
@@ -316,6 +331,8 @@ export function publicCustomerLedger(raw: AdminLedger) {
       note: s.note,
       occurredOn: s.occurredOn,
       createdAt: s.createdAt,
+      openBalance: s.openBalance,
+      allocations: s.allocations.map(publicAppliedTo),
       lines: s.lines.map((l) => ({
         id: l.id,
         productId: l.productId,
@@ -328,6 +345,7 @@ export function publicCustomerLedger(raw: AdminLedger) {
         id: r.id,
         refundAmount: r.refundAmount,
         debtReduced: r.debtReduced,
+        toCredit: r.toCredit,
         method: r.method,
         note: r.note,
         occurredOn: r.occurredOn,
@@ -343,8 +361,11 @@ export function publicCustomerLedger(raw: AdminLedger) {
       id: p.id,
       amount: p.amount,
       method: p.method,
+      // DC-54 — the customer sees the abono note.
+      note: p.note,
       occurredOn: p.occurredOn,
       createdAt: p.createdAt,
+      allocations: p.allocations.map(publicAppliedFrom),
     })),
   };
 }

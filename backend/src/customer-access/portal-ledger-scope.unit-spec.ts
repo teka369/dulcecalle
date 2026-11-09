@@ -23,6 +23,7 @@ function fakePrisma(calls: { model: string; where: unknown }[]) {
     initialDebt: model("initialDebt", null),
     sale: model("sale", null),
     customerPayment: model("customerPayment", null),
+    debtAllocation: model("debtAllocation", null),
   };
 }
 
@@ -57,7 +58,7 @@ describe("portal ledger scope (AC4)", () => {
     const arg = portalSpy.mock.calls[0]![0] as unknown as Record<string, unknown>;
     expect(arg.role).toBeUndefined();
     expect(calls.map((c) => c.model).sort()).toEqual(
-      ["customer", "customerPayment", "initialDebt", "sale"],
+      ["customer", "customerPayment", "debtAllocation", "initialDebt", "sale"],
     );
     for (const c of calls) {
       expect(c.where).toMatchObject({ businessId: BIZ });
@@ -71,14 +72,17 @@ describe("portal ledger scope (AC4)", () => {
 });
 
 describe("publicCustomerLedger shape (AC5)", () => {
-  it("strips cost, saleLineId, ids and payment note from a full admin ledger", () => {
+  // C04 / DC-54: the abono note is now shown to the customer (WIRES-C04 W5,
+  // SPEC-C09 «corrige DC-54»). Allocations never carry createdBy.
+  it("strips cost, saleLineId, ids and createdBy from a full admin ledger; keeps the abono note (DC-54)", () => {
     const now = new Date("2026-10-13T15:00:00Z");
     const raw = {
       customer: { id: CUS, code: "DC-0001", name: "Rosa", phone: "300", debt: 1, createdAt: now, businessId: BIZ, avgCost: 5 },
-      initials: [{ id: "i1", customerId: CUS, amount: 1, note: "n", occurredOn: "2026-10-13", createdAt: now }],
+      initials: [{ id: "i1", customerId: CUS, amount: 1, note: "n", occurredOn: "2026-10-13", createdAt: now, openBalance: 1, allocations: [] }],
       sales: [{
         id: "s1", customerId: CUS, paymentKind: "credit", method: null, saleTotal: 2, amountReceived: 0,
-        credit: 2, note: null, occurredOn: "2026-10-13", createdAt: now,
+        credit: 2, note: null, occurredOn: "2026-10-13", createdAt: now, openBalance: 0,
+        allocations: [{ id: "a1", sourceType: "payment", sourceId: "pay1", targetType: "sale", saleId: "s1", initialDebtId: null, amount: 1, mode: "fifo", groupId: "pay1", createdAt: now, createdBy: "u-staff" }],
         lines: [{ id: "l1", productId: "p1", productName: "X", qty: 1, unitPrice: 2, unitCost: 1, lineTotal: 2 }],
         returns: [{
           id: "r1", saleId: "s1", refundAmount: 0, debtReduced: 1, method: null, note: null,
@@ -86,16 +90,22 @@ describe("publicCustomerLedger shape (AC5)", () => {
           lines: [{ id: "rl1", saleLineId: "l1", productId: "p1", qty: 1, unitPrice: 2, unitCost: 1 }],
         }],
       }],
-      payments: [{ id: "pay1", customerId: CUS, amount: 1, method: "Nequi", note: "secreto", occurredOn: "2026-10-13", createdAt: now }],
+      payments: [{
+        id: "pay1", customerId: CUS, amount: 1, method: "Nequi", note: "Abono del jueves", occurredOn: "2026-10-13", createdAt: now,
+        allocations: [{ id: "a1", sourceType: "payment", sourceId: "pay1", targetType: "sale", saleId: "s1", initialDebtId: null, amount: 1, mode: "fifo", groupId: "pay1", createdAt: now, createdBy: "u-staff" }],
+      }],
     };
     const pub = publicCustomerLedger(raw as never);
     const blob = JSON.stringify(pub);
-    for (const banned of ["unitCost", "avgCost", "saleLineId", "businessId", "customerId", "secreto", "phone", "saleId"]) {
+    for (const banned of ["unitCost", "avgCost", "saleLineId", "businessId", "customerId", "phone", "saleId", "createdBy", "u-staff", "groupId"]) {
       expect(blob).not.toContain(banned);
     }
     expect(pub.payments[0]).toEqual({
-      id: "pay1", amount: 1, method: "Nequi", occurredOn: "2026-10-13", createdAt: now,
+      id: "pay1", amount: 1, method: "Nequi", note: "Abono del jueves", occurredOn: "2026-10-13", createdAt: now,
+      allocations: [{ targetType: "sale", targetId: "s1", amount: 1 }],
     });
+    expect(pub.sales[0]!.openBalance).toBe(0);
+    expect(pub.sales[0]!.allocations).toEqual([{ sourceType: "payment", sourceId: "pay1", amount: 1, createdAt: now }]);
     expect(Object.keys(pub.sales[0]!.lines[0]!).sort()).toEqual(
       ["id", "lineTotal", "productId", "productName", "qty", "unitPrice"],
     );

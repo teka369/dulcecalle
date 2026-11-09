@@ -55,6 +55,8 @@ export interface Customer {
   phone?: string;
   /** Outstanding fiado balance; always ≥ 0. */
   debt: number;
+  /** C04 — saldo a favor from overpayments; always ≥ 0. */
+  creditBalance?: number;
   createdAt: number;
   updatedAt: number;
 }

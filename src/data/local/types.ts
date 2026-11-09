@@ -213,6 +213,8 @@ export type LocalCustomer = {
   phone: string | null;
   /** CACHE / OPTIMISTIC — server debt. */
   debt: number;
+  /** C04 — CACHE of the server saldo a favor (never spent offline, J3). */
+  creditBalance?: number;
   archivedAt: string | null;
   createdAt: number;
   updatedAt: number;
