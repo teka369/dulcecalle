@@ -19,5 +19,5 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*", "test/**/*", "prisma/**/*", "migration/**/*"]
+  "include": ["src/**/*", "test/**/*", "prisma/**/*", "migration/**/*", "ops/**/*"]
 }

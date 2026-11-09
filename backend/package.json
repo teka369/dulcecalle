@@ -12,7 +12,7 @@
     "start:prod": "node dist/main.js",
     "start:render": "prisma migrate deploy && node dist/main.js",
     "build": "rm -f tsconfig*.tsbuildinfo && nest build",
-    "lint": "eslint \"{src,test,migration}/**/*.ts\"",
+    "lint": "eslint \"{src,test,migration,ops}/**/*.ts\"",
     "test": "jest --runInBand --forceExit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
