@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { formatNumber } from "../shared/sequences";
+import { ledgerReceiptRefs } from "../receipts/receipt-acks";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
@@ -654,6 +655,16 @@ export class CatalogService {
         })
       : [];
     const replacedBy = new Map(replacements.map((p) => [p.replacesPaymentId as string, p.id]));
+    // C09 §7 — receiptId, number and ackState per movement (sale, abono, devolución).
+    const receiptRefs = await ledgerReceiptRefs(this.prisma, ctx.businessId, [
+      ...sales.map((s) => s.id),
+      ...sales.flatMap((s) => s.returns.map((r) => r.id)),
+      ...payments.map((p) => p.id),
+    ]);
+    const receiptOf = (id: string) => {
+      const r = receiptRefs.get(id);
+      return { receiptId: r?.receiptId ?? null, ackState: r?.ackState ?? null };
+    };
     const cajaDayByPayment = new Map(
       moves.map((m) => [m.refId, dayBySession.get(m.sessionId ?? m.pendingForSessionId ?? "") ?? null]),
     );
@@ -674,6 +685,7 @@ export class CatalogService {
       sales: sales.map((s) => ({
         id: s.id,
         number: formatNumber("sale", s.number),
+        ...receiptOf(s.id),
         customerId: s.customerId,
         paymentKind: s.paymentKind,
         method: s.method,
@@ -700,6 +712,9 @@ export class CatalogService {
         })),
         returns: s.returns.map((r) => ({
           id: r.id,
+          // C09 — DC-D- lives on the return receipt (no column on sale_returns).
+          number: receiptRefs.get(r.id)?.number ?? null,
+          ...receiptOf(r.id),
           saleId: r.saleId,
           refundAmount: copToJson(r.refundAmount),
           debtReduced: copToJson(r.debtReduced),
@@ -728,6 +743,7 @@ export class CatalogService {
       payments: payments.map((p) => ({
         id: p.id,
         number: formatNumber("payment", p.number),
+        ...receiptOf(p.id),
         customerId: p.customerId,
         amount: copToJson(p.amount),
         method: p.method,

@@ -331,6 +331,10 @@ export function publicCustomerLedger(raw: AdminLedger) {
     })),
     sales: raw.sales.map((s) => ({
       id: s.id,
+      // C09 §7 — number, its receipt and the customer's confirmation state.
+      number: s.number,
+      receiptId: s.receiptId,
+      ackState: s.ackState,
       paymentKind: s.paymentKind,
       method: s.method,
       saleTotal: s.saleTotal,
@@ -352,6 +356,9 @@ export function publicCustomerLedger(raw: AdminLedger) {
       })),
       returns: s.returns.map((r) => ({
         id: r.id,
+        number: r.number,
+        receiptId: r.receiptId,
+        ackState: r.ackState,
         refundAmount: r.refundAmount,
         debtReduced: r.debtReduced,
         toCredit: r.toCredit,
@@ -368,6 +375,9 @@ export function publicCustomerLedger(raw: AdminLedger) {
     })),
     payments: raw.payments.map((p) => ({
       id: p.id,
+      number: p.number,
+      receiptId: p.receiptId,
+      ackState: p.ackState,
       amount: p.amount,
       method: p.method,
       // DC-54 — the customer sees the abono note.
