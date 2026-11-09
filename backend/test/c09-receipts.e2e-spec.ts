@@ -89,6 +89,7 @@ describe("C09-PR2 receipts", () => {
   }
   const fiada = (b: Biz, customerId: string, total: number, key?: string) =>
     post(b, "/v1/sales", { lines: [{ productId: b.productId, qty: total / 1000, unitPrice: 1000 }], paymentKind: "credit", customerId, amountReceived: 0 }, key);
+  const bogotaToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
   async function receipt(b: Biz, id: string) {
     const r = await get(b, `/v1/receipts/${id}`);
     expect(r.status).toBe(200);
@@ -121,6 +122,10 @@ describe("C09-PR2 receipts", () => {
     expect(r.snapshot.business.name).toBe(`Tienda ${seq}`);
     // Dates in America/Bogota with the zone in the string (T27 later relies on it).
     expect(r.snapshot.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}-05:00$/);
+    // P-C09-8 — the operation's business day (occurredOn) is in the snapshot,
+    // apart from the receipt issue time used by the list filters.
+    expect(r.snapshot.occurredOn).toBe(s.body.occurredOn);
+    expect(r.snapshot.occurredOn).toBe(bogotaToday());
     expect(r.contentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(sha(canon(r.snapshot))).toBe(r.contentHash);
     expect(r.hashPrefix).toBe(r.contentHash.slice(0, 8));
@@ -195,6 +200,7 @@ describe("C09-PR2 receipts", () => {
       creditGenerated: "0",
     });
     expect(sha(canon(pr.snapshot))).toBe(pr.contentHash);
+    expect(pr.snapshot.occurredOn).toBe(bogotaToday());
     const sale = await prisma.sale.findUniqueOrThrow({ where: { id: s.body.id }, include: { lines: true } });
     // Return 4 of 5 units (4000): 3000 lowers the debt, 1000 goes to saldo a favor (decision 6).
     const ret = await post(b, `/v1/sales/${s.body.id}/returns`, { lines: [{ saleLineId: sale.lines[0]!.id, qty: 4 }], remainder: "credit" });
@@ -214,6 +220,7 @@ describe("C09-PR2 receipts", () => {
       creditAfter: "1000",
       lines: [{ productName: "Bombón", qty: 4, unitPrice: "1000", value: "4000" }],
     });
+    expect(rr.snapshot.occurredOn).toBe(bogotaToday());
     // Overpay abono → saldo a favor generated.
     const p2 = await post(b, `/v1/customers/${ana.id}/payments`, { amount: 500, method: "Efectivo" });
     const pr2 = await receipt(b, p2.body.receipts[0].id);
