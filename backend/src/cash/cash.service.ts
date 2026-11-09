@@ -357,6 +357,10 @@ export class CashService {
     return {
       localDate: dateKey(localDate),
       session: session ? sessionJson(session) : null,
+      // C07 / QA M14.I6 — same computation as the cierre (sessionExpected):
+      // opening + carried + Σ Efectivo in − Σ Efectivo out; Nequi never counts.
+      expectedEfectivo: copToJson(expected.efectivo),
+      expectedNequi: copToJson(expected.nequi),
       expected: {
         efectivo: copToJson(expected.efectivo),
         nequi: copToJson(expected.nequi),
@@ -381,6 +385,9 @@ export class CashService {
         direction: m.direction,
         method: m.method,
         kind: m.kind,
+        refType: m.refType,
+        refId: m.refId,
+        note: m.note,
         occurredOn: dateKey(m.occurredOn),
         createdAt: m.createdAt,
       })),
@@ -430,17 +437,14 @@ export class CashService {
     return paged(rows, page.limit, expenseJson);
   }
 
-  async recordPayment(
-    ctx: BusinessContext,
-    customerId: string,
-    dto: CreatePaymentDto,
-    requestId: string,
-  ) {
+  /**
+   * C02 / DC-13 — the key is bound to (customer, amount, method, note) and,
+   * since C04, to a non-default target/overflow (T14). C03: never occurredAt.
+   */
+  paymentHash(customerId: string, dto: Pick<CreatePaymentDto, "amount" | "method" | "note" | "target" | "overflow">) {
     // C04 §6.1 — canonical target/overflow (malformed → 400 before any write).
     const target = parseTarget(dto.target);
     const overflow = target.mode === "fifo" ? "fifo" : parseOverflow(dto.overflow);
-    // C02 / DC-13 — the key is bound to (customer, amount, method, note) and,
-    // since C04, to a non-default target/overflow (T14). C03: never occurredAt.
     const hash = payloadHash({
       customerId,
       amount: String(dto.amount),
@@ -448,6 +452,16 @@ export class CashService {
       note: dto.note ?? null,
       ...targetHashFields(target, overflow),
     });
+    return { target, overflow, hash };
+  }
+
+  async recordPayment(
+    ctx: BusinessContext,
+    customerId: string,
+    dto: CreatePaymentDto,
+    requestId: string,
+  ) {
+    const { target, overflow, hash } = this.paymentHash(customerId, dto);
     const existing = await this.prisma.customerPayment.findUnique({
       where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
     });
@@ -478,18 +492,9 @@ export class CashService {
       return replay(existing);
     }
 
-    const amount = asCop(dto.amount);
-    if (amount <= 0n) {
-      throw new AppError(ERROR_CODES.VALIDATION, "El abono tiene que ser mayor a 0.");
-    }
-    if (dto.method !== "Efectivo" && dto.method !== "Nequi") {
-      throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.noMethod);
-    }
-
+    this.assertPaymentInput(dto);
     const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
     const occurredAt = parseOccurredAt(dto.occurredAt, now);
-    const syncedAt = now;
 
     try {
       const pay = await this.prisma.$transaction(async (tx) => {
@@ -497,100 +502,16 @@ export class CashService {
         // never rejected for a closed day: it goes to the open operating day,
         // or stays «recibido sin aplicar / requiere revisión» (unassigned).
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
-        const customer = await tx.customer.findFirst({
-          where: { id: customerId, businessId: ctx.businessId },
-        });
-        if (!customer) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
-
-        // C04 — allocation (R1–R4, §6.3). Inside the lock (R8 / T11).
-        const loaded = await loadObligations(tx, ctx.businessId, customerId);
-        const resolved = await resolveTarget(tx, ctx.businessId, customerId, target, loaded);
-        const plan = planOrThrow({
-          amount,
-          obligations: resolved.obligations,
-          target: resolved.input,
+        return this.createPaymentInTx(tx, ctx, customerId, {
+          id: randomUUID(),
+          dto,
+          target,
           overflow,
-          cap: customer.debt,
+          hash,
+          requestId,
+          now,
+          occurredAt,
         });
-        const debtAfter = customer.debt - plan.toObligations;
-        const creditAfter = customer.creditBalance + plan.toCredit;
-        const allocationResult = {
-          allocations: planLinesJson(plan),
-          debtBefore: copToJson(customer.debt),
-          debtAfter: copToJson(debtAfter),
-          creditBalanceAfter: copToJson(creditAfter),
-          adjusted: plan.adjusted,
-        };
-
-        const opens = await tx.cashSession.findMany({
-          where: { businessId: ctx.businessId, closedAt: null },
-        });
-        const link = linkForNewMove(opens, occurredOn);
-        const needsReview = link.sessionId == null && link.pendingForSessionId == null;
-        const id = randomUUID();
-        const payment = await tx.customerPayment.create({
-          data: {
-            id,
-            businessId: ctx.businessId,
-            customerId,
-            amount,
-            method: dto.method,
-            note: dto.note ?? null,
-            requestId,
-            occurredOn,
-            occurredAt,
-            syncedAt,
-            needsReview,
-            payloadHash: hash,
-            requestedTarget: { ...target, overflow } as Prisma.InputJsonValue,
-            allocationResult: allocationResult as Prisma.InputJsonValue,
-            allocationAdjusted: plan.adjusted,
-            createdAt: now,
-          },
-        });
-        await insertAllocations(
-          tx,
-          plan.lines.map((l) => ({
-            businessId: ctx.businessId,
-            customerId,
-            sourceType: "payment",
-            sourceId: id,
-            targetType: l.targetType,
-            saleId: l.targetType === "sale" ? l.id : null,
-            initialDebtId: l.targetType === "initial_debt" ? l.id : null,
-            amount: l.amount,
-            mode: l.mode,
-            groupId: id,
-            createdAt: now,
-            createdBy: ctx.userId,
-          })),
-        );
-        // R4 — no more 409 ABONO_EXCEEDS_DEBT: the surplus is saldo a favor.
-        await moveCustomerBalances(tx, ctx.businessId, customerId, {
-          debt: -plan.toObligations,
-          credit: plan.toCredit,
-        });
-        // §3.3 — allocation never creates or edits cash moves; the money in is
-        // still exactly one debt_collect for the full amount (I-A6).
-        await tx.cashMove.create({
-          data: {
-            id: randomUUID(),
-            businessId: ctx.businessId,
-            amount,
-            direction: "in",
-            method: dto.method,
-            kind: "debt_collect",
-            sessionId: link.sessionId,
-            pendingForSessionId: link.pendingForSessionId,
-            needsReview,
-            refType: "payment",
-            refId: id,
-            requestId,
-            occurredOn,
-            createdAt: now,
-          },
-        });
-        return payment;
       });
       return this.paymentWithAllocations(pay);
     } catch (e) {
@@ -606,6 +527,137 @@ export class CashService {
       }
       throw e;
     }
+  }
+
+  assertPaymentInput(dto: Pick<CreatePaymentDto, "amount" | "method">) {
+    const amount = asCop(dto.amount);
+    if (amount <= 0n) {
+      throw new AppError(ERROR_CODES.VALIDATION, "El abono tiene que ser mayor a 0.");
+    }
+    if (dto.method !== "Efectivo" && dto.method !== "Nequi") {
+      throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.noMethod);
+    }
+  }
+
+  /**
+   * One abono inside the caller's transaction, after the per-business
+   * advisory lock (R8): allocation rows, balances and exactly one
+   * debt_collect. Shared by POST payments and C07 «corregir abono».
+   */
+  async createPaymentInTx(
+    tx: Prisma.TransactionClient,
+    ctx: BusinessContext,
+    customerId: string,
+    args: {
+      id: string;
+      dto: Pick<CreatePaymentDto, "amount" | "method" | "note">;
+      target: PaymentTarget;
+      overflow: "fifo" | "credit";
+      hash: string;
+      requestId: string;
+      now: Date;
+      occurredAt: Date;
+      /** C07 «corregir» (decision 21). */
+      replacesPaymentId?: string | null;
+    },
+  ) {
+    const { id, dto, target, overflow, hash, requestId, now } = args;
+    const amount = asCop(dto.amount);
+    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const customer = await tx.customer.findFirst({
+      where: { id: customerId, businessId: ctx.businessId },
+    });
+    if (!customer) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
+
+    // C04 — allocation (R1–R4, §6.3). Inside the lock (R8 / T11).
+    const loaded = await loadObligations(tx, ctx.businessId, customerId);
+    const resolved = await resolveTarget(tx, ctx.businessId, customerId, target, loaded);
+    const plan = planOrThrow({
+      amount,
+      obligations: resolved.obligations,
+      target: resolved.input,
+      overflow,
+      cap: customer.debt,
+    });
+    const debtAfter = customer.debt - plan.toObligations;
+    const creditAfter = customer.creditBalance + plan.toCredit;
+    const allocationResult = {
+      allocations: planLinesJson(plan),
+      debtBefore: copToJson(customer.debt),
+      debtAfter: copToJson(debtAfter),
+      creditBalanceAfter: copToJson(creditAfter),
+      adjusted: plan.adjusted,
+    };
+
+    const opens = await tx.cashSession.findMany({
+      where: { businessId: ctx.businessId, closedAt: null },
+    });
+    const link = linkForNewMove(opens, occurredOn);
+    const needsReview = link.sessionId == null && link.pendingForSessionId == null;
+    const payment = await tx.customerPayment.create({
+      data: {
+        id,
+        businessId: ctx.businessId,
+        customerId,
+        amount,
+        method: dto.method,
+        note: dto.note ?? null,
+        requestId,
+        occurredOn,
+        occurredAt: args.occurredAt,
+        syncedAt: now,
+        needsReview,
+        payloadHash: hash,
+        requestedTarget: { ...target, overflow } as Prisma.InputJsonValue,
+        allocationResult: allocationResult as Prisma.InputJsonValue,
+        allocationAdjusted: plan.adjusted,
+        replacesPaymentId: args.replacesPaymentId ?? null,
+        createdAt: now,
+      },
+    });
+    await insertAllocations(
+      tx,
+      plan.lines.map((l) => ({
+        businessId: ctx.businessId,
+        customerId,
+        sourceType: "payment",
+        sourceId: id,
+        targetType: l.targetType,
+        saleId: l.targetType === "sale" ? l.id : null,
+        initialDebtId: l.targetType === "initial_debt" ? l.id : null,
+        amount: l.amount,
+        mode: l.mode,
+        groupId: id,
+        createdAt: now,
+        createdBy: ctx.userId,
+      })),
+    );
+    // R4 — no more 409 ABONO_EXCEEDS_DEBT: the surplus is saldo a favor.
+    await moveCustomerBalances(tx, ctx.businessId, customerId, {
+      debt: -plan.toObligations,
+      credit: plan.toCredit,
+    });
+    // §3.3 — allocation never creates or edits cash moves; the money in is
+    // still exactly one debt_collect for the full amount (I-A6).
+    await tx.cashMove.create({
+      data: {
+        id: randomUUID(),
+        businessId: ctx.businessId,
+        amount,
+        direction: "in",
+        method: dto.method,
+        kind: "debt_collect",
+        sessionId: link.sessionId,
+        pendingForSessionId: link.pendingForSessionId,
+        needsReview,
+        refType: "payment",
+        refId: id,
+        requestId,
+        occurredOn,
+        createdAt: now,
+      },
+    });
+    return payment;
   }
 
   /** Payment JSON + C04 allocation snapshot (stored at creation time). */

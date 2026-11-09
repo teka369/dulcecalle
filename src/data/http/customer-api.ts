@@ -68,6 +68,9 @@ export type CustomerAppliedFrom = {
   amount: number;
 };
 
+/** C07 J5 — the portal only gets the number and the reason label. */
+export type CustomerReversal = { number: string; reasonCode: string; createdAt: string | number };
+
 export type CustomerLedgerSale = {
   id: string;
   paymentKind: string;
@@ -81,6 +84,8 @@ export type CustomerLedgerSale = {
   /** C04 — what is still owed on this sale; absent on pre-C04 servers. */
   openBalance?: number;
   allocations?: CustomerAppliedTo[];
+  /** C07 — «Anulada · motivo»; null/absent = stands. */
+  reversal?: CustomerReversal | null;
   lines: CustomerLedgerLine[];
   returns: CustomerLedgerReturn[];
 };
@@ -94,6 +99,8 @@ export type CustomerLedgerPayment = {
   /** C04 / DC-54 — the abono note is shown to the customer. */
   note?: string | null;
   allocations?: CustomerAppliedFrom[];
+  /** C07 — «Anulado»; null/absent = stands. */
+  reversal?: CustomerReversal | null;
 };
 
 export type CustomerLedgerInitial = {

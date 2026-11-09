@@ -192,6 +192,28 @@ export type RemoteSaleApplied = {
   createdAt: number;
 };
 
+/** C07 §3.3 — derived «Anulada / Anulado» state of a sale or abono. */
+export type RemoteReversalRef = {
+  id: string | null;
+  number: string;
+  reasonCode: string;
+  /** Admin only; the portal never receives it (J5). */
+  reasonText: string | null;
+  createdAt: number;
+};
+
+export function mapReversalRef(raw: unknown): RemoteReversalRef | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  return {
+    id: r.id == null ? null : String(r.id),
+    number: String(r.number ?? ""),
+    reasonCode: String(r.reasonCode ?? "otro"),
+    reasonText: r.reasonText == null ? null : String(r.reasonText),
+    createdAt: r.createdAt == null ? 0 : asIsoEpoch(r.createdAt),
+  };
+}
+
 export type RemoteSale = {
   id: string;
   customerId: string | null;
@@ -213,6 +235,8 @@ export type RemoteSale = {
   creditApplied?: number;
   /** C04 W6 — money applied to this sale (abonos, returns, saldo a favor). */
   appliedFrom?: RemoteSaleApplied[];
+  /** C07 — present when the server sent it; null = the sale stands. */
+  reversal?: RemoteReversalRef | null;
   lines: RemoteSaleLine[];
 };
 
@@ -235,6 +259,7 @@ export function mapSale(raw: Record<string, unknown>): RemoteSale {
       : {}),
     ...(raw.openBalance != null ? { openBalance: asCopJson(raw.openBalance, "openBalance") } : {}),
     ...(raw.creditApplied != null ? { creditApplied: asCopJson(raw.creditApplied, "creditApplied") } : {}),
+    ...(raw.reversal !== undefined ? { reversal: mapReversalRef(raw.reversal) } : {}),
     ...(Array.isArray(raw.allocations)
       ? {
           appliedFrom: raw.allocations
@@ -318,6 +343,11 @@ export type RemotePayment = {
   adjusted?: boolean;
   adjustedReviewedAt?: string | null;
   requestedTarget?: Record<string, unknown> | null;
+  /** C07 — «Anulado» (ledger only). */
+  reversal?: RemoteReversalRef | null;
+  /** C07 decision 21 — «Reemplaza a / Reemplazada por». */
+  replacesPaymentId?: string | null;
+  replacedByPaymentId?: string | null;
 };
 
 export function mapPayment(raw: Record<string, unknown>): RemotePayment {
@@ -348,6 +378,9 @@ export function mapPayment(raw: Record<string, unknown>): RemotePayment {
     ...(raw.requestedTarget && typeof raw.requestedTarget === "object"
       ? { requestedTarget: raw.requestedTarget as Record<string, unknown> }
       : {}),
+    ...(raw.reversal !== undefined ? { reversal: mapReversalRef(raw.reversal) } : {}),
+    ...(typeof raw.replacesPaymentId === "string" ? { replacesPaymentId: raw.replacesPaymentId } : {}),
+    ...(typeof raw.replacedByPaymentId === "string" ? { replacedByPaymentId: raw.replacedByPaymentId } : {}),
   };
 }
 

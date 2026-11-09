@@ -26,6 +26,7 @@ import { listUnresolvedFinancialOps, type UnresolvedFinancialOp } from "@/data/p
 import { pendingDebtAdjustment } from "@/data/pwa/pending-debt";
 import { getPwaAuthSession } from "@/data/http/session";
 import { CustomerCreditPanel } from "@/components/customers/CustomerCreditPanel";
+import { CustomerPaymentsPanel } from "@/components/reversal/CustomerPaymentsPanel";
 import { loadCustomerMoneyState, type CustomerMoneyState } from "@/data/pwa/customer-allocations";
 import { useOnline } from "@/components/shell/use-online";
 
@@ -225,6 +226,15 @@ export default function ClienteFichaPage() {
         <RejectedOpsCard ops={unresolved} serverDebt={serverDebt} localDebt={customer.debt} />
         {money ? (
           <CustomerCreditPanel
+            customerId={customer.id}
+            customerName={customer.name}
+            money={money}
+            online={online}
+            onChanged={() => void load()}
+          />
+        ) : null}
+        {money ? (
+          <CustomerPaymentsPanel
             customerId={customer.id}
             customerName={customer.name}
             money={money}

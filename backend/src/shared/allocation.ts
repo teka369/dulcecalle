@@ -226,29 +226,62 @@ export function openBalances<T extends { kind: ObligationKind; id: string; origi
  * Credit (saldo a favor) still available per source, oldest first. Positive
  * credit rows add to their source; negative rows of the same source release
  * it (credit_apply); credit_refund rows consume FIFO across sources.
+ * C07: reversal rows count for their ORIGIN source (released money is
+ * available again under the source that paid it; a payment reversal takes
+ * its own saldo a favor back). A negative row larger than its source spills
+ * FIFO over the others, so Σ available = credit_balance.
  */
 export function creditBySource(
-  rows: ReadonlyArray<{ sourceType: string; sourceId: string; targetType: string; amount: bigint; createdAt: number; id: string }>,
+  rows: ReadonlyArray<{
+    sourceType: string;
+    sourceId: string;
+    originSourceType?: string | null;
+    originSourceId?: string | null;
+    targetType: string;
+    amount: bigint;
+    createdAt: number;
+    id: string;
+  }>,
 ): Array<{ sourceType: string; sourceId: string; available: bigint }> {
   const ordered = [...rows]
     .filter((r) => r.targetType === "credit")
     .sort((a, b) => (a.createdAt !== b.createdAt ? a.createdAt - b.createdAt : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const queue: Array<{ sourceType: string; sourceId: string; available: bigint }> = [];
   const find = (t: string, id: string) => queue.find((q) => q.sourceType === t && q.sourceId === id);
+  const consumeFifo = (amount: bigint) => {
+    let left = amount;
+    for (const q of queue) {
+      if (left <= 0n) break;
+      const x = minBig(left, q.available < 0n ? 0n : q.available);
+      q.available -= x;
+      left -= x;
+    }
+  };
   for (const r of ordered) {
-    if (r.sourceType === "credit_refund" || r.sourceType === "reversal") {
-      let left = -r.amount;
-      for (const q of queue) {
-        if (left <= 0n) break;
-        const x = minBig(left, q.available);
-        q.available -= x;
-        left -= x;
-      }
+    if (r.sourceType === "credit_refund") {
+      consumeFifo(-r.amount);
       continue;
     }
-    const q = find(r.sourceType, r.sourceId);
-    if (q) q.available += r.amount;
-    else queue.push({ sourceType: r.sourceType, sourceId: r.sourceId, available: r.amount });
+    const isReversal = r.sourceType === "reversal";
+    if (isReversal && !(r.originSourceType && r.originSourceId)) {
+      if (r.amount < 0n) consumeFifo(-r.amount);
+      continue;
+    }
+    const t = isReversal ? r.originSourceType! : r.sourceType;
+    const id = isReversal ? r.originSourceId! : r.sourceId;
+    let q = find(t, id);
+    if (r.amount > 0n) {
+      if (q) q.available += r.amount;
+      else queue.push({ sourceType: t, sourceId: id, available: r.amount });
+      continue;
+    }
+    if (!q) {
+      q = { sourceType: t, sourceId: id, available: 0n };
+      queue.push(q);
+    }
+    const own = minBig(-r.amount, q.available < 0n ? 0n : q.available);
+    q.available -= own;
+    consumeFifo(-r.amount - own);
   }
   return queue.filter((q) => q.available > 0n);
 }

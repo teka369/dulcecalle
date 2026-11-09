@@ -302,6 +302,14 @@ function publicAppliedFrom(a: AdminAllocation) {
   return { targetType: a.targetType, targetId: a.saleId ?? a.initialDebtId ?? null, amount: a.amount };
 }
 
+/**
+ * C07 §6 / J5 — portal: the voided purchase or abono shows its number and
+ * ONLY the reason label. Never reasonText, never who did it.
+ */
+function publicReversal(r: { number: string; reasonCode: string; createdAt: Date } | null | undefined) {
+  return r ? { number: r.number, reasonCode: r.reasonCode, createdAt: r.createdAt } : null;
+}
+
 export function publicCustomerLedger(raw: AdminLedger) {
   return {
     customer: {
@@ -333,6 +341,7 @@ export function publicCustomerLedger(raw: AdminLedger) {
       createdAt: s.createdAt,
       openBalance: s.openBalance,
       allocations: s.allocations.map(publicAppliedTo),
+      reversal: publicReversal(s.reversal),
       lines: s.lines.map((l) => ({
         id: l.id,
         productId: l.productId,
@@ -366,6 +375,7 @@ export function publicCustomerLedger(raw: AdminLedger) {
       occurredOn: p.occurredOn,
       createdAt: p.createdAt,
       allocations: p.allocations.map(publicAppliedFrom),
+      reversal: publicReversal(p.reversal),
     })),
   };
 }

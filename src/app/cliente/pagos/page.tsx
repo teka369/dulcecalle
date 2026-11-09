@@ -3,7 +3,7 @@
 import { dmy } from "@/components/inventory/inventory";
 import { CustomerChrome, PortalError, PortalLoading } from "@/components/customer/CustomerChrome";
 import { usePortalLedger } from "@/components/customer/usePortalLedger";
-import { newestFirst, paymentAppliedText } from "@/components/customer/portal";
+import { newestFirst, paymentAppliedText, portalPaymentReversal } from "@/components/customer/portal";
 import { formatCop } from "@/domain/money";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { RowGroup, RowGroupNote } from "@/components/ui/RowGroup";
@@ -42,13 +42,13 @@ export default function CustomerPaymentsPage() {
               <Row
                 key={p.id}
                 title={p.method}
-                meta={[dmy(p.occurredOn), paymentAppliedText(p, ledger), p.note ? `Nota: «${p.note}»` : null]
+                meta={[portalPaymentReversal(p), dmy(p.occurredOn), paymentAppliedText(p, ledger), p.note ? `Nota: «${p.note}»` : null]
                   .filter(Boolean)
                   .join(" · ")}
                 trailing={
                   <>
-                    <span className="text-[15px] font-semibold tabular-nums text-ok">− {formatCop(p.amount)}</span>
-                    <span className="text-xs text-ink-muted">Baja tu deuda</span>
+                    <span className={`text-[15px] font-semibold tabular-nums ${p.reversal ? "text-ink-muted line-through" : "text-ok"}`}>− {formatCop(p.amount)}</span>
+                    <span className="text-xs text-ink-muted">{p.reversal ? "Anulado" : "Baja tu deuda"}</span>
                   </>
                 }
               />

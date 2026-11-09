@@ -135,9 +135,13 @@ export function CustomerCreditPanel(props: {
                     {o.label}
                     <span className="block text-xs text-ink-muted">{`Total ${formatCop(o.original)}`}</span>
                   </span>
-                  <span className={`rounded-[var(--r-pill)] px-2 py-1 text-xs font-semibold ${o.open > 0 ? "bg-warning-soft" : "bg-ok-soft"}`}>
-                    {openBalanceLabel(o.open)}
-                  </span>
+                  {o.reversed ? (
+                    <span className="rounded-[var(--r-pill)] bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-muted">Anulada</span>
+                  ) : (
+                    <span className={`rounded-[var(--r-pill)] px-2 py-1 text-xs font-semibold ${o.open > 0 ? "bg-warning-soft" : "bg-ok-soft"}`}>
+                      {openBalanceLabel(o.open)}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

@@ -26,6 +26,17 @@ import { getPwaAuthSession } from "@/data/http/session";
 import { useProductImageMap } from "@/data/pwa/product-image-map";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { listCachedCustomers } from "@/data/pwa/catalog";
+import { useOnline } from "@/components/shell/use-online";
+import { useIsOwner } from "@/components/reversal/use-is-owner";
+import { ReversalSheet } from "@/components/reversal/ReversalSheet";
+import { getPwaApi } from "@/data/pwa/api";
+import { localDateKey } from "@/domain/cash/day";
+import {
+  OFFLINE_REVERSAL_TEXT,
+  canUndoSale,
+  reasonLabel,
+  reversalActionState,
+} from "@/domain/reversal";
 
 const kindLabel: Record<string, string> = {
   paid: "Pagada",
@@ -40,6 +51,15 @@ export default function VentaDetallePage() {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const imageMap = useProductImageMap(getPwaAuthSession().businessId);
+  const online = useOnline();
+  const isOwner = useIsOwner(online);
+  const [voidSheet, setVoidSheet] = useState<null | "manual" | "undo">(null);
+  const [voidDone, setVoidDone] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -114,7 +134,11 @@ export default function VentaDetallePage() {
   const { sale, lines, remainingValue, returns } = data;
   const pending = sale.pending;
   const fromCache = data.source === "cache";
-  const canReturn = remainingValue > 0;
+  const reversal = sale.reversal ?? null;
+  // C07 G8 — a voided sale has no more actions (no Devolver, no Anular).
+  const canReturn = remainingValue > 0 && !reversal;
+  const voidState = pending || fromCache ? (isOwner === true && !reversal ? "disabled" : "hidden") : reversalActionState({ isOwner, online, reversed: !!reversal });
+  const undo = canUndoSale({ createdAt: sale.createdAt, now, isOwner, online, reversed: !!reversal, pending });
   const day = saleDayKey(sale);
   const time = saleTime(sale.createdAt);
   const when = [day ? dayHeading(day, "") : null, time].filter(Boolean).join(", ");
@@ -130,7 +154,10 @@ export default function VentaDetallePage() {
         action={canReturn ? <HeroPill href={`/ventas/${sale.id}/devolver`} label="Devolver" /> : undefined}
         offline={fromCache ? { text: "Sin conexión · mostrando venta guardada en este dispositivo." } : null}
       >
-        <p className="mt-5 break-all text-5xl font-semibold leading-none tracking-tight tabular-nums max-[359px]:text-4xl">
+        <p
+          className={`mt-5 break-all text-5xl font-semibold leading-none tracking-tight tabular-nums max-[359px]:text-4xl ${reversal ? "line-through" : ""}`}
+          aria-label={reversal ? `${formatCop(sale.saleTotal)}, anulada` : undefined}
+        >
           {formatCop(sale.saleTotal)}
         </p>
         <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-on-hero-muted">
@@ -153,6 +180,20 @@ export default function VentaDetallePage() {
 
       <Sheet>
         <SaleSyncBlock sale={sale} />
+        {reversal ? (
+          <p role="status" className="rounded-[var(--r-lg)] bg-surface-2 px-3 py-2.5 text-sm text-ink">
+            <span className="font-semibold">Anulada</span>
+            {` el ${new Date(reversal.createdAt).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`}
+            {` · Motivo: ${reasonLabel(reversal.reasonCode)}`}
+            {reversal.reasonText ? ` (${reversal.reasonText})` : ""}
+            {reversal.number ? ` · Comprobante ${reversal.number}` : ""}
+          </p>
+        ) : null}
+        {voidDone ? (
+          <p role="status" className="rounded-[var(--r-lg)] bg-ok-soft px-3 py-2.5 text-sm text-ink">
+            {`Venta anulada · ${voidDone}`}
+          </p>
+        ) : null}
         {/* saleTotal ≠ amountReceived ≠ credit — each in its own cell */}
         <SegmentedMetrics
           label="Cobro de la venta"
@@ -204,7 +245,59 @@ export default function VentaDetallePage() {
           </section>
         ) : null}
 
-        {!canReturn && !data.returnPending && (
+        {voidState !== "hidden" ? (
+          <section className="flex flex-col gap-2" aria-label="Anular venta">
+            {undo && voidState === "enabled" ? (
+              <button
+                type="button"
+                onClick={() => setVoidSheet("undo")}
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--r-pill)] border border-border bg-surface px-4 text-sm font-semibold text-ink"
+              >
+                Deshacer venta
+              </button>
+            ) : null}
+            <button
+              type="button"
+              aria-disabled={voidState === "disabled" ? "true" : undefined}
+              onClick={() => {
+                if (voidState === "enabled") setVoidSheet("manual");
+              }}
+              className={`inline-flex min-h-11 items-center justify-center rounded-[var(--r-pill)] px-4 text-sm font-semibold text-danger ${voidState === "disabled" ? "opacity-50" : ""}`}
+            >
+              Anular venta
+            </button>
+            {voidState === "disabled" ? (
+              <p className="text-xs text-ink-muted">{OFFLINE_REVERSAL_TEXT}</p>
+            ) : (
+              <p className="text-xs text-ink-muted">
+                Anular: la venta no debió existir. Devolver: el cliente regresa algo.
+              </p>
+            )}
+          </section>
+        ) : null}
+        {voidSheet ? (
+          <ReversalSheet
+            title="Anular venta"
+            kind="sale"
+            ctaLabel="Anular venta"
+            firstName={customerName ? customerName.split(" ")[0] ?? null : null}
+            occurredOn={sale.occurredOn}
+            today={localDateKey()}
+            defaultReason={voidSheet === "undo" ? "error_digitacion" : undefined}
+            returnHref={`/ventas/${sale.id}/devolver`}
+            preview={(body) => getPwaApi().reversals.voidSale(sale.id, body, { dryRun: true })}
+            submit={(body, requestId) =>
+              getPwaApi().reversals.voidSale(sale.id, { ...body, source: voidSheet === "undo" ? "undo" : "manual" }, { requestId })
+            }
+            onDone={(r) => {
+              setVoidDone(r.number ?? "");
+              void load();
+            }}
+            onClose={() => setVoidSheet(null)}
+          />
+        ) : null}
+
+        {!canReturn && !reversal && !data.returnPending && (
           <p role="status" className="rounded-[var(--r-lg)] bg-info-soft px-3 py-2.5 text-sm text-info">
             Esta venta ya se devolvió.
           </p>

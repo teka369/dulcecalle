@@ -176,7 +176,7 @@ C04 also adds: `POST /v1/customers/:id/credit/apply` `{amount, target?}` (no cas
 ### Cash sessions
 `POST /v1/cash/sessions` Dto: `{ openingFloat }` → unique day, second call returns existing.  
 `POST /v1/cash/sessions/:id/close` Dto: `{ countedEfectivo }` → snapshot expected, difference.  
-`GET /v1/cash/today` → session + expected buckets (Efectivo vs Nequi).
+`GET /v1/cash/today` → session + expected buckets (Efectivo vs Nequi). C07: + top-level `expectedEfectivo` / `expectedNequi` (same computation as the cierre: opening + carried + Σ Efectivo in − Σ Efectivo out; Nequi never counts) and `refType` / `refId` / `note` on each move (`reverso` moves point to their reversal).
 
 ### Cash moves (read)
 `GET /v1/cash/moves?date=` or `?from&to` (`occurred_on`).
@@ -203,6 +203,27 @@ No `adjust` endpoint. No client `createdAt` in the past (Dexie tests only).
 `POST /v1/sales/:id/returns`  
 Dto: `{ lines: [{ saleLineId, qty }], requestId, note?, remainder?: "refund" | "credit" }`  
 Server: remaining qty, snapshots from the **sale line** (not current catalog), `splitReturnSettlement` from DOMAIN. C04 (decision 6): the value lowers the customer's debt up to `customer.debt` — **this** sale's open balance first, then the other open debts FIFO; the rest is a cash refund on the original sale method (`remainder: refund`) or saldo a favor (`remainder: credit`). With a customer and a rest > 0, `remainder` is required online (422 `REMAINDER_CHOICE_REQUIRED`); an `X-Offline-Replay` sync without it becomes saldo a favor + `needsReview`. Walk-in sales always refund. Response adds `toCredit`, `remainderMode`, `needsReview`, `allocations[]`. stock_move `devolucion` does **not** reweight avg_cost. cash_move if refund>0. Original sale untouched. Hits **today’s** `occurred_on`, not the sale’s day.
+
+A voided sale (C07) accepts no more returns: 409 `ALREADY_REVERSED`.
+
+---
+
+## 6b. Reversals (C07, SPEC-C07 §8)
+
+All **owner only** (staff 403), **online only**, Idempotency-Key required (C02 hash; same key + other body → 422). Nothing is ever deleted or overwritten: each reversal is a `reversals` row plus compensating rows (`debt_allocations` with `source_type = reversal` / `mode = reversal`, signed, with `origin_source_type/id` = whose money moves; `cash_moves` kind `reverso` out by the original method in **today's open** caja; `stock_moves` reason `anulacion`).
+
+| Method and path | Body | Answer |
+|---|---|---|
+| `POST /v1/sales/:id/void` | `{ reasonCode, reasonText?, confirmOld?, requestId?, source? }` | 201 Reversal + `effects`, `warnings[]` |
+| `POST /v1/customers/:id/payments/:paymentId/reverse` | same | same |
+| `POST /v1/customers/:id/payments/:paymentId/correct` | + `replacement { customerId, amount, method, note?, target?, overflow?, requestId }` (requestId ≠ the reversal key) | + `replacementPayment` (`replaces_payment_id` = original) |
+| `GET /v1/reversals?from&to&limit&cursor` | | paged list (`X-Has-More` / `X-Next-Cursor`) |
+| `GET /v1/reversals/:id` | | reversal + `voucher` (§6 data, `contentHash` sha256) |
+
+`reasonCode`: `error_digitacion | cliente_equivocado | monto_equivocado | duplicado | devolucion | otro`; `reasonText` 5–280 after trim, required only with `otro`. `?dryRun=true` → 200 `{ dryRun, effects, warnings, blockers }`, writes nothing, takes no number, never reads or registers the key.
+Errors: 400 `VALIDATION`, 403, 404, 409 `ALREADY_REVERSED` / `CLOSED_DAY` (today closed) / `CASH_SESSION_REQUIRED` (money moves and no open caja today) / `CONFIRM_OLD_REQUIRED` (original > 30 days) / `CREDIT_ALREADY_REFUNDED` (the saldo a favor the abono created was already paid back in cash), 422 `NOTHING_TO_VOID` (sale fully returned) and C02 mismatch. Warning `EXPECTED_CASH_NEGATIVE`.
+Read side: `GET /v1/sales`, `GET /v1/sales/:id`, `GET /v1/customers/:id/ledger` carry `reversal` (or `null`) per sale and per abono (+ `replacesPaymentId` / `replacedByPaymentId` on abonos); `GET /v1/customer/me/ledger` carries `reversal { number, reasonCode, createdAt }` only (no free text, no author).
+Stats: a reversal counts on **its** day (`anulado`, `anuladoCount`, `reversosCount`; Ventas, Recibido and Ganancia net of it); a closed day never changes.
 
 ---
 
@@ -241,6 +262,7 @@ No extra BI. The PWA stats page reads this endpoint.
 | sales, payments, inventory, returns, expenses, open/close caja | yes | yes |
 | initial debt | yes | yes |
 | archive product/customer | no | yes |
+| reversals (void sale, reverse/correct abono, list, voucher) | no | yes |
 | memberships, wipe, import | no | yes |
 
 ---

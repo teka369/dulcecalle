@@ -154,6 +154,8 @@ export class BusinessDataService {
       });
       // C04 — allocations reference sales, initial debts and customers: first.
       await wipe(tx, "debtAllocations", (where) => tx.debtAllocation.deleteMany({ where }));
+      // C07 — reversals are never deleted except by this business wipe.
+      await wipe(tx, "reversals", (where) => tx.reversal.deleteMany({ where }));
       await wipe(tx, "saleReturnLines", (where) => tx.saleReturnLine.deleteMany({ where }));
       await wipe(tx, "saleReturns", (where) => tx.saleReturn.deleteMany({ where }));
       await wipe(tx, "saleLines", (where) => tx.saleLine.deleteMany({ where }));

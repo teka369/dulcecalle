@@ -80,6 +80,37 @@ export type PaymentTarget =
   | { mode: "sale"; saleId?: string; saleRequestId?: string }
   | { mode: "split"; targets: Array<{ saleId?: string; initialDebtId?: string; amount: number }> };
 
+/** C07 — body common to void / reverse / correct. */
+export type ReversalBody = {
+  reasonCode: "error_digitacion" | "cliente_equivocado" | "monto_equivocado" | "duplicado" | "devolucion" | "otro";
+  reasonText?: string;
+  confirmOld?: boolean;
+  source?: "undo" | "manual";
+};
+
+/** C07 — 201 reversal (or 200 dryRun preview). Amounts are COP numbers. */
+export type ReversalResult = {
+  id?: string;
+  number?: string;
+  dryRun?: true;
+  reasonCode: string;
+  oldConfirmed?: boolean;
+  effects: {
+    cashMoves: Array<{ method: string; amount: number; sessionId: string | null }>;
+    stockMoves: Array<{ productId: string; delta: number }>;
+    debtBefore: number | null;
+    debtAfter: number | null;
+    creditBefore: number | null;
+    creditAfter: number | null;
+    cashOut: number;
+    target?: { occurredOn?: string };
+  };
+  after?: { cash?: { expectedEfectivo?: number | null } };
+  warnings: string[];
+  blockers?: string[];
+  replacementPayment?: Record<string, unknown>;
+};
+
 export type PaymentInput = {
   amount: number;
   method: "Efectivo" | "Nequi";
@@ -534,6 +565,58 @@ export class HttpRepository {
         sales: Array<Record<string, unknown> & { returns?: Record<string, unknown>[] }>;
         payments: Record<string, unknown>[];
       }>("GET", `/customers/${customerId}/ledger`);
+    },
+  };
+
+  /**
+   * C07 — owner-only, online-only reversals (SPEC-C07 §8). `dryRun` returns
+   * the preview (200, nothing written, key not consumed); the real call
+   * needs its own Idempotency-Key.
+   */
+  readonly reversals = {
+    voidSale: async (
+      saleId: string,
+      body: ReversalBody,
+      opts: { requestId?: string; dryRun?: boolean },
+    ): Promise<ReversalResult> => {
+      return this.http.request<ReversalResult>(
+        "POST",
+        `/sales/${saleId}/void${opts.dryRun ? "?dryRun=true" : ""}`,
+        opts.requestId && !opts.dryRun ? { body, idempotencyKey: opts.requestId } : { body },
+      );
+    },
+
+    reversePayment: async (
+      customerId: string,
+      paymentId: string,
+      body: ReversalBody,
+      opts: { requestId?: string; dryRun?: boolean },
+    ): Promise<ReversalResult> => {
+      return this.http.request<ReversalResult>(
+        "POST",
+        `/customers/${customerId}/payments/${paymentId}/reverse${opts.dryRun ? "?dryRun=true" : ""}`,
+        opts.requestId && !opts.dryRun ? { body, idempotencyKey: opts.requestId } : { body },
+      );
+    },
+
+    /** Decision 21 — reverse + replacement abono in one transaction. */
+    correctPayment: async (
+      customerId: string,
+      paymentId: string,
+      body: ReversalBody & {
+        replacement: { customerId: string; amount: number; method: "Efectivo" | "Nequi"; note?: string; requestId: string };
+      },
+      opts: { requestId?: string; dryRun?: boolean },
+    ): Promise<ReversalResult> => {
+      return this.http.request<ReversalResult>(
+        "POST",
+        `/customers/${customerId}/payments/${paymentId}/correct${opts.dryRun ? "?dryRun=true" : ""}`,
+        opts.requestId && !opts.dryRun ? { body, idempotencyKey: opts.requestId } : { body },
+      );
+    },
+
+    get: async (id: string): Promise<ReversalResult & { voucher?: Record<string, unknown> }> => {
+      return this.http.request("GET", `/reversals/${id}`);
     },
   };
 

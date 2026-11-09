@@ -28,6 +28,7 @@ import { linkForNewMove } from "../cash/session-link";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext, PortalLedgerScope } from "../identity/auth.types";
 import { nextCodeFromExisting } from "../shared/customer-code";
+import { reversalsByTarget, type ReversalRef } from "../shared/reversal-lookup";
 import { afterCursor, NEWEST_FIRST, paged, pageProbe, type PageQuery } from "../shared/http/paging";
 import { imageJson } from "./media.service";
 
@@ -607,6 +608,8 @@ export class CatalogService {
       groupId: r.groupId,
       createdAt: r.createdAt,
       createdBy: r.createdBy,
+      originSourceType: r.originSourceType ?? null,
+      originSourceId: r.originSourceId ?? null,
     });
     const toSale = new Map<string, typeof allocationRows>();
     const toInitial = new Map<string, typeof allocationRows>();
@@ -634,6 +637,22 @@ export class CatalogService {
       ? await this.prisma.cashSession.findMany({ where: { id: { in: sessionIds } }, select: { id: true, localDate: true } })
       : [];
     const dayBySession = new Map(sessions.map((s) => [s.id, dateKey(s.localDate)]));
+    // C07 §3.3 — derived «anulado» state per sale and per abono.
+    const [saleReversals, paymentReversals] = await Promise.all([
+      reversalsByTarget(this.prisma, ctx.businessId, "sale", sales.map((s) => s.id)),
+      reversalsByTarget(this.prisma, ctx.businessId, "customer_payment", payments.map((p) => p.id)),
+    ]);
+    const reversalJson = (r: ReversalRef | undefined) =>
+      r ? { id: r.id, number: r.number, reasonCode: r.reasonCode, reasonText: r.reasonText, createdAt: r.createdAt } : null;
+    // Decision 21 — «Reemplaza a / Reemplazada por» (replacedBy is derived).
+    // The replacement may belong to ANOTHER customer (cliente equivocado).
+    const replacements = payments.length
+      ? await this.prisma.customerPayment.findMany({
+          where: { businessId: ctx.businessId, replacesPaymentId: { in: payments.map((p) => p.id) } },
+          select: { id: true, replacesPaymentId: true },
+        })
+      : [];
+    const replacedBy = new Map(replacements.map((p) => [p.replacesPaymentId as string, p.id]));
     const cajaDayByPayment = new Map(
       moves.map((m) => [m.refId, dayBySession.get(m.sessionId ?? m.pendingForSessionId ?? "") ?? null]),
     );
@@ -667,6 +686,7 @@ export class CatalogService {
         // C04 — «Saldada» when 0, «Pendiente $X» otherwise (T1/T22).
         openBalance: s.credit > 0n ? copToJson(s.credit - applied(toSale.get(s.id))) : 0,
         allocations: (toSale.get(s.id) ?? []).map(allocJson),
+        reversal: reversalJson(saleReversals.get(s.id)),
         lines: s.lines.map((l) => ({
           id: l.id,
           productId: l.productId,
@@ -721,6 +741,9 @@ export class CatalogService {
         adjusted: p.allocationAdjusted,
         adjustedReviewedAt: p.adjustedReviewedAt,
         adjustedReviewedBy: p.adjustedReviewedBy,
+        reversal: reversalJson(paymentReversals.get(p.id)),
+        replacesPaymentId: p.replacesPaymentId ?? null,
+        replacedByPaymentId: replacedBy.get(p.id) ?? null,
       })),
       /** C04 — saldo a favor movements (credit_apply pairs, refunds) for the statement. */
       creditMoves: allocationRows
