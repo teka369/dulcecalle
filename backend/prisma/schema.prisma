@@ -122,6 +122,7 @@ enum SequenceKind {
   reversal
   adjustment
   return
+  imputation
 }
 
 model User {
