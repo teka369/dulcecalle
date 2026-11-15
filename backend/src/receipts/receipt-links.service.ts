@@ -1,12 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { Prisma, type ReceiptLink } from "@prisma/client";
-import { createHash, createHmac, randomUUID } from "crypto";
+import type { ReceiptLink } from "@prisma/client";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import type { BusinessContext } from "../identity/auth.types";
-import { requireJwtSecrets } from "../identity/jwt-secrets";
 import { PROD_ORIGIN } from "../http-setup";
 import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
-import { assertSamePayload, payloadHash } from "../shared/payload-hash";
 
 /** SPEC-C09 §3.4: a link lives 48 h from its creation. */
 export const LINK_TTL_MS = 48 * 60 * 60 * 1000;
@@ -34,14 +32,13 @@ export function tokenHash(token: string): string {
 }
 
 /**
- * The token is 32 bytes (base64url, 43 chars) derived with HMAC-SHA256 from
- * a server secret and the link id, so an Idempotency-Key replay can return
- * the SAME url while the database keeps only sha256(token). Without the
- * server secret the token is as unguessable as 32 random bytes.
+ * SPEC-C09 §3.4 (Jefecito, PR5): the token is 32 random bytes (base64url,
+ * 43 chars). Only sha256(token) is stored, so the URL exists exactly once,
+ * in the create response. No server secret is involved: sha256 of a 256-bit
+ * random value cannot be inverted or guessed.
  */
-function linkToken(linkId: string): string {
-  const secret = process.env.RECEIPT_LINK_SECRET?.trim() || requireJwtSecrets().access;
-  return createHmac("sha256", secret).update(`dulcecalle:receipt-link:v1:${linkId}`).digest("base64url");
+export function newLinkToken(): string {
+  return randomBytes(32).toString("base64url");
 }
 
 function portalOrigin(): string {
@@ -52,21 +49,14 @@ function portalOrigin(): string {
 export class ReceiptLinksService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private view(l: ReceiptLink) {
-    const path = `${LINK_PATH}${linkToken(l.id)}`;
-    return { id: l.id, url: `${portalOrigin()}${path}`, path, expiresAt: l.expiresAt.toISOString() };
-  }
-
-  /** POST /v1/receipts/:id/links (owner/staff). Internal receipts cannot be shared (T5). */
+  /**
+   * POST /v1/receipts/:id/links (owner/staff). Internal receipts cannot be
+   * shared (T5). Every call mints a NEW link with a fresh random token, even
+   * with the same Idempotency-Key (kept as request_id for audit): the token
+   * is not stored, so it cannot be replayed; earlier links stay valid until
+   * their own 48 h (Jefecito, PR5).
+   */
   async create(ctx: BusinessContext, receiptId: string, requestId: string) {
-    const hash = payloadHash({ receiptId });
-    const prior = await this.prisma.receiptLink.findUnique({
-      where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
-    });
-    if (prior) {
-      assertSamePayload(prior.payloadHash, hash);
-      return this.view(prior);
-    }
     const receipt = await this.prisma.receipt.findFirst({
       where: { id: receiptId, businessId: ctx.businessId },
       select: { id: true, customerId: true },
@@ -75,35 +65,23 @@ export class ReceiptLinksService {
     if (!receipt.customerId) {
       throw new AppError(ERROR_CODES.RECEIPT_NOT_SHAREABLE, "Este comprobante es interno: no se comparte por enlace.");
     }
-    const id = randomUUID();
+    const token = newLinkToken();
+    // No lock, no sequence, no ledger: nothing here is ordered against receipts (BL-02 n/a).
     const now = new Date();
-    try {
-      const row = await this.prisma.receiptLink.create({
-        data: {
-          id,
-          businessId: ctx.businessId,
-          receiptId,
-          tokenHash: tokenHash(linkToken(id)),
-          createdAt: now,
-          expiresAt: new Date(now.getTime() + LINK_TTL_MS),
-          createdBy: ctx.userId,
-          requestId,
-          payloadHash: hash,
-        },
-      });
-      return this.view(row);
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        const raced = await this.prisma.receiptLink.findUnique({
-          where: { businessId_requestId: { businessId: ctx.businessId, requestId } },
-        });
-        if (raced) {
-          assertSamePayload(raced.payloadHash, hash);
-          return this.view(raced);
-        }
-      }
-      throw e;
-    }
+    const row = await this.prisma.receiptLink.create({
+      data: {
+        id: randomUUID(),
+        businessId: ctx.businessId,
+        receiptId,
+        tokenHash: tokenHash(token),
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + LINK_TTL_MS),
+        createdBy: ctx.userId,
+        requestId,
+      },
+    });
+    const path = `${LINK_PATH}${token}`;
+    return { id: row.id, url: `${portalOrigin()}${path}`, path, expiresAt: row.expiresAt.toISOString() };
   }
 
   /** POST /v1/receipt-links/:id/revoke (owner). Idempotent: keeps the first revokedAt. */
