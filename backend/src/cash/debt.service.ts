@@ -71,9 +71,12 @@ export class DebtService {
     const target = parseTarget(dto.target, false);
     const prior = await this.applyReplay(ctx, customerId, requestId, dto.amount);
     if (prior) return prior;
-    const now = new Date();
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
+      // C09-PR3.2 — the instant is taken AFTER the lock, so DC-I- receipts
+      // (and their rows) are ordered by createdAt in the same order they took
+      // their number and read the balances (I-C3 under concurrency).
+      const now = new Date();
       const again = await tx.debtAllocation.count({ where: { businessId: ctx.businessId, groupId: requestId } });
       if (again > 0) return null;
       const customer = await tx.customer.findFirst({ where: { id: customerId, businessId: ctx.businessId } });
