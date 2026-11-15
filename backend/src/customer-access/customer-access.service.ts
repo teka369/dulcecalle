@@ -184,8 +184,9 @@ export class CustomerAccessService {
    * The link only fixes the business and the customer; the PIN check IS the
    * portal login (same ipcode/ip throttle counter and limit, same soft cap,
    * exactly one bcrypt compare, same generic 401). Unknown or malformed
-   * tokens get that same 401 (no oracle). A used / expired / revoked link is
-   * 410 with the W3 copy. The link is spent only by a successful login,
+   * tokens get that same 401 (no oracle), and so does a used / expired /
+   * revoked link unless the PIN is right; then it is 410 with the W3 copy
+   * (the session just issued is revoked). The link is spent only by a successful login,
    * atomically; a login that loses the race has its session revoked.
    */
   async linkLogin(tokenRaw: string, pinRaw: string, clientIp?: string) {
@@ -207,7 +208,9 @@ export class CustomerAccessService {
       await bcrypt.compare(String(pinRaw ?? "") || "000000", await dummyHash());
       throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
     }
-    this.links.assertUsable(link);
+    // The PIN check comes first: without the right PIN a used / expired /
+    // revoked link gets the same generic 401 as an unknown token (no state
+    // oracle). Only a caller who proved the PIN sees the W3 410 copy.
     const session = await this.login(customer.code, String(pinRaw ?? ""), link.businessId, clientIp);
     if (!(await this.links.claim(link.id))) {
       await this.sessions.revokeOwned(session.refreshToken, { kind: "customer", subjectId: session.customer.id }, "customer_refresh");
