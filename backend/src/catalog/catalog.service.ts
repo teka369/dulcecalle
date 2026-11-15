@@ -330,13 +330,15 @@ export class CatalogService {
     // the finished average is left untouched. 0 = real zero (gifted batch).
     // NEVER an auto-proration of the lot value.
     const unitCost = dto.unitCost == null ? null : asCop(dto.unitCost);
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order of the business's serialized writes.
+        const now = new Date();
         const source = await tx.product.findFirst({
           where: { id: dto.sourceId, businessId: ctx.businessId, archivedAt: null },
         });
@@ -901,13 +903,15 @@ export class CatalogService {
     }
     const { unitCost, totalCost } = reconcileSurtirCost(dto.qty, rawUnit, rawTotal);
 
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const move = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order of the business's serialized writes.
+        const now = new Date();
         if (dto.supplierId) {
           const supplier = await tx.supplier.findFirst({
             where: { id: dto.supplierId, businessId: ctx.businessId },
@@ -1005,13 +1009,15 @@ export class CatalogService {
       throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.badQty);
     }
 
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const move = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order of the business's serialized writes.
+        const now = new Date();
         const product = await tx.product.findFirst({
           where: { id: productId, businessId: ctx.businessId, archivedAt: null },
         });
