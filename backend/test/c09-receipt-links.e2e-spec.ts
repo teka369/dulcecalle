@@ -1,7 +1,8 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { execSync } from "child_process";
-import { createHash, randomUUID } from "crypto";
+import { createHash, createHmac, randomUUID } from "crypto";
+import { readFileSync } from "fs";
 import * as bcrypt from "bcrypt";
 import * as path from "path";
 import request from "supertest";
@@ -109,7 +110,7 @@ describe("C09-PR5 receipt links and link-login", () => {
     staff = { accessToken: sl.body.accessToken, business: { id: a.business.id } };
   }, 180000);
 
-  it("create: owner gets {id, url, expiresAt}; 32-byte base64url token, only its sha256 stored; expires 48 h after creation; replay is idempotent", async () => {
+  it("create: owner gets {id, url, expiresAt}; 32-byte base64url token, only its sha256 stored; expires 48 h after creation", async () => {
     const rid = await fiada(a, ana.id, productA);
     const key = randomUUID();
     const r = await mkLink(a, rid, key);
@@ -125,18 +126,63 @@ describe("C09-PR5 receipt links and link-login", () => {
     expect(row.expiresAt.getTime() - row.createdAt.getTime()).toBe(48 * H);
     expect(new Date(r.body.expiresAt).getTime()).toBe(row.expiresAt.getTime());
     expect(row).toMatchObject({ businessId: a.business.id, receiptId: rid, usedAt: null, revokedAt: null, createdBy: a.user.id });
-    // Same Idempotency-Key → same link and the same URL, no second row.
-    const again = await mkLink(a, rid, key);
-    expect(again.status).toBe(201);
-    expect(again.body).toEqual(r.body);
-    expect(await prisma.receiptLink.count({ where: { receiptId: rid } })).toBe(1);
-    // Same key, other receipt → 422.
-    const other = await fiada(a, ana.id, productA);
-    expect((await mkLink(a, other, key)).status).toBe(422);
     // Missing key → 400.
     expect((await api().post(`/v1/receipts/${rid}/links`).set(admin(a)).send({})).status).toBe(400);
     // Staff may create (SPEC §7 owner/staff).
     expect((await mkLink(staff as Owner, rid)).status).toBe(201);
+  });
+
+  it("C09-PR5 (Jefecito): repeating the request (same or new Idempotency-Key) mints a NEW random link; the old one stays valid; DB keeps only hashes", async () => {
+    const rid = await fiada(a, ana.id, productA);
+    const key = randomUUID();
+    const l1 = (await mkLink(a, rid, key)).body;
+    const l2r = await mkLink(a, rid, key);
+    const l3r = await mkLink(a, rid);
+    expect(l2r.status).toBe(201);
+    expect(l3r.status).toBe(201);
+    const [t1, t2, t3] = [l1, l2r.body, l3r.body].map((l) => tokenOf(l.url));
+    expect(new Set([t1, t2, t3]).size).toBe(3);
+    expect(new Set([l1.id, l2r.body.id, l3r.body.id]).size).toBe(3);
+    const rows = await prisma.receiptLink.findMany({ where: { receiptId: rid } });
+    expect(rows).toHaveLength(3);
+    for (const t of [t1, t2, t3]) {
+      expect(rows.some((row) => row.tokenHash === sha(t))).toBe(true);
+      expect(JSON.stringify(rows)).not.toContain(t);
+    }
+    // Every link works on its own (each one is single use).
+    for (const t of [t1, t2, t3]) expect((await linkLogin(t)).status).toBe(201);
+  });
+
+  it("C09-PR5 (Jefecito): the token is random — no JWT-secret fallback, no RECEIPT_LINK_SECRET", async () => {
+    const rid = await fiada(a, ana.id, productA);
+    const l = (await mkLink(a, rid)).body;
+    const token = tokenOf(l.url);
+    const derived = createHmac("sha256", process.env.JWT_SECRET!).update(`dulcecalle:receipt-link:v1:${l.id}`).digest("base64url");
+    expect(token).not.toBe(derived);
+    const src = readFileSync(path.join(__dirname, "..", "src", "receipts", "receipt-links.service.ts"), "utf8");
+    expect(src).not.toMatch(/jwt-secrets|requireJwtSecrets|JWT_SECRET|RECEIPT_LINK_SECRET|createHmac/);
+    expect(src).toMatch(/randomBytes\(32\)/);
+  });
+
+  it("C09-PR5 audit: without the right PIN a used / expired / revoked link looks exactly like an unknown token (no state oracle)", async () => {
+    const generic = { code: "UNAUTHORIZED", message: "No pudimos identificarte." };
+    const fred = await customer(a, "Fred Enlace");
+    const used = (await mkLink(a, await fiada(a, fred.id, productA))).body;
+    expect((await linkLogin(tokenOf(used.url))).status).toBe(201);
+    const exp = (await mkLink(a, await fiada(a, fred.id, productA))).body;
+    await prisma.receiptLink.update({ where: { id: exp.id }, data: { createdAt: new Date(Date.now() - 50 * H), expiresAt: new Date(Date.now() - 2 * H) } });
+    const rev = (await mkLink(a, await fiada(a, fred.id, productA))).body;
+    expect((await api().post(`/v1/receipt-links/${rev.id}/revoke`).set(admin(a)).send({})).status).toBe(201);
+    const unknown = await linkLogin(Buffer.alloc(32, 9).toString("base64url"), "000000");
+    expect(unknown.status).toBe(401);
+    for (const l of [used, exp, rev]) {
+      const r = await linkLogin(tokenOf(l.url), "000000");
+      expect(r.status).toBe(401);
+      expect(r.body.error).toMatchObject(generic);
+      expect(Object.keys(r.body.error).sort()).toEqual(Object.keys(unknown.body.error).sort());
+    }
+    expect((await prisma.receiptLink.findUniqueOrThrow({ where: { id: rev.id } })).usedAt).toBeNull();
+    expect((await prisma.receiptLink.findUniqueOrThrow({ where: { id: exp.id } })).usedAt).toBeNull();
   });
 
   it("T5 / isolation: an internal receipt cannot be shared; another business's or unknown receipt → 404", async () => {

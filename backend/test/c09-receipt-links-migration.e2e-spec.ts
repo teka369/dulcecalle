@@ -73,6 +73,8 @@ describe("C09-PR5 receipt links migration", () => {
     await ins("b".repeat(64), "r1");
     await expect(ins("b".repeat(64), "r2")).rejects.toThrow(/token_hash_key/);
     await expect(ins("raw-token-not-a-hash", "r3")).rejects.toThrow(/token_hash_format/);
-    await expect(ins("c".repeat(64), "r1")).rejects.toThrow(/request_id_key/);
+    // C09-PR5 (Jefecito): repeating the request mints a new link, so request_id is NOT unique.
+    await ins("c".repeat(64), "r1");
+    expect((await db.query(`SELECT count(*)::int n FROM receipt_links WHERE request_id = 'r1'`)).rows[0]!.n).toBe(2);
   });
 });
