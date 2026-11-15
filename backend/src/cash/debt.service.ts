@@ -20,6 +20,7 @@ import {
   resolveTarget,
 } from "../shared/debt-allocations";
 import { CashService } from "./cash.service";
+import { emitImputationReceipt, receiptRefs } from "../receipts/receipt-emit";
 import type { BusinessContext } from "../identity/auth.types";
 import type { ApplyCreditDto, RefundCreditDto } from "./debt.dto";
 
@@ -60,6 +61,8 @@ export class DebtService {
       })),
       debtAfter: copToJson(customer.debt),
       creditBalanceAfter: copToJson(customer.creditBalance),
+      // C09-PR3.1 — the receipt emitted with the original apply; never re-emitted.
+      receipts: await receiptRefs(this.prisma, ctx.businessId, groupId),
     };
   }
 
@@ -99,6 +102,17 @@ export class DebtService {
         createdBy: ctx.userId,
         now,
       });
+      // C09-PR3.1 (C09-QA-01) — own receipt DC-I-NNNNNN, same transaction (I-C1, I-C3).
+      const receipt = await emitImputationReceipt(tx, {
+        businessId: ctx.businessId,
+        customerId,
+        groupId: requestId,
+        createdAt: now,
+        timeZone: ctx.timezone,
+        occurredOn: dateKey(occurredOnDate(ctx.timezone, now)),
+        before: { debt: customer.debt, creditBalance: customer.creditBalance },
+        after: { debt: customer.debt - applied, creditBalance: customer.creditBalance - applied },
+      });
       return {
         groupId: requestId,
         customerId,
@@ -107,6 +121,7 @@ export class DebtService {
         debtBefore: copToJson(customer.debt),
         debtAfter: copToJson(customer.debt - applied),
         creditBalanceAfter: copToJson(customer.creditBalance - applied),
+        receipts: receipt ? [receipt] : [],
       };
     });
     if (result) return result;

@@ -2,7 +2,7 @@ import { randomInt, randomUUID } from "crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { contentHash, copString, isoInZone } from "../shared/canonical";
 import { loadObligations } from "../shared/debt-allocations";
-import { formatNumber } from "../shared/sequences";
+import { formatNumber, nextNumber } from "../shared/sequences";
 
 /**
  * C09-PR2 — receipts are written in the SAME transaction as their source
@@ -206,6 +206,74 @@ export async function emitAllocationReceipt(
       toObligations: copString(toObligations),
       toCredit: copString(toCredit),
       creditUsed: copString(creditUsed),
+    },
+  });
+}
+
+/**
+ * C09-PR3.1 (C09-QA-01) — saldo a favor applied with no parent operation
+ * (`POST customers/:id/credit/apply`): its own `allocation` receipt with the
+ * per-business number DC-I-NNNNNN (imputación). Unlike an annex it carries
+ * the customer's debt / saldo a favor before and after, so the I-C3 chain
+ * has no gap. Called in the same transaction that wrote the group's rows;
+ * the number is taken only when there is something to show (a rollback
+ * undoes the bump, I-C6).
+ */
+export async function emitImputationReceipt(
+  tx: Prisma.TransactionClient,
+  args: {
+    businessId: string;
+    customerId: string;
+    groupId: string;
+    createdAt: Date;
+    timeZone: string;
+    occurredOn: string;
+    before: { debt: bigint; creditBalance: bigint };
+    after: { debt: bigint; creditBalance: bigint };
+  },
+): Promise<ReceiptRef | null> {
+  const lines = await collectAllocation(tx, args.businessId, args.customerId, args.groupId);
+  if (lines.length === 0) return null;
+  const number = formatNumber("imputation", await nextNumber(tx, args.businessId, "imputation"))!;
+  const [business, customer] = await Promise.all([
+    tx.business.findUniqueOrThrow({ where: { id: args.businessId }, select: { id: true, name: true } }),
+    tx.customer.findFirstOrThrow({ where: { id: args.customerId, businessId: args.businessId }, select: { id: true, code: true, name: true } }),
+  ]);
+  let toObligations = 0n;
+  let toCredit = 0n;
+  let creditUsed = 0n;
+  for (const l of lines) {
+    const a = BigInt(l.amount);
+    if (l.targetType !== "credit") toObligations += a;
+    else if (a > 0n) toCredit += a;
+    else creditUsed -= a;
+  }
+  return emitReceipt(tx, {
+    businessId: args.businessId,
+    customerId: args.customerId,
+    kind: "allocation",
+    sourceType: "allocation",
+    sourceId: args.groupId,
+    number,
+    createdAt: args.createdAt,
+    snapshot: {
+      kind: "allocation",
+      number,
+      business: { id: business.id, name: business.name },
+      createdAt: isoInZone(args.createdAt, args.timeZone),
+      occurredOn: args.occurredOn,
+      customer: { id: customer.id, code: customer.code, name: customer.name },
+      internal: false,
+      parent: null,
+      adjusted: false,
+      lines,
+      toObligations: copString(toObligations),
+      toCredit: copString(toCredit),
+      creditUsed: copString(creditUsed),
+      debtBefore: copString(args.before.debt),
+      debtAfter: copString(args.after.debt),
+      creditBefore: copString(args.before.creditBalance),
+      creditAfter: copString(args.after.creditBalance),
     },
   });
 }
