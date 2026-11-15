@@ -499,8 +499,7 @@ export class CashService {
     }
 
     this.assertPaymentInput(dto);
-    const now = new Date();
-    const occurredAt = parseOccurredAt(dto.occurredAt, now);
+    const occurredAt = parseOccurredAt(dto.occurredAt, new Date());
 
     try {
       const pay = await this.prisma.$transaction(async (tx) => {
@@ -508,6 +507,9 @@ export class CashService {
         // never rejected for a closed day: it goes to the open operating day,
         // or stays «recibido sin aplicar / requiere revisión» (unassigned).
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order in which numbers and balances are taken (I-C3).
+        const now = new Date();
         return this.createPaymentInTx(tx, ctx, customerId, {
           id: randomUUID(),
           dto,
@@ -792,13 +794,15 @@ export class CashService {
       throw new AppError(ERROR_CODES.VALIDATION, "Di en qué se gastó.");
     }
 
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const row = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order in which numbers and balances are taken (I-C3).
+        const now = new Date();
         const id = randomUUID();
         const expense = await tx.expense.create({
           data: {
@@ -872,13 +876,15 @@ export class CashService {
       throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.noMethod);
     }
 
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const move = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order in which numbers and balances are taken (I-C3).
+        const now = new Date();
         const opens = await tx.cashSession.findMany({
           where: { businessId: ctx.businessId, closedAt: null },
         });
