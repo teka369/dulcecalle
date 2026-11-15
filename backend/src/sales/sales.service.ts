@@ -217,10 +217,10 @@ export class SalesService {
     }
     const method = amountReceived > 0n ? dto.method! : null;
 
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
-    const occurredAt = parseOccurredAt(dto.occurredAt, now);
-    const syncedAt = now;
+    // Business day and default occurredAt come from the request's arrival.
+    const requestedAt = new Date();
+    const occurredOn = occurredOnDate(ctx.timezone, requestedAt);
+    const occurredAt = parseOccurredAt(dto.occurredAt, requestedAt);
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     const productIds = [...new Set(dto.lines.map((l) => l.productId))].sort();
@@ -228,6 +228,10 @@ export class SalesService {
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order in which numbers and balances are taken (I-C3).
+        const now = new Date();
+        const syncedAt = now;
 
         let creditBalance = 0n;
         // C09 §2 — balances before this sale, read inside the lock (I-C3).
@@ -656,13 +660,15 @@ export class SalesService {
       throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.returnEmpty);
     }
 
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order in which numbers and balances are taken (I-C3).
+        const now = new Date();
 
         const sale = await tx.sale.findFirst({
           where: { id: saleId, businessId: ctx.businessId },
