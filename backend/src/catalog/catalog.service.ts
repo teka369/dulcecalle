@@ -813,8 +813,7 @@ export class CatalogService {
     if (amount <= 0n) {
       throw new AppError(ERROR_CODES.VALIDATION, "La deuda tiene que ser mayor a 0.");
     }
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
 
     try {
       const row = await this.prisma.$transaction(async (tx) => {
@@ -822,6 +821,9 @@ export class CatalogService {
         // business. Still allowed on a closed day (no cash involved), now
         // consistent with abonos, which are also accepted after the close.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order of the customer's debt writes.
+        const now = new Date();
         const customer = await tx.customer.findFirst({
           where: { id: customerId, businessId: ctx.businessId },
         });

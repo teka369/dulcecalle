@@ -164,12 +164,14 @@ export class DebtService {
     if (dto.method !== "Efectivo" && dto.method !== "Nequi") {
       throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.noMethod);
     }
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
     try {
       const move = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order in which numbers and balances are taken (I-C3).
+        const now = new Date();
         const today = await tx.cashSession.findUnique({
           where: { businessId_localDate: { businessId: ctx.businessId, localDate: occurredOn } },
         });
