@@ -226,9 +226,20 @@ describe("C09-PR2 receipts", () => {
     const p2 = await post(b, `/v1/customers/${ana.id}/payments`, { amount: 500, method: "Efectivo" });
     const pr2 = await receipt(b, p2.body.receipts[0].id);
     expect(pr2.snapshot).toMatchObject({ debtBefore: "0", debtAfter: "0", creditBefore: "1000", creditAfter: "1500", creditGenerated: "500" });
-    const all = await prisma.receipt.findMany({ where: { businessId: b.biz, customerId: ana.id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
-    // Allocation annexes (PR3) carry open balances per obligation, not the customer chain.
-    const snaps = all.filter((r) => r.kind !== "allocation").map((r) => r.snapshot as Record<string, string | null>);
+    // PR3.1 (C09-QA-01) — saldo a favor applied on its own (credit/apply) gets DC-I-000001 in the chain.
+    await fiada(b, ana.id, 1000);
+    const ap = await post(b, `/v1/customers/${ana.id}/credit/apply`, {});
+    expect(ap.status).toBe(201);
+    expect(ap.body.receipts.map((r: { kind: string; number: string }) => [r.kind, r.number])).toEqual([["allocation", "DC-I-000001"]]);
+    const ir = await receipt(b, ap.body.receipts[0].id);
+    expect(ir.snapshot).toMatchObject({ parent: null, debtBefore: "1000", debtAfter: "0", creditBefore: "1500", creditAfter: "500" });
+    const all = await prisma.receipt.findMany({ where: { businessId: b.biz, customerId: ana.id }, orderBy: [{ createdAt: "asc" }, { number: "asc" }] });
+    // Allocation annexes (PR3, with a parent) carry open balances per obligation, not the customer
+    // chain; a standalone imputation DC-I- (PR3.1, parent null) is a link of the chain.
+    const snaps = all
+      .filter((r) => r.kind !== "allocation" || (r.snapshot as Record<string, unknown>).parent == null)
+      .map((r) => r.snapshot as Record<string, string | null>);
+    expect(snaps.map((x) => x.number)).toEqual(["DC-000001", "DC-P-000001", "DC-D-000001", "DC-P-000002", "DC-000002", "DC-I-000001"]);
     for (let i = 1; i < snaps.length; i++) {
       expect([snaps[i]!.debtBefore, snaps[i]!.creditBefore ?? snaps[i - 1]!.creditAfter]).toEqual([snaps[i - 1]!.debtAfter, snaps[i - 1]!.creditAfter ?? snaps[i]!.creditBefore]);
     }
