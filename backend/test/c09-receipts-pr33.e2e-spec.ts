@@ -144,7 +144,8 @@ describe("C09-PR3.3 mixed concurrency keeps I-C3 ordered (BL-02)", () => {
     return out;
   }
 
-  it("mixed parallel sales, abonos, a return, a reversal, a corregir and a credit/apply for Ana (+ Beto): createdAt order == number order == I-C3 chain, no gaps, balances consistent", async () => {
+  // Tester checks 0 createdAt/number inversions in sales and payments over 3 concurrent passes: same here.
+  it.each([1, 2, 3])("pass %i — mixed parallel sales, abonos, a return, a reversal, a corregir and a credit/apply for Ana (+ Beto): createdAt order == number order == I-C3 chain, no gaps, balances consistent", async () => {
     const b = await newBiz();
     const ana = await customer(b, "Ana");
     const beto = await customer(b, "Beto");
@@ -183,6 +184,9 @@ describe("C09-PR3.3 mixed concurrency keeps I-C3 ordered (BL-02)", () => {
       ...[ana.id, beto.id, cris.id].flatMap((c) => chainProblems(rows.filter((r) => r.customerId === c)).map((p) => `[${c === ana.id ? "Ana" : c === beto.id ? "Beto" : "Cris"}] ${p}`)),
     ];
     expect(problems).toEqual([]);
+    // The passes really exercised the sale and payment sequences.
+    expect(rows.filter((r) => /^DC-\d{6}$/.test(r.number)).length).toBe(11); // 3 setup + 8 parallel
+    expect(rows.filter((r) => /^DC-P-\d{6}$/.test(r.number)).length).toBe(10); // 3 setup + 6 parallel + 1 corregir replacement
 
     // Balances: deterministic finals, equal to the last chain link; never negative saldo a favor.
     // Ana: 10000 + 1000 (P0 reversed) + 700 (P1 corrected away) − 1700 + 4×1000 − 4×500 − 1000 (return) = 11000.
