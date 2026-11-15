@@ -7,6 +7,7 @@ import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import { isoInZone } from "../shared/canonical";
 import type { CustomerAuth } from "../identity/auth.types";
 import { ackStates, type AckState } from "./receipt-acks";
+import { imputationCompensations } from "./receipt-compensation";
 
 export const RECEIPT_KINDS = ["sale", "payment", "allocation", "reversal", "adjustment", "return"] as const;
 export type ReceiptStatus = "vigente" | "reemplazado" | "anulado";
@@ -28,12 +29,32 @@ function dayStart(day: string, timeZone: string): Date {
 
 type Row = Prisma.ReceiptGetPayload<object>;
 
+/** C09-PR3.1 — a standalone imputation DC-I- (allocation receipt with no parent operation). */
+function isImputation(r: Row): boolean {
+  if (r.kind !== "allocation" || !r.customerId) return false;
+  const snap = r.snapshot as Record<string, unknown> | null;
+  return snap != null && typeof snap === "object" && snap.parent === null;
+}
+
 @Injectable()
 export class ReceiptsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** C09 §3.2 — status is derived, the receipt row never changes. */
   private async statuses(businessId: string, rows: Row[]): Promise<Map<string, ReceiptStatus>> {
+    return (await this.derive(businessId, rows)).status;
+  }
+
+  /**
+   * The one status derivation (owner and portal, list and detail). Also
+   * returns, per standalone imputation (DC-I-, PR3.2), the reversals that
+   * compensated its credit_apply rows: fully → «anulado»; partially → it
+   * stays «vigente»; either way those reversals are `related`.
+   */
+  private async derive(
+    businessId: string,
+    rows: Row[],
+  ): Promise<{ status: Map<string, ReceiptStatus>; compensatedBy: Map<string, string[]> }> {
     const ids = rows.map((r) => r.id);
     const replaced = new Set(
       (
@@ -63,16 +84,40 @@ export class ReceiptsService {
             })
           ).flatMap((x) => [`${x.targetType}:${x.targetId}`, `allocation:${x.targetId}`]),
     );
+    // C09-PR3.2 — standalone imputations (allocation with no parent: DC-I-).
+    const imputations = rows.filter((r) => isImputation(r));
+    const comp = await imputationCompensations(
+      this.prisma,
+      businessId,
+      imputations.map((r) => ({ groupId: r.sourceId, customerId: r.customerId! })),
+    );
     const out = new Map<string, ReceiptStatus>();
+    const compensatedBy = new Map<string, string[]>();
     for (const r of rows) {
+      const c = isImputation(r) ? comp.get(r.sourceId) : undefined;
+      if (c && c.reversalIds.length > 0) compensatedBy.set(r.id, c.reversalIds);
       const st: ReceiptStatus = replaced.has(r.id)
         ? "reemplazado"
-        : reversed.has(r.sourceType === "allocation" ? `allocation:${r.sourceId}` : `${REVERSAL_TARGET[r.sourceType]}:${r.sourceId}`)
+        : reversed.has(r.sourceType === "allocation" ? `allocation:${r.sourceId}` : `${REVERSAL_TARGET[r.sourceType]}:${r.sourceId}`) ||
+            (c !== undefined && c.total > 0n && c.compensated >= c.total)
           ? "anulado"
           : "vigente";
       out.set(r.id, st);
     }
-    return out;
+    return { status: out, compensatedBy };
+  }
+
+  /**
+   * `related`: receipts of the same operation (shared source id) plus, for a
+   * DC-I-, the receipts of the reversals that compensated it (PR3.2).
+   */
+  private async related(businessId: string, r: Row, compensatedBy: string[] | undefined, scope: Prisma.ReceiptWhereInput = {}) {
+    const sourceIds = [r.sourceId, ...(compensatedBy ?? [])];
+    return this.prisma.receipt.findMany({
+      where: { ...scope, businessId, sourceId: { in: sourceIds }, id: { not: r.id } },
+      orderBy: [{ number: "asc" }],
+      select: { id: true, kind: true, number: true },
+    });
   }
 
   private summary(r: Row, status: ReceiptStatus, ackState: AckState = "pending") {
@@ -124,14 +169,11 @@ export class ReceiptsService {
   async get(ctx: BusinessContext, id: string) {
     const r = await this.prisma.receipt.findFirst({ where: { id, businessId: ctx.businessId } });
     if (!r) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
-    const st = await this.statuses(ctx.businessId, [r]);
+    const { status: st, compensatedBy } = await this.derive(ctx.businessId, [r]);
     // C09-PR3 — receipts of the same operation (payment ↔ its allocation
-    // annex, reversal ↔ its annex), derived from the shared source id.
-    const related = await this.prisma.receipt.findMany({
-      where: { businessId: ctx.businessId, sourceId: r.sourceId, id: { not: r.id } },
-      orderBy: [{ number: "asc" }],
-      select: { id: true, kind: true, number: true },
-    });
+    // annex, reversal ↔ its annex), derived from the shared source id;
+    // PR3.2 — plus the reversals that compensated a DC-I-.
+    const related = await this.related(ctx.businessId, r, compensatedBy.get(r.id));
     const acks = await this.prisma.receiptAcknowledgement.findMany({
       where: { businessId: ctx.businessId, receiptId: r.id },
       orderBy: [{ at: "asc" }, { id: "asc" }],
@@ -188,12 +230,8 @@ export class ReceiptsService {
 
   async portalGet(auth: CustomerAuth, id: string) {
     const r = await this.portalFind(auth, id);
-    const st = await this.statuses(auth.businessId, [r]);
-    const related = await this.prisma.receipt.findMany({
-      where: { ...this.portalWhere(auth), sourceId: r.sourceId, id: { not: r.id } },
-      orderBy: [{ number: "asc" }],
-      select: { id: true, kind: true, number: true },
-    });
+    const { status: st, compensatedBy } = await this.derive(auth.businessId, [r]);
+    const related = await this.related(auth.businessId, r, compensatedBy.get(r.id), { customerId: auth.customerId });
     const acks = await this.prisma.receiptAcknowledgement.findMany({
       where: { businessId: auth.businessId, customerId: auth.customerId, receiptId: r.id },
       orderBy: [{ at: "asc" }, { id: "asc" }],
