@@ -154,6 +154,8 @@ describe("C09-PR3.3 mixed concurrency keeps I-C3 ordered (BL-02)", () => {
     const p0 = await post(b, `/v1/customers/${ana.id}/payments`, { amount: 1000, method: "Efectivo" });
     const p1 = await post(b, `/v1/customers/${ana.id}/payments`, { amount: 700, method: "Efectivo" });
     await fiada(b, beto.id, 5000);
+    const sv = await fiada(b, beto.id, 2000); // voided in parallel
+    expect(sv.status).toBe(201);
     const cris = await customer(b, "Cris");
     await post(b, `/v1/customers/${cris.id}/payments`, { amount: 900, method: "Efectivo" }); // saldo a favor 900
     await fiada(b, cris.id, 3000);
@@ -173,6 +175,8 @@ describe("C09-PR3.3 mixed concurrency keeps I-C3 ordered (BL-02)", () => {
     );
     for (let i = 0; i < 2; i++) reqs.push(fiada(b, beto.id, 1000));
     for (let i = 0; i < 2; i++) reqs.push(post(b, `/v1/customers/${beto.id}/payments`, { amount: 300, method: "Efectivo" }));
+    // Void of Beto's fiada racing Beto's abonos and the corregir replacement (also for Beto).
+    reqs.push(post(b, `/v1/sales/${sv.body.id}/void`, { reasonCode: "error_digitacion" }));
     reqs.push(post(b, `/v1/customers/${cris.id}/credit/apply`, {}));
     for (let i = 0; i < 2; i++) reqs.push(fiada(b, cris.id, 1000));
     const res = await Promise.all(reqs);
@@ -185,12 +189,12 @@ describe("C09-PR3.3 mixed concurrency keeps I-C3 ordered (BL-02)", () => {
     ];
     expect(problems).toEqual([]);
     // The passes really exercised the sale and payment sequences.
-    expect(rows.filter((r) => /^DC-\d{6}$/.test(r.number)).length).toBe(11); // 3 setup + 8 parallel
+    expect(rows.filter((r) => /^DC-\d{6}$/.test(r.number)).length).toBe(12); // 4 setup + 8 parallel
     expect(rows.filter((r) => /^DC-P-\d{6}$/.test(r.number)).length).toBe(10); // 3 setup + 6 parallel + 1 corregir replacement
 
     // Balances: deterministic finals, equal to the last chain link; never negative saldo a favor.
     // Ana: 10000 + 1000 (P0 reversed) + 700 (P1 corrected away) − 1700 + 4×1000 − 4×500 − 1000 (return) = 11000.
-    // Beto: 5000 − 700 (replacement) + 2×1000 − 2×300 = 5700. Cris: 3000 − 900 + 2×1000 = 4100.
+    // Beto: 5000 + 2000 − 2000 (voided) − 700 (replacement) + 2×1000 − 2×300 = 5700. Cris: 3000 − 900 + 2×1000 = 4100.
     for (const [id, debt, credit] of [[ana.id, 11000n, 0n], [beto.id, 5700n, 0n], [cris.id, 4100n, 0n]] as const) {
       const c = await prisma.customer.findUniqueOrThrow({ where: { id } });
       expect([c.debt, c.creditBalance]).toEqual([debt, credit]);
