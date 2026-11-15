@@ -116,7 +116,7 @@ describe("C09-PR3.4 midnight boundary: occurredOn = arrival day, createdAt post-
     return prisma.receipt.findMany({ where: { businessId: b.biz, id: { in: ids } } });
   }
 
-  it("abono, corregir, payment reversal, sale void and credit/apply crossing midnight stay on the arrival day", async () => {
+  it("abono, corregir, payment reversal, sale void and credit/apply (plus return and expense) crossing midnight stay on the arrival day", async () => {
     const owner = await seedOwner(app, "c09r34@test.co", "Tienda Medianoche");
     const b: Biz = { token: owner.accessToken, biz: owner.business.id, productId: "" };
     b.productId = (await post(b, "/v1/products", { name: "Bombón", price: 1000, stock: 1000, avgCost: 400 })).body.id;
@@ -124,7 +124,8 @@ describe("C09-PR3.4 midnight boundary: occurredOn = arrival day, createdAt post-
     expect(session.status).toBe(201);
     const ana = (await post(b, "/v1/customers", { name: "Ana Medianoche" })).body;
     const beto = (await post(b, "/v1/customers", { name: "Beto Medianoche" })).body;
-    expect((await fiada(b, ana.id, 5000)).status).toBe(201);
+    const s0 = await fiada(b, ana.id, 5000);
+    expect(s0.status).toBe(201);
     const toVoid = (await fiada(b, ana.id, 1000)).body;
     const p1 = (await abono(b, ana.id, 500)).body; // corrected across midnight
     const p2 = (await abono(b, ana.id, 300)).body; // reversed across midnight
@@ -187,6 +188,19 @@ describe("C09-PR3.4 midnight boundary: occurredOn = arrival day, createdAt post-
     // 5. credit/apply (DC-I-).
     const ap = await acrossMidnight(b, () => post(b, `/v1/customers/${beto.id}/credit/apply`, {}));
     await check("credit/apply", ap, [], ids(ap.res));
+
+    // 6. Paths already on the arrival day since PR3.3 (justification evidence, not a fix): return and expense.
+    const sale0 = await prisma.sale.findUniqueOrThrow({ where: { id: s0.body.id }, include: { lines: true } });
+    const rt = await acrossMidnight(b, () => post(b, `/v1/sales/${s0.body.id}/returns`, { lines: [{ saleLineId: sale0.lines[0]!.id, qty: 1 }] }));
+    if (rt.res.status === 201) {
+      const ret = await prisma.saleReturn.findFirstOrThrow({ where: { businessId: b.biz, saleId: s0.body.id } });
+      await check("devolución", rt, [ret.occurredOn], ids(rt.res));
+    } else await check("devolución", rt, [], []);
+    const ex = await acrossMidnight(b, () => post(b, "/v1/expenses", { amount: 100, category: "Otros", method: "Efectivo" }));
+    if (ex.res.status === 201) {
+      const row = await prisma.expense.findFirstOrThrow({ where: { businessId: b.biz } });
+      if (key(row.occurredOn) !== D) problems.push(`gasto: occurredOn ${key(row.occurredOn)} ≠ ${D}`);
+    } else problems.push(`gasto: HTTP ${ex.res.status} ${JSON.stringify(ex.res.body?.error ?? ex.res.body)}`);
 
     // No createdAt/number inversion in any sequence of the business.
     const all = await prisma.receipt.findMany({ where: { businessId: b.biz } });
