@@ -215,4 +215,29 @@ describe("C09-PR5 public receipt verification", () => {
     expect(Object.keys(ri.body).sort()).toEqual(FIELDS);
     expect(ri.body).toMatchObject({ kind: "sale", amount: "1000", businessName: "Tienda Verifica A" });
   });
+
+  it("C09-PR5 audit (post PR3.2): a standalone DC-I- verifies with the shared derivation («anulado» after its abono is reversed); no reasonText leaks", async () => {
+    const c = (await post(a, "/v1/customers", { name: "Cami Verifica" })).body;
+    const p = (await post(a, `/v1/customers/${c.id}/payments`, { amount: 800, method: "Efectivo" })).body;
+    expect((await post(a, "/v1/sales", { lines: [{ productId: productA, qty: 1, unitPrice: 1000 }], paymentKind: "credit", customerId: c.id, amountReceived: 0 })).status).toBe(201);
+    const ap = await post(a, `/v1/customers/${c.id}/credit/apply`, {});
+    expect(ap.status).toBe(201);
+    const ir = await owner(a, ap.body.receipts[0].id);
+    expect(ir.number).toMatch(/^DC-I-\d{6}$/);
+    const before = await verify(ir.verifyCode);
+    expect(before.body).toMatchObject({ valid: true, kind: "allocation", number: ir.number, amount: "800", status: "vigente" });
+    const secret = "texto privado zq9 del dueño";
+    const rv = await post(a, `/v1/customers/${c.id}/payments/${p.id}/reverse`, { reasonCode: "duplicado", reasonText: secret });
+    expect(rv.status).toBe(201);
+    const after = await verify(ir.verifyCode);
+    expect(after.body).toMatchObject({ valid: true, number: ir.number, status: "anulado", hashPrefix: before.body.hashPrefix });
+    expect(Object.keys(after.body).sort()).toEqual(FIELDS);
+    for (const r of rv.body.receipts as Array<{ id: string }>) {
+      const x = await verify((await owner(a, r.id)).verifyCode);
+      expect(x.status).toBe(200);
+      expect(Object.keys(x.body).sort()).toEqual(FIELDS);
+      expect(JSON.stringify(x.body)).not.toContain("zq9");
+    }
+    expect(JSON.stringify(after.body)).not.toContain("zq9");
+  });
 });
