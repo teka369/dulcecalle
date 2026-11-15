@@ -71,6 +71,8 @@ export class DebtService {
     const target = parseTarget(dto.target, false);
     const prior = await this.applyReplay(ctx, customerId, requestId, dto.amount);
     if (prior) return prior;
+    // C09-PR3.4 (C09-INV-01) — business day = arrival day (before the lock).
+    const requestedAt = new Date();
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
       // C09-PR3.2 — the instant is taken AFTER the lock, so DC-I- receipts
@@ -112,7 +114,7 @@ export class DebtService {
         groupId: requestId,
         createdAt: now,
         timeZone: ctx.timezone,
-        occurredOn: dateKey(occurredOnDate(ctx.timezone, now)),
+        occurredOn: dateKey(occurredOnDate(ctx.timezone, requestedAt)),
         before: { debt: customer.debt, creditBalance: customer.creditBalance },
         after: { debt: customer.debt - applied, creditBalance: customer.creditBalance - applied },
       });

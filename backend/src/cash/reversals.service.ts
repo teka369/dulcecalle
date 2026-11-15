@@ -161,8 +161,8 @@ export class ReversalsService {
   ) {}
 
   voidSale(ctx: BusinessContext, saleId: string, dto: ReverseDto, key: string | undefined, dryRun: boolean) {
-    return this.run(ctx, { targetType: "sale", targetId: saleId, dto, key, dryRun }, (tx, forUpdate) =>
-      this.prepareSale(tx, ctx, saleId, dto, forUpdate),
+    return this.run(ctx, { targetType: "sale", targetId: saleId, dto, key, dryRun }, (tx, forUpdate, requestedAt) =>
+      this.prepareSale(tx, ctx, saleId, dto, forUpdate, requestedAt),
     );
   }
 
@@ -174,8 +174,8 @@ export class ReversalsService {
     key: string | undefined,
     dryRun: boolean,
   ) {
-    return this.run(ctx, { targetType: "customer_payment", targetId: paymentId, dto, key, dryRun }, (tx, forUpdate) =>
-      this.preparePayment(tx, ctx, customerId, paymentId, dto, forUpdate),
+    return this.run(ctx, { targetType: "customer_payment", targetId: paymentId, dto, key, dryRun }, (tx, forUpdate, requestedAt) =>
+      this.preparePayment(tx, ctx, customerId, paymentId, dto, forUpdate, requestedAt),
     );
   }
 
@@ -211,8 +211,8 @@ export class ReversalsService {
           },
         },
       },
-      async (tx, forUpdate) => {
-        const p = await this.preparePayment(tx, ctx, customerId, paymentId, dto, forUpdate);
+      async (tx, forUpdate, requestedAt) => {
+        const p = await this.preparePayment(tx, ctx, customerId, paymentId, dto, forUpdate, requestedAt);
         const other = await tx.customer.findFirst({ where: { id: r.customerId, businessId: ctx.businessId }, select: { id: true } });
         if (!other) fail(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
         if (dryRun) {
@@ -239,13 +239,17 @@ export class ReversalsService {
         hashFields: Record<string, unknown>;
       };
     },
-    prepare: (tx: Tx, forUpdate: boolean) => Promise<Prepared>,
+    prepare: (tx: Tx, forUpdate: boolean, requestedAt: Date) => Promise<Prepared>,
   ) {
+    // C09-PR3.4 (C09-INV-01) — the business day (`p.today`, the replacement
+    // abono's day) is the day the request ARRIVED, taken before the lock;
+    // the post-lock `now` is only createdAt (BL-02).
+    const requestedAt = new Date();
     const reason = normalizeReason(op.dto);
     if (op.dryRun) {
       // §8 dryRun: same validations, no writes, no sequence, the key is
       // neither read nor registered (T30). Effects = those of the real call.
-      const p = await this.prisma.$transaction((tx) => prepare(tx, false));
+      const p = await this.prisma.$transaction((tx) => prepare(tx, false, requestedAt));
       return {
         dryRun: true as const,
         targetType: p.targetType,
@@ -301,7 +305,7 @@ export class ReversalsService {
             assertSamePayload(again.payloadHash, hash);
             return again.id;
           }
-          const p = await prepare(tx, true);
+          const p = await prepare(tx, true, requestedAt);
           const blocker = BLOCKER_ORDER.find((b) => p.blockers.includes(b));
           if (blocker) fail(blocker, BLOCKER_MESSAGE[blocker]);
           if (op.replacement) {
@@ -367,7 +371,8 @@ export class ReversalsService {
               hash: op.replacement.hash,
               requestId: op.replacement.dto.requestId,
               now: new Date(now.getTime() + 1),
-              occurredAt: now,
+              requestedAt,
+              occurredAt: requestedAt,
               replacesPaymentId: p.targetId,
             });
           }
@@ -559,9 +564,9 @@ export class ReversalsService {
   private async dayAndCaja(
     tx: Tx,
     ctx: BusinessContext,
-    args: { originalOccurredOn: Date; cash: { amount: bigint; method: Method } | null; confirmOld: boolean; forUpdate: boolean },
+    args: { originalOccurredOn: Date; cash: { amount: bigint; method: Method } | null; confirmOld: boolean; forUpdate: boolean; requestedAt: Date },
   ) {
-    const today = occurredOnDate(ctx.timezone);
+    const today = occurredOnDate(ctx.timezone, args.requestedAt);
     const blockers: Blocker[] = [];
     const warnings: string[] = [];
     const rows = args.forUpdate
@@ -685,7 +690,7 @@ export class ReversalsService {
   }
 
   /** §5.1 — void what is left of a sale (I-R11). */
-  private async prepareSale(tx: Tx, ctx: BusinessContext, saleId: string, dto: ReverseDto, forUpdate: boolean): Promise<Prepared> {
+  private async prepareSale(tx: Tx, ctx: BusinessContext, saleId: string, dto: ReverseDto, forUpdate: boolean, requestedAt: Date): Promise<Prepared> {
     const sale = await tx.sale.findFirst({
       where: { id: saleId, businessId: ctx.businessId },
       include: { lines: true, returns: { include: { lines: true } } },
@@ -737,6 +742,7 @@ export class ReversalsService {
       cash,
       confirmOld: dto.confirmOld === true,
       forUpdate,
+      requestedAt,
     });
 
     const products = perProduct.size
@@ -810,6 +816,7 @@ export class ReversalsService {
     paymentId: string,
     dto: ReverseDto,
     forUpdate: boolean,
+    requestedAt: Date,
   ): Promise<Prepared> {
     const payment = await tx.customerPayment.findFirst({
       where: { id: paymentId, customerId, businessId: ctx.businessId },
@@ -836,6 +843,7 @@ export class ReversalsService {
       cash,
       confirmOld: dto.confirmOld === true,
       forUpdate,
+      requestedAt,
     });
     const bal = this.balances(state.obligations, plan.lines);
     const c = state.customer;
