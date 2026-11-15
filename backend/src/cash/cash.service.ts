@@ -499,7 +499,11 @@ export class CashService {
     }
 
     this.assertPaymentInput(dto);
-    const occurredAt = parseOccurredAt(dto.occurredAt, new Date());
+    // C09-PR3.4 (C09-INV-01) — the business day is the day the request
+    // ARRIVED (before the lock), like the sale; `now` (after the lock) is
+    // only createdAt/syncedAt.
+    const requestedAt = new Date();
+    const occurredAt = parseOccurredAt(dto.occurredAt, requestedAt);
 
     try {
       const pay = await this.prisma.$transaction(async (tx) => {
@@ -518,6 +522,7 @@ export class CashService {
           hash,
           requestId,
           now,
+          requestedAt,
           occurredAt,
         });
       });
@@ -563,7 +568,10 @@ export class CashService {
       overflow: "fifo" | "credit";
       hash: string;
       requestId: string;
+      /** createdAt/syncedAt: taken AFTER the business lock (BL-02). */
       now: Date;
+      /** Arrival instant, taken BEFORE the lock: fixes the business day (C09-INV-01). */
+      requestedAt: Date;
       occurredAt: Date;
       /** C07 «corregir» (decision 21). */
       replacesPaymentId?: string | null;
@@ -571,7 +579,7 @@ export class CashService {
   ) {
     const { id, dto, target, overflow, hash, requestId, now } = args;
     const amount = asCop(dto.amount);
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, args.requestedAt);
     const customer = await tx.customer.findFirst({
       where: { id: customerId, businessId: ctx.businessId },
     });
