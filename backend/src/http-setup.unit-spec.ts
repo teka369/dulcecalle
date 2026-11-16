@@ -4,7 +4,7 @@ import { APP_GUARD, NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import request from "supertest";
-import { configureHttp, originAllowed } from "./http-setup";
+import { configureHttp, originAllowed, trustPrivateProxy } from "./http-setup";
 
 /** loop/v1 investigador #1/#2/#8: real client IP behind Render's proxy + explicit CORS list. */
 @Controller()
@@ -59,6 +59,13 @@ describe("trust proxy (rate limit keyed on the real client IP)", () => {
     }
     await http.get("/ip").set("X-Forwarded-For", "3.3.3.3, 198.51.100.9").expect(429);
     await app.close();
+  });
+});
+
+describe("C09-PR5.2 trust proxy by private subnet (T02)", () => {
+  it("trusts only private/loopback proxies, never a public address", () => {
+    for (const a of ["127.0.0.1", "::1", "::ffff:127.0.0.1", "10.21.157.68", "172.16.0.1", "192.168.0.2", "100.64.0.1", "fd00::1"]) expect(trustPrivateProxy(a)).toBe(true);
+    for (const a of ["198.51.100.78", "104.22.17.40", "2001:db8::1"]) expect(trustPrivateProxy(a)).toBe(false);
   });
 });
 

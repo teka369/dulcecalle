@@ -1,20 +1,22 @@
 import { PAGING_HEADERS } from "./shared/http/paging-headers.interceptor";
+import { isPrivatePeer } from "./shared/http/client-ip";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 
 type Env = Partial<Record<string, string | undefined>>;
 
 /**
- * Render puts one proxy hop we must trust in front of the app (Cloudflare →
- * Render LB → app; Render documents `trust proxy` = 1). With it, `req.ip` /
- * `req.ips` come from the X-Forwarded-For entry Render appended, so the
- * ThrottlerGuard keys on the real client instead of one shared proxy bucket,
- * and a client cannot spoof the left-most entry. Override with
- * TRUST_PROXY_HOPS only after checking `req.ip` on a deployed Preview.
+ * C09-PR5.2 (Tester C09-PR5-T02) — `trust proxy` by PRIVATE SUBNET, not by
+ * hop count. Render's proxy reaches the app from a private address; Express
+ * walks X-Forwarded-For from the right and stops at the first address that
+ * is not private, so behind Render `req.ip` is the Cloudflare edge Render
+ * appended (the real client comes from CF-Connecting-IP, see client-ip.ts),
+ * and a client-forged left-most entry is never reached. A PUBLIC direct peer
+ * is not trusted at all: `req.ip` is the socket address and XFF is ignored.
+ * (Replaces TRUST_PROXY_HOPS = 1, which trusted one hop even from a public
+ * peer, so a forged XFF picked the bucket.)
  */
-export function trustProxyHops(env: Env = process.env): number {
-  const raw = env.TRUST_PROXY_HOPS?.trim();
-  const n = raw ? Number(raw) : 1;
-  return Number.isInteger(n) && n >= 0 ? n : 1;
+export function trustPrivateProxy(addr: string): boolean {
+  return isPrivatePeer(addr);
 }
 
 /** Production PWA. */
@@ -36,7 +38,7 @@ export function originAllowed(origin: string, env: Env = process.env): boolean {
 }
 
 export function configureHttp(app: NestExpressApplication, env: Env = process.env): void {
-  app.set("trust proxy", trustProxyHops(env));
+  app.set("trust proxy", trustPrivateProxy);
   app.enableCors({
     origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
       // No Origin (curl, server-to-server, same-origin) is not a CORS request.

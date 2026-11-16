@@ -25,7 +25,9 @@ type ReqLike = {
  * - the socket peer is a private/loopback address, i.e. the request came
  *   through Render's internal proxy and not straight from the internet;
  * - it holds exactly one valid IP.
- * Otherwise `req.ip` (trust proxy hops) is used, the pre-PR5.1 behaviour.
+ * Otherwise, behind the private proxy, `req.ip` (trust proxy by private
+ * subnet, http-setup.ts). C09-PR5.2: from a PUBLIC peer the socket address
+ * is the key and every forwarded header is ignored.
  */
 export function clientIpHeader(env: Env = process.env): string | null {
   const raw = env.CLIENT_IP_HEADER?.trim().toLowerCase();
@@ -43,12 +45,18 @@ export function isPrivatePeer(addr: string | undefined): boolean {
 }
 
 export function clientIp(req: ReqLike, env: Env = process.env): string | undefined {
+  const peer = req.socket?.remoteAddress;
+  // C09-PR5.2 (T02) — a public direct peer did not come through the proxy:
+  // nothing it sends (CF-Connecting-IP, X-Forwarded-For) picks the bucket.
+  if (!isPrivatePeer(peer)) return peer ? peer.replace(/^::ffff:/i, "") : req.ip;
   const name = clientIpHeader(env);
-  if (name && isPrivatePeer(req.socket?.remoteAddress)) {
+  if (name) {
     const raw = req.headers?.[name];
     const value = typeof raw === "string" ? raw.trim().replace(/^::ffff:/i, "") : "";
     if (value && isIP(value) !== 0) return value;
   }
+  // Behind the private proxy without a usable header: req.ip, i.e. the first
+  // non-private X-Forwarded-For entry from the right (trust proxy by subnet).
   return req.ip;
 }
 

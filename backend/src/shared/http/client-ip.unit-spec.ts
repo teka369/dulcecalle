@@ -35,6 +35,12 @@ describe("clientIp", () => {
     expect(clientIp(behindRender({ "true-client-ip": "203.0.113.9" }), { CLIENT_IP_HEADER: "True-Client-IP" })).toBe("203.0.113.9");
   });
 
+  it("C09-PR5.2 (T02): a public peer is keyed by its socket IP even if req.ip came from a forged XFF", () => {
+    const forged = { ip: "45.160.0.7", headers: { "x-forwarded-for": "45.160.0.7", "cf-connecting-ip": "203.0.113.7" }, socket: { remoteAddress: "198.51.100.78" } };
+    expect(clientIp(forged, {})).toBe("198.51.100.78");
+    expect(clientIp({ ...forged, socket: { remoteAddress: "::ffff:198.51.100.78" } }, {})).toBe("198.51.100.78");
+  });
+
   it("private peers", () => {
     for (const a of ["10.1.2.3", "172.16.0.1", "192.168.1.1", "127.0.0.1", "::1", "::ffff:10.0.0.1", "100.64.0.1", "fd12::1"]) expect(isPrivatePeer(a)).toBe(true);
     for (const a of ["104.22.17.40", "203.0.113.7", "2001:db8::1", undefined]) expect(isPrivatePeer(a)).toBe(false);
