@@ -1,3 +1,4 @@
+import { dateKey } from "./clock";
 import { AppError, ERROR_CODES, MESSAGES } from "./errors";
 
 type SessionReader = {
@@ -39,6 +40,11 @@ export async function assertDayEditable(
 /**
  * Serialize economic writes for one business and re-check closed-day
  * against a locked session row. Call inside the DB transaction.
+ *
+ * C09-PR3.5 — the business day is bound as a DATE (`'YYYY-MM-DD'::date`), as
+ * reversals do. Binding the JS Date compared the DATE column with a
+ * timestamptz, which Postgres resolves in the session TimeZone: off UTC it
+ * never matched and a close committed while the write waited was missed.
  */
 export async function lockAndAssertDayEditable(
   tx: TxLock,
@@ -50,7 +56,7 @@ export async function lockAndAssertDayEditable(
     SELECT closed_at
     FROM cash_sessions
     WHERE business_id = ${businessId}::uuid
-      AND local_date = ${occurredOn}
+      AND local_date = ${dateKey(occurredOn)}::date
     FOR UPDATE
   `) as Array<{ closed_at: Date | null }>;
   if (rows[0]?.closed_at) {
