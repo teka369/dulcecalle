@@ -8,7 +8,7 @@ import { C0, CUS, installFakeApi, PROD, readiness, type Fake } from "./fixtures"
  * Fictitious data only.
  */
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
-const RID = (n: number) => `00000000-0000-4000-8000-0000000009${String(n).padStart(2, "0")}`;
+const RID = (n: number) => `00000000-0000-4000-8000-${String(9000 + n).padStart(12, "0")}`;
 const LINK_URL = "https://dulcecalle.vercel.app/cliente/comprobante/tok_QA-123";
 
 type Seen = { linkPosts: Array<{ path: string; key: string | null }> };
@@ -74,6 +74,8 @@ test("fiada with a customer: «Copiar enlace» mints one 48 h link and «Compart
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const fake = await installFakeApi(context);
   const seen = await serverSales(context, fake);
+  // Never reach the real WhatsApp: stub the share target.
+  await context.route(/^https:\/\/(wa\.me|api\.whatsapp\.com)\//, (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<p>wa stub</p>" }));
   await page.goto("/ventas/nueva");
   await toCobrar(page);
   await page.getByRole("radio", { name: "Fiada" }).click();
@@ -92,6 +94,7 @@ test("fiada with a customer: «Copiar enlace» mints one 48 h link and «Compart
   const popup = page.waitForEvent("popup");
   await sheet.getByRole("button", { name: "Compartir por WhatsApp" }).click();
   const wa = await popup;
+  await wa.waitForURL(/^https:\/\/(wa\.me|api\.whatsapp\.com)\//, { timeout: 15_000 });
   const href = wa.url();
   expect(href.startsWith("https://wa.me/") || href.startsWith("https://api.whatsapp.com/")).toBe(true);
   expect(decodeURIComponent(href)).toContain(`Tu comprobante DC-000125: ${LINK_URL}`);
@@ -156,7 +159,7 @@ test("abono online: the sheet shows DC-P- and offers the link", async ({ context
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 15_000 }).toBe(`/clientes/${C0}`);
 });
 
-test("offline sale: «Venta guardada en este teléfono», L- ref, no DC- and no link until it is sent", async ({ context, page }) => {
+test("offline fiada: «Venta guardada en este teléfono», L- ref, no DC- and no link until it is sent", async ({ context, page }) => {
   test.setTimeout(400_000);
   const fake = await installFakeApi(context);
   await serverSales(context, fake);
@@ -168,6 +171,9 @@ test("offline sale: «Venta guardada en este teléfono», L- ref, no DC- and no 
   await context.setOffline(true);
   await page.goto("/ventas/nueva").catch(() => undefined);
   await toCobrar(page);
+  await page.getByRole("radio", { name: "Fiada" }).click();
+  await page.locator('button[aria-labelledby="cliente-label"]').click();
+  await page.getByRole("dialog", { name: "Selecciona cliente" }).getByRole("button", { name: new RegExp(CUS.name) }).click();
   await page.getByRole("button", { name: "Registrar" }).click();
   const sheet = page.getByRole("dialog", { name: "Venta guardada en este teléfono" });
   await expect(sheet).toBeVisible({ timeout: 15_000 });
@@ -175,6 +181,7 @@ test("offline sale: «Venta guardada en este teléfono», L- ref, no DC- and no 
   await expect(sheet).toContainText("El enlace estará cuando se envíe.");
   await expect(sheet).not.toContainText("DC-");
   await expect(sheet.getByRole("button", { name: "Copiar enlace" })).toHaveCount(0);
+  await expect(sheet.getByRole("button", { name: "Compartir por WhatsApp" })).toHaveCount(0);
   await expect(sheet.getByRole("button", { name: "Compartir texto" })).toBeVisible();
   fake.offline = false;
   await context.setOffline(false);
