@@ -81,6 +81,17 @@ export class DebtService {
       const now = new Date();
       const again = await tx.debtAllocation.count({ where: { businessId: ctx.businessId, groupId: requestId } });
       if (again > 0) return null;
+      // C09-PR3.5 — closed days are immutable: saldo a favor is never applied
+      // to a closed arrival day (PR3.4), nor moved silently to another day.
+      // Checked UNDER the lock against the locked session row, so a close that
+      // committed while this request waited is honoured. Same code and copy
+      // as reversals; nothing is written (no DC-I-, no number, no rows).
+      const day = (await tx.$queryRaw`
+        SELECT closed_at FROM cash_sessions
+        WHERE business_id = ${ctx.businessId}::uuid AND local_date = ${dateKey(occurredOnDate(ctx.timezone, requestedAt))}::date
+        FOR UPDATE
+      `) as Array<{ closed_at: Date | null }>;
+      if (day[0]?.closed_at) throw new AppError(ERROR_CODES.CLOSED_DAY, MESSAGES.closedDayReversal);
       const customer = await tx.customer.findFirst({ where: { id: customerId, businessId: ctx.businessId } });
       if (!customer) throw new AppError(ERROR_CODES.NOT_FOUND, MESSAGES.notFound);
       const wanted = dto.amount != null ? asCop(dto.amount) : customer.creditBalance < customer.debt ? customer.creditBalance : customer.debt;
