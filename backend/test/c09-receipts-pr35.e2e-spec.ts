@@ -74,7 +74,7 @@ describe("C09-PR3.5 credit/apply on a closed day → 409 CLOSED_DAY, nothing wri
     const pay0 = (await post(`/v1/customers/${ana.id}/payments`, { amount: 800, method: "Efectivo" })).body; // saldo a favor 800
     expect(pay0.number).toMatch(/^DC-P-/);
     expect((await post("/v1/sales", { lines: [{ productId: product, qty: 2, unitPrice: 1000 }], paymentKind: "credit", customerId: ana.id, amountReceived: 0 })).status).toBe(201);
-    return { biz: owner.business.id, post, session, ana, pay0 };
+    return { biz: owner.business.id, post, session, ana, pay0, product };
   }
 
   /** Everything credit/apply could write, so «nothing written» is checked, not assumed. */
@@ -129,6 +129,42 @@ describe("C09-PR3.5 credit/apply on a closed day → 409 CLOSED_DAY, nothing wri
     expect(c.status).toBe(201);
     expect({ status: r.status, code: r.body?.error?.code }).toEqual({ status: 409, code: "CLOSED_DAY" });
     // The close added nothing credit/apply could have written either: the footprint is unchanged.
+    expect(await footprint(s.biz, s.ana.id)).toBe(before);
+  });
+
+  /** Close D while `op` waits on the business lock; returns the op's response. */
+  async function raceAfterClose(s: Awaited<ReturnType<typeof setup>>, op: () => Promise<request.Response>) {
+    if (!/^[0-9a-f-]{36}$/.test(s.biz)) throw new Error("unexpected business id");
+    await locker.query(`SELECT pg_advisory_lock(hashtext('${s.biz}'))`);
+    const close = s.post(`/v1/cash/sessions/${s.session.id}/close`, { countedEfectivo: 800 }).then((x) => x);
+    await waiters(1);
+    const pending = op().then((x) => x);
+    await waiters(2);
+    await locker.query(`SELECT pg_advisory_unlock(hashtext('${s.biz}'))`);
+    expect((await close).status).toBe(201);
+    return pending;
+  }
+
+  // Other debt / saldo writers without caja (PR3.5 audit). Their under-lock
+  // re-check is shared/day-guard.lockAndAssertDayEditable, which compared the
+  // DATE column with a timestamptz parameter: with a DB TimeZone other than
+  // UTC (here America/Bogota) it never matched, so only the pre-lock check
+  // held. These races pin the under-lock guarantee.
+  it("race (audit): a fiada sale waiting on the close's lock → 409 CLOSED_DAY, nothing written", async () => {
+    const s = await setup();
+    const before = await footprint(s.biz, s.ana.id);
+    const r = await raceAfterClose(s, () =>
+      s.post("/v1/sales", { lines: [{ productId: s.product, qty: 1, unitPrice: 1000 }], paymentKind: "credit", customerId: s.ana.id, amountReceived: 0 }),
+    );
+    expect({ status: r.status, code: r.body?.error?.code }).toEqual({ status: 409, code: "CLOSED_DAY" });
+    expect(await footprint(s.biz, s.ana.id)).toBe(before);
+  });
+
+  it("race (audit): credit/refund waiting on the close's lock → 409 CLOSED_DAY, nothing written", async () => {
+    const s = await setup();
+    const before = await footprint(s.biz, s.ana.id);
+    const r = await raceAfterClose(s, () => s.post(`/v1/customers/${s.ana.id}/credit/refund`, { amount: 100, method: "Efectivo" }));
+    expect({ status: r.status, code: r.body?.error?.code }).toEqual({ status: 409, code: "CLOSED_DAY" });
     expect(await footprint(s.biz, s.ana.id)).toBe(before);
   });
 
