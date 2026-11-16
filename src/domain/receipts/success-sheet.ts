@@ -1,4 +1,5 @@
-import { formatCop } from "@/domain/money";
+// Relative import: the backend type-checks src/data/http/mappers.ts, which imports this file.
+import { formatCop } from "../money";
 
 /**
  * C09-PR6 — success sheet after a sale or an abono (SPEC-C09 §5.1, §11.2-3,
