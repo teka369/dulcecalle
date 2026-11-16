@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { formatNumber } from "../shared/sequences";
+import { ledgerReceiptRefs } from "../receipts/receipt-acks";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
@@ -329,13 +330,15 @@ export class CatalogService {
     // the finished average is left untouched. 0 = real zero (gifted batch).
     // NEVER an auto-proration of the lot value.
     const unitCost = dto.unitCost == null ? null : asCop(dto.unitCost);
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order of the business's serialized writes.
+        const now = new Date();
         const source = await tx.product.findFirst({
           where: { id: dto.sourceId, businessId: ctx.businessId, archivedAt: null },
         });
@@ -654,6 +657,16 @@ export class CatalogService {
         })
       : [];
     const replacedBy = new Map(replacements.map((p) => [p.replacesPaymentId as string, p.id]));
+    // C09 §7 — receiptId, number and ackState per movement (sale, abono, devolución).
+    const receiptRefs = await ledgerReceiptRefs(this.prisma, ctx.businessId, [
+      ...sales.map((s) => s.id),
+      ...sales.flatMap((s) => s.returns.map((r) => r.id)),
+      ...payments.map((p) => p.id),
+    ]);
+    const receiptOf = (id: string) => {
+      const r = receiptRefs.get(id);
+      return { receiptId: r?.receiptId ?? null, ackState: r?.ackState ?? null };
+    };
     const cajaDayByPayment = new Map(
       moves.map((m) => [m.refId, dayBySession.get(m.sessionId ?? m.pendingForSessionId ?? "") ?? null]),
     );
@@ -674,6 +687,7 @@ export class CatalogService {
       sales: sales.map((s) => ({
         id: s.id,
         number: formatNumber("sale", s.number),
+        ...receiptOf(s.id),
         customerId: s.customerId,
         paymentKind: s.paymentKind,
         method: s.method,
@@ -700,6 +714,9 @@ export class CatalogService {
         })),
         returns: s.returns.map((r) => ({
           id: r.id,
+          // C09 — DC-D- lives on the return receipt (no column on sale_returns).
+          number: receiptRefs.get(r.id)?.number ?? null,
+          ...receiptOf(r.id),
           saleId: r.saleId,
           refundAmount: copToJson(r.refundAmount),
           debtReduced: copToJson(r.debtReduced),
@@ -728,6 +745,7 @@ export class CatalogService {
       payments: payments.map((p) => ({
         id: p.id,
         number: formatNumber("payment", p.number),
+        ...receiptOf(p.id),
         customerId: p.customerId,
         amount: copToJson(p.amount),
         method: p.method,
@@ -797,8 +815,7 @@ export class CatalogService {
     if (amount <= 0n) {
       throw new AppError(ERROR_CODES.VALIDATION, "La deuda tiene que ser mayor a 0.");
     }
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
 
     try {
       const row = await this.prisma.$transaction(async (tx) => {
@@ -806,6 +823,9 @@ export class CatalogService {
         // business. Still allowed on a closed day (no cash involved), now
         // consistent with abonos, which are also accepted after the close.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order of the customer's debt writes.
+        const now = new Date();
         const customer = await tx.customer.findFirst({
           where: { id: customerId, businessId: ctx.businessId },
         });
@@ -883,13 +903,15 @@ export class CatalogService {
     }
     const { unitCost, totalCost } = reconcileSurtirCost(dto.qty, rawUnit, rawTotal);
 
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const move = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order of the business's serialized writes.
+        const now = new Date();
         if (dto.supplierId) {
           const supplier = await tx.supplier.findFirst({
             where: { id: dto.supplierId, businessId: ctx.businessId },
@@ -987,13 +1009,15 @@ export class CatalogService {
       throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.badQty);
     }
 
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const move = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order of the business's serialized writes.
+        const now = new Date();
         const product = await tx.product.findFirst({
           where: { id: productId, businessId: ctx.businessId, archivedAt: null },
         });

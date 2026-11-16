@@ -266,7 +266,8 @@ describe("portal ledger is scoped by the customer token business", () => {
     }
     expect(Object.keys(res.body).sort()).toEqual(["customer", "initials", "payments", "sales"]);
     expect(Object.keys(res.body.customer).sort()).toEqual(["code", "createdAt", "creditBalance", "debt", "id", "name"]);
-    expect(Object.keys(res.body.payments[0]).sort()).toEqual(["allocations", "amount", "createdAt", "id", "method", "note", "occurredOn", "reversal"]); // C07 §8: + reversal (null)
+    // C07 §8: + reversal (null). C09 §7: + number, receiptId, ackState.
+    expect(Object.keys(res.body.payments[0]).sort()).toEqual(["ackState", "allocations", "amount", "createdAt", "id", "method", "note", "number", "occurredOn", "receiptId", "reversal"]);
     expect(res.body.payments[0].reversal).toBeNull();
     expect(res.body.payments[0].note).toBe("abono-privado-A");
     expect(Object.keys(res.body.sales[0].lines[0]).sort()).toEqual(

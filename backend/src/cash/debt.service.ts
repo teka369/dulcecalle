@@ -20,6 +20,7 @@ import {
   resolveTarget,
 } from "../shared/debt-allocations";
 import { CashService } from "./cash.service";
+import { emitImputationReceipt, receiptRefs } from "../receipts/receipt-emit";
 import type { BusinessContext } from "../identity/auth.types";
 import type { ApplyCreditDto, RefundCreditDto } from "./debt.dto";
 
@@ -60,6 +61,8 @@ export class DebtService {
       })),
       debtAfter: copToJson(customer.debt),
       creditBalanceAfter: copToJson(customer.creditBalance),
+      // C09-PR3.1 — the receipt emitted with the original apply; never re-emitted.
+      receipts: await receiptRefs(this.prisma, ctx.businessId, groupId),
     };
   }
 
@@ -68,9 +71,14 @@ export class DebtService {
     const target = parseTarget(dto.target, false);
     const prior = await this.applyReplay(ctx, customerId, requestId, dto.amount);
     if (prior) return prior;
-    const now = new Date();
+    // C09-PR3.4 (C09-INV-01) — business day = arrival day (before the lock).
+    const requestedAt = new Date();
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
+      // C09-PR3.2 — the instant is taken AFTER the lock, so DC-I- receipts
+      // (and their rows) are ordered by createdAt in the same order they took
+      // their number and read the balances (I-C3 under concurrency).
+      const now = new Date();
       const again = await tx.debtAllocation.count({ where: { businessId: ctx.businessId, groupId: requestId } });
       if (again > 0) return null;
       const customer = await tx.customer.findFirst({ where: { id: customerId, businessId: ctx.businessId } });
@@ -99,6 +107,17 @@ export class DebtService {
         createdBy: ctx.userId,
         now,
       });
+      // C09-PR3.1 (C09-QA-01) — own receipt DC-I-NNNNNN, same transaction (I-C1, I-C3).
+      const receipt = await emitImputationReceipt(tx, {
+        businessId: ctx.businessId,
+        customerId,
+        groupId: requestId,
+        createdAt: now,
+        timeZone: ctx.timezone,
+        occurredOn: dateKey(occurredOnDate(ctx.timezone, requestedAt)),
+        before: { debt: customer.debt, creditBalance: customer.creditBalance },
+        after: { debt: customer.debt - applied, creditBalance: customer.creditBalance - applied },
+      });
       return {
         groupId: requestId,
         customerId,
@@ -107,6 +126,7 @@ export class DebtService {
         debtBefore: copToJson(customer.debt),
         debtAfter: copToJson(customer.debt - applied),
         creditBalanceAfter: copToJson(customer.creditBalance - applied),
+        receipts: receipt ? [receipt] : [],
       };
     });
     if (result) return result;
@@ -146,12 +166,14 @@ export class DebtService {
     if (dto.method !== "Efectivo" && dto.method !== "Nequi") {
       throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.noMethod);
     }
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
     try {
       const move = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order in which numbers and balances are taken (I-C3).
+        const now = new Date();
         const today = await tx.cashSession.findUnique({
           where: { businessId_localDate: { businessId: ctx.businessId, localDate: occurredOn } },
         });

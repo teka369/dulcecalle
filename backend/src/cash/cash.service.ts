@@ -9,6 +9,8 @@ import { addCop, asCop, copToJson, subCop } from "../shared/money";
 import { dateKey, occurredOnDate } from "../shared/clock";
 import { linkForNewMove } from "./session-link";
 import { formatNumber, nextNumber } from "../shared/sequences";
+import { copString, isoInZone } from "../shared/canonical";
+import { emitAllocationReceipt, emitReceipt, receiptRefs } from "../receipts/receipt-emit";
 import { sessionExpected } from "./carry-rules";
 import { assertDayEditable, lockAndAssertDayEditable } from "../shared/day-guard";
 import type { BusinessContext } from "../identity/auth.types";
@@ -497,8 +499,11 @@ export class CashService {
     }
 
     this.assertPaymentInput(dto);
-    const now = new Date();
-    const occurredAt = parseOccurredAt(dto.occurredAt, now);
+    // C09-PR3.4 (C09-INV-01) — the business day is the day the request
+    // ARRIVED (before the lock), like the sale; `now` (after the lock) is
+    // only createdAt/syncedAt.
+    const requestedAt = new Date();
+    const occurredAt = parseOccurredAt(dto.occurredAt, requestedAt);
 
     try {
       const pay = await this.prisma.$transaction(async (tx) => {
@@ -506,6 +511,9 @@ export class CashService {
         // never rejected for a closed day: it goes to the open operating day,
         // or stays «recibido sin aplicar / requiere revisión» (unassigned).
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ctx.businessId}))`;
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order in which numbers and balances are taken (I-C3).
+        const now = new Date();
         return this.createPaymentInTx(tx, ctx, customerId, {
           id: randomUUID(),
           dto,
@@ -514,6 +522,7 @@ export class CashService {
           hash,
           requestId,
           now,
+          requestedAt,
           occurredAt,
         });
       });
@@ -559,7 +568,10 @@ export class CashService {
       overflow: "fifo" | "credit";
       hash: string;
       requestId: string;
+      /** createdAt/syncedAt: taken AFTER the business lock (BL-02). */
       now: Date;
+      /** Arrival instant, taken BEFORE the lock: fixes the business day (C09-INV-01). */
+      requestedAt: Date;
       occurredAt: Date;
       /** C07 «corregir» (decision 21). */
       replacesPaymentId?: string | null;
@@ -567,7 +579,7 @@ export class CashService {
   ) {
     const { id, dto, target, overflow, hash, requestId, now } = args;
     const amount = asCop(dto.amount);
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, args.requestedAt);
     const customer = await tx.customer.findFirst({
       where: { id: customerId, businessId: ctx.businessId },
     });
@@ -664,12 +676,57 @@ export class CashService {
         createdAt: now,
       },
     });
+    // C09-PR2 — payment receipt DC-P- in this transaction (I-C1). Its own
+    // balances before/after (I-C3). Allocation receipts are PR3.
+    const replaced = args.replacesPaymentId
+      ? await tx.customerPayment.findUnique({ where: { id: args.replacesPaymentId }, select: { number: true } })
+      : null;
+    const business = await tx.business.findUniqueOrThrow({ where: { id: ctx.businessId }, select: { id: true, name: true } });
+    const paymentNumber = formatNumber("payment", number)!;
+    const paymentRef = await emitReceipt(tx, {
+      businessId: ctx.businessId,
+      customerId,
+      kind: "payment",
+      sourceType: "customer_payment",
+      sourceId: id,
+      number: paymentNumber,
+      createdAt: now,
+      snapshot: {
+        kind: "payment",
+        number: paymentNumber,
+        business: { id: business.id, name: business.name },
+        createdAt: isoInZone(now, ctx.timezone),
+        occurredOn: dateKey(occurredOn),
+        customer: { id: customer.id, code: customer.code, name: customer.name },
+        internal: false,
+        amount: copString(amount),
+        method: dto.method,
+        evidenceRef: null,
+        debtBefore: copString(customer.debt),
+        debtAfter: copString(debtAfter),
+        creditBefore: copString(customer.creditBalance),
+        creditAfter: copString(creditAfter),
+        creditGenerated: copString(plan.toCredit),
+        replacesPaymentNumber: replaced ? formatNumber("payment", replaced.number) : null,
+      },
+    });
+    // C09-PR3 — «a qué se aplicó», annex DC-P-…/D1 linked to the payment (T6).
+    await emitAllocationReceipt(tx, {
+      businessId: ctx.businessId,
+      customerId,
+      groupId: id,
+      parent: paymentRef,
+      createdAt: now,
+      timeZone: ctx.timezone,
+      occurredOn: dateKey(occurredOn),
+      adjusted: plan.adjusted,
+    });
     return payment;
   }
 
   /** Payment JSON + C04 allocation snapshot (stored at creation time). */
   async paymentWithAllocations(row: PaymentRow) {
-    const base = paymentJson(row);
+    const base = { ...paymentJson(row), receipts: await receiptRefs(this.prisma, row.businessId, row.id) };
     const stored = row.allocationResult as StoredAllocationResult | null;
     if (stored && typeof stored === "object" && Array.isArray(stored.allocations)) {
       return {
@@ -745,13 +802,15 @@ export class CashService {
       throw new AppError(ERROR_CODES.VALIDATION, "Di en qué se gastó.");
     }
 
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const row = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order in which numbers and balances are taken (I-C3).
+        const now = new Date();
         const id = randomUUID();
         const expense = await tx.expense.create({
           data: {
@@ -825,13 +884,15 @@ export class CashService {
       throw new AppError(ERROR_CODES.VALIDATION, MESSAGES.noMethod);
     }
 
-    const now = new Date();
-    const occurredOn = occurredOnDate(ctx.timezone, now);
+    const occurredOn = occurredOnDate(ctx.timezone, new Date());
     await assertDayEditable(this.prisma, ctx.businessId, occurredOn);
 
     try {
       const move = await this.prisma.$transaction(async (tx) => {
         await lockAndAssertDayEditable(tx, ctx.businessId, occurredOn);
+        // C09-PR3.3 (BL-02) — the instant is taken AFTER the business lock, so
+        // createdAt follows the order in which numbers and balances are taken (I-C3).
+        const now = new Date();
         const opens = await tx.cashSession.findMany({
           where: { businessId: ctx.businessId, closedAt: null },
         });

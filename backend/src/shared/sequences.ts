@@ -7,7 +7,7 @@ import type { Prisma } from "@prisma/client";
  * upsert takes the row lock, so concurrent creators serialize, and a rollback
  * undoes the bump (no gaps, I-C6). Never reset (a business wipe keeps them).
  */
-export type SequenceKind = "sale" | "payment" | "reversal" | "adjustment" | "return";
+export type SequenceKind = "sale" | "payment" | "reversal" | "adjustment" | "return" | "imputation";
 
 const PREFIX: Record<SequenceKind, string> = {
   sale: "DC-",
@@ -15,6 +15,8 @@ const PREFIX: Record<SequenceKind, string> = {
   reversal: "DC-R-",
   adjustment: "DC-A-",
   return: "DC-D-",
+  // C09-PR3.1 — saldo a favor applied with no parent operation (credit/apply).
+  imputation: "DC-I-",
 };
 
 export async function nextNumber(tx: Prisma.TransactionClient, businessId: string, kind: SequenceKind): Promise<number> {
@@ -27,7 +29,7 @@ export async function nextNumber(tx: Prisma.TransactionClient, businessId: strin
   return Number(rows[0]!.n);
 }
 
-/** DC-000125 / DC-P-000045 / DC-R-000001 … (6 digits, more if it ever grows). */
+/** DC-000125 / DC-P-000045 / DC-R-000001 / DC-I-000001 … (6 digits, more if it ever grows). */
 export function formatNumber(kind: SequenceKind, n: number | null | undefined): string | null {
   if (n == null) return null;
   return `${PREFIX[kind]}${String(n).padStart(6, "0")}`;
