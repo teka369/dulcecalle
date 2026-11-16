@@ -11,6 +11,7 @@ import { DEFAULT_TZ } from "../shared/clock";
 import { copToJson } from "../shared/money";
 import {
   CUSTOMER_SOFT_CAP,
+  CODE_POLICY,
   IP_CODE_POLICY,
   IP_POLICY,
   isPrivateOrUnknownIp,
@@ -80,9 +81,11 @@ export class CustomerAccessService {
    *   Without businessId the code must resolve to a single customer; zero or
    *   several candidates do one dummy compare and fail the same way (no O(n)
    *   bcrypt, no timing signal about how many stores use the code).
-   * - Guess limits are per client IP + code (and per IP across codes), never
-   *   per customer: anonymous attempts from someone else cannot lock the real
-   *   customer out of their own phone.
+   * - Guess limits are per client IP + code and per IP across codes, plus
+   *   (C09-PR5.1, C09-INV-02) a hard cap per typed code in its store scope
+   *   from any IP (CODE_POLICY), so rotating IPs cannot brute-force one PIN.
+   *   That cap can cool the real customer's login too (bounded window;
+   *   asked for in Jefecito's PR5.1 brief; the trade-off is an open question).
    * - If `req.ip` looks private (trust proxy misconfigured → every client is the
    *   proxy), the per-IP-across-codes bucket is skipped (it would throttle
    *   everyone) and the per-IP+code bucket degrades to per-code — the previous
@@ -100,8 +103,21 @@ export class CustomerAccessService {
     const ip = clientIp?.replace(/^::ffff:/i, "") || "unknown";
     const shared = isPrivateOrUnknownIp(ip);
     const ipCodeKey = `ipcode:${shared ? "shared" : ip}:${businessId ?? "*"}:${code}`;
+    // C09-PR5.1 — per typed code in its store scope, any IP. The scope is
+    // what was typed: the business (by its 8-hex store code, so the uuid and
+    // the short code share one bucket), the normalized store name, or none.
+    const storeHint = businessId ? null : normalizeStore(storeRaw);
+    const scope = businessId
+      ? businessId.slice(0, 8).toLowerCase()
+      : storeHint
+        ? /^[0-9a-f]{8}$/.test(storeHint)
+          ? storeHint
+          : `name:${storeHint}`
+        : "*";
+    const codeKey = `pincode:${scope}:${code}`;
     const cooled =
       (await this.throttle.take(ipCodeKey, IP_CODE_POLICY)) === "cooled" ||
+      (await this.throttle.take(codeKey, CODE_POLICY)) === "cooled" ||
       (!shared && (await this.throttle.take(`ip:${ip}`, IP_POLICY)) === "cooled");
     if (cooled) {
       await bcrypt.compare(pin, await dummyHash());
@@ -161,6 +177,7 @@ export class CustomerAccessService {
     const matches = [candidate];
     const customer = matches[0];
     await this.throttle.reset(ipCodeKey);
+    await this.throttle.reset(codeKey);
     await Promise.all(softKeys.map((k) => this.throttle.reset(k)));
     const issued = await this.tokens(customer.id, customer.businessId);
     return {
