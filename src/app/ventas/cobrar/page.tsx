@@ -7,7 +7,10 @@ import { navigateOfflineAware } from "@/data/pwa/offline-nav";
 import { formatCop, mulCop } from "@/domain/money";
 import type { PayMethod, PaymentKind } from "@/domain/types";
 import type { RemoteCustomer, RemoteProduct } from "@/data/http/mappers";
-import { createSaleWithOfflineFallback } from "@/data/pwa/offline-sales";
+import { createSaleWithOfflineFallback, getLocalSale } from "@/data/pwa/offline-sales";
+import { getPwaAuthSession } from "@/data/http/session";
+import { SuccessSheet } from "@/components/receipts/SuccessSheet";
+import { shareableReceipt, successView, type ReceiptRef, type SuccessView } from "@/domain/receipts/success-sheet";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getPendingCustomerIds } from "@/data/pwa/offline-catalog";
@@ -22,7 +25,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { ChoiceSegmented } from "@/components/ui/ChoiceSegmented";
 import { AmountField, amountInputInvalid } from "@/components/ui/AmountField";
-import { ActionBar, ACTION_BAR_SPACE, ABOVE_ACTION_BAR } from "@/components/ui/ActionBar";
+import { ActionBar, ACTION_BAR_SPACE } from "@/components/ui/ActionBar";
 import { StateBlock } from "@/components/ui/StateBlock";
 import { useOnline } from "@/components/shell/use-online";
 import { saldoAFavorView } from "@/components/sale/saldo-a-favor";
@@ -69,7 +72,8 @@ export default function CobrarPage() {
   const [note, setNote] = useState("");
   const [showLines, setShowLines] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  // C09-PR6 / DC-08 — the success sheet replaces the 700 ms toast + jump to Inicio.
+  const [success, setSuccess] = useState<{ view: SuccessView; receipt: ReceiptRef | null; detail: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   // C04 W7 — «Usar saldo a favor»: one tap, online only (J3 / T34).
   const [useSaldo, setUseSaldo] = useState(false);
@@ -94,8 +98,9 @@ export default function CobrarPage() {
     // pending. clear() after Registrar empties the cart; without this guard
     // the redirect unmounted the dialog (Tester C01-QA-02).
     if (rejected.pending) return;
+    if (success) return; // C09-PR6 — the success sheet owns the next step
     if (items.length === 0) navigateOfflineAware(router, "/ventas/nueva", { replace: true });
-  }, [hydrated, items.length, router, rejected.pending]);
+  }, [hydrated, items.length, router, rejected.pending, success]);
 
   const lines = useMemo(() => {
     const out: Array<{
@@ -161,19 +166,39 @@ export default function CobrarPage() {
       const request = saldo.applied > 0 ? { ...built, applyCredit: true as const } : built;
       requestIdRef.current = payloadBoundRequestId(requestIdRef.current, JSON.stringify(request));
       const result = await createSaleWithOfflineFallback(request, requestIdRef.current.id);
+      const hasCustomer = !!request.customerId;
+      const detail = [formatCop(total), KIND_LABEL[paymentKind], selectedCustomer ? selectedCustomer.name : null]
+        .filter(Boolean)
+        .join(" · ");
+      if (result.mode === "online") {
+        const receipt = shareableReceipt(result.sale.receipts, "sale");
+        setSuccess({
+          view: successView({ op: "sale", mode: "online", number: result.sale.number ?? null, receipt, hasCustomer, amount: total }),
+          receipt,
+          detail,
+        });
+      } else {
+        const offlineView = (ref: string | null) =>
+          successView({ op: "sale", mode: "offline", localRef: ref, hasCustomer, amount: total });
+        setSuccess({ view: offlineView(null), receipt: null, detail });
+        const businessId = getPwaAuthSession().businessId;
+        if (businessId) {
+          void getLocalSale(businessId, result.saleId)
+            .then((row) => {
+              if (row?.localRef) setSuccess({ view: offlineView(row.localRef), receipt: null, detail });
+            })
+            .catch(() => undefined);
+        }
+      }
       // C01.3 — open the discard dialog before clear() so a store emit after
-      // this await cannot navigate away with pending still false.
+      // this await cannot navigate away with pending still false. The sheet
+      // waits for that dialog (it renders only when nothing is pending).
       rejected.afterSave(
-        () => navigateOfflineAware(router, "/"),
-        700,
+        () => undefined,
+        0,
         result.mode === "online" ? result.sale.id : result.saleId,
       );
       clear();
-      setToast(
-        result.mode === "offline"
-          ? "Venta guardada en este dispositivo · se sincronizará automáticamente."
-          : "Venta registrada",
-      );
     } catch (e) {
       setError(errorText(e, "Error al registrar venta"));
       setBusy(false);
@@ -312,14 +337,15 @@ export default function CobrarPage() {
         primary={{ label: "Registrar", onClick: () => void confirm(), disabled: !valid, busy }}
       />
 
-      {toast && (
-        <div
-          role="status"
-          className={`fixed ${ABOVE_ACTION_BAR} left-1/2 z-50 max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-center text-sm text-bg`}
-        >
-          {toast}
-        </div>
-      )}
+      {success && !rejected.pending ? (
+        <SuccessSheet
+          view={success.view}
+          receipt={success.receipt}
+          detail={success.detail}
+          onClose={() => navigateOfflineAware(router, "/")}
+          onNewSale={() => navigateOfflineAware(router, "/ventas/nueva")}
+        />
+      ) : null}
       {rejected.dialog}
     </div>
   );
