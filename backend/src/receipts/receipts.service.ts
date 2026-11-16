@@ -106,34 +106,44 @@ export class ReceiptsService {
     // An allocation annex shares its source id with the abono/sale it
     // distributes, so it reads «anulado» when that source is reversed.
     const reversible = rows.filter((r) => REVERSAL_TARGET[r.sourceType] || r.sourceType === "allocation");
-    const reversed = new Set(
-      reversible.length === 0
-        ? []
-        : (
-            await this.prisma.reversal.findMany({
-              where: {
-                businessId,
-                OR: reversible.map((r) =>
-                  r.sourceType === "allocation"
-                    ? { targetId: r.sourceId, targetType: { in: ["sale", "customer_payment"] as ReversalTarget[] } }
-                    : { targetType: REVERSAL_TARGET[r.sourceType]!, targetId: r.sourceId },
-                ),
-              },
-              select: { targetType: true, targetId: true },
-            })
-          ).flatMap((x) => [`${x.targetType}:${x.targetId}`, `allocation:${x.targetId}`]),
-    );
+    const reversed = new Set<string>();
+    const markReversed = (targetType: string | null, targetId: string | null) => {
+      if (!targetType || !targetId) return;
+      reversed.add(`${targetType}:${targetId}`);
+      reversed.add(`allocation:${targetId}`);
+    };
+    if (reversible.length > 0) {
+      for (const x of await this.prisma.reversal.findMany({
+        where: {
+          businessId,
+          OR: reversible.map((r) =>
+            r.sourceType === "allocation"
+              ? { targetId: r.sourceId, targetType: { in: ["sale", "customer_payment"] as ReversalTarget[] } }
+              : { targetType: REVERSAL_TARGET[r.sourceType]!, targetId: r.sourceId },
+          ),
+        },
+        select: { targetType: true, targetId: true },
+      })) {
+        markReversed(x.targetType, x.targetId);
+      }
+      // C09-PR5.2 (T01) — the DC-R- receipts themselves (insert-only, kept by
+      // the business wipe, which deletes `reversals`) name what they cancel.
+      const targetIds = [...new Set(reversible.map((r) => r.sourceId))];
+      for (const x of await this.prisma.$queryRaw<Array<{ t: string | null; id: string | null }>>`
+        SELECT snapshot->'original'->>'type' AS t, snapshot->'original'->>'id' AS id
+        FROM receipts
+        WHERE business_id = ${businessId}::uuid AND kind = 'reversal'
+          AND snapshot->'original'->>'id' = ANY(${targetIds}::text[])`) {
+        if (x.t === "sale" || x.t === "customer_payment") markReversed(x.t, x.id);
+      }
+    }
     // C09-PR3.2 — standalone imputations (allocation with no parent: DC-I-).
     const imputations = rows.filter((r) => isImputation(r));
-    const comp = await imputationCompensations(
-      this.prisma,
-      businessId,
-      imputations.map((r) => ({ groupId: r.sourceId, customerId: r.customerId! })),
-    );
+    const comp = await this.compensations(businessId, imputations);
     const out = new Map<string, ReceiptStatus>();
     const compensatedBy = new Map<string, string[]>();
     for (const r of rows) {
-      const c = isImputation(r) ? comp.get(r.sourceId) : undefined;
+      const c = isImputation(r) ? comp.get(r.id) : undefined;
       if (c && c.reversalIds.length > 0) compensatedBy.set(r.id, c.reversalIds);
       const st: ReceiptStatus = replaced.has(r.id)
         ? "reemplazado"
@@ -144,6 +154,62 @@ export class ReceiptsService {
       out.set(r.id, st);
     }
     return { status: out, compensatedBy };
+  }
+
+  /**
+   * C09-PR3.2 / PR5.2 — compensation of each DC-I- (by receipt id). Two
+   * sources, per reversal: the amount frozen in its DC-R- snapshot
+   * (`compensates`, PR5.2 on; insert-only, survives the wipe) and, for
+   * reversals emitted before that field existed, the replay of
+   * `debt_allocations` (gone after the wipe). The DC-I- total is the replay
+   * total or, once the rows are gone, its own frozen `toObligations`.
+   */
+  private async compensations(
+    businessId: string,
+    imputations: Row[],
+  ): Promise<Map<string, { total: bigint; compensated: bigint; reversalIds: string[] }>> {
+    const out = new Map<string, { total: bigint; compensated: bigint; reversalIds: string[] }>();
+    if (imputations.length === 0) return out;
+    const replay = await imputationCompensations(
+      this.prisma,
+      businessId,
+      imputations.map((r) => ({ groupId: r.sourceId, customerId: r.customerId! })),
+    );
+    const customers = [...new Set(imputations.map((r) => r.customerId!))];
+    const frozen = new Map<string, Map<string, bigint>>(); // reversalId → DC-I- receipt id → amount
+    const frozenOrder: string[] = [];
+    for (const rv of await this.prisma.receipt.findMany({
+      where: { businessId, kind: "reversal", customerId: { in: customers } },
+      select: { sourceId: true, snapshot: true },
+      orderBy: [{ createdAt: "asc" }, { number: "asc" }],
+    })) {
+      const list = (rv.snapshot as Snap | null)?.compensates;
+      if (!Array.isArray(list)) continue;
+      const m = new Map<string, bigint>();
+      for (const e of list as Snap[]) {
+        const id = str(e?.receiptId);
+        const amt = str(e?.amount);
+        if (id && amt && /^\d+$/.test(amt)) m.set(id, (m.get(id) ?? 0n) + BigInt(amt));
+      }
+      frozen.set(rv.sourceId, m);
+      frozenOrder.push(rv.sourceId);
+    }
+    for (const r of imputations) {
+      const c = replay.get(r.sourceId);
+      const ids = [...(c?.reversalIds ?? [])];
+      for (const rv of frozenOrder) if ((frozen.get(rv)!.get(r.id) ?? 0n) > 0n && !ids.includes(rv)) ids.push(rv);
+      let compensated = 0n;
+      const reversalIds: string[] = [];
+      for (const rv of ids) {
+        const y = frozen.has(rv) ? (frozen.get(rv)!.get(r.id) ?? 0n) : (c?.byReversal.get(rv) ?? 0n);
+        if (y <= 0n) continue;
+        compensated += y;
+        reversalIds.push(rv);
+      }
+      const total = c && c.total > 0n ? c.total : abs((r.snapshot as Snap | null)?.toObligations);
+      out.set(r.id, { total, compensated, reversalIds });
+    }
+    return out;
   }
 
   /**
