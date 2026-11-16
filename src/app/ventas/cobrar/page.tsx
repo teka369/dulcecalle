@@ -10,6 +10,7 @@ import type { RemoteCustomer, RemoteProduct } from "@/data/http/mappers";
 import { createSaleWithOfflineFallback, getLocalSale } from "@/data/pwa/offline-sales";
 import { getPwaAuthSession } from "@/data/http/session";
 import { SuccessSheet } from "@/components/receipts/SuccessSheet";
+import { syncStore } from "@/store/syncStore";
 import { shareableReceipt, successView, type ReceiptRef, type SuccessView } from "@/domain/receipts/success-sheet";
 import { primaryImageUrl } from "@/data/media/urls";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
@@ -181,6 +182,8 @@ export default function CobrarPage() {
         const offlineView = (ref: string | null) =>
           successView({ op: "sale", mode: "offline", localRef: ref, hasCustomer, amount: total });
         setSuccess({ view: offlineView(null), receipt: null, detail });
+        // We stay on this page now: refresh «N guardada(s) aquí» (the old jump reloaded it).
+        void syncStore.refresh();
         const businessId = getPwaAuthSession().businessId;
         if (businessId) {
           void getLocalSale(businessId, result.saleId)

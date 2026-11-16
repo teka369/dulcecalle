@@ -30,6 +30,7 @@ import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
 import { SuccessSheet } from "@/components/receipts/SuccessSheet";
+import { syncStore } from "@/store/syncStore";
 import { shareableReceipt, successView, type ReceiptRef, type SuccessView } from "@/domain/receipts/success-sheet";
 import { getPwaAuthSession } from "@/data/http/session";
 import { localRefForOperation } from "@/data/pwa/op-local-ref";
@@ -194,6 +195,8 @@ export default function RegistrarAbonoPage() {
         const offlineView = (ref: string | null) =>
           successView({ op: "payment", mode: "offline", localRef: ref, hasCustomer: true, amount });
         setSuccess({ view: offlineView(null), receipt: null, detail });
+        // We stay on this page now: refresh «N guardada(s) aquí» (the old jump reloaded it).
+        void syncStore.refresh();
         const businessId = getPwaAuthSession().businessId;
         if (businessId) {
           void localRefForOperation(businessId, result.id)

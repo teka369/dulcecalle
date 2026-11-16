@@ -183,6 +183,7 @@ test("offline fiada: «Venta guardada en este teléfono», L- ref, no DC- and no
   await expect(sheet.getByRole("button", { name: "Copiar enlace" })).toHaveCount(0);
   await expect(sheet.getByRole("button", { name: "Compartir por WhatsApp" })).toHaveCount(0);
   await expect(sheet.getByRole("button", { name: "Compartir texto" })).toBeVisible();
+  await expect(page.getByText(/1 guardada aquí/).first()).toBeVisible({ timeout: 15_000 }); // the pill stays honest
   fake.offline = false;
   await context.setOffline(false);
 });
