@@ -75,7 +75,9 @@ export class RegistrationService {
       await this.notifyAlreadyRegistered(email);
       return REGISTER_ACCEPTED;
     }
-    if (existing.status === "PENDING_ADMIN_APPROVAL") return REGISTER_ACCEPTED;
+    if (existing.status === "PENDING_ADMIN_APPROVAL" || existing.status === "REJECTED") {
+      return REGISTER_ACCEPTED;
+    }
     await this.issueVerification(existing, { name, passwordHash, revive: true });
     return REGISTER_ACCEPTED;
   }
@@ -241,18 +243,33 @@ export class RegistrationService {
     const result = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.registrationRequest.updateMany({
         where: { id, status: "PENDING_ADMIN_APPROVAL" },
-        data: { status: "APPROVED", decidedAt: now, decidedByUserId: actorUserId },
+        data: {
+          status: "APPROVED",
+          decidedAt: now,
+          decidedByUserId: actorUserId,
+          emailTokenHash: null,
+          emailTokenExpiresAt: null,
+        },
       });
       if (claimed.count !== 1) return null;
       const emailTaken = await tx.user.findUnique({ where: { email: existing.email } });
       if (emailTaken) {
         throw new AppError(ERROR_CODES.CONFLICT, "Ese correo ya tiene una cuenta.");
       }
-      const created = await createOwnerAccount(tx, {
-        email: existing.email,
-        passwordHash: existing.passwordHash,
-        businessName: existing.name,
-      });
+      let created: { userId: string; businessId: string };
+      try {
+        created = await createOwnerAccount(tx, {
+          email: existing.email,
+          passwordHash: existing.passwordHash,
+          businessName: existing.name,
+        });
+      } catch (e) {
+        const code = typeof e === "object" && e && "code" in e ? String((e as { code: unknown }).code) : "";
+        if (code === "P2002") {
+          throw new AppError(ERROR_CODES.CONFLICT, "Ese correo ya tiene una cuenta.");
+        }
+        throw e;
+      }
       await tx.registrationRequest.update({
         where: { id },
         data: { userId: created.userId, businessId: created.businessId },
@@ -451,14 +468,12 @@ export class RegistrationService {
     opts: { name?: string; passwordHash?: string; revive?: boolean },
   ) {
     const now = new Date();
+    const elapsed = row.lastResendAt ? now.getTime() - row.lastResendAt.getTime() : Number.POSITIVE_INFINITY;
+    const inWindow = elapsed < RESEND_LOCK_MS;
+    const count = inWindow ? row.resendCount : 0;
     const cooling =
-      row.status === "PENDING_EMAIL_VERIFICATION" &&
-      row.lastResendAt &&
-      now.getTime() - row.lastResendAt.getTime() < RESEND_GAP_MS;
-    const locked =
-      row.resendCount >= MAX_RESENDS &&
-      row.lastResendAt &&
-      now.getTime() - row.lastResendAt.getTime() < RESEND_LOCK_MS;
+      row.status === "PENDING_EMAIL_VERIFICATION" && inWindow && elapsed < RESEND_GAP_MS;
+    const locked = inWindow && count >= MAX_RESENDS;
     if (cooling || locked) return;
 
     const token = newEmailToken();
@@ -489,7 +504,7 @@ export class RegistrationService {
         emailTokenHash: token.hash,
         emailTokenExpiresAt: new Date(now.getTime() + TOKEN_TTL_MS),
         tokenGeneration: generation,
-        resendCount: row.resendCount + 1,
+        resendCount: count + 1,
         lastResendAt: now,
         expiresAt: new Date(now.getTime() + REQUEST_TTL_MS),
         ...(opts.revive

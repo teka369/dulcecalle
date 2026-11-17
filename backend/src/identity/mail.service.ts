@@ -55,7 +55,9 @@ export class MailService {
       text: message.text,
       html: message.html,
     });
-    this.sent.push({ ...message, text: "[sent]", html: "[sent]" });
+    if (env.NODE_ENV !== "production") {
+      this.sent.push({ ...message, text: "[sent]", html: "[sent]" });
+    }
   }
 
   async enqueue(

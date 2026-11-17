@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ApiError } from "@/data/errors";
+import { ApiError, NetworkError } from "@/data/errors";
 import { apiBaseUrl } from "@/data/backend";
 import { HttpRepository, type RegistrationDetail, type RegistrationRow } from "@/data/http/repository";
 import { getPwaAuthSession } from "@/data/http/session";
@@ -33,6 +33,7 @@ export default function AdminRegistrationsPage() {
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const repo = useCallback(() => {
     const base = apiBaseUrl();
@@ -42,17 +43,22 @@ export default function AdminRegistrationsPage() {
 
   const load = useCallback(async () => {
     setError(null);
+    setLoading(true);
     try {
       setRows(await repo().registrations.list(status || undefined));
     } catch (err) {
       setRows([]);
-      setError(
-        err instanceof ApiError && err.status === 403
-          ? "No tienes permiso para ver las solicitudes."
-          : err instanceof Error
-            ? err.message
-            : "No pudimos cargar las solicitudes.",
-      );
+      if (err instanceof ApiError && (err.status === 403 || err.code === "FORBIDDEN")) {
+        setError("No tienes permiso para ver las solicitudes.");
+      } else if (err instanceof ApiError && err.status === 401) {
+        setError("Inicia sesión para ver las solicitudes.");
+      } else if (err instanceof NetworkError || !(err instanceof ApiError)) {
+        setError("Sin conexión. No pudimos cargar las solicitudes.");
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setLoading(false);
     }
   }, [repo, status]);
 
@@ -112,6 +118,7 @@ export default function AdminRegistrationsPage() {
             {error}
           </p>
         ) : null}
+        {loading ? <p className="text-sm text-ink-muted">Cargando solicitudes…</p> : null}
         <ul className="flex flex-col gap-3">
           {rows.map((row) => (
             <li key={row.id}>
@@ -125,7 +132,7 @@ export default function AdminRegistrationsPage() {
             </li>
           ))}
         </ul>
-        {rows.length === 0 && !error ? (
+        {rows.length === 0 && !error && !loading ? (
           <p className="text-sm text-ink-muted">No hay solicitudes en esta lista.</p>
         ) : null}
         {detail ? (

@@ -284,4 +284,100 @@ describe("registration approval", () => {
     const after = mail.sent.filter((m) => m.to === "revisa@dulce.test").length;
     expect(after - before).toBe(1);
   });
+
+  it("does not let a rejected request register again or replace its password", async () => {
+    const email = "rechazo-fijo@test.co";
+    await api().post("/v1/auth/register").send(body(email, { name: "Iris Rueda" })).expect(201);
+    await api().post("/v1/auth/register/verify").send({ token: tokenFor(mail, email) }).expect(200);
+    const admin = await api()
+      .post("/v1/auth/login")
+      .send({ email: "admin@dulce.test", password: "password12" })
+      .expect(201);
+    const list = await api()
+      .get("/v1/admin/registrations")
+      .query({ status: "PENDING_ADMIN_APPROVAL" })
+      .set("Authorization", `Bearer ${admin.body.accessToken}`)
+      .expect(200);
+    const item = list.body.find((row: { email: string }) => row.email === email);
+    await api()
+      .post(`/v1/admin/registrations/${item.id}/reject`)
+      .set("Authorization", `Bearer ${admin.body.accessToken}`)
+      .send({ note: "No corresponde." })
+      .expect(200);
+
+    const before = await prisma.registrationRequest.findUnique({ where: { email } });
+    const again = await api()
+      .post("/v1/auth/register")
+      .send(body(email, { name: "Otra Persona", password: "otra-clave-99", confirmPassword: "otra-clave-99" }))
+      .expect(201);
+    expect(again.body.status).toBe("ACCEPTED");
+    const after = await prisma.registrationRequest.findUnique({ where: { email } });
+    expect(after?.status).toBe("REJECTED");
+    expect(after?.passwordHash).toBe(before?.passwordHash);
+    expect(after?.name).toBe("Iris Rueda");
+    expect(await prisma.user.count({ where: { email } })).toBe(0);
+    await api()
+      .post("/v1/auth/register/resend")
+      .send({ email })
+      .expect(200);
+    expect((await prisma.registrationRequest.findUnique({ where: { email } }))?.status).toBe("REJECTED");
+    await api()
+      .post("/v1/auth/login")
+      .send({ email, password: "clave1234" })
+      .expect(403)
+      .expect((r) => expect(r.body.error.code).toBe("REGISTRATION_REJECTED"));
+    await api().post("/v1/auth/login").send({ email, password: "otra-clave-99" }).expect(401);
+  });
+
+  it("allows five resends per hour and a new window after that hour", async () => {
+    const email = "cupo@test.co";
+    await api().post("/v1/auth/register").send(body(email, { name: "Camilo Ortiz" })).expect(201);
+    let previous = tokenFor(mail, email);
+    for (let i = 0; i < 5; i++) {
+      await prisma.registrationRequest.update({
+        where: { email },
+        data: { lastResendAt: new Date(Date.now() - 120_000) },
+      });
+      await api().post("/v1/auth/register/resend").send({ email }).expect(200);
+      const next = tokenFor(mail, email);
+      expect(next).not.toBe(previous);
+      previous = next;
+    }
+    await prisma.registrationRequest.update({
+      where: { email },
+      data: { lastResendAt: new Date(Date.now() - 120_000) },
+    });
+    const sentBefore = mail.sent.filter((m) => m.to === email).length;
+    await api().post("/v1/auth/register/resend").send({ email }).expect(200);
+    expect(mail.sent.filter((m) => m.to === email).length).toBe(sentBefore);
+    expect(tokenFor(mail, email)).toBe(previous);
+
+    await prisma.registrationRequest.update({
+      where: { email },
+      data: { lastResendAt: new Date(Date.now() - 2 * 60 * 60 * 1000), resendCount: 5 },
+    });
+    await api().post("/v1/auth/register/resend").send({ email }).expect(200);
+    expect(tokenFor(mail, email)).not.toBe(previous);
+    const row = await prisma.registrationRequest.findUnique({ where: { email } });
+    expect(row?.resendCount).toBe(1);
+  });
+
+  it("rejects a manipulated token and an unknown admin id without creating a user", async () => {
+    await api()
+      .post("/v1/auth/register/verify")
+      .send({ token: "esto-no-es-un-token-real-de-32-bytes" })
+      .expect(400);
+    const admin = await api()
+      .post("/v1/auth/login")
+      .send({ email: "admin@dulce.test", password: "password12" })
+      .expect(201);
+    await api()
+      .get("/v1/admin/registrations/00000000-0000-4000-8000-000000000099")
+      .set("Authorization", `Bearer ${admin.body.accessToken}`)
+      .expect(404);
+    await api()
+      .post("/v1/admin/registrations/not-a-uuid/approve")
+      .set("Authorization", `Bearer ${admin.body.accessToken}`)
+      .expect(400);
+  });
 });

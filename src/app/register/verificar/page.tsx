@@ -51,7 +51,9 @@ function VerifyRegistration() {
   return (
     <Card>
       <p className="text-base font-semibold">{ok ? "Listo" : "Verificación"}</p>
-      <p className="mt-2 text-sm text-ink-muted">{message}</p>
+      <p role="status" className="mt-2 text-sm text-ink-muted">
+        {message}
+      </p>
       <Link href="/register" className="mt-4 flex min-h-11 items-center text-sm font-semibold text-ink">
         Volver al registro
       </Link>

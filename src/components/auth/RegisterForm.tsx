@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ApiError } from "@/data/errors";
 import { HttpRepository } from "@/data/http/repository";
@@ -22,6 +22,9 @@ export function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
+  const [resendNote, setResendNote] = useState<string | null>(null);
+  const [resendBusy, setResendBusy] = useState(false);
+  const lock = useRef(false);
 
   useEffect(() => {
     if (!SITE_KEY) return;
@@ -36,7 +39,7 @@ export function RegisterForm() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (lock.current || busy) return;
     setError(null);
     if (name.trim().length < 2) {
       setError("Escribe tu nombre.");
@@ -66,6 +69,7 @@ export function RegisterForm() {
       setError("Confirma que no eres un robot.");
       return;
     }
+    lock.current = true;
     setBusy(true);
     try {
       const repo = new HttpRepository(base, getPwaAuthSession());
@@ -79,8 +83,29 @@ export function RegisterForm() {
       });
       setDone(result.message);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No pudimos enviar la solicitud.");
+      lock.current = false;
       setBusy(false);
+      setError(err instanceof ApiError ? err.message : "No pudimos enviar la solicitud.");
+    }
+  }
+
+  async function resend() {
+    if (resendBusy) return;
+    setResendNote(null);
+    const base = apiBaseUrl();
+    if (!base) {
+      setResendNote("El servidor no está configurado.");
+      return;
+    }
+    setResendBusy(true);
+    try {
+      const repo = new HttpRepository(base, getPwaAuthSession());
+      await repo.auth.resendRegistration(email.trim());
+      setResendNote("Si todavía falta confirmar el correo, te enviamos otro enlace.");
+    } catch (err) {
+      setResendNote(err instanceof ApiError ? err.message : "No pudimos reenviar el enlace.");
+    } finally {
+      setResendBusy(false);
     }
   }
 
@@ -92,6 +117,19 @@ export function RegisterForm() {
         <p className="mt-3 text-sm text-ink-muted">
           Confirmar el correo no abre la tienda. Después alguien de Dulce Calle aprueba la cuenta.
         </p>
+        <button
+          type="button"
+          className="mt-4 min-h-11 text-left text-sm font-semibold text-ink"
+          disabled={resendBusy}
+          onClick={() => void resend()}
+        >
+          {resendBusy ? "Reenviando…" : "Reenviar enlace"}
+        </button>
+        {resendNote ? (
+          <p role="status" className="mt-2 text-sm text-ink-muted">
+            {resendNote}
+          </p>
+        ) : null}
         <Link href="/login" className="mt-4 flex min-h-11 items-center text-sm font-semibold text-ink">
           Volver a entrar
         </Link>
