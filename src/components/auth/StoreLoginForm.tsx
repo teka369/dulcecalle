@@ -54,12 +54,21 @@ export function StoreLoginForm() {
       }
       router.replace("/");
     } catch (e) {
+      const code = e instanceof ApiError ? e.code : "";
       fail(
-        e instanceof ApiError && (e.status === 401 || e.code === "UNAUTHORIZED")
-          ? "Correo o contraseña incorrectos."
-          : e instanceof Error
-            ? e.message
-            : "No pudimos entrar.",
+        code === "EMAIL_NOT_VERIFIED"
+          ? "Confirma tu correo antes de entrar. Revisa tu bandeja."
+          : code === "PENDING_APPROVAL"
+            ? "Tu correo está confirmado. Falta la aprobación de Dulce Calle."
+            : code === "REGISTRATION_REJECTED"
+              ? "Esta solicitud no fue aprobada."
+              : code === "REGISTRATION_EXPIRED"
+                ? "La solicitud venció. Puedes registrarte de nuevo."
+                : e instanceof ApiError && (e.status === 401 || e.code === "UNAUTHORIZED")
+                  ? "Correo o contraseña incorrectos."
+                  : e instanceof Error
+                    ? e.message
+                    : "No pudimos entrar.",
       );
     }
   }

@@ -8,9 +8,10 @@ import {
   ADMIN_PUBLIC,
   decideAuthGate,
   isCustomerPath,
+  isPublicAdminPath,
 } from "./auth-gate-decision";
 
-export { ADMIN_PUBLIC, decideAuthGate, isCustomerPath };
+export { ADMIN_PUBLIC, decideAuthGate, isCustomerPath, isPublicAdminPath };
 export type { AuthGateDecision } from "./auth-gate-decision";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -46,7 +47,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [pathname, router]);
 
-  if (pathname === "/cliente/login" || ADMIN_PUBLIC.has(pathname)) {
+  if (pathname === "/cliente/login" || isPublicAdminPath(pathname)) {
     return children;
   }
   if (isCustomerPath(pathname) && !ok) {
@@ -56,7 +57,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       </p>
     );
   }
-  if (ADMIN_PUBLIC.has(pathname)) return children;
+  if (isPublicAdminPath(pathname)) return children;
   if (!ok) {
     return (
       <p className="rounded-[var(--r-md)] border border-border bg-surface px-3 py-2 text-sm text-ink-muted">

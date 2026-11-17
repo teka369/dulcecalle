@@ -29,3 +29,25 @@ services:
       # External Neon PostgreSQL connection string: postgresql://...?sslmode=require
       - key: DATABASE_URL
         sync: false
+      # Registration. Leave blank until the mailbox exists; signup then returns 503
+      # and existing logins keep working. See REGISTRO.md.
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USER
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_SECURE
+        value: "false"
+      - key: REGISTRATION_ADMIN_EMAIL
+        sync: false
+      - key: APP_PUBLIC_URL
+        value: https://dulcecalle.vercel.app
+      - key: PLATFORM_ADMIN_EMAILS
+        sync: false
+      - key: TURNSTILE_SECRET_KEY
+        sync: false

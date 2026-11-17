@@ -1,5 +1,11 @@
 export const ADMIN_PUBLIC = new Set(["/login", "/register", "/offline", "/acceso-tienda"]);
 
+/** Exact public paths, plus the registration follow-up screens. */
+export function isPublicAdminPath(pathname: string): boolean {
+  if (ADMIN_PUBLIC.has(pathname)) return true;
+  return pathname.startsWith("/register/");
+}
+
 export function isCustomerPath(pathname: string): boolean {
   return pathname === "/cliente" || pathname.startsWith("/cliente/");
 }
@@ -25,7 +31,7 @@ export function decideAuthGate(input: {
     }
     return { kind: "allow" };
   }
-  if (ADMIN_PUBLIC.has(input.pathname)) return { kind: "allow" };
+  if (isPublicAdminPath(input.pathname)) return { kind: "allow" };
   if (!input.adminAuthenticated || !input.adminBusinessId) {
     return { kind: "redirect", to: "/login" };
   }

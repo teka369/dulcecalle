@@ -32,6 +32,8 @@ npm run start:dev             # http://localhost:3000/v1/health
 Optional fake user (not the owner's books): `npm run seed`  
 (`dev@dulcecalle.test` / `devpass12`)
 
+Public signup is not this seed. It is a request plus email verification plus manual approval. See [`../REGISTRO.md`](../REGISTRO.md). Existing users are unchanged.
+
 ## JWT
 
 `JWT_SECRET` (access, 15m) and `JWT_REFRESH_SECRET` (refresh, 7d, claim `typ: "refresh"`) are **required**. There is no fallback. Missing or blank secrets → the process refuses to boot.
