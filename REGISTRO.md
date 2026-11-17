@@ -20,7 +20,9 @@ Nombre, correo, contraseña y confirmación. La confirmación no se guarda. No s
 
 Un correo sin confirmar no llega al administrador. Abrir el enlace no aprueba la cuenta. Aprobar y rechazar son `POST` con sesión de administrador. No hay un enlace mágico de aprobación.
 
-Una solicitud `REJECTED` no se reactiva desde el formulario ni desde el reenvío. El correo queda reservado. Para dejar que esa persona vuelva a pedir acceso hay que borrar la solicitud a mano (ver recuperación). Una solicitud `EXPIRED` sí puede volver a pedir el enlace.
+Una solicitud `REJECTED` no se reactiva desde el formulario ni desde el reenvío. El correo queda reservado. Para dejar que esa persona vuelva a pedir acceso hay que borrar la solicitud a mano (ver recuperación). Una solicitud `EXPIRED`, o una que ya pasó su plazo de 7 días, sí puede volver a registrarse: ese alta nueva reemplaza nombre, contraseña y enlace.
+
+Mientras la solicitud sigue viva (`PENDING_EMAIL_VERIFICATION` dentro del plazo, o `PENDING_ADMIN_APPROVAL`), un segundo formulario no cambia nada. Ni el nombre, ni la contraseña, ni el enlace. La respuesta es la misma de siempre, para no decir si el correo existe.
 
 ## Arquitectura
 
@@ -35,7 +37,7 @@ Una solicitud `REJECTED` no se reactiva desde el formulario ni desde el reenvío
 
 1. La persona envía nombre, correo, contraseña y confirmación.
 2. Si el correo ya es una cuenta, la respuesta es la misma y, como máximo una vez al día, se le escribe "ya tienes cuenta".
-3. Si no hay solicitud, se crea `PENDING_EMAIL_VERIFICATION` y se manda el enlace. Si el envío falla, se borra la fila y la API responde 503.
+3. Si no hay solicitud, se crea `PENDING_EMAIL_VERIFICATION` y se manda el enlace. Si el envío falla, se borra la fila y la API responde 503. Si ya hay una solicitud viva, el formulario no la modifica.
 4. Abrir `/register/verificar?token=` hace `POST /auth/register/verify`. El enlace es de un solo uso. La solicitud pasa a `PENDING_ADMIN_APPROVAL`. Ahí se encola el aviso al administrador.
 5. Un administrador abre `/admin/registros`, confirma y aprueba o rechaza.
 6. Si aprueba, la persona entra en `/login` con la misma contraseña. Su membresía es `owner` de un negocio nuevo, con el nombre que escribió. No queda como administrador de la plataforma salvo que ese correo ya estuviera en `PLATFORM_ADMIN_EMAILS`.
@@ -94,7 +96,7 @@ Para probar el envío real, en el servicio de Render (no en el chat):
 
 Brevo y Resend sirven. No hace falta contratarlos desde aquí. Después de cargarlos, un alta de prueba con un correo propio tiene que llegar en menos de un minuto. Si no llega, `email_outbox.last_error` queda en `smtp_failed` y `attempts` sube. No mires los logs buscando la contraseña ni el enlace: no se escriben.
 
-Si la fila se guardó y el correo de verificación falló, la fila se borra y el cliente recibe 503. Puede reintentar. Si el proceso se cae justo después de guardar y antes de SMTP, la solicitud queda sin correo; a los 60 segundos el mismo formulario puede pedir otro enlace.
+Si la fila se guardó y el correo de verificación falló, la fila se borra y el cliente recibe 503. Puede reintentar. Si el proceso se cae justo después de guardar y antes de SMTP, la solicitud queda sin correo y **un segundo formulario no la reescribe**. Quien tiene el buzón usa "Reenviar enlace" (`POST /auth/register/resend`), pasado el minuto. Ese reenvío rota el enlace y conserva el nombre y la contraseña originales.
 
 ### Turnstile
 
@@ -132,9 +134,12 @@ La migración solo crea el enum `RegistrationStatus` y las tablas `registration_
 - El DTO de alta no acepta rol, `userId` ni `businessId` (`whitelist` + `forbidNonWhitelisted`). El `owner` lo pone el servidor, y siempre en un negocio nuevo.
 - Un JWT de staff o de dueño que no esté en `PLATFORM_ADMIN_EMAILS` recibe 403. Sin JWT, 401. `GET` de aprobar no existe.
 - `REJECTED` no se puede reabrir ni cambiarle la contraseña desde el formulario.
+- Una solicitud viva no se puede tomar. Quien solo conoce el correo, aunque espere el minuto de reenvío, no cambia el nombre ni la contraseña ni invalida el enlace con otro formulario. El enlace que ya llegó sigue sirviendo. El login con la contraseña del atacante responde el mismo 401 que un correo desconocido.
+- El reenvío público sigue existiendo y sí rota el enlace, con espera de 60 segundos y tope de 5 por hora. No toca nombre ni contraseña. Pedir el enlace actual para reenviar impediría recuperar un correo que nunca llegó. No se hizo.
+- Se descartó aplicar el cambio de nombre o contraseña cuando la víctima abre un enlace nuevo. Ese enlace llega a su buzón; al abrirlo quedaría la contraseña de quien reenvió el formulario. Invalidar el enlace anterior al modificar, que era el comportamiento previo, tiene el mismo problema.
+- Una solicitud ya cerrada (`EXPIRED`, o `PENDING_EMAIL_VERIFICATION` con el plazo de 7 días vencido) sí se reemplaza con el siguiente formulario. Ahí no hay una solicitud viva que proteger: es el mismo modelo que el primer alta. Sin el clic en el buzón no pasa a aprobación.
 - Los logs de error guardan código, usuario y estado. No guardan contraseña, token ni cuerpo del correo.
-- Queda un hueco conocido: quien conozca un correo con solicitud aún no confirmada puede, pasado el minuto de espera, reemplazar el nombre y la contraseña de esa solicitud. No puede confirmarla sin el buzón, porque el enlace nuevo llega ahí y el anterior muere. El tope es 5 reenvíos por hora.
-- Con SMTP caído, un alta nueva y una cuenta ya existente responden 503. Una solicitud ya rechazada o ya pendiente de aprobación responde el 201 genérico, porque no necesitan correo. Eso solo distingue esos estados mientras el correo esté caído.
+- Con SMTP caído de verdad (producción sin `MAIL_HOST` y `MAIL_FROM`), cualquier alta responde 503 y no revela el estado. Con el servidor de correo configurado, un alta nueva y un correo que ya es cuenta intentan enviar y pueden responder 503 si ese envío falla. Una solicitud viva, rechazada o ya pendiente de aprobación responde el 201 genérico y no manda correo: un segundo formulario no distingue esos tres estados.
 
 ## Despliegue
 
@@ -151,7 +156,8 @@ Orden, cuando se decida:
 ## Recuperación
 
 - SMTP caído y el alta respondió 503: no quedó solicitud. Reintentar cuando el proveedor responda.
-- Solicitud creada y el enlace no llegó: esperar 60 segundos y usar "Reenviar enlace", o enviar otra vez el formulario.
+- Solicitud creada y el enlace no llegó: esperar 60 segundos y usar "Reenviar enlace". Volver a enviar el formulario no cambia la solicitud ni manda otro enlace.
+- Alguien reenvió el formulario con otra contraseña mientras la solicitud seguía sin confirmar: no pasó nada. La contraseña buena es la primera. El enlace original sigue válido, salvo que además se haya usado "Reenviar enlace".
 - Aviso al administrador atascado: abrir el listado (reintenta la bandeja de salida) o leer `email_outbox` donde `sent_at` es null. No reenviar a mano el enlace de verificación desde esa tabla: no está ahí.
 - Aprobación a medias no debería quedar: usuario, negocio y membresía nacen en la misma transacción. Si el correo del solicitante ya era una cuenta, la solicitud sigue en `PENDING_ADMIN_APPROVAL`.
 - Dejar que un correo rechazado vuelva a registrarse, solo con respaldo y a conciencia:
@@ -177,14 +183,24 @@ La cuenta (`users`), la verificación, la aprobación y el acceso son cosas dist
 
 ## Pruebas
 
-Contra PostgreSQL aislado (no Neon):
+Contra PostgreSQL aislado (embedded-postgres, no Neon, no producción):
 
 ```bash
 cd backend
 npm test -- --runInBand src/identity/registration-policy.unit-spec.ts test/registration.e2e-spec.ts test/registration-throttle.e2e-spec.ts
 ```
 
-Pantallas, con el frontend ya construido:
+En esta ronda ese comando terminó en verde: 3 suites, 18 pruebas. Incluye el intento de cambiar nombre y contraseña de una solicitud sin verificar (no se modifica, el enlace original sigue válido, la contraseña ajena no entra) y el reemplazo solo cuando la solicitud ya está `EXPIRED` o venció el plazo de 7 días.
+
+La regresión del backend (`npm test` en `backend`, el mismo comando del job `backend`) terminó en verde: 62 suites pasadas, 431 pruebas pasadas. 1 suite se omite sola: `fase69.real-snapshot`, porque el snapshot privado de DEVICE_COPY no está en el repositorio. Es anterior a este PR. No apareció ningún fallo nuevo en autenticación, clientes, portal, ventas, abonos, devoluciones ni caja.
+
+El frontend (`npx vitest run` en la raíz) terminó en verde: 166 archivos, 1030 pruebas. Ahí entran sesión, portal, navegación del shell, permisos de la puerta de entrada, ventas, abonos y caja del cliente. No hubo fallos.
+
+Playwright no se ejecutó en esta ronda: en este entorno no hay navegadores instalados y el workflow de GitHub tampoco lo corre. `e2e/registration-ui.spec.ts` intercepta `/v1`; no habría visto este cambio de servidor. No se afirma que las pantallas pasaron.
+
+No se envió correo real. No se usó Neon ni datos de producción.
+
+Pantallas, cuando haya navegador y el frontend ya construido:
 
 ```bash
 npx playwright test e2e/registration-ui.spec.ts
@@ -192,7 +208,7 @@ npx playwright test e2e/registration-ui.spec.ts
 
 Ese archivo no llama a Render ni a Neon: intercepta `/v1`. El widget de Turnstile no se prueba en el navegador mientras el build no tenga `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. El servidor sí se prueba en `registration-policy.unit-spec.ts`.
 
-En GitHub Actions, el workflow `registration` corre las pruebas de Nest contra PostgreSQL 16. No usa Neon ni la base de producción. No corre Playwright.
+En GitHub Actions, el workflow `registration` corre las pruebas de Nest contra PostgreSQL 16. No usa Neon ni la base de producción. No corre Playwright. El commit `91dad98` tenía en verde `registration`, `backend`, `postgres` y `client-postgres`. Esta ronda empuja otro commit a `feat/registration-approval` y no espera el workflow nuevo para afirmar que ya está verde.
 
 ## Para ponerlo en producción
 

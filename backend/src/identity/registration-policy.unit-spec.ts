@@ -1,6 +1,12 @@
 import { assertTurnstile } from "./turnstile";
 import { isPlatformAdminEmail, platformAdminEmails } from "./platform-admin";
-import { hashToken, isHoneypot, newEmailToken, tokenHashesEqual } from "./registration-token";
+import {
+  canReplaceRegistrationCredentials,
+  hashToken,
+  isHoneypot,
+  newEmailToken,
+  tokenHashesEqual,
+} from "./registration-token";
 
 describe("registration policy", () => {
   const env = { ...process.env };
@@ -51,5 +57,44 @@ describe("registration policy", () => {
     const ok = (async () =>
       new Response(JSON.stringify({ success: true }), { status: 200 })) as typeof fetch;
     await expect(assertTurnstile("tok", process.env, ok)).resolves.toBeUndefined();
+  });
+
+  it("does not let a public form replace a live request", () => {
+    const future = new Date(Date.now() + 60_000);
+    const past = new Date(Date.now() - 60_000);
+    expect(
+      canReplaceRegistrationCredentials({
+        status: "PENDING_EMAIL_VERIFICATION",
+        expiresAt: future,
+      }),
+    ).toBe(false);
+    expect(
+      canReplaceRegistrationCredentials({
+        status: "PENDING_EMAIL_VERIFICATION",
+        expiresAt: past,
+      }),
+    ).toBe(true);
+    expect(
+      canReplaceRegistrationCredentials({
+        status: "PENDING_ADMIN_APPROVAL",
+        expiresAt: future,
+      }),
+    ).toBe(false);
+    expect(canReplaceRegistrationCredentials({ status: "REJECTED", expiresAt: past })).toBe(false);
+    expect(canReplaceRegistrationCredentials({ status: "APPROVED", expiresAt: past })).toBe(false);
+    expect(
+      canReplaceRegistrationCredentials({
+        status: "EXPIRED",
+        expiresAt: future,
+        userId: null,
+      }),
+    ).toBe(true);
+    expect(
+      canReplaceRegistrationCredentials({
+        status: "EXPIRED",
+        expiresAt: past,
+        userId: "user-1",
+      }),
+    ).toBe(false);
   });
 });

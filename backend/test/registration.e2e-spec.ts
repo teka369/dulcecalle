@@ -283,6 +283,92 @@ describe("registration approval", () => {
     await api().post("/v1/auth/register").send(body(email)).expect(201);
     const after = mail.sent.filter((m) => m.to === "revisa@dulce.test").length;
     expect(after - before).toBe(1);
+    const kept = await prisma.registrationRequest.findUnique({ where: { email } });
+    expect(kept?.status).toBe("PENDING_ADMIN_APPROVAL");
+    expect(kept?.name).toBe("Ana Pérez");
+  });
+
+  it("does not let someone who only knows the email take over an unverified request", async () => {
+    const email = "toma@test.co";
+    await api().post("/v1/auth/register").send(body(email, { name: "Dueña Real" })).expect(201);
+    const before = await prisma.registrationRequest.findUnique({ where: { email } });
+    const original = tokenFor(mail, email);
+    await prisma.registrationRequest.update({
+      where: { email },
+      data: { lastResendAt: new Date(Date.now() - 120_000) },
+    });
+    const sentBefore = mail.sent.filter((m) => m.to === email).length;
+    const again = await api()
+      .post("/v1/auth/register")
+      .send(body(email, { name: "Atacante", password: "otra-clave-99", confirmPassword: "otra-clave-99" }))
+      .expect(201);
+    expect(again.body.status).toBe("ACCEPTED");
+    expect(again.body.message).not.toContain("Atacante");
+    const after = await prisma.registrationRequest.findUnique({ where: { email } });
+    expect(after?.status).toBe("PENDING_EMAIL_VERIFICATION");
+    expect(after?.name).toBe("Dueña Real");
+    expect(after?.passwordHash).toBe(before?.passwordHash);
+    expect(after?.emailTokenHash).toBe(before?.emailTokenHash);
+    expect(mail.sent.filter((m) => m.to === email).length).toBe(sentBefore);
+    await api().post("/v1/auth/login").send({ email, password: "otra-clave-99" }).expect(401);
+    await api()
+      .post("/v1/auth/login")
+      .send({ email, password: "clave1234" })
+      .expect(403)
+      .expect((r) => expect(r.body.error.code).toBe("EMAIL_NOT_VERIFIED"));
+    await api().post("/v1/auth/register/verify").send({ token: original }).expect(200);
+    const verified = await prisma.registrationRequest.findUnique({ where: { email } });
+    expect(verified?.status).toBe("PENDING_ADMIN_APPROVAL");
+    expect(verified?.name).toBe("Dueña Real");
+    expect(verified?.passwordHash).toBe(before?.passwordHash);
+  });
+
+  it("lets a closed request be replaced, and keeps the new password off the old link", async () => {
+    const email = "vence@test.co";
+    await api().post("/v1/auth/register").send(body(email, { name: "Vieja Solicitud" })).expect(201);
+    const first = tokenFor(mail, email);
+    const previous = await prisma.registrationRequest.findUnique({ where: { email } });
+    await prisma.registrationRequest.update({
+      where: { email },
+      data: {
+        status: "EXPIRED",
+        emailTokenHash: null,
+        emailTokenExpiresAt: null,
+        lastResendAt: new Date(Date.now() - 120_000),
+      },
+    });
+    await api()
+      .post("/v1/auth/register")
+      .send(body(email, { name: "Nueva Solicitud", password: "clave-nueva-1", confirmPassword: "clave-nueva-1" }))
+      .expect(201);
+    const after = await prisma.registrationRequest.findUnique({ where: { email } });
+    expect(after?.status).toBe("PENDING_EMAIL_VERIFICATION");
+    expect(after?.name).toBe("Nueva Solicitud");
+    expect(after?.passwordHash).not.toBe(previous?.passwordHash);
+    await api().post("/v1/auth/register/verify").send({ token: first }).expect(400);
+    const second = tokenFor(mail, email);
+    expect(second).not.toBe(first);
+    await api().post("/v1/auth/login").send({ email, password: "clave1234" }).expect(401);
+    await api()
+      .post("/v1/auth/login")
+      .send({ email, password: "clave-nueva-1" })
+      .expect(403)
+      .expect((r) => expect(r.body.error.code).toBe("EMAIL_NOT_VERIFIED"));
+
+    const stuck = "plazo@test.co";
+    await api().post("/v1/auth/register").send(body(stuck, { name: "Plazo Viejo" })).expect(201);
+    await prisma.registrationRequest.update({
+      where: { email: stuck },
+      data: { expiresAt: new Date(Date.now() - 1000), lastResendAt: new Date(Date.now() - 120_000) },
+    });
+    await api()
+      .post("/v1/auth/register")
+      .send(body(stuck, { name: "Plazo Nuevo", password: "clave-plazo-1", confirmPassword: "clave-plazo-1" }))
+      .expect(201);
+    const reopened = await prisma.registrationRequest.findUnique({ where: { email: stuck } });
+    expect(reopened?.status).toBe("PENDING_EMAIL_VERIFICATION");
+    expect(reopened?.name).toBe("Plazo Nuevo");
+    expect(reopened?.expiresAt.getTime()).toBeGreaterThan(Date.now());
   });
 
   it("does not let a rejected request register again or replace its password", async () => {

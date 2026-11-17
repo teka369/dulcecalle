@@ -27,6 +27,7 @@ import {
   isHoneypot,
   newEmailToken,
   normalizeEmail,
+  canReplaceRegistrationCredentials,
 } from "./registration-token";
 import { assertTurnstile } from "./turnstile";
 
@@ -75,7 +76,9 @@ export class RegistrationService {
       await this.notifyAlreadyRegistered(email);
       return REGISTER_ACCEPTED;
     }
-    if (existing.status === "PENDING_ADMIN_APPROVAL" || existing.status === "REJECTED") {
+    // Knowing the email is not enough to change a live request. Only a closed
+    // one (expired, or past its 7 day window) can be replaced by a new form.
+    if (!canReplaceRegistrationCredentials(existing)) {
       return REGISTER_ACCEPTED;
     }
     await this.issueVerification(existing, { name, passwordHash, revive: true });
@@ -444,10 +447,11 @@ export class RegistrationService {
       const code = typeof e === "object" && e && "code" in e ? String((e as { code: unknown }).code) : "";
       if (code === "P2002") {
         const winner = await this.prisma.registrationRequest.findUnique({ where: { email } });
-        if (winner) {
+        if (!winner) throw e;
+        if (canReplaceRegistrationCredentials(winner)) {
           await this.issueVerification(winner, { name, passwordHash, revive: true });
-          return;
         }
+        return;
       }
       throw e;
     }
@@ -468,6 +472,12 @@ export class RegistrationService {
     opts: { name?: string; passwordHash?: string; revive?: boolean },
   ) {
     const now = new Date();
+    const nextName = opts.name?.trim();
+    const changesIdentity =
+      (nextName !== undefined && nextName.length > 0 && nextName !== row.name) ||
+      opts.passwordHash !== undefined;
+    if (changesIdentity && !canReplaceRegistrationCredentials(row, now.getTime())) return;
+
     const elapsed = row.lastResendAt ? now.getTime() - row.lastResendAt.getTime() : Number.POSITIVE_INFINITY;
     const inWindow = elapsed < RESEND_LOCK_MS;
     const count = inWindow ? row.resendCount : 0;

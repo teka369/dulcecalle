@@ -51,7 +51,7 @@ Duplicate request_id is **not** 409: it is 200 with the first result.
 
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| POST | `/v1/auth/register` | no | Signup **request** only. Body: name, email, password, confirmPassword. Does not create a User and does not return tokens. Same generic body if the email already exists. |
+| POST | `/v1/auth/register` | no | Signup **request** only. Body: name, email, password, confirmPassword. Does not create a User and does not return tokens. Same generic body if the email already exists, is rejected, or already has a live request. A live unverified request is not overwritten. An expired request, or one past its 7-day window, can be replaced. |
 | POST | `/v1/auth/register/verify` | no | `{ token }`. Confirms the mailbox and moves the request to admin approval. Single-use, hashed at rest, 24h. Does not approve the account. |
 | POST | `/v1/auth/register/resend` | no | `{ email }`. Generic `{ ok: true }`. Rotates the token when the request is still unverified or expired. |
 | POST | `/v1/auth/login` | no | access 15m + refresh 7d. A matching signup password (no User yet) returns `EMAIL_NOT_VERIFIED`, `PENDING_APPROVAL`, `REGISTRATION_REJECTED` or `REGISTRATION_EXPIRED` (403). A wrong password stays `401`. |

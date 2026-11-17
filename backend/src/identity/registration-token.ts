@@ -13,6 +13,23 @@ export const RESEND_GAP_MS = 60 * 1000;
 export const MAX_RESENDS = 5;
 export const RESEND_LOCK_MS = 60 * 60 * 1000;
 
+const NOT_REPLACEABLE = new Set(["APPROVED", "REJECTED", "PENDING_ADMIN_APPROVAL"]);
+
+/**
+ * A public form may replace name and password only when the previous request
+ * is already closed. A live unverified request stays as the mailbox owner left it.
+ */
+export function canReplaceRegistrationCredentials(
+  row: { status: string; userId?: string | null; expiresAt: Date },
+  nowMs = Date.now(),
+): boolean {
+  if (row.userId) return false;
+  if (NOT_REPLACEABLE.has(row.status)) return false;
+  if (row.status === "EXPIRED") return true;
+  if (row.status === "PENDING_EMAIL_VERIFICATION") return row.expiresAt.getTime() <= nowMs;
+  return false;
+}
+
 export function newEmailToken(): { raw: string; hash: string } {
   const raw = randomBytes(32).toString("base64url");
   return { raw, hash: hashToken(raw) };
