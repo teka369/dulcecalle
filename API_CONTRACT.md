@@ -35,6 +35,12 @@ Error envelope:
 | 409 | `KIND_LOCKED` | patch `kind` on a product with stock > 0 or any stock move (TICKET-A) |
 | 200 | *(idempotent hit)* | same request_id; body = original resource |
 | 429 | `RATE_LIMIT` | |
+| 409 | `CONFLICT` | registration can no longer be approved or rejected |
+| 403 | `EMAIL_NOT_VERIFIED` | signup password matches, mailbox not confirmed |
+| 403 | `PENDING_APPROVAL` | mailbox confirmed, admin has not approved |
+| 403 | `REGISTRATION_REJECTED` | admin rejected the signup |
+| 403 | `REGISTRATION_EXPIRED` | verification link or request expired |
+| 503 | `MAIL_UNAVAILABLE` | verification email could not be sent; nothing was stored for a brand-new signup |
 | 500 | `INTERNAL` | |
 
 Duplicate request_id is **not** 409: it is 200 with the first result.
@@ -45,8 +51,14 @@ Duplicate request_id is **not** 409: it is 200 with the first result.
 
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| POST | `/v1/auth/register` | no | first owner + first business |
-| POST | `/v1/auth/login` | no | access 15m + refresh 7d |
+| POST | `/v1/auth/register` | no | Signup **request** only. Body: name, email, password, confirmPassword. Does not create a User and does not return tokens. Same generic body if the email already exists. |
+| POST | `/v1/auth/register/verify` | no | `{ token }`. Confirms the mailbox and moves the request to admin approval. Single-use, hashed at rest, 24h. Does not approve the account. |
+| POST | `/v1/auth/register/resend` | no | `{ email }`. Generic `{ ok: true }`. Rotates the token when the request is still unverified or expired. |
+| POST | `/v1/auth/login` | no | access 15m + refresh 7d. A matching signup password (no User yet) returns `EMAIL_NOT_VERIFIED`, `PENDING_APPROVAL`, `REGISTRATION_REJECTED` or `REGISTRATION_EXPIRED` (403). A wrong password stays `401`. |
+| GET | `/v1/admin/registrations` | platform admin | Optional `status`. No password hashes. |
+| GET | `/v1/admin/registrations/:id` | platform admin | Request plus decision history. |
+| POST | `/v1/admin/registrations/:id/approve` | platform admin | Creates the owner and the business once. Repeating it is idempotent. |
+| POST | `/v1/admin/registrations/:id/reject` | platform admin | `{ note? }`. Idempotent if already rejected. |
 | POST | `/v1/auth/refresh` | no | body `{ refreshToken }`; new access + refresh |
 | POST | `/v1/auth/logout` | yes | `{ ok: true }`. Does **not** revoke JWTs |
 | GET | `/v1/me` | yes | user + memberships |

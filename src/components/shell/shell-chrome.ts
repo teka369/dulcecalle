@@ -4,6 +4,7 @@ export function shellHidesChrome(pathname: string): boolean {
     pathname === "/login" ||
     pathname === "/acceso-tienda" ||
     pathname === "/register" ||
+    pathname.startsWith("/register/") ||
     pathname === "/cliente" ||
     pathname.startsWith("/cliente/") ||
     pathname.startsWith("/ventas/nueva") ||

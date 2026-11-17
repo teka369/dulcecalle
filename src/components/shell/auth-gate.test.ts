@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: () => undefined, push: () => undefined }),
 }));
 
-import { ADMIN_PUBLIC, decideAuthGate, isCustomerPath } from "./AuthGate";
+import { ADMIN_PUBLIC, decideAuthGate, isCustomerPath, isPublicAdminPath } from "./AuthGate";
 import { CustomerSession } from "@/data/http/customer-session";
 import { HttpSession, type AuthStorage } from "@/data/http/session";
 
@@ -25,6 +25,13 @@ describe("customer portal routing", () => {
   it("keeps admin login/register public and customer login public", () => {
     expect(ADMIN_PUBLIC.has("/login")).toBe(true);
     expect(ADMIN_PUBLIC.has("/register")).toBe(true);
+    expect(isPublicAdminPath("/register/verificar")).toBe(true);
+    expect(decideAuthGate({
+      pathname: "/register/verificar",
+      adminAuthenticated: false,
+      adminBusinessId: null,
+      customerAuthenticated: false,
+    })).toEqual({ kind: "allow" });
     expect(ADMIN_PUBLIC.has("/acceso-tienda")).toBe(true);
     expect(ADMIN_PUBLIC.has("/cliente")).toBe(false);
     expect(ADMIN_PUBLIC.has("/cliente/login")).toBe(false);

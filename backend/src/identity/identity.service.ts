@@ -7,6 +7,9 @@ import { AppError, ERROR_CODES, MESSAGES } from "../shared/errors";
 import { DEFAULT_TZ } from "../shared/clock";
 import { AuthSessionService } from "./auth-sessions";
 import type { RegisterDto } from "./dto";
+import { isPlatformAdminEmail } from "./platform-admin";
+import { createOwnerAccount } from "./provision-owner";
+import { RegistrationService } from "./registration.service";
 
 @Injectable()
 export class IdentityService {
@@ -14,6 +17,7 @@ export class IdentityService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly sessions: AuthSessionService,
+    private readonly registration: RegistrationService,
   ) {}
 
   private tokens(userId: string, email: string) {
@@ -33,32 +37,14 @@ export class IdentityService {
       throw new AppError(ERROR_CODES.VALIDATION, "Ese correo ya está registrado.");
     }
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const userId = randomUUID();
-    const businessId = randomUUID();
-    const membershipId = randomUUID();
     const name = (dto.businessName ?? "DulceCalle").trim() || "DulceCalle";
-
-    await this.prisma.$transaction([
-      this.prisma.user.create({
-        data: { id: userId, email, passwordHash },
-      }),
-      this.prisma.business.create({
-        data: { id: businessId, name, timezone: DEFAULT_TZ },
-      }),
-      this.prisma.businessMembership.create({
-        data: {
-          id: membershipId,
-          businessId,
-          userId,
-          role: "owner",
-        },
-      }),
-    ]);
-
-    const issued = await this.tokens(userId, email);
+    const created = await this.prisma.$transaction((tx) =>
+      createOwnerAccount(tx, { email, passwordHash, businessName: name }),
+    );
+    const issued = await this.tokens(created.userId, email);
     return {
-      user: { id: userId, email },
-      business: { id: businessId, name, timezone: DEFAULT_TZ },
+      user: { id: created.userId, email },
+      business: { id: created.businessId, name: created.name, timezone: created.timezone },
       accessToken: issued.accessToken,
       refreshToken: issued.refreshToken,
     };
@@ -68,6 +54,7 @@ export class IdentityService {
     const email = emailRaw.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
+      await this.registration.assertPendingCredentials(email, password);
       throw new AppError(ERROR_CODES.UNAUTHORIZED, "Correo o clave incorrectos.");
     }
     const ok = await bcrypt.compare(password, user.passwordHash);
@@ -131,6 +118,7 @@ export class IdentityService {
     return {
       id: user.id,
       email: user.email,
+      platformAdmin: isPlatformAdminEmail(user.email),
       memberships: user.memberships.map((m) => ({
         businessId: m.businessId,
         role: m.role,

@@ -71,6 +71,9 @@ export default function LoginPage() {
         ) : (
           <>
             <StoreLoginForm />
+            <Link href="/register" className="flex min-h-11 items-center justify-center text-sm font-semibold text-ink">
+              Crear cuenta de tienda
+            </Link>
             <Link href="/cliente/login" className="flex min-h-11 items-center justify-center text-sm font-semibold text-ink">
               ¿Eres cliente? Consulta tu saldo
             </Link>

@@ -131,7 +131,10 @@ model User {
   passwordHash String   @map("password_hash")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  memberships BusinessMembership[]
+  memberships             BusinessMembership[]
+  decidedRegistrations    RegistrationRequest[]     @relation("RegistrationDecider")
+  accountRegistration     RegistrationRequest?      @relation("RegistrationAccount")
+  registrationLogEntries  RegistrationDecisionLog[] @relation("RegistrationLogActor")
 
   @@map("users")
 }
@@ -166,6 +169,7 @@ model Business {
   sequences          BusinessSequence[]
   receipts           Receipt[]
   receiptAcks        ReceiptAcknowledgement[]
+  registrationRequests RegistrationRequest[]
 
   @@map("businesses")
 }
@@ -861,4 +865,78 @@ model ReceiptAcknowledgement {
   @@index([businessId, receiptId, at])
   @@index([businessId, customerId, at])
   @@map("receipt_acknowledgements")
+}
+
+/// Public signup is a request, not a User. A User row is created only on approval.
+enum RegistrationStatus {
+  PENDING_EMAIL_VERIFICATION
+  PENDING_ADMIN_APPROVAL
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+model RegistrationRequest {
+  id                  String             @id @db.Uuid
+  name                String
+  email               String             @unique
+  passwordHash        String             @map("password_hash")
+  status              RegistrationStatus
+  emailTokenHash      String?            @unique @map("email_token_hash")
+  emailTokenExpiresAt DateTime?          @map("email_token_expires_at") @db.Timestamptz(3)
+  emailVerifiedAt     DateTime?          @map("email_verified_at") @db.Timestamptz(3)
+  tokenGeneration     Int                @default(0) @map("token_generation")
+  resendCount         Int                @default(0) @map("resend_count")
+  lastResendAt        DateTime?          @map("last_resend_at") @db.Timestamptz(3)
+  expiresAt           DateTime           @map("expires_at") @db.Timestamptz(3)
+  decidedAt           DateTime?          @map("decided_at") @db.Timestamptz(3)
+  decidedByUserId     String?            @map("decided_by_user_id") @db.Uuid
+  decisionNote        String?            @map("decision_note")
+  userId              String?            @unique @map("user_id") @db.Uuid
+  businessId          String?            @map("business_id") @db.Uuid
+  adminNotifiedAt     DateTime?          @map("admin_notified_at") @db.Timestamptz(3)
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  decidedBy User?                     @relation("RegistrationDecider", fields: [decidedByUserId], references: [id])
+  account   User?                     @relation("RegistrationAccount", fields: [userId], references: [id])
+  business  Business?                 @relation(fields: [businessId], references: [id])
+  logs      RegistrationDecisionLog[]
+
+  @@index([status, createdAt])
+  @@map("registration_requests")
+}
+
+/// Append-only trail of submit, verify, resend, approve and reject.
+model RegistrationDecisionLog {
+  id          String   @id @db.Uuid
+  requestId   String   @map("request_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  request RegistrationRequest @relation(fields: [requestId], references: [id])
+  actor   User?               @relation("RegistrationLogActor", fields: [actorUserId], references: [id])
+
+  @@index([requestId, createdAt])
+  @@map("registration_decision_logs")
+}
+
+/// Non-secret mail (admin notice, approval, rejection). Verification links are not stored.
+model EmailOutbox {
+  id        String    @id @db.Uuid
+  dedupeKey String    @unique @map("dedupe_key")
+  kind      String
+  toAddress String    @map("to_address")
+  subject   String
+  textBody  String    @map("text_body")
+  htmlBody  String    @map("html_body")
+  sentAt    DateTime? @map("sent_at") @db.Timestamptz(3)
+  attempts  Int       @default(0)
+  lastError String?   @map("last_error")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([sentAt, attempts])
+  @@map("email_outbox")
 }

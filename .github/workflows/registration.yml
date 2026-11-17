@@ -1,0 +1,49 @@
+name: registration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  registration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dulcecalle_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dulcecalle_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dulcecalle_test
+      E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dulcecalle_test
+      JWT_SECRET: test-access-secret
+      JWT_REFRESH_SECRET: test-refresh-secret
+      NODE_ENV: test
+      APP_PUBLIC_URL: https://dulcecalle.vercel.app
+      REGISTRATION_ADMIN_EMAIL: revisa@dulce.test
+      PLATFORM_ADMIN_EMAILS: admin@dulce.test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend
+        working-directory: backend
+        run: npm ci
+      - name: Apply migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+      - name: Registration unit + e2e
+        working-directory: backend
+        run: npx jest --runInBand --forceExit src/identity/registration-policy.unit-spec.ts test/registration.e2e-spec.ts test/registration-throttle.e2e-spec.ts

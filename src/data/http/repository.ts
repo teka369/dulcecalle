@@ -186,6 +186,31 @@ export async function pageAll<T extends Record<string, unknown>>(
   return out;
 }
 
+export type RegistrationRow = {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  emailVerifiedAt: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  decidedByEmail: string | null;
+  userId: string | null;
+  businessId: string | null;
+  expiresAt: string;
+};
+
+export type RegistrationDetail = RegistrationRow & {
+  history: Array<{
+    id: string;
+    action: string;
+    note: string | null;
+    createdAt: string;
+    actorEmail: string | null;
+  }>;
+};
+
 export class HttpRepository {
   readonly session: HttpSession;
   private readonly http: HttpClient;
@@ -203,21 +228,33 @@ export class HttpRepository {
 
   readonly auth = {
     register: async (input: {
+      name: string;
       email: string;
       password: string;
-      businessName?: string;
+      confirmPassword: string;
+      companyWebsite?: string;
+      turnstileToken?: string;
     }) => {
-      const body = await this.http.request<{
-        user: { id: string; email: string };
-        business: { id: string; name: string; timezone: string };
-        accessToken: string;
-        refreshToken: string;
+      return this.http.request<{
+        ok: true;
+        status: "ACCEPTED";
+        message: string;
       }>("POST", "/auth/register", { body: input, skipBusiness: true });
-      this.session.accessToken = body.accessToken;
-      this.session.refreshToken = body.refreshToken;
-      this.session.user = body.user;
-      this.session.businessId = body.business.id;
-      return body;
+    },
+
+    verifyRegistration: async (token: string) => {
+      return this.http.request<{ status: "PENDING_ADMIN_APPROVAL" }>(
+        "POST",
+        "/auth/register/verify",
+        { body: { token }, skipBusiness: true },
+      );
+    },
+
+    resendRegistration: async (email: string) => {
+      return this.http.request<{ ok: true }>("POST", "/auth/register/resend", {
+        body: { email },
+        skipBusiness: true,
+      });
     },
 
     login: async (email: string, password: string) => {
@@ -258,6 +295,7 @@ export class HttpRepository {
       return this.http.request<{
         id: string;
         email: string;
+        platformAdmin?: boolean;
         memberships: Array<{
           businessId: string;
           role: "owner" | "staff";
@@ -274,6 +312,35 @@ export class HttpRepository {
 
     selectBusiness: (businessId: string) => {
       this.session.selectBusiness(businessId);
+    },
+  };
+
+  readonly registrations = {
+    list: async (status?: string) => {
+      const query = status ? `?status=${encodeURIComponent(status)}` : "";
+      return this.http.request<RegistrationRow[]>("GET", `/admin/registrations${query}`, {
+        skipBusiness: true,
+      });
+    },
+    get: async (id: string) => {
+      return this.http.request<RegistrationDetail>("GET", `/admin/registrations/${id}`, {
+        skipBusiness: true,
+      });
+    },
+    approve: async (id: string) => {
+      return this.http.request<{
+        status: "APPROVED";
+        userId: string;
+        businessId: string;
+        idempotent: boolean;
+      }>("POST", `/admin/registrations/${id}/approve`, { skipBusiness: true });
+    },
+    reject: async (id: string, note?: string) => {
+      return this.http.request<{ status: "REJECTED"; idempotent: boolean }>(
+        "POST",
+        `/admin/registrations/${id}/reject`,
+        { body: note ? { note } : {}, skipBusiness: true },
+      );
     },
   };
 

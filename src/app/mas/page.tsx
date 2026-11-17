@@ -4,6 +4,9 @@ import { CASH_COPY } from "@/domain/cash";
 import { STATS_COPY } from "@/domain/stats";
 import { useCash } from "@/store/cashStore";
 import { getCachedBusinessLabel } from "@/data/pwa/dashboard";
+import { apiBaseUrl } from "@/data/backend";
+import { HttpRepository } from "@/data/http/repository";
+import { getPwaAuthSession } from "@/data/http/session";
 import { useEffect, useState } from "react";
 import { HeroBlock } from "@/components/ui/HeroBlock";
 import { HeroPill } from "@/components/ui/HeroPill";
@@ -27,7 +30,17 @@ export default function MasPage() {
   const { summary } = useCash();
   // Read after mount (session lives in localStorage); no fetch — null until Inicio has loaded it.
   const [businessLabel, setBusinessLabel] = useState<string | null>(null);
+  const [platformAdmin, setPlatformAdmin] = useState(false);
   useEffect(() => setBusinessLabel(getCachedBusinessLabel()), []);
+  useEffect(() => {
+    const base = apiBaseUrl();
+    if (!base) return;
+    const repo = new HttpRepository(base, getPwaAuthSession());
+    void repo.auth
+      .me()
+      .then((me) => setPlatformAdmin(me.platformAdmin === true))
+      .catch(() => setPlatformAdmin(false));
+  }, []);
   const pending = summary?.pendingCount ?? 0;
   const pill = !summary
     ? null
@@ -68,6 +81,9 @@ export default function MasPage() {
             <Row href="/mas/datos" leading={<Lead icon="package" />} title="Datos" />
             <Row href="/mas/portal" leading={<Lead icon="users" />} title="Portal de clientes" />
             <Row href="/login" leading={<Lead icon="users" />} title="Cuenta" />
+            {platformAdmin ? (
+              <Row href="/admin/registros" leading={<Lead icon="check" />} title="Solicitudes de registro" />
+            ) : null}
           </RowGroup>
         </section>
       </Sheet>
