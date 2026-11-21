@@ -1,0 +1,1039 @@
+{
+ "venta-pagada": {
+  "taps": 4,
+  "typed": 0,
+  "log": [
+   {
+    "i": 1,
+    "ok": true,
+    "d": "FAB",
+    "url": "/ventas/nueva"
+   },
+   {
+    "i": 2,
+    "ok": true,
+    "d": "producto",
+    "url": "/ventas/nueva"
+   },
+   {
+    "i": 3,
+    "ok": true,
+    "d": "Cobrar",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 4,
+    "ok": true,
+    "d": "Registrar",
+    "url": "/ventas/nueva"
+   }
+  ],
+  "posts": [],
+  "endText": "↻ Preparando / ✓ En el servidor / Buenos días / Tienda Doña Rosa / Martes, 3 de Noviembre / Caja abierta / HOY / 3 ventas / $ 184.500 / VENTAS DE HOY / $ 184.500 / Ver estadísticas / 2 / Stock bajo / 5 / Productos / $ 50.000 / Por cobrar / 2 fiados / ACCESOS RÁPIDOS / Fiados / Stock bajo / Gastos / Venta rápida / Abre la caja registradora / FIADOS PENDIENTES / Ver todos / Ana Pérez / Pendiente / $"
+ },
+ "venta-parcial": {
+  "taps": 10,
+  "typed": 2,
+  "log": [
+   {
+    "i": 1,
+    "ok": true,
+    "d": "FAB",
+    "url": "/ventas/nueva"
+   },
+   {
+    "i": 2,
+    "ok": true,
+    "d": "producto",
+    "url": "/ventas/nueva"
+   },
+   {
+    "i": 3,
+    "ok": true,
+    "d": "producto2",
+    "url": "/ventas/nueva"
+   },
+   {
+    "i": 4,
+    "ok": true,
+    "d": "Cobrar",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 5,
+    "ok": true,
+    "d": "Parcial",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 6,
+    "ok": true,
+    "d": "Cliente",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 7,
+    "ok": true,
+    "d": "buscar",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 8,
+    "ok": true,
+    "d": "elige",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 9,
+    "ok": true,
+    "d": "Recibido",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 10,
+    "ok": true,
+    "d": "Registrar",
+    "url": "/ventas/nueva"
+   }
+  ],
+  "posts": [],
+  "endText": "↻ Preparando / ✓ En el servidor / Buenos días / Tienda Doña Rosa / Martes, 3 de Noviembre / Caja abierta / HOY / 3 ventas / $ 184.500 / VENTAS DE HOY / $ 184.500 / Ver estadísticas / 2 / Stock bajo / 5 / Productos / $ 50.000 / Por cobrar / 2 fiados / ACCESOS RÁPIDOS / Fiados / Stock bajo / Gastos / Venta rápida / Abre la caja registradora / FIADOS PENDIENTES / Ver todos / Ana Pérez / Pendiente / $"
+ },
+ "venta-fiada": {
+  "taps": 7,
+  "typed": 0,
+  "log": [
+   {
+    "i": 1,
+    "ok": true,
+    "d": "FAB",
+    "url": "/ventas/nueva"
+   },
+   {
+    "i": 2,
+    "ok": true,
+    "d": "producto",
+    "url": "/ventas/nueva"
+   },
+   {
+    "i": 3,
+    "ok": true,
+    "d": "Cobrar",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 4,
+    "ok": true,
+    "d": "Fiada",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 5,
+    "ok": true,
+    "d": "Cliente",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 6,
+    "ok": true,
+    "d": "elige",
+    "url": "/ventas/cobrar"
+   },
+   {
+    "i": 7,
+    "ok": true,
+    "d": "Registrar",
+    "url": "/ventas/nueva"
+   }
+  ],
+  "posts": [],
+  "endText": "↻ Preparando / ✓ En el servidor / Buenos días / Tienda Doña Rosa / Martes, 3 de Noviembre / Caja abierta / HOY / 3 ventas / $ 184.500 / VENTAS DE HOY / $ 184.500 / Ver estadísticas / 2 / Stock bajo / 5 / Productos / $ 50.000 / Por cobrar / 2 fiados / ACCESOS RÁPIDOS / Fiados / Stock bajo / Gastos / Venta rápida / Abre la caja registradora / FIADOS PENDIENTES / Ver todos / Ana Pérez / Pendiente / $"
+ },
+ "abono": {
+  "taps": 5,
+  "typed": 1,
+  "log": [
+   {
+    "i": 1,
+    "ok": true,
+    "d": "tab Clientes",
+    "url": "/clientes"
+   },
+   {
+    "i": 2,
+    "ok": true,
+    "d": "cliente",
+    "url": "/clientes/[REDACTED]"
+   },
+   {
+    "i": 3,
+    "ok": true,
+    "d": "Registrar abono",
+    "url": "/clientes/[REDACTED]/abono"
+   },
+   {
+    "i": 4,
+    "ok": true,
+    "d": "monto",
+    "url": "/clientes/[REDACTED]/abono"
+   },
+   {
+    "i": 5,
+    "ok": true,
+    "d": "Registrar",
+    "url": "/clientes/[REDACTED]/abono"
+   }
+  ],
+  "posts": [],
+  "endText": "↻ Preparando / ✓ En el servidor / Registrar abono / Ana Pérez · Debe $ 30.000 / ¿CUÁNTO ABONA? / $ / Revisa los datos e inténtalo de nuevo. / Todo $ 30.000 / ¿CÓMO RECIBES? / Efectivo / Nequi / Queda debiendo $ 25.000 / Registrar abono"
+ },
+ "devolucion": {
+  "taps": 5,
+  "typed": 0,
+  "log": [
+   {
+    "i": 1,
+    "ok": true,
+    "d": "tab Ventas",
+    "url": "/ventas"
+   },
+   {
+    "i": 2,
+    "ok": true,
+    "d": "venta",
+    "url": "/ventas/[REDACTED]"
+   },
+   {
+    "i": 3,
+    "ok": true,
+    "d": "Devolver",
+    "url": "/ventas/[REDACTED]/devolver"
+   },
+   {
+    "i": 4,
+    "ok": true,
+    "d": "+1",
+    "url": "/ventas/[REDACTED]/devolver"
+   },
+   {
+    "i": 5,
+    "ok": true,
+    "d": "Confirmar",
+    "url": "/ventas/[REDACTED]/devolver"
+   }
+  ],
+  "posts": [],
+  "endText": "↻ Preparando / ✓ En el servidor / Devolver / Venta $ 62.000 · Ana Pérez / ELIGE QUÉ VUELVE / Devolver todo / Gomitas / Quedan 2 · $ 1.500 c/u / − / 1 / + / Chocolatina Jet / Quedan 1 · $ 59.000 c/u / − / 0 / + / Se devuelve $ 1.500 / El inventario sube cuando el servidor confirme la devolución. / Revisa los datos e inténtalo de nuevo. / Si la venta fue pagada, sale plata de caja o Nequi. Si fue fi"
+ },
+ "gasto": {
+  "taps": 4,
+  "typed": 2,
+  "log": [
+   {
+    "i": 1,
+    "ok": true,
+    "d": "tile Gastos",
+    "url": "/mas/gastos"
+   },
+   {
+    "i": 2,
+    "ok": true,
+    "d": "Nuevo gasto",
+    "url": "/mas/gastos/nuevo"
+   },
+   {
+    "i": 3,
+    "ok": true,
+    "d": "monto",
+    "url": "/mas/gastos/nuevo"
+   },
+   {
+    "i": 4,
+    "ok": true,
+    "d": "concepto",
+    "url": "/mas/gastos/nuevo"
+   },
+   {
+    "i": 5,
+    "ok": false,
+    "d": "Registrar",
+    "err": "locator.click: Timeout 6000ms exceeded.",
+    "url": "/mas/gastos/nuevo"
+   }
+  ],
+  "posts": [],
+  "endText": "↻ Preparando / ✓ En el servidor / Registrar gasto / Efectivo esperado $ 95.000 / Plata del negocio que sale para operar. No es retiro personal. Esto es un gasto del negocio, no un retiro tuyo. / MONTO / $ / ¿EN QUÉ SE GASTÓ? / ¿CÓMO PAGASTE? / Efectivo / Nequi / NOTA / Quedará en caja $ 87.000 (Efectivo) / Total $ 87.000 / Confirmar gasto"
+ },
+ "surtir": {
+  "taps": 0,
+  "typed": 0,
+  "log": [
+   {
+    "i": 1,
+    "ok": false,
+    "d": "tile Surtir",
+    "err": "locator.click: Timeout 6000ms exceeded.",
+    "url": "/"
+   }
+  ],
+  "posts": [],
+  "endText": "↻ Preparando / ✓ En el servidor / Buenos días / Tienda Doña Rosa / Martes, 3 de Noviembre / Caja abierta / HOY / 3 ventas / $ 184.500 / VENTAS DE HOY / $ 184.500 / Ver estadísticas / 2 / Stock bajo / 5 / Productos / $ 50.000 / Por cobrar / 2 fiados / ACCESOS RÁPIDOS / Fiados / Stock bajo / Gastos / Venta rápida / Abre la caja registradora / FIADOS PENDIENTES / Ver todos / Ana Pérez / Pendiente / $"
+ },
+ "abrir-caja": {
+  "taps": 1,
+  "log": [
+   {
+    "d": "tab Más",
+    "ok": true,
+    "url": "/mas"
+   },
+   {
+    "d": "Caja",
+    "ok": false,
+    "err": "locator.click: Timeout 30000ms exceeded."
+   }
+  ],
+  "posts": []
+ },
+ "cerrar-caja": {
+  "taps": 5,
+  "typed": 1,
+  "log": [
+   {
+    "i": 1,
+    "ok": true,
+    "d": "tab Más",
+    "url": "/mas"
+   },
+   {
+    "i": 2,
+    "ok": true,
+    "d": "Caja",
+    "url": "/mas/caja"
+   },
+   {
+    "i": 3,
+    "ok": true,
+    "d": "Cerrar caja",
+    "url": "/mas/caja/cerrar"
+   },
+   {
+    "i": 4,
+    "ok": true,
+    "d": "conteo",
+    "url": "/mas/caja/cerrar"
+   },
+   {
+    "i": 5,
+    "ok": true,
+    "d": "Cerrar",
+    "url": "/mas/caja/cerrar"
+   }
+  ],
+  "posts": [],
+  "endText": "↻ Preparando / ✓ En el servidor / Cerrar caja / Esperado $ 95.000 (Efectivo) · Nequi $ 0 no cuenta en billetes / ¿CUÁNTO EFECTIVO HAY? / $ / Diferencia: Falta $ 5.000 / Falta / ¿Cerrar con diferencia? / ¿Cerrar con diferencia?"
+ },
+ "audit": {
+  "inicio@360": {
+   "h1": [
+    "Buenos días"
+   ],
+   "ovX": false,
+   "curTab": "Inicio",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 8,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Buenos días / Tienda Doña Rosa / Martes, 3 de Noviembre / Caja abierta / HOY / 3 ventas / $ 184.500 / VENTAS DE HOY / $ 184.500 / Ver estad",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Buenos días / Tienda Doña Rosa / Martes, 3 de Noviembre / Caja abierta / HOY / 3 ventas / $ 184.500 / VENTAS DE HOY / $ 184.500 / Ver estadísticas / 2 / Stock bajo / 5 / Productos / $ 50.000 / Por cobrar / 2 fiados / ACCESOS RÁPIDOS / Fiados / Stock bajo / Gastos / Venta rápida / Abre la caja registradora / FIADOS PENDIENTES / Ver todos / Ana Pérez / Pendiente / $ 30.000 / Luis Gómez / Pendiente / $ 20.000 / ATENCIÓN EN INVENTARIO / Ver inventario / Bombón Bum / Poco stock · umbral 10 / 2 u. / Gomitas / Poco stock · umbral 5 / 3 u. / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "ventas@360": {
+   "h1": [
+    "Ventas"
+   ],
+   "ovX": false,
+   "curTab": "Ventas",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 3,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Ventas / Nueva venta / TOTAL LISTADO / 3 ventas / $ 184.500 / Recibido $ 75.000 · Fiado $ 109.500 / Todas / Pagadas / Parcial / Fiadas / HOY · MA",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Ventas / Nueva venta / TOTAL LISTADO / 3 ventas / $ 184.500 / Recibido $ 75.000 · Fiado $ 109.500 / Todas / Pagadas / Parcial / Fiadas / HOY · MAR 3 NOV / Sin cliente · efectivo / 3 nov · 09:45 / contado / $ 45.000 / Ana Pérez · Nequi + Fiado / 3 nov · 09:45 / Recibió $ 30.000 · Fía $ 32.000 / Parcial / $ 62.000 / Luis Gómez · Fiado / 3 nov · 09:45 / Fía $ 77.500 / Fiada / $ 77.500 / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "venta@360": {
+   "h1": [
+    "Venta"
+   ],
+   "ovX": false,
+   "curTab": "Ventas",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 4,
+   "smallTaps": 1,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Venta / mar 3 nov, 09:45 / Devolver / $ 62.000 / Parcial / Ana Pérez / $ 30.000 / Recibido / $ 32.000 / Fiado / Nequi + Fiado / Método / PRODUCTOS / Go",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [
+    "Ana Pérez:65x20"
+   ],
+   "nTiny": 1,
+   "full": "↻ Preparando / ✓ En el servidor / Venta / mar 3 nov, 09:45 / Devolver / $ 62.000 / Parcial / Ana Pérez / $ 30.000 / Recibido / $ 32.000 / Fiado / Nequi + Fiado / Método / PRODUCTOS / Gomitas / 2 × $ 1.500 · Costo $ 750 / $ 3.000 / Chocolatina Jet / 1 × $ 59.000 · Costo $ 1.000 / $ 59.000 / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "clientes@360": {
+   "h1": [
+    "Clientes"
+   ],
+   "ovX": false,
+   "curTab": "Clientes",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 3,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Clientes / Agregar cliente / POR COBRAR / 2 clientes deben / $ 50.000 / Buscar cliente / Deben / (2) / Todos / (2) / Ana Pérez / C1 / $ 30.000 / Luis Gó",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Clientes / Agregar cliente / POR COBRAR / 2 clientes deben / $ 50.000 / Buscar cliente / Deben / (2) / Todos / (2) / Ana Pérez / C1 / $ 30.000 / Luis Gómez / C2 / $ 20.000 / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "cliente@360": {
+   "h1": [
+    "Ana Pérez"
+   ],
+   "ovX": false,
+   "curTab": "Clientes",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 5,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Ana Pérez / C1 / Editar / DEBE / $ 30.000 / Registrar abono / Agregar deuda anterior / PIN del portal / ESTADO DE CUENTA / Abono · Nequi / 3 nov ",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Ana Pérez / C1 / Editar / DEBE / $ 30.000 / Registrar abono / Agregar deuda anterior / PIN del portal / ESTADO DE CUENTA / Abono · Nequi / 3 nov · 09:45 / − $ 12.000 / Abono · Saldo $ 30.000 / Fiado parcial · Venta #001 / 3 nov · 09:45 · Venta $ 62.000 · Pagó $ 30.000 / + $ 32.000 / Cargo · Saldo $ 42.000 / Deuda anterior / 3 nov · 09:45 · Nota: Cuaderno / + $ 10.000 / Cargo · Saldo $ 10.000 / Cargado $ 42.000 · Pagos y devoluciones $ 12.000 · Total pendiente $ 30.000 / PIN DEL PORTAL / Abrir / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "inventario@360": {
+   "h1": [
+    "Inventario"
+   ],
+   "ovX": false,
+   "curTab": "Inventario",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 5,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Inventario / Agregar producto / 5 / productos / 2 / stock bajo / Productos / Proveedores / Buscar producto / STOCK BAJO / Gomitas / umbral 5 · $ 1.500 / 3",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Inventario / Agregar producto / 5 / productos / 2 / stock bajo / Productos / Proveedores / Buscar producto / STOCK BAJO / Gomitas / umbral 5 · $ 1.500 / 3 u. / Stock bajo / Bombón Bum / umbral 10 · $ 800 / 2 u. / Stock bajo / TODOS / Chocolatina Jet / $ 2.000 / 40 u. / Galletas Festival / $ 2.500 / 25 u. / Masa de arequipe / $ 0 / 20 u. / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "producto@360": {
+   "h1": [
+    "Gomitas"
+   ],
+   "ovX": false,
+   "curTab": "Inventario",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 9,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Editar / Gomitas / STOCK / 3 u. / Stock bajo (umbral 5) / Surtir / $ 1.500 / Precio / $ 750 / Costo prom. / $ 2.250 / Valor inventario / AJUSTES / Me lo",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Editar / Gomitas / STOCK / 3 u. / Stock bajo (umbral 5) / Surtir / $ 1.500 / Precio / $ 750 / Costo prom. / $ 2.250 / Valor inventario / AJUSTES / Me lo comí / Regalo / Perdido / dañado / Fotos / Sin fotos todavía. / Agregar fotos (8 libres) / JPG, PNG o WebP · máx 5 MB c/u / PREPARACIONES / 10 u. → Galletas Festival / 03/11/2026 · Tanda de la mañana / $ 2.000 c/u / Desde Masa de arequipe · 10 u. / 03/11/2026 · Tanda de la mañana / $ 2.000 c/u / HISTORIAL / Surtir / 03/11/2026 / +10 / Entra / Venta / 03/11/2026 / −2 / Sale / Me lo comí / probé · 03/11/2026 / −1 / Sale / Archivar producto / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "mas@360": {
+   "h1": [
+    "Más"
+   ],
+   "ovX": false,
+   "curTab": "Más",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 4,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Más / Caja, gastos y ajustes de la tienda / NEGOCIO / Caja / Estadísticas / Gastos / AJUSTES / Apariencia / Datos / Portal de clientes / Cuenta / Inic",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Más / Caja, gastos y ajustes de la tienda / NEGOCIO / Caja / Estadísticas / Gastos / AJUSTES / Apariencia / Datos / Portal de clientes / Cuenta / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "caja@360": {
+   "h1": [
+    "Caja"
+   ],
+   "ovX": false,
+   "curTab": "Más",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 7,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Caja / mar 3 nov · Caja abierta / Cerrar caja / EFECTIVO ESPERADO / Nequi $ 0 · Total $ 95.000 / $ 95.000 / Nequi no cuenta en billetes ",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Caja / mar 3 nov · Caja abierta / Cerrar caja / EFECTIVO ESPERADO / Nequi $ 0 · Total $ 95.000 / $ 95.000 / Nequi no cuenta en billetes de cierre. / $ 67.000 / Entradas / $ 8.000 / Salidas / Aporte / Retiro / Gasto / MOVIMIENTOS / Abono / Nequi / + $ 12.000 / Entra / Gasto / Efectivo / − $ 8.000 / Sale / Aporte de capital / Efectivo / + $ 10.000 / Entra / Venta / Efectivo / + $ 45.000 / Entra / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "cerrar@360": {
+   "h1": [
+    "Cerrar caja"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 2,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Cerrar caja / Esperado $ 95.000 (Efectivo) · Nequi $ 0 no cuenta en billetes / ¿CUÁNTO EFECTIVO HAY? / $ / Cerrar caja",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Cerrar caja / Esperado $ 95.000 (Efectivo) · Nequi $ 0 no cuenta en billetes / ¿CUÁNTO EFECTIVO HAY? / $ / Cerrar caja"
+  },
+  "stats@360": {
+   "h1": [
+    "Estadísticas"
+   ],
+   "ovX": false,
+   "curTab": "Más",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 6,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Estadísticas / Hoy / Semana / Mes / VENTAS / 3 ventas / $ 184.500 / Lo facturado. Las devoluciones van aparte. / DINERO / RECIBIDO / $ 152.500 / Pl",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Estadísticas / Hoy / Semana / Mes / VENTAS / 3 ventas / $ 184.500 / Lo facturado. Las devoluciones van aparte. / DINERO / RECIBIDO / $ 152.500 / Plata que sí entró. No es ganancia. No resta reembolsos. / POR COBRAR / $ 109.500 / Deuda actual pendiente. No es el fiado generado en el período. / Ver clientes / GASTÉ / $ 33.000 / Gastos del negocio. No incluye retiros personales. / INVERTÍ / $ 7.000 / Compras / surtir (inversión en inventario). / RECIBIDO POR MÉTODO / Efectivo / $ 140.500 / Nequi / $ 12.000 / RESULTADO / Ganancia aprox / Margen de ventas menos devoluciones. No resta merma ni regalos. No es caja. / $ 62.000 / Devoluciones / Lo que se devolvió en "
+  },
+  "gastos@360": {
+   "h1": [
+    "Gastos"
+   ],
+   "ovX": false,
+   "curTab": "Más",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 4,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Gastos / Nuevo gasto / TOTAL LISTADO / 2 gastos / $ 33.000 / HOY · MAR 3 NOV / Bolsas / Efectivo · Paquete x100 / − $ 8.000 / LUN 2 NOV / Transpor",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Gastos / Nuevo gasto / TOTAL LISTADO / 2 gastos / $ 33.000 / HOY · MAR 3 NOV / Bolsas / Efectivo · Paquete x100 / − $ 8.000 / LUN 2 NOV / Transporte / Nequi / − $ 25.000 / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "nueva@360": {
+   "h1": [
+    "Nueva venta"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 6,
+   "smallTaps": 0,
+   "fails": [
+    {
+     "t": "0 productos · $ 0",
+     "r": 1.35
+    }
+   ],
+   "nf": 1,
+   "text": "↻ Preparando / ✓ En el servidor / Nueva venta / Buscar dulce... / Todos / Dulces / Insumos / Gomitas / $ 1.500 / Quedan 3 / Editar precio / Chocolatina Jet / $ 2.000 / Quedan 40 / Editar p",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Nueva venta / Buscar dulce... / Todos / Dulces / Insumos / Gomitas / $ 1.500 / Quedan 3 / Editar precio / Chocolatina Jet / $ 2.000 / Quedan 40 / Editar precio / Bombón Bum / $ 800 / Quedan 2 / Editar precio / Galletas Festival / $ 2.500 / Quedan 25 / Editar precio / 0 productos · $ 0 / Cobrar"
+  },
+  "abono@360": {
+   "h1": [
+    "Registrar abono"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 2,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Registrar abono / Ana Pérez · Debe $ 30.000 / ¿CUÁNTO ABONA? / $ / Todo $ 30.000 / ¿CÓMO RECIBES? / Efectivo / Nequi / Registrar abono",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Registrar abono / Ana Pérez · Debe $ 30.000 / ¿CUÁNTO ABONA? / $ / Todo $ 30.000 / ¿CÓMO RECIBES? / Efectivo / Nequi / Registrar abono"
+  },
+  "devolver@360": {
+   "h1": [
+    "Devolver"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 3,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Devolver / Venta $ 62.000 · Ana Pérez / ELIGE QUÉ VUELVE / Devolver todo / Gomitas / Quedan 2 · $ 1.500 c/u / − / 0 / + / Chocolatina Jet / Quedan 1",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Devolver / Venta $ 62.000 · Ana Pérez / ELIGE QUÉ VUELVE / Devolver todo / Gomitas / Quedan 2 · $ 1.500 c/u / − / 0 / + / Chocolatina Jet / Quedan 1 · $ 59.000 c/u / − / 0 / + / Si la venta fue pagada, sale plata de caja o Nequi. Si fue fiada, baja la deuda. La venta original no se borra. / Elige qué vuelve"
+  },
+  "surtir@360": {
+   "h1": [
+    "Surtir"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 2,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Surtir / Gomitas · Stock 3 u. / CANTIDAD / − / + / COSTO TOTAL / $ / COSTO UNITARIO / $ / ¿CÓMO PAGASTE? / Efectivo / Nequi / PROVEEDOR / Elegir o crear",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Surtir / Gomitas · Stock 3 u. / CANTIDAD / − / + / COSTO TOTAL / $ / COSTO UNITARIO / $ / ¿CÓMO PAGASTE? / Efectivo / Nequi / PROVEEDOR / Elegir o crear… / Distribuidora La 14 / NOTA / Confirmar surtir"
+  },
+  "gasto-nuevo@360": {
+   "h1": [
+    "Registrar gasto"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 2,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Registrar gasto / Efectivo esperado $ 95.000 / Plata del negocio que sale para operar. No es retiro personal. Esto es un gasto del n",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Registrar gasto / Efectivo esperado $ 95.000 / Plata del negocio que sale para operar. No es retiro personal. Esto es un gasto del negocio, no un retiro tuyo. / MONTO / $ / ¿EN QUÉ SE GASTÓ? / ¿CÓMO PAGASTE? / Efectivo / Nequi / NOTA / Confirmar gasto"
+  },
+  "sync@360": {
+   "h1": [
+    "Datos y sincronización"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 6,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Datos y sincronización / Este teléfono · 0 pendientes / Los datos de la tienda abierta se conservan aquí para poder trabajar incluso",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Datos y sincronización / Este teléfono · 0 pendientes / Los datos de la tienda abierta se conservan aquí para poder trabajar incluso sin conexión. / No hay operaciones pendientes de enviar desde este teléfono. / EN EL SERVIDOR / No hay operaciones pendientes de enviar desde este dispositivo. / GUARDADO SOLO AQUÍ / No hay operaciones esperando envío. / HACE FALTA ATENCIÓN / No hay nada que revisar. / Aún no hay un envío registrado / Esto no es una copia de seguridad. / OPERACIONES / Nada pendiente / No hay operaciones por enviar desde este teléfono. / PROTECCIÓN DEL DISPOSITIVO / En el servidor. Lo que ya fue aceptado por el servidor. El resumen de arriba dic"
+  },
+  "inicio@1440": {
+   "h1": [
+    "Buenos días"
+   ],
+   "ovX": false,
+   "curTab": "Inicio",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 8,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Buenos días / Tienda Doña Rosa / Martes, 3 de Noviembre / Caja abierta / HOY / 3 ventas / $ 184.500 / VENTAS DE HOY / $ 184.500 / Ver estad",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Buenos días / Tienda Doña Rosa / Martes, 3 de Noviembre / Caja abierta / HOY / 3 ventas / $ 184.500 / VENTAS DE HOY / $ 184.500 / Ver estadísticas / 2 / Stock bajo / 5 / Productos / $ 50.000 / Por cobrar / 2 fiados / ACCESOS RÁPIDOS / Fiados / Stock bajo / Gastos / Venta rápida / Abre la caja registradora / FIADOS PENDIENTES / Ver todos / Ana Pérez / Pendiente / $ 30.000 / Luis Gómez / Pendiente / $ 20.000 / ATENCIÓN EN INVENTARIO / Ver inventario / Bombón Bum / Poco stock · umbral 10 / 2 u. / Gomitas / Poco stock · umbral 5 / 3 u. / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "ventas@1440": {
+   "h1": [
+    "Ventas"
+   ],
+   "ovX": false,
+   "curTab": "Ventas",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 3,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Ventas / Nueva venta / TOTAL LISTADO / 3 ventas / $ 184.500 / Recibido $ 75.000 · Fiado $ 109.500 / Todas / Pagadas / Parcial / Fiadas / HOY · MA",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Ventas / Nueva venta / TOTAL LISTADO / 3 ventas / $ 184.500 / Recibido $ 75.000 · Fiado $ 109.500 / Todas / Pagadas / Parcial / Fiadas / HOY · MAR 3 NOV / Sin cliente · efectivo / 3 nov · 09:45 / contado / $ 45.000 / Ana Pérez · Nequi + Fiado / 3 nov · 09:45 / Recibió $ 30.000 · Fía $ 32.000 / Parcial / $ 62.000 / Luis Gómez · Fiado / 3 nov · 09:45 / Fía $ 77.500 / Fiada / $ 77.500 / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "venta@1440": {
+   "h1": [
+    "Venta"
+   ],
+   "ovX": false,
+   "curTab": "Ventas",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 4,
+   "smallTaps": 1,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Venta / mar 3 nov, 09:45 / Devolver / $ 62.000 / Parcial / Ana Pérez / $ 30.000 / Recibido / $ 32.000 / Fiado / Nequi + Fiado / Método / PRODUCTOS / Go",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [
+    "Ana Pérez:65x20"
+   ],
+   "nTiny": 1,
+   "full": "↻ Preparando / ✓ En el servidor / Venta / mar 3 nov, 09:45 / Devolver / $ 62.000 / Parcial / Ana Pérez / $ 30.000 / Recibido / $ 32.000 / Fiado / Nequi + Fiado / Método / PRODUCTOS / Gomitas / 2 × $ 1.500 · Costo $ 750 / $ 3.000 / Chocolatina Jet / 1 × $ 59.000 · Costo $ 1.000 / $ 59.000 / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "clientes@1440": {
+   "h1": [
+    "Clientes"
+   ],
+   "ovX": false,
+   "curTab": "Clientes",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 3,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Clientes / Agregar cliente / POR COBRAR / 2 clientes deben / $ 50.000 / Buscar cliente / Deben / (2) / Todos / (2) / Ana Pérez / C1 / $ 30.000 / Luis Gó",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Clientes / Agregar cliente / POR COBRAR / 2 clientes deben / $ 50.000 / Buscar cliente / Deben / (2) / Todos / (2) / Ana Pérez / C1 / $ 30.000 / Luis Gómez / C2 / $ 20.000 / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "cliente@1440": {
+   "h1": [
+    "Ana Pérez"
+   ],
+   "ovX": false,
+   "curTab": "Clientes",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 5,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Ana Pérez / C1 / Editar / DEBE / $ 30.000 / Registrar abono / Agregar deuda anterior / PIN del portal / ESTADO DE CUENTA / Abono · Nequi / 3 nov ",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Ana Pérez / C1 / Editar / DEBE / $ 30.000 / Registrar abono / Agregar deuda anterior / PIN del portal / ESTADO DE CUENTA / Abono · Nequi / 3 nov · 09:45 / − $ 12.000 / Abono · Saldo $ 30.000 / Fiado parcial · Venta #001 / 3 nov · 09:45 · Venta $ 62.000 · Pagó $ 30.000 / + $ 32.000 / Cargo · Saldo $ 42.000 / Deuda anterior / 3 nov · 09:45 · Nota: Cuaderno / + $ 10.000 / Cargo · Saldo $ 10.000 / Cargado $ 42.000 · Pagos y devoluciones $ 12.000 · Total pendiente $ 30.000 / PIN DEL PORTAL / Abrir / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "inventario@1440": {
+   "h1": [
+    "Inventario"
+   ],
+   "ovX": false,
+   "curTab": "Inventario",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 5,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Inventario / Agregar producto / 5 / productos / 2 / stock bajo / Productos / Proveedores / Buscar producto / STOCK BAJO / Gomitas / umbral 5 · $ 1.500 / 3",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Inventario / Agregar producto / 5 / productos / 2 / stock bajo / Productos / Proveedores / Buscar producto / STOCK BAJO / Gomitas / umbral 5 · $ 1.500 / 3 u. / Stock bajo / Bombón Bum / umbral 10 · $ 800 / 2 u. / Stock bajo / TODOS / Chocolatina Jet / $ 2.000 / 40 u. / Galletas Festival / $ 2.500 / 25 u. / Masa de arequipe / $ 0 / 20 u. / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "producto@1440": {
+   "h1": [
+    "Gomitas"
+   ],
+   "ovX": false,
+   "curTab": "Inventario",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 9,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Editar / Gomitas / STOCK / 3 u. / Stock bajo (umbral 5) / Surtir / $ 1.500 / Precio / $ 750 / Costo prom. / $ 2.250 / Valor inventario / AJUSTES / Me lo",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Editar / Gomitas / STOCK / 3 u. / Stock bajo (umbral 5) / Surtir / $ 1.500 / Precio / $ 750 / Costo prom. / $ 2.250 / Valor inventario / AJUSTES / Me lo comí / Regalo / Perdido / dañado / Fotos / Sin fotos todavía. / Agregar fotos (8 libres) / JPG, PNG o WebP · máx 5 MB c/u / PREPARACIONES / 10 u. → Galletas Festival / 03/11/2026 · Tanda de la mañana / $ 2.000 c/u / Desde Masa de arequipe · 10 u. / 03/11/2026 · Tanda de la mañana / $ 2.000 c/u / HISTORIAL / Surtir / 03/11/2026 / +10 / Entra / Venta / 03/11/2026 / −2 / Sale / Me lo comí / probé · 03/11/2026 / −1 / Sale / Archivar producto / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "mas@1440": {
+   "h1": [
+    "Más"
+   ],
+   "ovX": false,
+   "curTab": "Más",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 4,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Más / Caja, gastos y ajustes de la tienda / NEGOCIO / Caja / Estadísticas / Gastos / AJUSTES / Apariencia / Datos / Portal de clientes / Cuenta / Inic",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Más / Caja, gastos y ajustes de la tienda / NEGOCIO / Caja / Estadísticas / Gastos / AJUSTES / Apariencia / Datos / Portal de clientes / Cuenta / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "caja@1440": {
+   "h1": [
+    "Caja"
+   ],
+   "ovX": false,
+   "curTab": "Más",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 7,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Caja / mar 3 nov · Caja abierta / Cerrar caja / EFECTIVO ESPERADO / Nequi $ 0 · Total $ 95.000 / $ 95.000 / Nequi no cuenta en billetes ",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Caja / mar 3 nov · Caja abierta / Cerrar caja / EFECTIVO ESPERADO / Nequi $ 0 · Total $ 95.000 / $ 95.000 / Nequi no cuenta en billetes de cierre. / $ 67.000 / Entradas / $ 8.000 / Salidas / Aporte / Retiro / Gasto / MOVIMIENTOS / Abono / Nequi / + $ 12.000 / Entra / Gasto / Efectivo / − $ 8.000 / Sale / Aporte de capital / Efectivo / + $ 10.000 / Entra / Venta / Efectivo / + $ 45.000 / Entra / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "cerrar@1440": {
+   "h1": [
+    "Cerrar caja"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 2,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Cerrar caja / Esperado $ 95.000 (Efectivo) · Nequi $ 0 no cuenta en billetes / ¿CUÁNTO EFECTIVO HAY? / $ / Cerrar caja",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Cerrar caja / Esperado $ 95.000 (Efectivo) · Nequi $ 0 no cuenta en billetes / ¿CUÁNTO EFECTIVO HAY? / $ / Cerrar caja"
+  },
+  "stats@1440": {
+   "h1": [
+    "Estadísticas"
+   ],
+   "ovX": false,
+   "curTab": "Más",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 6,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Estadísticas / Hoy / Semana / Mes / VENTAS / 3 ventas / $ 184.500 / Lo facturado. Las devoluciones van aparte. / DINERO / RECIBIDO / $ 152.500 / Pl",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Estadísticas / Hoy / Semana / Mes / VENTAS / 3 ventas / $ 184.500 / Lo facturado. Las devoluciones van aparte. / DINERO / RECIBIDO / $ 152.500 / Plata que sí entró. No es ganancia. No resta reembolsos. / POR COBRAR / $ 109.500 / Deuda actual pendiente. No es el fiado generado en el período. / Ver clientes / GASTÉ / $ 33.000 / Gastos del negocio. No incluye retiros personales. / INVERTÍ / $ 7.000 / Compras / surtir (inversión en inventario). / RECIBIDO POR MÉTODO / Efectivo / $ 140.500 / Nequi / $ 12.000 / RESULTADO / Ganancia aprox / Margen de ventas menos devoluciones. No resta merma ni regalos. No es caja. / $ 62.000 / Devoluciones / Lo que se devolvió en "
+  },
+  "gastos@1440": {
+   "h1": [
+    "Gastos"
+   ],
+   "ovX": false,
+   "curTab": "Más",
+   "curVisible": true,
+   "iso": 0,
+   "cards": 4,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Gastos / Nuevo gasto / TOTAL LISTADO / 2 gastos / $ 33.000 / HOY · MAR 3 NOV / Bolsas / Efectivo · Paquete x100 / − $ 8.000 / LUN 2 NOV / Transpor",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Gastos / Nuevo gasto / TOTAL LISTADO / 2 gastos / $ 33.000 / HOY · MAR 3 NOV / Bolsas / Efectivo · Paquete x100 / − $ 8.000 / LUN 2 NOV / Transporte / Nequi / − $ 25.000 / Inicio / Ventas / Clientes / Inventario / Más"
+  },
+  "nueva@1440": {
+   "h1": [
+    "Nueva venta"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 6,
+   "smallTaps": 0,
+   "fails": [
+    {
+     "t": "0 productos · $ 0",
+     "r": 1.35
+    }
+   ],
+   "nf": 1,
+   "text": "↻ Preparando / ✓ En el servidor / Nueva venta / Buscar dulce... / Todos / Dulces / Insumos / Gomitas / $ 1.500 / Quedan 3 / Editar precio / Chocolatina Jet / $ 2.000 / Quedan 40 / Editar p",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Nueva venta / Buscar dulce... / Todos / Dulces / Insumos / Gomitas / $ 1.500 / Quedan 3 / Editar precio / Chocolatina Jet / $ 2.000 / Quedan 40 / Editar precio / Bombón Bum / $ 800 / Quedan 2 / Editar precio / Galletas Festival / $ 2.500 / Quedan 25 / Editar precio / 0 productos · $ 0 / Cobrar"
+  },
+  "abono@1440": {
+   "h1": [
+    "Registrar abono"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 2,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Registrar abono / Ana Pérez · Debe $ 30.000 / ¿CUÁNTO ABONA? / $ / Todo $ 30.000 / ¿CÓMO RECIBES? / Efectivo / Nequi / Registrar abono",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Registrar abono / Ana Pérez · Debe $ 30.000 / ¿CUÁNTO ABONA? / $ / Todo $ 30.000 / ¿CÓMO RECIBES? / Efectivo / Nequi / Registrar abono"
+  },
+  "devolver@1440": {
+   "h1": [
+    "Devolver"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 3,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Devolver / Venta $ 62.000 · Ana Pérez / ELIGE QUÉ VUELVE / Devolver todo / Gomitas / Quedan 2 · $ 1.500 c/u / − / 0 / + / Chocolatina Jet / Quedan 1",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Devolver / Venta $ 62.000 · Ana Pérez / ELIGE QUÉ VUELVE / Devolver todo / Gomitas / Quedan 2 · $ 1.500 c/u / − / 0 / + / Chocolatina Jet / Quedan 1 · $ 59.000 c/u / − / 0 / + / Si la venta fue pagada, sale plata de caja o Nequi. Si fue fiada, baja la deuda. La venta original no se borra. / Elige qué vuelve"
+  },
+  "surtir@1440": {
+   "h1": [
+    "Surtir"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 2,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Surtir / Gomitas · Stock 3 u. / CANTIDAD / − / + / COSTO TOTAL / $ / COSTO UNITARIO / $ / ¿CÓMO PAGASTE? / Efectivo / Nequi / PROVEEDOR / Elegir o crear",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Surtir / Gomitas · Stock 3 u. / CANTIDAD / − / + / COSTO TOTAL / $ / COSTO UNITARIO / $ / ¿CÓMO PAGASTE? / Efectivo / Nequi / PROVEEDOR / Elegir o crear… / Distribuidora La 14 / NOTA / Confirmar surtir"
+  },
+  "gasto-nuevo@1440": {
+   "h1": [
+    "Registrar gasto"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 2,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Registrar gasto / Efectivo esperado $ 95.000 / Plata del negocio que sale para operar. No es retiro personal. Esto es un gasto del n",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Registrar gasto / Efectivo esperado $ 95.000 / Plata del negocio que sale para operar. No es retiro personal. Esto es un gasto del negocio, no un retiro tuyo. / MONTO / $ / ¿EN QUÉ SE GASTÓ? / ¿CÓMO PAGASTE? / Efectivo / Nequi / NOTA / Confirmar gasto"
+  },
+  "sync@1440": {
+   "h1": [
+    "Datos y sincronización"
+   ],
+   "ovX": false,
+   "curTab": null,
+   "curVisible": null,
+   "iso": 0,
+   "cards": 6,
+   "smallTaps": 0,
+   "fails": [],
+   "nf": 0,
+   "text": "↻ Preparando / ✓ En el servidor / Datos y sincronización / Este teléfono · 0 pendientes / Los datos de la tienda abierta se conservan aquí para poder trabajar incluso",
+   "unl": [],
+   "nUnl": 0,
+   "tiny": [],
+   "nTiny": 0,
+   "full": "↻ Preparando / ✓ En el servidor / Datos y sincronización / Este teléfono · 0 pendientes / Los datos de la tienda abierta se conservan aquí para poder trabajar incluso sin conexión. / No hay operaciones pendientes de enviar desde este teléfono. / EN EL SERVIDOR / No hay operaciones pendientes de enviar desde este dispositivo. / GUARDADO SOLO AQUÍ / No hay operaciones esperando envío. / HACE FALTA ATENCIÓN / No hay nada que revisar. / Aún no hay un envío registrado / Esto no es una copia de seguridad. / OPERACIONES / Nada pendiente / No hay operaciones por enviar desde este teléfono. / PROTECCIÓN DEL DISPOSITIVO / En el servidor. Lo que ya fue aceptado por el servidor. El resumen de arriba dic"
+  }
+ },
+ "empty-inicio": "↻ Preparando / ✓ En el servidor / Buenos días / Tienda Doña Rosa / Martes, 3 de Noviembre / Caja abierta / HOY / 3 ventas / $ 184.500 / VENTAS DE HOY / $ 184.500 / Ver estadísticas / 2 / Stock bajo / 5 / Productos / $ 50.000 / Por cobrar / 2 fiados / ACCESOS RÁPIDOS / Fiados / Stock bajo / Gastos / Venta rápida / Abre la caja registradora / FIADOS PENDIENTES / Ver todos / Ana Pérez / Pendiente / $",
+ "empty-clientes": "↻ Preparando / ✓ En el servidor / Clientes / Agregar cliente / POR COBRAR / 2 clientes deben / $ 50.000 / Buscar cliente / Deben / (2) / Todos / (2) / Ana Pérez / C1 / $ 30.000 / Luis Gómez / C2 / $ 20.000 / Inicio / Ventas / Clientes / Inventario / Más",
+ "empty-nueva": "↻ Preparando / ✓ En el servidor / Nueva venta / Buscar dulce... / Todos / Dulces / Insumos / Gomitas / $ 1.500 / Quedan 3 / Editar precio / Chocolatina Jet / $ 2.000 / Quedan 40 / Editar precio / Bombón Bum / $ 800 / Quedan 2 / Editar precio / Galletas Festival / $ 2.500 / Quedan 25 / Editar precio / 0 productos · $ 0 / Cobrar"
+}

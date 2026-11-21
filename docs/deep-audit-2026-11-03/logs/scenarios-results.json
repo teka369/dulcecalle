@@ -1,0 +1,867 @@
+[
+  {
+    "id": "S13",
+    "name": "apertura caja",
+    "inv": "201 + base 20000",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "body": 20000
+    }
+  },
+  {
+    "id": "S1",
+    "name": "venta pagada efectivo",
+    "inv": "201 total 2000",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "total": 2000,
+      "credit": 0
+    }
+  },
+  {
+    "id": "S1",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S1",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S1",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S1",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "S2",
+    "name": "venta parcial multi-línea",
+    "inv": "total 6000, credit 4000, debt C1 4000",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "total": 6000,
+      "credit": 4000,
+      "debt": "4000"
+    }
+  },
+  {
+    "id": "S2b",
+    "name": "parcial sin cliente",
+    "inv": "rechazo 4xx",
+    "status": "PASS",
+    "evidence": {
+      "status": 400
+    }
+  },
+  {
+    "id": "S2",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S2",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S2",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S2",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "S3",
+    "name": "venta fiada",
+    "inv": "credit 2500, debt C2 2500, sin cash move",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "debt": "2500"
+    }
+  },
+  {
+    "id": "S3",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S3",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S3",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S3",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "S4",
+    "name": "deuda previa + nueva fiada",
+    "inv": "debt C1 = 4000+10000+3000 = 17000",
+    "status": "PASS",
+    "evidence": {
+      "s": [
+        201,
+        201
+      ],
+      "debt": "17000"
+    }
+  },
+  {
+    "id": "S4",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S4",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S4",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S4",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "S5",
+    "name": "abono efectivo 5000",
+    "inv": "debt 12000 + cash move debt_collect",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "debt": "12000",
+      "saleIdOnPayment": null
+    }
+  },
+  {
+    "id": "S5",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S5",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S5",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S5",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "S5b",
+    "name": "abono > deuda",
+    "inv": "409 ABONO_EXCEEDS_DEBT, deuda intacta",
+    "status": "PASS",
+    "evidence": {
+      "status": 409,
+      "code": {
+        "code": "ABONO_EXCEEDS_DEBT",
+        "message": "El abono no puede ser mayor al saldo."
+      },
+      "debt": "12000"
+    }
+  },
+  {
+    "id": "S6",
+    "name": "pago total deuda (Nequi)",
+    "inv": "debt 0",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "debt": "0"
+    }
+  },
+  {
+    "id": "S6",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S6",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S6",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S6",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "R1",
+    "name": "ledger tras pago total",
+    "inv": "ninguna venta debería aparecer con saldo pendiente (no existe campo saldo por venta)",
+    "status": "FAIL",
+    "evidence": {
+      "customerDebt": 0,
+      "salesWithCreditField": [
+        {
+          "id": "[REDACTED]",
+          "credit": 4000,
+          "paymentKind": "partial"
+        },
+        {
+          "id": "[REDACTED]",
+          "credit": 3000,
+          "paymentKind": "credit"
+        }
+      ],
+      "paymentsHaveSaleId": [
+        null,
+        null
+      ]
+    }
+  },
+  {
+    "id": "S7",
+    "name": "devolución 1 chocolatina sobre parcial ya saldada",
+    "inv": "refund 2500 método Nequi, debt 0, stock +1",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "refund": 2500,
+      "debtReduced": 0,
+      "method": "Nequi"
+    }
+  },
+  {
+    "id": "S7b",
+    "name": "devolución sobre fiada pendiente",
+    "inv": "debtReduced 2500, refund 0, debt C2 0",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "debtReduced": 2500,
+      "debt": "0"
+    }
+  },
+  {
+    "id": "S7c",
+    "name": "devolver más de lo vendido",
+    "inv": "409 RETURN_EXCEEDS",
+    "status": "PASS",
+    "evidence": {
+      "status": 409
+    }
+  },
+  {
+    "id": "S7",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S7",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S7",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S7",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "S8",
+    "name": "venta equivocada → devolución total",
+    "inv": "refund 5000 efectivo, venta conserva historial",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "refund": 5000
+    }
+  },
+  {
+    "id": "S9",
+    "name": "cancelación/anulación de venta",
+    "inv": "no existe endpoint: solo devolución (404 esperado)",
+    "status": "PASS",
+    "evidence": {
+      "DELETE": 404,
+      "POST_cancel": 404,
+      "PATCH": 404
+    }
+  },
+  {
+    "id": "S9",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S9",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S9",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S9",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "S10",
+    "name": "consumo propio (me_lo_comi)",
+    "inv": "stock −2, sin cash move",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "stock": [
+        44,
+        42
+      ]
+    }
+  },
+  {
+    "id": "S10b",
+    "name": "consumo > stock",
+    "inv": "rechazo",
+    "status": "PASS",
+    "evidence": {
+      "status": 409
+    }
+  },
+  {
+    "id": "S11",
+    "name": "surtido 10 a 1500",
+    "inv": "stock +10, avgCost ponderado, cash out compra 15000",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "stock": [
+        19,
+        29
+      ],
+      "avgCost": "1303",
+      "compraMove": [
+        {
+          "amount": "15000",
+          "method": "Efectivo",
+          "direction": "out"
+        }
+      ]
+    }
+  },
+  {
+    "id": "S11",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S11",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S11",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S11",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "S12",
+    "name": "gastos efectivo y nequi",
+    "inv": "201 x2",
+    "status": "PASS",
+    "evidence": {
+      "s": [
+        201,
+        201
+      ]
+    }
+  },
+  {
+    "id": "S16a",
+    "name": "2 abonos paralelos = deuda total",
+    "inv": "uno 201, otro 409; debt 0; 1 payment",
+    "status": "PASS",
+    "evidence": {
+      "statuses": [
+        201,
+        409
+      ],
+      "debt": "0",
+      "payments4000": 1
+    }
+  },
+  {
+    "id": "S16b",
+    "name": "2 ventas paralelas del último stock",
+    "inv": "una 201, otra 409; stock 0",
+    "status": "PASS",
+    "evidence": {
+      "statuses": [
+        201,
+        409
+      ],
+      "stock": 0,
+      "debt": "3000"
+    }
+  },
+  {
+    "id": "S16",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S16",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S16",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S16",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "S17a",
+    "name": "5 POST /sales paralelos mismo Idempotency-Key",
+    "inv": "1 venta, mismo id en todas",
+    "status": "PASS",
+    "evidence": {
+      "statuses": [
+        201,
+        201,
+        201,
+        201,
+        201
+      ],
+      "salesRows": 1,
+      "ids": 1
+    }
+  },
+  {
+    "id": "S17b",
+    "name": "3 abonos paralelos mismo key",
+    "inv": "1 payment, debt 2000−500=1500",
+    "status": "PASS",
+    "evidence": {
+      "statuses": [
+        201,
+        201,
+        201
+      ],
+      "rows": 1,
+      "debt": "1500"
+    }
+  },
+  {
+    "id": "S17c",
+    "name": "mismo Idempotency-Key reutilizado con OTRO cliente/monto",
+    "inv": "debería 409/422 (conflicto); NO 2xx silencioso",
+    "status": "FAIL",
+    "evidence": {
+      "status": 201,
+      "returnedCustomer": "C1 (pago viejo)",
+      "returnedAmount": 500,
+      "debtC2": "1000"
+    }
+  },
+  {
+    "id": "S17d",
+    "name": "mismo key de venta con cuerpo distinto",
+    "inv": "debería conflicto, no 2xx con venta vieja",
+    "status": "FAIL",
+    "evidence": {
+      "status": 201,
+      "returnedTotal": 1000,
+      "debtC2": "1000"
+    }
+  },
+  {
+    "id": "S17e",
+    "name": "requestId body ≠ header",
+    "inv": "400",
+    "status": "PASS",
+    "evidence": {
+      "status": 400
+    }
+  },
+  {
+    "id": "S17f",
+    "name": "sin Idempotency-Key",
+    "inv": "400",
+    "status": "PASS",
+    "evidence": {
+      "status": 400
+    }
+  },
+  {
+    "id": "S17",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "S17",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S17",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "S17",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  },
+  {
+    "id": "S13b",
+    "name": "cierre: efectivo esperado = base + Σefectivo in − out (sin Nequi)",
+    "inv": "computed ef=17500",
+    "status": "PASS",
+    "evidence": {
+      "status": 201,
+      "stored": {
+        "ef": "17500",
+        "nq": "10500",
+        "diff": "-500"
+      },
+      "computedFromMoves": {
+        "ef": "17500",
+        "nq": "10500"
+      },
+      "expensesByMethod": [
+        [
+          "Efectivo",
+          "3000"
+        ],
+        [
+          "Nequi",
+          "1000"
+        ]
+      ],
+      "movesWithoutSession": 0
+    }
+  },
+  {
+    "id": "S14",
+    "name": "Nequi fuera del efectivo esperado; diferencia = contado − esperado",
+    "inv": "diff = -500",
+    "status": "PASS",
+    "evidence": {
+      "nequi": "10500",
+      "diff": "-500"
+    }
+  },
+  {
+    "id": "S13c",
+    "name": "cierre duplicado con otro key",
+    "inv": "rechazo",
+    "status": "PASS",
+    "evidence": {
+      "status": 409,
+      "body": {
+        "error": {
+          "code": "SESSION_ALREADY_CLOSED",
+          "message": "El día está cerrado."
+        }
+      }
+    }
+  },
+  {
+    "id": "S13d",
+    "name": "venta tras cierre del día",
+    "inv": "bloqueada (día cerrado) o fuera de caja documentado",
+    "status": "PASS",
+    "evidence": {
+      "status": 409
+    }
+  },
+  {
+    "id": "FINAL",
+    "name": "sales",
+    "inv": "total=Σlíneas & credit=total−recibido",
+    "status": "PASS",
+    "evidence": {
+      "badRows": 0
+    }
+  },
+  {
+    "id": "FINAL",
+    "name": "customers",
+    "inv": "debt almacenado = reconstruido",
+    "status": "PASS",
+    "evidence": {
+      "customers": 2,
+      "mismatches": []
+    }
+  },
+  {
+    "id": "FINAL",
+    "name": "inventory",
+    "inv": "stock = Σ stock_moves (inicial+entradas−salidas)",
+    "status": "PASS",
+    "evidence": {
+      "mismatches": []
+    }
+  },
+  {
+    "id": "FINAL",
+    "name": "cash",
+    "inv": "pago recibido = movimiento de caja; sin huérfanos",
+    "status": "PASS",
+    "evidence": {
+      "orphan": 0,
+      "payNoMove": 0,
+      "saleNoMove": 0
+    }
+  }
+]

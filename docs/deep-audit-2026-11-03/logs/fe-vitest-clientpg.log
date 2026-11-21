@@ -1,0 +1,17 @@
+
+ RUN  v3.2.4 /workspace/deep-audit/qa/dulcecalle
+
+ ✓ e2e/offline-client-pg.test.ts (3 tests) 3808ms
+stdout | e2e/offline-prep-sell-pg.test.ts > offline prepare → sell → shrink, synced to PostgreSQL > prepared units are on the server before the sale and the shrink use them
+PREP-SELL {"queued":["cashSession:open","preparation:create","sale:create","stockMove:shrink"],"posts":["/v1/cash/sessions","/v1/preparations","/v1/sales","/v1/products/[REDACTED]/shrink"],"notSynced":[],"serverComboStock":0,"serverInsumoStock":5,"sales":1,"cash":["sale:in:Efectivo:12000"]}
+
+ ✓ e2e/offline-prep-sell-pg.test.ts (1 test) 3598ms
+ ✓ e2e/online-lists-pending-pg.test.ts (1 test) 3372ms
+ ✓ e2e/preparar-ids-pg.test.ts (1 test) 3309ms
+
+ Test Files  4 passed (4)
+      Tests  6 passed (6)
+   Start at  09:48:18
+   Duration  15.37s (transform 305ms, setup 72ms, collect 601ms, tests 14.09s, environment 0ms, prepare 190ms)
+
+exit=0 secs=15

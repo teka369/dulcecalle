@@ -1,0 +1,17 @@
+import { randomUUID as uuid } from "crypto"; import fs from "fs";
+const own = JSON.parse(fs.readFileSync("/tmp/qa-owner2.json","utf8"));
+const H = { "content-type":"application/json", authorization:`Bearer ${own.accessToken}`, "x-business-id": own.business.id };
+const B="http://127.0.0.1:4291/v1";
+const post = async (p,b)=>{ const r=await fetch(B+p,{method:"POST",headers:{...H,"idempotency-key":uuid()},body:JSON.stringify(b)}); const j=await r.json(); console.log("POST",p,r.status); return j; };
+const P = await post("/products",{name:"Chocorramo",price:3000,stock:10,avgCost:1500});
+const C = await post("/customers",{name:"Rosa"});
+await post("/cash/sessions",{openingFloat:10000});
+const S = await post("/sales",{lines:[{productId:P.id,qty:1}],paymentKind:"credit",amountReceived:0,customerId:C.id});
+console.log("after sale debt", (await (await fetch(`${B}/customers/${C.id}`,{headers:H})).json()).debt);
+await post(`/customers/${C.id}/payments`,{amount:3000,method:"Efectivo"});
+const c = await (await fetch(`${B}/customers/${C.id}`,{headers:H})).json();
+console.log("after abono debt", c.debt, "code", c.code);
+await post(`/customers/${C.id}/pin`,{pin:"[REDACTED]"});
+const L = await (await fetch(`${B}/customers/${C.id}/ledger`,{headers:H})).json();
+console.log("ledger sales:", JSON.stringify(L.sales.map(s=>({id:s.id,paymentKind:s.paymentKind,credit:s.credit,amountReceived:s.amountReceived}))), "payments:", JSON.stringify(L.payments.map(p=>({amount:p.amount,saleId:p.saleId??null}))));
+fs.writeFileSync("/tmp/qa-r1.json", JSON.stringify({code:c.code, businessId: own.business.id, saleId:S.id}));

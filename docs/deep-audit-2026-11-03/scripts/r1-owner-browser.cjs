@@ -1,0 +1,34 @@
+const { chromium } = require("/workspace/deep-audit/qa/dulcecalle/node_modules/@playwright/test");
+const fs = require("fs");
+const r1 = JSON.parse(fs.readFileSync("/tmp/qa-r1.json", "utf8"));
+const OUT = "/workspace/qa-plans/deep-audit/logs";
+(async () => {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ viewport: { width: 390, height: 780 }, serviceWorkers: "block" });
+  const leaks = [];
+  await context.route(/onrender\.com|vercel\.app/, (r) => { leaks.push(r.request().url()); return r.abort(); });
+  await context.route(/\/v1\//, async (route) => {
+    const u = new URL(route.request().url());
+    const target = "http://127.0.0.1:4291" + u.pathname.replace(/^.*\/v1/, "/v1") + u.search;
+    const resp = await route.fetch({ url: target });
+    await route.fulfill({ response: resp });
+  });
+  const page = await context.newPage();
+  await page.goto("http://127.0.0.1:3293/login");
+  await page.getByLabel(/correo/i).fill("[REDACTED]");
+  await page.getByLabel(/contraseña/i).fill("password12");
+  await page.getByRole("button", { name: "Entrar a la tienda" }).click();
+  await page.waitForTimeout(4000);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: OUT + "/r1-owner-home.png", fullPage: true });
+  const home = await page.locator("main").innerText().catch(() => page.innerText("body"));
+  await page.goto("http://127.0.0.1:3293/clientes"); await page.waitForTimeout(1500);
+  await page.screenshot({ path: OUT + "/r1-owner-compras.png", fullPage: true });
+  const compras = await page.innerText("body");
+  await page.goto(`http://127.0.0.1:3293/ventas/${r1.saleId}`); await page.waitForTimeout(1500);
+  await page.screenshot({ path: OUT + "/r1-owner-compra-detalle.png", fullPage: true });
+  const detalle = await page.innerText("body");
+  fs.writeFileSync(OUT + "/r1-owner-browser.log", JSON.stringify({ leaks, home, compras, detalle }, null, 2));
+  console.log(JSON.stringify({ leaks, home, compras, detalle }, null, 2));
+  await browser.close();
+})().catch((e) => { console.error(e); process.exit(1); });

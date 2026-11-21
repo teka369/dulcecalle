@@ -1,0 +1,88 @@
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [NestFactory] Starting Nest application...
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] PrismaModule dependencies initialized +10ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] ConfigHostModule dependencies initialized +1ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] JwtModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] ThrottlerModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] TenancyModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] ConfigModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] CatalogModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] SalesModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] StatsModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] IdentityModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] BusinessModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] CashModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] AppModule dependencies initialized +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [InstanceLoader] CustomerAccessModule dependencies initialized +1ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RoutesResolver] HealthController {/v1/health}: +2ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/health, GET} route +2ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RoutesResolver] IdentityController {/v1}: +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/auth/login, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/auth/refresh, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/auth/logout, POST} route +1ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/me, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/businesses, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/businesses, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RoutesResolver] CatalogController {/v1}: +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id/moves, GET} route +1ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id, PATCH} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/preparations, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/preparations, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id/archive, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id/surtir, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id/shrink, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customers, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customers/:id, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customers/:id/ledger, GET} route +1ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customers, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customers/:id, PATCH} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customers/:id/pin, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customers/:id/initial-debts, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/suppliers, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/suppliers/:id, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/suppliers/:id/surtidas, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/suppliers, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/suppliers/:id, PATCH} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RoutesResolver] MediaController {/v1}: +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id/image-signature, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id/images, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id/images, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id/images/reorder, PATCH} route +1ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id/images/:imageId, PATCH} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/products/:id/images/:imageId, DELETE} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RoutesResolver] BusinessDataController {/v1}: +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/business/data, DELETE} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RoutesResolver] SalesController {/v1/sales}: +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/sales, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/sales/:id/returns, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/sales/:id/returns, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/sales/:id, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/sales, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RoutesResolver] CashController {/v1}: +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/sessions, POST} route +1ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/sessions/:id/close, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/today, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/sessions, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/sessions/:id, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/unassigned-moves, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/moves/:id/assign, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/sessions/:id/carry, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/moves, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/expenses, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/aportes, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/cash/retiros, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/expenses, POST} route +1ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customers/:id/payments, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RoutesResolver] StatsController {/v1/stats}: +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/stats, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RoutesResolver] CustomerAccessController {/v1}: +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customer-access/login, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customer-access/refresh, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customer-access/logout, POST} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customer/me, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customer/me/ledger, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [RouterExplorer] Mapped {/v1/customer/products, GET} route +0ms
+[Nest] 96059  - 11/03/2026, 9:52:05 AM     LOG [NestApplication] Nest application successfully started +33ms
+READY [REDACTED]

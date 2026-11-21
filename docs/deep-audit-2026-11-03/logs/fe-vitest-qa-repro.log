@@ -1,0 +1,47 @@
+
+ RUN  v3.2.4 /workspace/deep-audit/qa/dulcecalle
+
+stdout | src/data/pwa/zz-qa-audit-tmp.test.ts > QA-AUDIT temp repro (NOT TO COMMIT) > R2: offline abono rejected 409 CLOSED_DAY (caja cerrada online antes del sync) -> deuda vuelve a mostrarse
+QA R2 debt after offline abono: 30000
+
+stdout | src/data/pwa/zz-qa-audit-tmp.test.ts > QA-AUDIT temp repro (NOT TO COMMIT) > R2: offline abono rejected 409 CLOSED_DAY (caja cerrada online antes del sync) -> deuda vuelve a mostrarse
+QA R2 after reject: {"debt":50000,"opStatus":"failed","nextAttemptAt":null,"lastError":"No se puede editar el día.","cashDebtCollect":0,"statementTotal":50000,"abonoEntries":0}
+
+stdout | src/data/pwa/zz-qa-audit-tmp.test.ts > QA-AUDIT temp repro (NOT TO COMMIT) > R3: fiada offline rechazada (409 stock) + abono offline mayor a deuda del servidor -> abono rechazado 409 y revertido
+QA R3 local debt after fiada+abono total: 0
+
+stdout | src/data/pwa/zz-qa-audit-tmp.test.ts > QA-AUDIT temp repro (NOT TO COMMIT) > R3: fiada offline rechazada (409 stock) + abono offline mayor a deuda del servidor -> abono rechazado 409 y revertido
+QA R3 debt after both rejected: 56000 pay calls: 2
+
+ ❯ src/data/pwa/zz-qa-audit-tmp.test.ts (2 tests | 1 failed) 60ms
+   ✓ QA-AUDIT temp repro (NOT TO COMMIT) > R2: offline abono rejected 409 CLOSED_DAY (caja cerrada online antes del sync) -> deuda vuelve a mostrarse 37ms
+   × QA-AUDIT temp repro (NOT TO COMMIT) > R3: fiada offline rechazada (409 stock) + abono offline mayor a deuda del servidor -> abono rechazado 409 y revertido 22ms
+     → expected 56000 to be 50000 // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/data/pwa/zz-qa-audit-tmp.test.ts > QA-AUDIT temp repro (NOT TO COMMIT) > R3: fiada offline rechazada (409 stock) + abono offline mayor a deuda del servidor -> abono rechazado 409 y revertido
+AssertionError: expected 56000 to be 50000 // Object.is equality
+
+- Expected
++ Received
+
+- 50000
++ 56000
+
+ ❯ src/data/pwa/zz-qa-audit-tmp.test.ts:147:18
+    145|     const debt = (await getLocalDb().customers.get(customerId))?.debt;
+    146|     console.log("QA R3 debt after both rejected:", debt, "pay calls:",…
+    147|     expect(debt).toBe(50_000);
+       |                  ^
+    148|   });
+    149| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  09:51:05
+   Duration  521ms (transform 199ms, setup 24ms, collect 237ms, tests 60ms, environment 0ms, prepare 57ms)
+

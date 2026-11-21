@@ -1,0 +1,16 @@
+
+ RUN  v3.2.4 /workspace/deep-audit/dev/dulcecalle
+
+stdout | src/data/local/zz-audit-d3-race.test.ts > AUDIT D3 carrera lista clientes vs sync de abono > A: snapshot leído ANTES del commit, op marcada synced antes de proyectar -> deuda vieja (abono invisible)
+A deuda mostrada: 10000 deuda real servidor post-commit: 6000
+
+stdout | src/data/local/zz-audit-d3-race.test.ts > AUDIT D3 carrera lista clientes vs sync de abono > B: snapshot leído DESPUÉS del commit pero op aún in_flight -> abono restado dos veces
+B deuda mostrada: 2000 deuda real: 6000
+
+ ✓ src/data/local/zz-audit-d3-race.test.ts (2 tests) 44ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  09:47:20
+   Duration  397ms (transform 98ms, setup 23ms, collect 115ms, tests 44ms, environment 0ms, prepare 58ms)
+

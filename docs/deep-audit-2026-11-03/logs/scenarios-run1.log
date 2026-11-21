@@ -1,0 +1,80 @@
+setup [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED]
+[PASS] S13 apertura caja :: 201 + base 20000 :: {"status":201,"body":20000}
+[PASS] S1 venta pagada efectivo :: 201 total 2000 :: {"status":201,"total":2000,"credit":0}
+[PASS] S1 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S1 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S1 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S1 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[FAIL] S2 venta parcial multi-línea :: total 6000, credit 4000, debt C1 4000 :: {"status":201,"total":6000,"credit":4000,"debt":"4000"}
+[PASS] S2b parcial sin cliente :: rechazo 4xx :: {"status":400}
+[PASS] S2 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S2 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S2 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S2 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[FAIL] S3 venta fiada :: credit 2500, debt C2 2500, sin cash move :: {"status":201,"debt":"2500"}
+[PASS] S3 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S3 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S3 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S3 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[FAIL] S4 deuda previa + nueva fiada :: debt C1 = 4000+10000+3000 = 17000 :: {"s":[201,201],"debt":"17000"}
+[PASS] S4 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S4 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S4 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S4 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[FAIL] S5 abono efectivo 5000 :: debt 12000 + cash move debt_collect :: {"status":201,"debt":"12000","saleIdOnPayment":null}
+[PASS] S5 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S5 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S5 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S5 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[FAIL] S5b abono > deuda :: 409 ABONO_EXCEEDS_DEBT, deuda intacta :: {"status":409,"code":{"code":"ABONO_EXCEEDS_DEBT","message":"El abono no puede ser mayor al saldo."},"debt":"12000"}
+[FAIL] S6 pago total deuda (Nequi) :: debt 0 :: {"status":201,"debt":"0"}
+[PASS] S6 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S6 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S6 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S6 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[FAIL] R1 ledger tras pago total :: ninguna venta debería aparecer con saldo pendiente (no existe campo saldo por venta) :: {"customerDebt":0,"salesWithCreditField":[{"id":"[REDACTED]","credit":4000,"paymentKind":"partial"},{"id":"[REDACTED]","credit":3000,"paymentKind":"credit"}],"paymentsHaveSaleId":[null,null]}
+[FAIL] S7 devolución 1 chocolatina sobre parcial ya saldada :: refund 2500 método Nequi, debt 0, stock +1 :: {"status":201,"refund":2500,"debtReduced":0,"method":"Nequi"}
+[FAIL] S7b devolución sobre fiada pendiente :: debtReduced 2500, refund 0, debt C2 0 :: {"status":201,"debtReduced":2500,"debt":"0"}
+[PASS] S7c devolver más de lo vendido :: 409 RETURN_EXCEEDS :: {"status":409}
+[PASS] S7 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S7 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S7 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S7 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[PASS] S8 venta equivocada → devolución total :: refund 5000 efectivo, venta conserva historial :: {"status":201,"refund":5000}
+[PASS] S9 cancelación/anulación de venta :: no existe endpoint: solo devolución (404 esperado) :: {"DELETE":404,"POST_cancel":404,"PATCH":404}
+[PASS] S9 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S9 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S9 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S9 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[PASS] S10 consumo propio (me_lo_comi) :: stock −2, sin cash move :: {"status":201,"stock":[44,42]}
+[PASS] S10b consumo > stock :: rechazo :: {"status":409}
+[PASS] S11 surtido 10 a 1500 :: stock +10, avgCost ponderado, cash out compra 15000 :: {"status":201,"stock":[19,29],"avgCost":"1303","compraMove":[{"amount":"15000","method":"Efectivo","direction":"out"}]}
+[PASS] S11 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S11 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S11 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S11 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[PASS] S12 gastos efectivo y nequi :: 201 x2 :: {"s":[201,201]}
+[FAIL] S16a 2 abonos paralelos = deuda total :: uno 201, otro 409; debt 0; 1 payment :: {"statuses":[201,409],"debt":"0","payments4000":1}
+[PASS] S16b 2 ventas paralelas del último stock :: una 201, otra 409; stock 0 :: {"statuses":[201,409],"stock":0,"debt":"3000"}
+[PASS] S16 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S16 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S16 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S16 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[PASS] S17a 5 POST /sales paralelos mismo Idempotency-Key :: 1 venta, mismo id en todas :: {"statuses":[201,201,201,201,201],"salesRows":1,"ids":1}
+[FAIL] S17b 3 abonos paralelos mismo key :: 1 payment, debt 2000−500=1500 :: {"statuses":[201,201,201],"rows":1,"debt":"1500"}
+[FAIL] S17c mismo Idempotency-Key reutilizado con OTRO cliente/monto :: debería 409/422 (conflicto); NO 2xx silencioso :: {"status":201,"returnedCustomer":"C1 (pago viejo)","returnedAmount":500,"debtC2":"1000"}
+[FAIL] S17d mismo key de venta con cuerpo distinto :: debería conflicto, no 2xx con venta vieja :: {"status":201,"returnedTotal":1000,"debtC2":"1000"}
+[PASS] S17e requestId body ≠ header :: 400 :: {"status":400}
+[PASS] S17f sin Idempotency-Key :: 400 :: {"status":400}
+[PASS] S17 sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] S17 customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] S17 inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] S17 cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}
+[FAIL] S13b cierre: efectivo esperado = base + Σefectivo in − out (sin Nequi) :: computed ef=20000200050005000-5000-15000-3000400030001000500 :: {"status":400,"stored":{"ef":"null","nq":"null","diff":"null"},"computedFromMoves":{"ef":"20000200050005000-5000-15000-3000400030001000500","nq":"0200012000-2500-1000"},"expensesByMethod":[["Efectivo","3000"],["Nequi","1000"]],"movesWithoutSession":0}
+[FAIL] S14 Nequi fuera del efectivo esperado; diferencia = contado − esperado :: diff = -500 :: {"nequi":"null","diff":"null"}
+[FAIL] S13c cierre duplicado con otro key :: rechazo :: {"status":201,"body":{"id":"[REDACTED]","localDate":"2026-11-03","openedAt":"2026-11-03T14:49:47.998Z","closedAt":"2026-11-03T14:49:48.413Z","openingFloat":20000,"closingCount":1,"expectedEfectivo":17500,"expectedNequi":10500,"difference":-17499}}
+[PASS] S13d venta tras cierre del día :: bloqueada (día cerrado) o fuera de caja documentado :: {"status":409}
+[PASS] FINAL sales :: total=Σlíneas & credit=total−recibido :: {"badRows":0}
+[PASS] FINAL customers :: debt almacenado = reconstruido :: {"customers":2,"mismatches":[]}
+[PASS] FINAL inventory :: stock = Σ stock_moves (inicial+entradas−salidas) :: {"mismatches":[]}
+[PASS] FINAL cash :: pago recibido = movimiento de caja; sin huérfanos :: {"orphan":0,"payNoMove":0,"saleNoMove":0}

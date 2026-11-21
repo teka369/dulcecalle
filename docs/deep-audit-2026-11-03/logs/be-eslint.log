@@ -1,0 +1,5 @@
+
+> dulcecalle-backend@0.1.0 lint
+> eslint "{src,test,migration}/**/*.ts"
+
+exit=0 secs=2

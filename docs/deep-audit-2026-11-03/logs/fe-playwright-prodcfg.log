@@ -1,0 +1,35 @@
+
+> dulcecalle@0.1.0 test:e2e:prod
+> playwright test -c playwright.prod.config.ts
+
+
+Running 3 tests using 1 worker
+
+(node:100951) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+opens=2 key=[REDACTED] sessions=1 moves=1
+  ✓  1 e2e/caja-offline.spec.ts:9:5 › B1/B5: open caja offline + offline aporte -> esperado includes pending move; sync twice = 1 server session (5.8s)
+tiles offline: taps=36 onLineTrueTaps=0 bounces=0 []
+  ✓  2 e2e/caja-tiles-offline.spec.ts:11:5 › offline Caja tiles never bounce back to /mas/caja (30+ taps) (51.6s)
+E2E (http://127.0.0.1:3292)
+/clientes/[REDACTED] -> /clientes/[REDACTED] -> data OK
+/clientes/[REDACTED]/abono -> /clientes/[REDACTED]/abono -> data OK
+/clientes/[REDACTED]/deuda-inicial -> /clientes/[REDACTED]/deuda-inicial -> data OK
+/ventas/[REDACTED] -> /ventas/[REDACTED] -> data OK
+/ventas/[REDACTED]/devolver -> /ventas/[REDACTED]/devolver -> data OK
+/inventario/[REDACTED] -> /inventario/[REDACTED] -> data OK
+/inventario/[REDACTED]/surtir -> /inventario/[REDACTED]/surtir -> data OK
+/inventario/[REDACTED]/preparar -> /inventario/[REDACTED]/preparar -> data OK
+/inventario/[REDACTED]/me-lo-comi -> /inventario/[REDACTED]/me-lo-comi -> data OK
+/inventario/[REDACTED]/regalo -> /inventario/[REDACTED]/regalo -> data OK
+/inventario/[REDACTED]/perdido -> /inventario/[REDACTED]/perdido -> data OK
+/inventario/proveedores/[REDACTED] -> /inventario/proveedores/[REDACTED] -> data OK
+/mas/caja/gestionar -> /mas/caja/gestionar -> data OK
+/mas/caja/gestionar/[REDACTED] -> /mas/caja/gestionar/[REDACTED] -> data OK
+/clientes/[REDACTED]/deuda-inicial --Volver al cliente--> /clientes/[REDACTED] (customer shown)
+/clientes/[REDACTED]/abono --header back--> /clientes/[REDACTED] (customer shown)
+/clientes/[REDACTED] --Volver a Clientes--> /clientes (list shown)
+  ✓  3 e2e/offline-cold-load.spec.ts:24:5 › full PREP, then offline cold loads of never-visited entity URLs keep the URL and show Dexie data (29.9s)
+
+  3 passed (1.7m)
+exit=0 secs=103

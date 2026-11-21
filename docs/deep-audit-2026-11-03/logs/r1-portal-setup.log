@@ -1,0 +1,9 @@
+POST /products 201
+POST /customers 201
+POST /cash/sessions 201
+POST /sales 201
+after sale debt 3000
+POST /customers/[REDACTED]/payments 201
+after abono debt 0 code DC-0001
+POST /customers/[REDACTED]/pin 201
+ledger sales: [{"id":"[REDACTED]","paymentKind":"credit","credit":3000,"amountReceived":0}] payments: [{"amount":3000,"saleId":null}]

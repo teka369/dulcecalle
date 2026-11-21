@@ -1,0 +1,11 @@
+import { createRequire } from "module"; import { randomUUID as uuid } from "crypto"; import fs from "fs";
+const own = JSON.parse(fs.readFileSync("/tmp/qa-owner.json","utf8"));
+const H = { "content-type":"application/json", authorization:`Bearer ${own.accessToken}`, "x-business-id": own.business.id };
+const B="http://127.0.0.1:4291/v1";
+const cs = await (await fetch(B+"/customers",{headers:H})).json();
+const list = cs.items ?? cs; const c = list.find(x=>x.debt>0) ?? list[0];
+console.log("customer", c.name, "debt", c.debt);
+const r = await fetch(`${B}/customers/${c.id}/payments`,{method:"POST",headers:{...H,"idempotency-key":uuid()},body:JSON.stringify({amount:100,method:"Efectivo"})});
+console.log("abono after day closed:", r.status, await r.text());
+const r2 = await fetch(`${B}/customers/${c.id}/initial-debts`,{method:"POST",headers:{...H,"idempotency-key":uuid()},body:JSON.stringify({amount:100})});
+console.log("initial-debt after day closed:", r2.status);

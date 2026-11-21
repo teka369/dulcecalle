@@ -1,0 +1,215 @@
+{
+ "pickerItems": [
+  "Ana Pérez",
+  "Luis Gómez"
+ ],
+ "actionbarFiada": "↻ Preparando\n✓ En el servidor\nCobrar\n\nTOTAL\n\n1 producto\n\n$ 2.000\n\n¿CÓMO PAGAN?\nPagada\nParcial\nFiada\n\nCLIENTE\n\nLuis Gómez\nNOTA (opcional)\n$ 2.000 · Fiada\nRegistrar",
+ "toastTimeline": [
+  [
+   15,
+   "/ventas/cobrar",
+   ""
+  ],
+  [
+   119,
+   "/ventas/nueva",
+   ""
+  ],
+  [
+   226,
+   "/ventas/nueva",
+   ""
+  ],
+  [
+   329,
+   "/ventas/nueva",
+   ""
+  ],
+  [
+   433,
+   "/ventas/nueva",
+   ""
+  ],
+  [
+   536,
+   "/ventas/nueva",
+   ""
+  ],
+  [
+   641,
+   "/ventas/nueva",
+   ""
+  ],
+  [
+   748,
+   "/",
+   ""
+  ],
+  [
+   852,
+   "/",
+   ""
+  ],
+  [
+   956,
+   "/",
+   ""
+  ],
+  [
+   1060,
+   "/",
+   ""
+  ],
+  [
+   1165,
+   "/",
+   ""
+  ],
+  [
+   1269,
+   "/",
+   ""
+  ],
+  [
+   1375,
+   "/",
+   ""
+  ],
+  [
+   1481,
+   "/",
+   ""
+  ],
+  [
+   1587,
+   "/",
+   ""
+  ],
+  [
+   1692,
+   "/",
+   ""
+  ],
+  [
+   1796,
+   "/",
+   ""
+  ],
+  [
+   1899,
+   "/",
+   ""
+  ],
+  [
+   2003,
+   "/",
+   ""
+  ],
+  [
+   2108,
+   "/",
+   ""
+  ],
+  [
+   2212,
+   "/",
+   ""
+  ],
+  [
+   2317,
+   "/",
+   ""
+  ],
+  [
+   2421,
+   "/",
+   ""
+  ],
+  [
+   2524,
+   "/",
+   ""
+  ],
+  [
+   2628,
+   "/",
+   ""
+  ],
+  [
+   2733,
+   "/",
+   ""
+  ],
+  [
+   2839,
+   "/",
+   ""
+  ],
+  [
+   2943,
+   "/",
+   ""
+  ],
+  [
+   3047,
+   "/",
+   ""
+  ]
+ ],
+ "dblPosts": [],
+ "idbCounts": {
+  "cacheMeta": 2,
+  "cashMoves": 0,
+  "cashSessions": 0,
+  "customerLedgers": 0,
+  "customerPayments": 0,
+  "customers": 2,
+  "expenses": 0,
+  "initialDebts": 0,
+  "outbox": 0,
+  "pendingMedia": 0,
+  "portalCatalogs": 0,
+  "prepState": 0,
+  "preparations": 0,
+  "products": 5,
+  "saleLines": 2,
+  "saleReturnLines": 0,
+  "saleReturns": 0,
+  "sales": 1,
+  "snapshots": 1,
+  "stockMoves": 0,
+  "suppliers": 0
+ },
+ "masLinks": [
+  "Caja→/mas/caja",
+  "Estadísticas→/mas/estadisticas",
+  "Gastos→/mas/gastos",
+  "Apariencia→/mas/apariencia",
+  "Datos→/mas/datos",
+  "Portal de clientes→/mas/portal",
+  "Cuenta→/login"
+ ],
+ "cajaClosed": "↻ Preparando / ✓ En el servidor / Caja / mar 3 nov · Caja abierta / Cerrar caja / EFECTIVO ESPERADO / Nequi $ 0 · Total $ 95.000 / $ 95.000 / Nequi no cuenta en billetes de cierre. / $ 67.000 / Entradas / $ 8.000 / Salidas / Aporte / Retiro / Gasto / MOVIMIENTOS / Abono / Nequi / + $ 12.000 / Entra / Gasto / Efectivo / − $ 8.000 / Sale / Aporte de capital / Efectivo / + $ 10.000 / Entra / Venta / ",
+ "prodActions": [
+  "",
+  "Editar",
+  "Surtir",
+  "Me lo comí",
+  "Regalo",
+  "Perdido / dañado",
+  "Agregar fotos (8 libres)",
+  "Archivar producto"
+ ],
+ "gastoBtns": [
+  "↻ Preparando",
+  "✓ En el servidor",
+  "Efectivo",
+  "Nequi",
+  "Confirmar gasto(dis)"
+ ],
+ "stats": "↻ Preparando / ✓ En el servidor / Estadísticas / Hoy / Semana / Mes / VENTAS / 3 ventas / $ 184.500 / Lo facturado. Las devoluciones van aparte. / DINERO / RECIBIDO / $ 152.500 / Plata que sí entró. No es ganancia. No resta reembolsos. / POR COBRAR / $ 109.500 / Deuda actual pendiente. No es el fiado generado en el período. / Ver clientes / GASTÉ / $ 33.000 / Gastos del negocio. No incluye retiros personales. / INVERTÍ / $ 7.000 / Compras / surtir (inversión en inventario). / RECIBIDO POR MÉTODO / Efectivo / $ 140.500 / Nequi / $ 12.000 / RESULTADO / Ganancia aprox / Margen de ventas menos devoluciones. No resta merma ni regalos. No es caja. / $ 62.000 / Devoluciones / Lo que se devolvió en ",
+ "ventas": "↻ Preparando / ✓ En el servidor / Ventas / Nueva venta / TOTAL LISTADO / 3 ventas / $ 184.500 / Recibido $ 75.000 · Fiado $ 109.500 / Todas / Pagadas / Parcial / Fiadas / HOY · MAR 3 NOV / Sin cliente · efectivo / 3 nov · 09:45 / contado / $ 45.000 / Ana Pérez · Nequi + Fiado / 3 nov · 09:45 / Recibió $ 30.000 · Fía $ 32.000 / Parcial / $ 62.000 / Luis Gómez · Fiado / 3 nov · 09:45 / Fía $ 77.500 / Fiada / $ 77.500 / Inicio / Ventas / Clientes / Inventario / Más",
+ "caja": "↻ Preparando / ✓ En el servidor / Caja / mar 3 nov · Caja abierta / Cerrar caja / EFECTIVO ESPERADO / Nequi $ 0 · Total $ 95.000 / $ 95.000 / Nequi no cuenta en billetes de cierre. / $ 67.000 / Entradas / $ 8.000 / Salidas / Aporte / Retiro / Gasto / MOVIMIENTOS / Abono / Nequi / + $ 12.000 / Entra / Gasto / Efectivo / − $ 8.000 / Sale / Aporte de capital / Efectivo / + $ 10.000 / Entra / Venta / Efectivo / + $ 45.000 / Entra / Inicio / Ventas / Clientes / Inventario / Más",
+ "venta": "↻ Preparando / ✓ En el servidor / Venta / mar 3 nov, 09:45 / Devolver / $ 62.000 / Parcial / Ana Pérez / $ 30.000 / Recibido / $ 32.000 / Fiado / Nequi + Fiado / Método / PRODUCTOS / Gomitas / 2 × $ 1.500 · Costo $ 750 / $ 3.000 / Chocolatina Jet / 1 × $ 59.000 · Costo $ 1.000 / $ 59.000 / Inicio / Ventas / Clientes / Inventario / Más",
+ "empty": "↻ Preparando / ✓ En el servidor / Buenos días / Tienda Doña Rosa / Martes, 3 de Noviembre / Caja abierta / HOY / 3 ventas / $ 184.500 / VENTAS DE HOY / $ 184.500 / Ver estadísticas / 2 / Stock bajo / 5 / Productos / $ 50.000 / Por cobrar / 2 fiados / ACCESOS RÁPIDOS / Fiados / Stock bajo / Gastos / Venta rápida / Abre la caja registradora / FIADOS PENDIENTES / Ver todos / Ana Pérez / Pendiente / $ 30.000 / Luis Gómez / Pendiente / $ 20.000 / ATENCIÓN EN INVENTARIO / Ver inventario / Bombón Bum /"
+}
