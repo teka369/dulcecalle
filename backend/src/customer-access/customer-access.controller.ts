@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Ip, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { CustomerAccessService } from "./customer-access.service";
-import { CustomerLoginDto, CustomerLogoutDto, CustomerRefreshDto } from "./customer-access.dto";
+import { CustomerLinkLoginDto, CustomerLoginDto, CustomerLogoutDto, CustomerRefreshDto } from "./customer-access.dto";
 import { CustomerJwtGuard } from "./customer.guard";
 import { CurrentCustomer } from "./customer.decorator";
 import { Public } from "../shared/http/decorators";
+import { ClientIp } from "../shared/http/client-ip";
 import type { CustomerAuth } from "../identity/auth.types";
 
 @Controller()
@@ -14,9 +15,17 @@ export class CustomerAccessController {
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post("customer-access/login")
-  login(@Body() dto: CustomerLoginDto, @Ip() ip: string) {
-    // req.ip honours `trust proxy` (configureHttp); see CustomerAccessService.login.
+  login(@Body() dto: CustomerLoginDto, @ClientIp() ip: string) {
+    // C09-PR5.1 — the real client IP (CF-Connecting-IP via Render), see shared/http/client-ip.
     return this.access.login(dto.code, dto.pin, dto.businessId, ip, dto.store);
+  }
+
+  /** C09-PR5 — same HTTP throttle as login; the PIN check reuses login's counters. */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post("customer-access/link-login")
+  linkLogin(@Body() dto: CustomerLinkLoginDto, @ClientIp() ip: string) {
+    return this.access.linkLogin(dto.token, dto.pin, ip);
   }
 
   @Public()

@@ -22,6 +22,7 @@ import { CashService } from "./cash.service";
 import { formatNumber, nextNumber } from "../shared/sequences";
 import { copString, isoInZone } from "../shared/canonical";
 import { collectAllocation, emitAllocationReceipt, emitReceipt, receiptRefs } from "../receipts/receipt-emit";
+import { compensatesFor } from "../receipts/receipt-compensation";
 import type { CorrectPaymentDto, ReverseDto } from "./reversals.dto";
 
 type Tx = Prisma.TransactionClient;
@@ -476,6 +477,8 @@ export class ReversalsService {
         cashOut: p.cash ? { method: p.cash.method, amount: copString(p.cash.amount) } : null,
         stock: p.stock.map((x) => ({ productName: names.get(x.productId) ?? "", qty: x.qty })),
         replacementPaymentNumber: replacement ? formatNumber("payment", replacement.number) : null,
+        // C09-PR5.2 (T01) — DC-I- this reversal compensated (frozen; survives the wipe).
+        compensates: p.customerId ? await compensatesFor(tx, ctx.businessId, p.customerId, args.reversalId) : [],
       },
     });
     if (p.customerId) {

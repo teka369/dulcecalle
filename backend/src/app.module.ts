@@ -5,7 +5,8 @@ import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { PagingHeadersInterceptor } from "./shared/http/paging-headers.interceptor";
 import { JwtModule } from "@nestjs/jwt";
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { ClientIpThrottlerGuard } from "./shared/http/client-ip";
 import { PrismaModule } from "./prisma/prisma.module";
 import { IdentityModule } from "./identity/identity.module";
 import { TenancyModule } from "./tenancy/tenancy.module";
@@ -57,7 +58,7 @@ import { shouldSkipThrottle } from "./http-setup";
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: BusinessGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ClientIpThrottlerGuard },
   ],
 })
 export class AppModule {}

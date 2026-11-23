@@ -13,6 +13,16 @@ export const IP_CODE_POLICY: ThrottlePolicy = { freeAttempts: FREE_ATTEMPTS, win
 export const IP_POLICY: ThrottlePolicy = { freeAttempts: 20, windowMs: WINDOW_MS, maxCooldownMs: MAX_COOLDOWN_MS };
 
 /**
+ * C09-PR5.1 (C09-INV-02) — hard cap per typed CODE in one store scope, from
+ * ANY IP: a guess at one PIN is capped even if every guess comes from a new
+ * IP. Keyed only by what was typed (never by whether the code exists), so an
+ * unknown code gets exactly the same schedule and the same 429 (no oracle).
+ * Trade-off (question for Jefecito): someone who knows a code can keep that
+ * customer's portal login cooled down by spending 10 guesses per window.
+ */
+export const CODE_POLICY: ThrottlePolicy = { freeAttempts: 10, windowMs: WINDOW_MS, maxCooldownMs: MAX_COOLDOWN_MS };
+
+/**
  * Soft cap per CUSTOMER, from any IP (a distributed guess at one PIN). It
  * never blocks: after `freeFailures` failures in the window each attempt on
  * that customer waits a growing delay (capped) and we log an alert.

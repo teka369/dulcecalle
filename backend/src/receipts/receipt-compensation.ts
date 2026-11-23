@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { originOf, targetKeyOf } from "../shared/reversal-plan";
+import { copString } from "../shared/canonical";
 
 /**
  * C09-PR3.2 — how much of a standalone imputation (DC-I-, `credit/apply`
@@ -19,6 +20,8 @@ export type Compensation = {
   compensated: bigint;
   /** Reversal ids that compensated part of the group, in order. */
   reversalIds: string[];
+  /** C09-PR5.2 — how much each of those reversals compensated. */
+  byReversal: Map<string, bigint>;
 };
 
 export async function imputationCompensations(
@@ -28,7 +31,7 @@ export async function imputationCompensations(
 ): Promise<Map<string, Compensation>> {
   const out = new Map<string, Compensation>();
   if (imputations.length === 0) return out;
-  for (const i of imputations) out.set(i.groupId, { total: 0n, compensated: 0n, reversalIds: [] });
+  for (const i of imputations) out.set(i.groupId, { total: 0n, compensated: 0n, reversalIds: [], byReversal: new Map() });
   const customers = [...new Set(imputations.map((i) => i.customerId))];
   const rows = await db.debtAllocation.findMany({
     where: { businessId, customerId: { in: customers }, targetType: { not: "credit" } },
@@ -56,8 +59,37 @@ export async function imputationCompensations(
       if (hit && r.sourceType === "reversal") {
         hit.compensated += y;
         if (!hit.reversalIds.includes(r.sourceId)) hit.reversalIds.push(r.sourceId);
+        hit.byReversal.set(r.sourceId, (hit.byReversal.get(r.sourceId) ?? 0n) + y);
       }
     }
   }
   return out;
+}
+
+/**
+ * C09-PR5.2 (T01) — what THIS reversal compensated of each standalone
+ * imputation (DC-I-) of the customer, computed in the reversal's transaction
+ * right after its rows are written, and frozen in the DC-R- snapshot
+ * (`compensates`). The business wipe deletes `debt_allocations`; the
+ * insert-only receipts keep this, so the DC-I- status stays derivable.
+ */
+export async function compensatesFor(
+  tx: Prisma.TransactionClient,
+  businessId: string,
+  customerId: string,
+  reversalId: string,
+): Promise<Array<{ receiptId: string; number: string; amount: string }>> {
+  const imps = (
+    await tx.receipt.findMany({
+      where: { businessId, customerId, kind: "allocation", sourceType: "allocation" },
+      select: { id: true, number: true, sourceId: true, snapshot: true },
+      orderBy: { number: "asc" },
+    })
+  ).filter((r) => (r.snapshot as Record<string, unknown> | null)?.parent === null);
+  if (imps.length === 0) return [];
+  const comp = await imputationCompensations(tx, businessId, imps.map((r) => ({ groupId: r.sourceId, customerId })));
+  return imps.flatMap((r) => {
+    const y = comp.get(r.sourceId)?.byReversal.get(reversalId) ?? 0n;
+    return y > 0n ? [{ receiptId: r.id, number: r.number, amount: copString(y) }] : [];
+  });
 }

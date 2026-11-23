@@ -11,6 +11,7 @@ import { DEFAULT_TZ } from "../shared/clock";
 import { copToJson } from "../shared/money";
 import {
   CUSTOMER_SOFT_CAP,
+  CODE_POLICY,
   IP_CODE_POLICY,
   IP_POLICY,
   isPrivateOrUnknownIp,
@@ -18,6 +19,7 @@ import {
   softCapAlert,
   softDelayMs,
 } from "./portal-throttle";
+import { ReceiptLinksService } from "../receipts/receipt-links.service";
 
 const IDENTIFY_FAIL = "No pudimos identificarte.";
 const PIN_RE = /^\d{6}$/;
@@ -54,6 +56,8 @@ export class CustomerAccessService {
     private readonly catalog: CatalogService,
     private readonly sessions: AuthSessionService,
     private readonly throttle: PortalLoginThrottle,
+    /** C09-PR5 link-login. Optional only so older unit specs can build the service without it. */
+    private readonly links?: ReceiptLinksService,
   ) {}
 
   private readonly logger = new Logger("CustomerAccess");
@@ -77,9 +81,11 @@ export class CustomerAccessService {
    *   Without businessId the code must resolve to a single customer; zero or
    *   several candidates do one dummy compare and fail the same way (no O(n)
    *   bcrypt, no timing signal about how many stores use the code).
-   * - Guess limits are per client IP + code (and per IP across codes), never
-   *   per customer: anonymous attempts from someone else cannot lock the real
-   *   customer out of their own phone.
+   * - Guess limits are per client IP + code and per IP across codes, plus
+   *   (C09-PR5.1, C09-INV-02) a hard cap per typed code in its store scope
+   *   from any IP (CODE_POLICY), so rotating IPs cannot brute-force one PIN.
+   *   That cap can cool the real customer's login too (bounded window;
+   *   asked for in Jefecito's PR5.1 brief; the trade-off is an open question).
    * - If `req.ip` looks private (trust proxy misconfigured → every client is the
    *   proxy), the per-IP-across-codes bucket is skipped (it would throttle
    *   everyone) and the per-IP+code bucket degrades to per-code — the previous
@@ -97,8 +103,21 @@ export class CustomerAccessService {
     const ip = clientIp?.replace(/^::ffff:/i, "") || "unknown";
     const shared = isPrivateOrUnknownIp(ip);
     const ipCodeKey = `ipcode:${shared ? "shared" : ip}:${businessId ?? "*"}:${code}`;
+    // C09-PR5.1 — per typed code in its store scope, any IP. The scope is
+    // what was typed: the business (by its 8-hex store code, so the uuid and
+    // the short code share one bucket), the normalized store name, or none.
+    const storeHint = businessId ? null : normalizeStore(storeRaw);
+    const scope = businessId
+      ? businessId.slice(0, 8).toLowerCase()
+      : storeHint
+        ? /^[0-9a-f]{8}$/.test(storeHint)
+          ? storeHint
+          : `name:${storeHint}`
+        : "*";
+    const codeKey = `pincode:${scope}:${code}`;
     const cooled =
       (await this.throttle.take(ipCodeKey, IP_CODE_POLICY)) === "cooled" ||
+      (await this.throttle.take(codeKey, CODE_POLICY)) === "cooled" ||
       (!shared && (await this.throttle.take(`ip:${ip}`, IP_POLICY)) === "cooled");
     if (cooled) {
       await bcrypt.compare(pin, await dummyHash());
@@ -158,6 +177,7 @@ export class CustomerAccessService {
     const matches = [candidate];
     const customer = matches[0];
     await this.throttle.reset(ipCodeKey);
+    await this.throttle.reset(codeKey);
     await Promise.all(softKeys.map((k) => this.throttle.reset(k)));
     const issued = await this.tokens(customer.id, customer.businessId);
     return {
@@ -174,6 +194,48 @@ export class CustomerAccessService {
       accessToken: issued.accessToken,
       refreshToken: issued.refreshToken,
     };
+  }
+
+  /**
+   * C09-PR5 — POST /v1/customer-access/link-login {token, pin} (SPEC-C09 §5, §7).
+   * The link only fixes the business and the customer; the PIN check IS the
+   * portal login (same ipcode/ip throttle counter and limit, same soft cap,
+   * exactly one bcrypt compare, same generic 401). Unknown or malformed
+   * tokens get that same 401 (no oracle), and so does a used / expired /
+   * revoked link unless the PIN is right; then it is 410 with the W3 copy
+   * (the session just issued is revoked). The link is spent only by a successful login,
+   * atomically; a login that loses the race has its session revoked.
+   */
+  async linkLogin(tokenRaw: string, pinRaw: string, clientIp?: string) {
+    if (!this.links) throw new Error("ReceiptLinksService not wired");
+    const token = (tokenRaw ?? "").trim();
+    const link = await this.links.findByToken(token);
+    const customer = link?.receipt.customerId
+      ? await this.prisma.customer.findFirst({
+          where: { id: link.receipt.customerId, businessId: link.businessId },
+          select: { code: true },
+        })
+      : null;
+    if (!link || !customer) {
+      const ip = clientIp?.replace(/^::ffff:/i, "") || "unknown";
+      if (!isPrivateOrUnknownIp(ip) && (await this.throttle.take(`ip:${ip}`, IP_POLICY)) === "cooled") {
+        await bcrypt.compare(String(pinRaw ?? "") || "000000", await dummyHash());
+        throw new AppError(ERROR_CODES.RATE_LIMIT, "Demasiados intentos. Espera un momento.");
+      }
+      await bcrypt.compare(String(pinRaw ?? "") || "000000", await dummyHash());
+      throw new AppError(ERROR_CODES.UNAUTHORIZED, IDENTIFY_FAIL);
+    }
+    // The PIN check comes first: without the right PIN a used / expired /
+    // revoked link gets the same generic 401 as an unknown token (no state
+    // oracle). Only a caller who proved the PIN sees the W3 410 copy.
+    const session = await this.login(customer.code, String(pinRaw ?? ""), link.businessId, clientIp);
+    if (!(await this.links.claim(link.id))) {
+      await this.sessions.revokeOwned(session.refreshToken, { kind: "customer", subjectId: session.customer.id }, "customer_refresh");
+      const now = await this.prisma.receiptLink.findUniqueOrThrow({ where: { id: link.id } });
+      this.links.assertUsable(now);
+      throw new AppError(ERROR_CODES.LINK_USED, "Este enlace ya se usó. Entra con tu PIN en Mis compras.");
+    }
+    return { ...session, receiptId: link.receiptId };
   }
 
   async refresh(refreshToken: string) {
