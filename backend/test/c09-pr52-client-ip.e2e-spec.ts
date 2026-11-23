@@ -108,6 +108,21 @@ describe("C09-PR5.2 client IP: public peer and per-code reset (Tester T02, mutan
     expect(r.status).toBe(401);
   });
 
+  it("C09-BL-14 (mutant m-d): private peer, no CF header, XFF with forged left entries and VARYING private hops → 429 on the 11th (trust proxy by subnet, not by hop count)", async () => {
+    // Same shape as Tester check C9-PRIV-NO-CF. With trust proxy by private
+    // subnet, req.ip is the first non-private XFF entry from the right (the
+    // client, 203.0.113.140), so all 11 share one bucket. With trust proxy by
+    // hop count (e.g. 1) req.ip would be the right-most private hop, which
+    // changes every request, and the 11th would still be 401.
+    const xff = (i: number) => `198.51.100.${i + 140}, 10.0.0.${i + 1}, 203.0.113.140, 172.16.0.${i + 1}`;
+    for (let i = 0; i < 10; i++) {
+      const r = await probe({ "X-Test-Peer": "10.21.157.200", "X-Forwarded-For": xff(i) });
+      expect(r.status).toBe(401);
+    }
+    const r = await probe({ "X-Test-Peer": "10.21.157.200", "X-Forwarded-For": xff(10) });
+    expect({ status: r.status, code: r.body?.error?.code }).toEqual({ status: 429, code: "RATE_LIMIT" });
+  });
+
   async function customerWithPin(o: { accessToken: string; business: { id: string } }, name: string) {
     const auth = { Authorization: `Bearer ${o.accessToken}`, "X-Business-Id": o.business.id };
     const c = await api().post("/v1/customers").set(auth).set("Idempotency-Key", randomUUID()).send({ name });
