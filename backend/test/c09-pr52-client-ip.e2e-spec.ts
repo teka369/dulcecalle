@@ -24,7 +24,9 @@ jest.setTimeout(60000);
  *
  * (Context from C09-PR5.1 (C09-INV-02) — throttles count the REAL client IP behind
  * Cloudflare → Render, without opening spoofing. The app is configured as in
- * prod (configureHttp: trust proxy 1). Each request mimics what reaches the
+ * prod (configureHttp: trust proxy = trustPrivateProxy, i.e. trusted only
+ * when the peer is in a private subnet, not by hop count). Each request
+ * mimics what reaches the
  * app there (Cloudflare HTTP headers doc + Render DDoS article):
  *   CF-Connecting-IP: <client>            (set by Cloudflare's edge)
  *   X-Forwarded-For: [<forged>,] <client>, <cloudflare edge IP>
