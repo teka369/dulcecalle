@@ -5,6 +5,7 @@ import type { ProductKind } from "../../domain/types";
  */
 import { HttpClient } from "./client";
 import { HttpSession } from "./session";
+import { ContractError } from "../errors";
 import {
   mapCustomer,
   mapPayment,
@@ -445,7 +446,25 @@ export class HttpRepository {
     },
   };
 
-  readonly customers = {
+  /** C09-PR6 — share link for a receipt (API_CONTRACT: POST /v1/receipts/:id/links, 48 h). */
+  readonly receipts = {
+    createLink: async (
+      receiptId: string,
+      requestId: string,
+    ): Promise<{ id: string; url: string; path: string; expiresAt: string }> => {
+      const r = await this.http.request<Record<string, unknown>>(
+        "POST",
+        `/receipts/${encodeURIComponent(receiptId)}/links`,
+        { body: {}, idempotencyKey: requestId },
+      );
+      if (typeof r.url !== "string" || !/^https?:\/\//.test(r.url)) {
+        throw new ContractError("receiptLink.url");
+      }
+      return { id: String(r.id ?? ""), url: r.url, path: String(r.path ?? ""), expiresAt: String(r.expiresAt ?? "") };
+    },
+  };
+
+    readonly customers = {
     list: async (): Promise<RemoteCustomer[]> => {
       const rows = await this.http.request<Record<string, unknown>[]>(
         "GET",

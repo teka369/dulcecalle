@@ -1,6 +1,7 @@
 import type { ProductKind } from "../../domain/types";
 /** Transport mappers only. No stock/debt/total/caja math. */
 import { ContractError } from "../errors";
+import { mapReceiptRefs, type ReceiptRef } from "../../domain/receipts/success-sheet";
 
 export function asCopJson(n: unknown, field: string): number {
   if (typeof n !== "number" || !Number.isInteger(n) || !Number.isSafeInteger(n)) {
@@ -239,6 +240,8 @@ export type RemoteSale = {
   appliedFrom?: RemoteSaleApplied[];
   /** C07 — present when the server sent it; null = the sale stands. */
   reversal?: RemoteReversalRef | null;
+  /** C09 — receipts issued with this write (POST /sales); used by the success sheet. */
+  receipts?: ReceiptRef[];
   lines: RemoteSaleLine[];
 };
 
@@ -263,6 +266,7 @@ export function mapSale(raw: Record<string, unknown>): RemoteSale {
     ...(raw.openBalance != null ? { openBalance: asCopJson(raw.openBalance, "openBalance") } : {}),
     ...(raw.creditApplied != null ? { creditApplied: asCopJson(raw.creditApplied, "creditApplied") } : {}),
     ...(raw.reversal !== undefined ? { reversal: mapReversalRef(raw.reversal) } : {}),
+    ...(Array.isArray(raw.receipts) ? { receipts: mapReceiptRefs(raw.receipts) ?? [] } : {}),
     ...(Array.isArray(raw.allocations)
       ? {
           appliedFrom: raw.allocations
@@ -353,12 +357,15 @@ export type RemotePayment = {
   /** C07 decision 21 — «Reemplaza a / Reemplazada por». */
   replacesPaymentId?: string | null;
   replacedByPaymentId?: string | null;
+  /** C09 — receipts issued with this abono (payment + /D annexes). */
+  receipts?: ReceiptRef[];
 };
 
 export function mapPayment(raw: Record<string, unknown>): RemotePayment {
   return {
     id: asUuid(raw.id, "payment.id"),
     ...(typeof raw.number === "string" && raw.number ? { number: raw.number } : {}),
+    ...(Array.isArray(raw.receipts) ? { receipts: mapReceiptRefs(raw.receipts) ?? [] } : {}),
     customerId: asUuid(raw.customerId, "payment.customerId"),
     amount: asCopJson(raw.amount, "amount"),
     method: String(raw.method),

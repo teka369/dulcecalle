@@ -29,7 +29,11 @@ import { ListErrorState } from "@/components/ui/ListErrorState";
 import { SkeletonHero, SkeletonRows } from "@/components/ui/Skeleton";
 import { Row } from "@/components/ui/Row";
 import { RowGroup } from "@/components/ui/RowGroup";
-import { ActionToast } from "@/components/ui/ActionToast";
+import { SuccessSheet } from "@/components/receipts/SuccessSheet";
+import { syncStore } from "@/store/syncStore";
+import { shareableReceipt, successView, type ReceiptRef, type SuccessView } from "@/domain/receipts/success-sheet";
+import { getPwaAuthSession } from "@/data/http/session";
+import { localRefForOperation } from "@/data/pwa/op-local-ref";
 import { loadCustomerMoneyState, type CustomerMoneyState } from "@/data/pwa/customer-allocations";
 import { AbonoAllocationPicker } from "@/components/customers/AbonoAllocationPicker";
 import { buildAbonoPreview, wireTarget, type AbonoChoice } from "@/components/customers/abono-target";
@@ -46,7 +50,8 @@ export default function RegistrarAbonoPage() {
   const [method, setMethod] = useState<PayMethod>("Efectivo");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  // C09-PR6 — success sheet with «Compartir comprobante» (replaces the 700 ms toast).
+  const [success, setSuccess] = useState<{ view: SuccessView; receipt: ReceiptRef | null; detail: string } | null>(null);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingSync, setPendingSync] = useState(false);
@@ -170,18 +175,37 @@ export default function RegistrarAbonoPage() {
         ...wire,
       });
       const p = result.payment;
-      setToast(
+      const amount = parseAbonoAmount(amountRaw);
+      const detail =
         result.mode === "offline"
-          ? "Abono guardado sin conexión"
+          ? `${formatCop(amount)} · ${customer.name}`
           : p?.adjusted
-            ? "Abono registrado · se aplicó distinto"
+            ? `${formatCop(amount)} · ${customer.name} · se aplicó distinto`
             : p?.debtBefore != null && p.debtAfter != null
-              ? `Abono registrado · Deuda ${formatCop(p.debtBefore)} → ${formatCop(p.debtAfter)}`
-              : "Abono registrado",
-      );
-      rejected.afterSave(() => {
-        navigateOfflineAware(router, `/clientes/${customer.id}`);
-      }, 700, requestIdRef.current);
+              ? `${formatCop(amount)} · Deuda ${formatCop(p.debtBefore)} → ${formatCop(p.debtAfter)}`
+              : `${formatCop(amount)} · ${customer.name}`;
+      if (result.mode === "online") {
+        const receipt = shareableReceipt(p?.receipts, "payment");
+        setSuccess({
+          view: successView({ op: "payment", mode: "online", number: p?.number ?? null, receipt, hasCustomer: true, amount }),
+          receipt,
+          detail,
+        });
+      } else {
+        const offlineView = (ref: string | null) =>
+          successView({ op: "payment", mode: "offline", localRef: ref, hasCustomer: true, amount });
+        setSuccess({ view: offlineView(null), receipt: null, detail });
+        // We stay on this page now: refresh «N guardada(s) aquí» (the old jump reloaded it).
+        void syncStore.refresh();
+        const businessId = getPwaAuthSession().businessId;
+        if (businessId) {
+          void localRefForOperation(businessId, result.id)
+            .then((ref) => setSuccess({ view: offlineView(ref), receipt: null, detail }))
+            .catch(() => undefined);
+        }
+      }
+      // The sheet waits for «¿Descartar la operación rechazada?» when correcting.
+      rejected.afterSave(() => undefined, 0, requestIdRef.current);
     } catch (e) {
       setError(errorText(e, "Error al registrar abono"));
       setBusy(false);
@@ -289,7 +313,14 @@ export default function RegistrarAbonoPage() {
           busy,
         }}
       />
-      <ActionToast text={toast} />
+      {success && !rejected.pending ? (
+        <SuccessSheet
+          view={success.view}
+          receipt={success.receipt}
+          detail={success.detail}
+          onClose={() => navigateOfflineAware(router, `/clientes/${customer.id}`)}
+        />
+      ) : null}
       {rejected.dialog}
     </div>
   );

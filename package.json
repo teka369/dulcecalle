@@ -15,7 +15,7 @@
   "dependencies": {
     "@serwist/next": "9.5.13",
     "dexie": "^4.4.6",
-    "next": "16.4.1",
+    "next": "16.4.6",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -26,16 +26,17 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.1",
+    "eslint-config-next": "16.4.6",
     "fake-indexeddb": "^6.2.5",
     "serwist": "9.5.13",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "zod": "4.6.6",
     "glob": "14.0.2",
-    "source-map-js": "1.2.2"
+    "source-map-js": "1.2.2",
+    "vite": "7.3.7"
   }
 }
